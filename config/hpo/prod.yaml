@@ -1,0 +1,41 @@
+# HPO Configuration - Production
+# Cost-effective hyperparameter search
+
+search_space:
+  backbone:
+    type: "choice"
+    values: ["distilbert", "deberta"]
+  
+  learning_rate:
+    type: "loguniform"
+    min: 1e-5
+    max: 5e-5
+  
+  batch_size:
+    type: "choice"
+    values: [8, 16, 32]
+  
+  dropout:
+    type: "uniform"
+    min: 0.1
+    max: 0.3
+  
+  weight_decay:
+    type: "loguniform"
+    min: 0.001
+    max: 0.1
+
+sampling:
+  algorithm: "random"
+  max_trials: 50
+  timeout_minutes: 480
+
+early_termination:
+  policy: "bandit"
+  evaluation_interval: 1
+  slack_factor: 0.2
+  delay_evaluation: 2
+
+objective:
+  metric: "macro-f1"
+  goal: "maximize"

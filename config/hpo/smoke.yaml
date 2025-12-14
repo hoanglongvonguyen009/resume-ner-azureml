@@ -1,0 +1,26 @@
+# HPO Configuration - Smoke Test
+# Quick validation run with minimal search
+
+search_space:
+  backbone:
+    type: "choice"
+    values: ["distilbert", "deberta"]
+  
+  learning_rate:
+    type: "loguniform"
+    min: 1e-5
+    max: 5e-5
+  
+  batch_size:
+    type: "choice"
+    values: [8, 16]
+
+sampling:
+  algorithm: "random"
+  max_trials: 4
+  timeout_minutes: 30
+
+objective:
+  metric: "macro-f1"
+  goal: "maximize"
+

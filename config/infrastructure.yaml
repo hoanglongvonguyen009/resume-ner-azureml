@@ -1,0 +1,42 @@
+# Infrastructure Configuration
+# This file defines the infrastructure resources to be created
+
+azure:
+  subscription_id: "${AZURE_SUBSCRIPTION_ID}"  # Set via environment variable
+  resource_group: "${AZURE_RESOURCE_GROUP}"     # Set via environment variable
+  location: "${AZURE_LOCATION:-eastus}"         # Default: eastus
+
+workspace:
+  name: "resume-ner-ws"
+  description: "Azure ML Workspace for Resume NER project"
+  
+storage:
+  account_name: "resumenerstorage"  # Must be globally unique, lowercase, alphanumeric
+  containers:
+    - name: "datasets"
+      public_access: "None"
+    - name: "models"
+      public_access: "None"
+    - name: "artifacts"
+      public_access: "None"
+
+compute:
+  gpu_cluster:
+    name: "gpu-cluster"
+    vm_size: "Standard_NC4as_T4_v3"
+    min_nodes: 0
+    max_nodes: 1
+    idle_time_before_scale_down: 1800
+    
+  cpu_cluster:
+    name: "cpu-cluster"
+    vm_size: "Standard_D2s_v3"
+    min_nodes: 0
+    max_nodes: 2
+    idle_time_before_scale_down: 600
+
+identity:
+  # Use system-assigned managed identity by default
+  # For user-assigned identity, specify identity_id
+  use_system_assigned: true
+

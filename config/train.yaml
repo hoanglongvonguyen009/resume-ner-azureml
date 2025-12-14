@@ -1,0 +1,31 @@
+# Global Training Defaults
+# Applied to all training runs
+
+training:
+  epochs: 10
+  batch_size: 16
+  gradient_accumulation_steps: 1
+  learning_rate: 2e-5
+  weight_decay: 0.01
+  warmup_steps: 500
+  max_grad_norm: 1.0
+  
+  # EDA-based metric selection
+  metric: "macro-f1"  # Class imbalance requires macro-f1
+  metric_mode: "max"  # Maximize macro-f1
+  
+  early_stopping:
+    enabled: true
+    patience: 3
+    min_delta: 0.001
+
+logging:
+  log_interval: 100
+  eval_interval: 500
+  save_interval: 1000
+
+checkpointing:
+  save_strategy: "steps"
+  save_total_limit: 3
+  load_best_model_at_end: true
+
