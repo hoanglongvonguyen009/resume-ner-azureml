@@ -1,0 +1,46 @@
+experiment_name: "resume_ner_baseline"
+
+# Relative to the top-level config directory
+data_config: "data/resume_tiny.yaml"
+model_config: "model/distilbert.yaml"
+train_config: "train.yaml"
+hpo_config: "hpo/smoke.yaml"      # default HPO config; stages can override if needed
+env_config: "env/azure.yaml"
+
+# High-level orchestration design:
+# - Stages: smoke → hpo → training
+# - Each stage can target a specific set of backbones
+# - AML experiment names are per-stage, optionally per-backbone
+
+stages:
+  smoke:
+    # AML experiment base name for smoke tests
+    aml_experiment: "resume-ner-smoke"
+    # Backbones to include in the smoke stage
+    backbones:
+      - "distilbert"
+      - "deberta"
+
+  hpo:
+    # AML experiment base name for HPO sweeps
+    aml_experiment: "resume-ner-hpo"
+    # Backbones to include in HPO (usually a subset/superset of smoke)
+    backbones:
+      - "distilbert"
+      - "deberta"
+
+  training:
+    # AML experiment base name for final single-run training
+    aml_experiment: "resume-ner-train"
+    # Final production backbone(s); typically one chosen after HPO
+    backbones:
+      - "distilbert"
+
+# Optional naming policy for how AML experiments are derived per backbone.
+# If true, the orchestrator should build experiment_name as:
+#   "<aml_experiment>-<backbone>"
+# otherwise it should use "<aml_experiment>" directly and rely on tags
+# (stage/backbone) for grouping in AML.
+naming:
+  include_backbone_in_experiment: true
+

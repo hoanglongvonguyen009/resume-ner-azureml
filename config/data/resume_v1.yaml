@@ -2,8 +2,9 @@
 # Based on EDA analysis
 
 name: "resume-ner-data"
-version: "1"
+version: "2"
 description: "Resume NER dataset with character-level annotations"
+local_path: "../dataset"
 
 schema:
   format: "json"
