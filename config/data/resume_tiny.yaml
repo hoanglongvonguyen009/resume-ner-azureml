@@ -1,0 +1,22 @@
+name: resume-ner-data-tiny-short
+version: v2
+description: Tiny smoke-test subset of Resume NER dataset (short-text version for
+  fast orchestration tests)
+schema:
+  format: json
+  annotation_format: character_spans
+  entity_types:
+  - SKILL
+  - EDUCATION
+  - DESIGNATION
+  - EXPERIENCE
+  - NAME
+  - EMAIL
+  - PHONE
+  - LOCATION
+  stats:
+    median_sentence_length: 19
+    mean_sentence_length: 20
+    p95_sentence_length: 40
+    suggested_sequence_length: 40
+    entity_density: 0.35

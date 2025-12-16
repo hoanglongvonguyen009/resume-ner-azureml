@@ -5,7 +5,7 @@
 search_space:
   backbone:
     type: "choice"
-    values: ["distilbert", "deberta"]
+    values: ["deberta"]  # ["distilbert", "deberta"]
   
   learning_rate:
     type: "loguniform"
@@ -14,7 +14,7 @@ search_space:
   
   batch_size:
     type: "choice"
-    values: [8, 16]  # Fewer options than prod (which has [8, 16, 32])
+    values: [4, 8]  # Reduced for DeBERTa OOM safety (8GB VM can't handle batch_size=16 with DeBERTa-v3-base)
   
   dropout:
     type: "uniform"
@@ -28,8 +28,8 @@ search_space:
 
 sampling:
   algorithm: "random"
-  max_trials: 4  # Much fewer than prod (which has 50)
-  timeout_minutes: 60  # Reduced since image preparation is done separately
+  max_trials: 2
+  timeout_minutes: 10
 
 early_termination:
   policy: "bandit"

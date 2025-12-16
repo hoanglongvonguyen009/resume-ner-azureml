@@ -9,14 +9,15 @@ channels:
   - defaults
 dependencies:
   - python=3.10
-  - pytorch=2.2.0  # PyTorch 2.2.0+ required for compatibility with newer transformers (pytree API: _register_pytree_node)
+  - pytorch>=2.6.0  # PyTorch 2.6+ required by transformers>=4.35.0 due to CVE-2025-32434 security fix
   - cpuonly  # CPU-only PyTorch installation (lightweight, no CUDA)
   - pip
   - pip:
     - azureml-defaults  # Required for Azure ML tracking/logging
-    - transformers>=4.35.0,<5.0.0  # Compatible with PyTorch 2.2.0+
+    - transformers>=4.35.0,<5.0.0  # Requires PyTorch>=2.6.0 for safe model loading
+    - safetensors>=0.4.0  # Prefer safetensors format for model weights (avoids torch.load security check)
     - datasets>=2.12.0
-    - numpy>=1.24.0
+      - numpy>=1.24.0,<2.0
     - pandas>=2.0.0
     - scikit-learn>=1.3.0
     - azure-ai-ml>=1.0.0
@@ -25,6 +26,7 @@ dependencies:
     - pyyaml>=6.0
     - tqdm>=4.65.0
     - seqeval>=1.2.2
+    - sentencepiece>=0.1.99  # Required for DeBERTa slow tokenizer (use_fast=False)
     - mlflow  # For experiment tracking
     - azureml-mlflow  # Azure ML MLflow integration
     - onnxruntime  # For Phase 2 inference (ONNX model serving)

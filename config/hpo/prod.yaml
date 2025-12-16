@@ -13,7 +13,7 @@ search_space:
   
   batch_size:
     type: "choice"
-    values: [8, 16, 32]
+    values: [4, 8, 16]  # Reduced max from 32 to 16 for DeBERTa OOM safety (8GB VM)
   
   dropout:
     type: "uniform"
