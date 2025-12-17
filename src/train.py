@@ -116,13 +116,46 @@ def main() -> None:
     set_seed(seed)
     
     dataset = load_dataset(args.data_asset)
-    
-    output_dir = Path(os.getenv("AZURE_ML_OUTPUT_DIR", "./outputs"))
 
-    # MLflow run context: Azure ML auto-configures tracking URI
-    with mlflow.start_run():
+    # Azure ML automatically sets AZURE_ML_OUTPUT_<output_name> for each named output.
+    # For a named output called "checkpoint", it sets AZURE_ML_OUTPUT_checkpoint.
+    # Fall back to AZURE_ML_OUTPUT_DIR for backward compatibility when running locally.
+    output_dir = Path(
+        os.getenv("AZURE_ML_OUTPUT_checkpoint")
+        or os.getenv("AZURE_ML_OUTPUT_DIR", "./outputs")
+    )
+    # Ensure the output directory exists and always contains at least one file so that
+    # Azure ML materialises the named output in the datastore. Without this, an
+    # otherwise successful training run that never writes artefacts would result in
+    # the `checkpoint` output not existing at all, leading to
+    # ScriptExecution.StreamAccess.NotFound when downstream jobs try to mount it.
+    output_dir.mkdir(parents=True, exist_ok=True)
+    placeholder = output_dir / "checkpoint_placeholder.txt"
+    if not placeholder.exists():
+        placeholder.write_text(
+            "This file ensures the Azure ML 'checkpoint' output is materialised. "
+            "Real model weights are saved under the 'checkpoint/' subdirectory."
+        )
+
+    # Azure ML automatically creates an MLflow run context for each job.
+    # We should NOT call mlflow.start_run() when running in Azure ML, as it creates
+    # a nested/separate run, causing metrics to be logged to the wrong run.
+    # Detect Azure ML execution by checking for AZURE_ML_* environment variables.
+    is_azure_ml_job = any(
+        key.startswith("AZURE_ML_") for key in os.environ.keys()
+    )
+    
+    if is_azure_ml_job:
+        # Running in Azure ML - use the automatically created MLflow run context
+        # Do NOT start a new run, just log directly
         log_training_parameters(config)
         metrics = train_model(config, dataset, output_dir)
+        log_metrics(output_dir, metrics)
+    else:
+        # Local execution - start our own MLflow run
+        with mlflow.start_run():
+            log_training_parameters(config)
+            metrics = train_model(config, dataset, output_dir)
         log_metrics(output_dir, metrics)
 
 

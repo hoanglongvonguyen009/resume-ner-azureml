@@ -3,8 +3,62 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict
 
-from azure.ai.ml import Input, command
-from azure.ai.ml.entities import Environment
+from azure.ai.ml import Input, Output, command
+from azure.ai.ml.entities import Environment, Job
+
+
+DEFAULT_RANDOM_SEED = 42
+
+
+def build_final_training_config(
+    best_config: Dict[str, Any],
+    train_config: Dict[str, Any],
+    random_seed: int = DEFAULT_RANDOM_SEED,
+) -> Dict[str, Any]:
+    """
+    Build final training configuration by merging best HPO config with train.yaml defaults.
+
+    Args:
+        best_config: Best configuration from HPO selection (must have 'backbone' and 'hyperparameters').
+        train_config: Training defaults from train.yaml.
+        random_seed: Random seed for reproducibility.
+
+    Returns:
+        Final training configuration dictionary.
+    """
+    hyperparameters = best_config.get("hyperparameters", {})
+    training_defaults = train_config.get("training", {})
+
+    # Final training should reuse global defaults for core schedule/throughput
+    # settings (batch_size, epochs), and only override the most important
+    # HPO-tuned knobs (learning rate / regularisation).
+    return {
+        "backbone": best_config["backbone"],
+        # Override from HPO when present:
+        "learning_rate": hyperparameters.get("learning_rate", training_defaults.get("learning_rate", 2e-5)),
+        "dropout": hyperparameters.get("dropout", training_defaults.get("dropout", 0.1)),
+        "weight_decay": hyperparameters.get("weight_decay", training_defaults.get("weight_decay", 0.01)),
+        # Always use train.yaml defaults for these:
+        "batch_size": training_defaults.get("batch_size", 16),
+        "epochs": training_defaults.get("epochs", 5),
+        "random_seed": random_seed,
+        "early_stopping_enabled": False,
+        "use_combined_data": True,
+    }
+
+
+def validate_final_training_job(job: Job) -> None:
+    """
+    Validate final training job completed successfully.
+
+    Args:
+        job: Completed job instance.
+
+    Raises:
+        ValueError: If job did not complete successfully.
+    """
+    if job.status != "Completed":
+        raise ValueError(f"Final training job failed with status: {job.status}")
 
 
 def create_final_training_job(
@@ -51,7 +105,7 @@ def create_final_training_job(
 
     args = (
         f"--data-asset ${{{{inputs.data}}}} "
-        f"--config-dir ../config "
+        f"--config-dir config "
         f"--backbone {final_config['backbone']} "
         f"--learning-rate {final_config['learning_rate']} "
         f"--batch-size {final_config['batch_size']} "
@@ -65,10 +119,16 @@ def create_final_training_job(
 
     data_input = Input(type="uri_folder", path=data_asset_datastore_path)
 
+    # Use the project root as code snapshot so both `src/` and `config/` are included.
+    # Azure ML automatically sets AZURE_ML_OUTPUT_checkpoint for the named "checkpoint"
+    # output, which the training script will use to save model artefacts.
     return command(
-        code="../src",
-        command=f"python {script_path.name} {args}",
+        code="..",
+        command=f"python src/{script_path.name} {args}",
         inputs={"data": data_input},
+        outputs={
+            "checkpoint": Output(type="uri_folder"),
+        },
         environment=environment,
         compute=compute_cluster,
         experiment_name=aml_experiment_name,

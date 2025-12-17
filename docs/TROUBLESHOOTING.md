@@ -16,6 +16,8 @@ This document provides solutions to common problems encountered when running the
 
 - [Model Loading Issues](#model-loading-issues)
 
+- [MLflow Issues](#mlflow-issues)
+
 ## Data Access Issues
 
 ### Problem: `ScriptExecution.StreamAccess.NotFound` Error
@@ -313,16 +315,24 @@ sweep_job = SweepJob(
 #### Symptoms
 
 - Error: `FileNotFoundError: Config directory not found: ../config`
+- Error: `FileNotFoundError: Config directory not found: config`
 
 - Occurs in remote jobs
 
 #### Root Cause
 
-Code snapshot doesn't include config directory when `code` path is incorrect.
+Two common misconfigurations cause this:
+
+1. **Code snapshot does not include the `config/` directory** because the
+   `code` path is too narrow (e.g. `code="../src"` only snapshots `src/`).
+2. **The training command uses the wrong relative path** for `--config-dir`
+   (e.g. `--config-dir ../config` even though the working directory already
+   contains `config/` at the root of the snapshot).
 
 #### Solution
 
-Set `code=".."` (project root) and use relative paths:
+Set `code=".."` (project root) so both `src/` and `config/` are included, and
+use a config path that is relative to that root:
 
 ```python
 trial_job = command(
@@ -359,6 +369,83 @@ Remove hard-coded epochs, read from config:
 
 ```
 
+## MLflow Issues
+
+### Problem: Metrics Not Logged to Azure ML
+
+#### Symptoms
+
+- Training completes successfully but no metrics appear in Azure ML Studio
+- `mlflow.log_metric()` calls don't show up in the run
+- Selection module can't find metrics for best model selection
+
+#### Root Cause
+
+When running on Azure ML, MLflow requires an active run context. Without calling `mlflow.start_run()`, metrics are logged to a default local context that isn't synced to Azure ML.
+
+#### Solution
+
+Wrap training code with `mlflow.start_run()`:
+
+```python
+import mlflow
+
+def main():
+    mlflow.start_run()
+    
+    # Training code here...
+    for epoch in range(num_epochs):
+        train_loss = train_one_epoch(...)
+        mlflow.log_metric("loss", train_loss, step=epoch)
+        mlflow.log_metric("macro-f1", f1_score, step=epoch)
+    
+    mlflow.end_run()
+```
+
+#### Additional Requirements
+
+Add `azureml-mlflow` to your environment for Azure ML tracking URI support:
+
+```yaml
+# In config/environment/conda.yaml
+dependencies:
+  - pip:
+      - azureml-mlflow>=1.50.0
+```
+
+#### Prevention
+
+- Always use `mlflow.start_run()` at the beginning of training scripts
+- Use `azureml-mlflow` package when running on Azure ML
+- Test metric logging locally before submitting remote jobs
+
+### Problem: Cannot Retrieve Run Metrics for Model Selection
+
+#### Symptoms
+
+- `mlflow.get_run(run_id)` returns empty metrics
+- Selection module fails to find best configuration
+- Error: `KeyError` when accessing `run.data.metrics`
+
+#### Root Cause
+
+MLflow metrics may not be immediately available after a run completes due to sync delays, or the run context wasn't properly initialized.
+
+#### Solution
+
+Use `mlflow.get_run()` with the correct tracking URI:
+
+```python
+import mlflow
+
+# Set tracking URI to Azure ML workspace
+mlflow.set_tracking_uri(ml_client.tracking_uri)
+
+# Get run metrics
+run = mlflow.get_run(run_id)
+metrics = run.data.metrics  # Dict of metric_name -> final_value
+```
+
 ## General Debugging Tips
 
 ### How to Download Job Logs
@@ -393,6 +480,66 @@ print(f"Error: {getattr(job, 'error', None)}")
 
 ```
 
+### Problem: Checkpoint File Not Found During Conversion
+
+#### Symptoms
+
+- Conversion job (e.g. `quiet_onion_*`) fails in `convert_to_onnx.py`
+- Error: `FileNotFoundError: Checkpoint file not found in: <checkpoint_path>` or similar
+
+#### Root Cause
+
+- The training script saves the Hugging Face checkpoint under a nested `checkpoint/`
+  subdirectory inside the Azure ML output folder:
+  - Training writes to `<AZURE_ML_OUTPUT_DIR>/checkpoint/…`
+  - The conversion script originally only looked for `model.pt` / `pytorch_model.bin`
+    directly under `<AZURE_ML_OUTPUT_DIR>`, not inside the `checkpoint/` folder.
+
+#### Solution
+
+- Make the conversion script search both the root and the `checkpoint/` subdirectory
+  for standard Hugging Face weight filenames:
+
+```python
+def load_checkpoint(checkpoint_path: str) -> Dict[str, Any]:
+    checkpoint_path_obj = Path(checkpoint_path)
+
+    if not checkpoint_path_obj.exists():
+        raise FileNotFoundError(f"Checkpoint path not found: {checkpoint_path}")
+
+    if checkpoint_path_obj.is_file():
+        checkpoint_file = checkpoint_path_obj
+    else:
+        candidate_dirs = [checkpoint_path_obj, checkpoint_path_obj / "checkpoint"]
+        candidate_files = ["model.pt", "pytorch_model.bin"]
+
+        checkpoint_file = None
+        for base_dir in candidate_dirs:
+            for filename in candidate_files:
+                candidate = base_dir / filename
+                if candidate.exists():
+                    checkpoint_file = candidate
+                    break
+            if checkpoint_file is not None:
+                break
+
+        if checkpoint_file is None:
+            raise FileNotFoundError(
+                f"Checkpoint file not found under: {checkpoint_path}. "
+                "Expected one of {candidate_files} in either the root or a "
+                "'checkpoint/' subdirectory."
+            )
+
+    return {"path": str(checkpoint_file)}
+```
+
+#### Prevention
+
+- Keep the training output layout (`<output_dir>/checkpoint/`) and the conversion
+  script’s search logic in sync whenever you change where checkpoints are saved.
+- When debugging, inspect the remote output directory structure for a failing
+  conversion job using `ml_client.jobs.download(job_id, all=True, ...)`.
+
 ## Prevention Checklist
 
 Before submitting jobs, verify:
@@ -408,6 +555,8 @@ Before submitting jobs, verify:
 - [ ] `SweepJob` uses correct parameter names
 
 - [ ] Code snapshot includes all necessary directories (`code=".."`)
+
+- [ ] Training script calls `mlflow.start_run()` for metric logging
 
 ## Related Documentation
 

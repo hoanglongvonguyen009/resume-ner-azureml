@@ -2,8 +2,8 @@
 # Applied to all training runs
 
 training:
-  epochs: 5
-  batch_size: 16
+  epochs: 2
+  batch_size: 4 
   gradient_accumulation_steps: 1
   learning_rate: 2e-5
   weight_decay: 0.01
