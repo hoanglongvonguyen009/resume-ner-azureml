@@ -1,0 +1,195 @@
+"""Training loop utilities."""
+
+from pathlib import Path
+from typing import Dict, Any
+
+import torch
+from torch.utils.data import DataLoader
+from transformers import (
+    AutoTokenizer,
+    DataCollatorForTokenClassification,
+    get_linear_schedule_with_warmup,
+)
+
+from .data import ResumeNERDataset, build_label_list
+from .model import create_model_and_tokenizer
+from .evaluator import evaluate_model
+
+# Constants
+VAL_SPLIT_DIVISOR = 10
+DEBERTA_MAX_BATCH_SIZE = 8
+WARMUP_STEPS_DIVISOR = 10
+
+
+def prepare_data_loaders(
+    config: Dict[str, Any],
+    dataset: Dict[str, Any],
+    tokenizer: AutoTokenizer,
+    label2id: Dict[str, int],
+) -> tuple[DataLoader, DataLoader]:
+    """
+    Prepare training and validation data loaders.
+
+    Args:
+        config: Configuration dictionary.
+        dataset: Dataset dictionary with "train" and "validation" keys.
+        tokenizer: Tokenizer instance.
+        label2id: Mapping from label strings to integer IDs.
+
+    Returns:
+        Tuple of (train_loader, val_loader).
+    """
+    train_data = dataset.get("train", [])
+    val_data = dataset.get("validation", [])
+    if not val_data:
+        val_data = train_data[: max(1, len(train_data) // VAL_SPLIT_DIVISOR)]
+
+    model_cfg = config["model"]
+    max_length = model_cfg.get("preprocessing", {}).get("max_length", 128)
+    train_cfg = config["training"]
+    batch_size = train_cfg.get("batch_size", 8)
+    
+    backbone = model_cfg.get("backbone", "distilbert-base-uncased")
+    if "deberta" in backbone.lower() and batch_size > DEBERTA_MAX_BATCH_SIZE:
+        batch_size = DEBERTA_MAX_BATCH_SIZE
+
+    train_ds = ResumeNERDataset(train_data, tokenizer, max_length, label2id)
+    val_ds = ResumeNERDataset(val_data, tokenizer, max_length, label2id)
+
+    data_collator = DataCollatorForTokenClassification(tokenizer)
+    train_loader = DataLoader(
+        train_ds, batch_size=batch_size, shuffle=True, collate_fn=data_collator
+    )
+    val_loader = DataLoader(
+        val_ds, batch_size=batch_size, shuffle=False, collate_fn=data_collator
+    )
+    
+    return train_loader, val_loader
+
+
+def create_optimizer_and_scheduler(
+    model: torch.nn.Module,
+    config: Dict[str, Any],
+    total_steps: int,
+) -> tuple:
+    """
+    Create optimizer and learning rate scheduler.
+
+    Args:
+        model: Model to optimize.
+        config: Configuration dictionary.
+        total_steps: Total number of training steps.
+
+    Returns:
+        Tuple of (optimizer, scheduler).
+    """
+    train_cfg = config["training"]
+    lr = train_cfg.get("learning_rate", 2e-5)
+    wd = train_cfg.get("weight_decay", 0.0)
+    warmup_steps = train_cfg.get("warmup_steps", 0)
+    max_grad_norm = train_cfg.get("max_grad_norm", 1.0)
+    
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=wd)
+    max_warmup_steps = total_steps // WARMUP_STEPS_DIVISOR
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=min(warmup_steps, max_warmup_steps),
+        num_training_steps=total_steps,
+    )
+    
+    return optimizer, scheduler, max_grad_norm
+
+
+def run_training_loop(
+    model: torch.nn.Module,
+    train_loader: DataLoader,
+    optimizer: torch.optim.Optimizer,
+    scheduler,
+    epochs: int,
+    max_grad_norm: float,
+    device: torch.device,
+) -> None:
+    """
+    Run the training loop for specified epochs.
+
+    Args:
+        model: Model to train.
+        train_loader: Training data loader.
+        optimizer: Optimizer instance.
+        scheduler: Learning rate scheduler.
+        epochs: Number of training epochs.
+        max_grad_norm: Maximum gradient norm for clipping.
+        device: Device to run training on.
+    """
+    model.train()
+    for _ in range(epochs):
+        for batch in train_loader:
+            batch = {k: v.to(device) for k, v in batch.items()}
+            outputs = model(**batch)
+            loss = outputs.loss
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad()
+
+
+def save_checkpoint(
+    model: torch.nn.Module,
+    tokenizer: AutoTokenizer,
+    output_dir: Path,
+) -> None:
+    """
+    Save model and tokenizer checkpoint.
+
+    Args:
+        model: Trained model.
+        tokenizer: Tokenizer instance.
+        output_dir: Directory to save checkpoint.
+    """
+    checkpoint_path = output_dir / "checkpoint"
+    checkpoint_path.mkdir(parents=True, exist_ok=True)
+    model.save_pretrained(checkpoint_path)
+    tokenizer.save_pretrained(checkpoint_path)
+
+
+def train_model(
+    config: Dict[str, Any],
+    dataset: Dict[str, Any],
+    output_dir: Path,
+) -> Dict[str, float]:
+    """
+    Train a token classification model and return evaluation metrics.
+
+    Args:
+        config: Configuration dictionary.
+        dataset: Dataset dictionary.
+        output_dir: Directory for outputs and checkpoints.
+
+    Returns:
+        Dictionary of evaluation metrics.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    data_cfg = config["data"]
+    label_list = build_label_list(data_cfg)
+    label2id = {l: i for i, l in enumerate(label_list)}
+    id2label = {i: l for l, i in label2id.items()}
+
+    model, tokenizer, device = create_model_and_tokenizer(config, label2id, id2label)
+    train_loader, val_loader = prepare_data_loaders(config, dataset, tokenizer, label2id)
+
+    train_cfg = config["training"]
+    epochs = max(1, train_cfg.get("epochs", 1))
+    total_steps = epochs * max(1, len(train_loader))
+    optimizer, scheduler, max_grad_norm = create_optimizer_and_scheduler(
+        model, config, total_steps
+    )
+
+    run_training_loop(model, train_loader, optimizer, scheduler, epochs, max_grad_norm, device)
+
+    metrics = evaluate_model(model, val_loader, device, id2label)
+    save_checkpoint(model, tokenizer, output_dir)
+
+    return metrics
+

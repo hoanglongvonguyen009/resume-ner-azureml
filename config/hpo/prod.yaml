@@ -1,10 +1,7 @@
-# HPO Configuration - Production
-# Cost-effective hyperparameter search
-
 search_space:
   backbone:
     type: "choice"
-    values: ["distilbert", "deberta"]
+    values: ["distilbert"]  # ["distilbert", "deberta"]
   
   learning_rate:
     type: "loguniform"
@@ -13,7 +10,7 @@ search_space:
   
   batch_size:
     type: "choice"
-    values: [4, 8, 16]  # Reduced max from 32 to 16 for DeBERTa OOM safety (8GB VM)
+    values: [4, 8]  # [4, 8, 16]
   
   dropout:
     type: "uniform"

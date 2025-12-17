@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 from typing import Dict, Any
 
-import yaml
+from shared.yaml_utils import load_yaml
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -75,11 +75,7 @@ def load_config_file(config_dir: Path, filename: str) -> Dict[str, Any]:
         FileNotFoundError: If config file does not exist
     """
     config_path = config_dir / filename
-    if not config_path.exists():
-        raise FileNotFoundError(f"Config file not found: {config_path}")
-    
-    with open(config_path, "r") as f:
-        return yaml.safe_load(f)
+    return load_yaml(config_path)
 
 
 def load_checkpoint(checkpoint_path: str) -> Dict[str, Any]:

@@ -6,7 +6,8 @@ from typing import Any, Dict
 
 import hashlib
 import json
-import yaml
+
+from shared.yaml_utils import load_yaml
 
 CONFIG_HASH_LENGTH = 16
 
@@ -35,20 +36,10 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
     """
     Load a YAML file from disk.
 
-    Args:
-        path: Absolute or root-relative path to the YAML file.
-
-    Returns:
-        Parsed YAML content as a dictionary.
-
-    Raises:
-        FileNotFoundError: If the file does not exist.
-        yaml.YAMLError: If the file cannot be parsed as valid YAML.
+    Note: kept as a thin wrapper for backwards readability within this module.
+    The underlying implementation is centralized in ``shared.yaml_utils``.
     """
-    if not path.exists():
-        raise FileNotFoundError(f"Config file not found: {path}")
-    with path.open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle)
+    return load_yaml(path)
 
 
 def load_experiment_config(config_root: Path, experiment_name: str) -> ExperimentConfig:

@@ -6,12 +6,13 @@ from typing import Any, Dict, Optional
 
 import hashlib
 import json
-import yaml
+
 from azure.ai.ml import MLClient, command
 from azure.ai.ml.entities import Environment
 from azure.core.exceptions import ResourceNotFoundError
 
 from .config_loader import CONFIG_HASH_LENGTH
+from shared.yaml_utils import load_yaml
 
 
 # Centralised defaults for the training environment. These can be overridden
@@ -106,10 +107,8 @@ def load_conda_environment(path: Path) -> Dict[str, Any]:
         FileNotFoundError: If the conda file does not exist.
         yaml.YAMLError: If the file cannot be parsed.
     """
-    if not path.exists():
-        raise FileNotFoundError(f"Conda environment file not found: {path}")
-    with path.open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle)
+    # Centralized YAML parsing (keeps behavior consistent across the repo)
+    return load_yaml(path)
 
 
 def compute_environment_hash(conda_deps: Dict[str, Any], docker_image: str) -> str:

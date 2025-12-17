@@ -268,62 +268,86 @@ def create_hpo_sweep_job_for_backbone(
     )
 
 
-def validate_dry_run_sweep_job(ml_client: MLClient, job: Job, backbone: str) -> None:
+def _validate_job_status(job: Job, job_type: str, backbone: str) -> None:
     """
-    Validate dry run sweep job completed successfully.
-    Falls back to counting child runs if trial_count is missing/zero.
+    Validate that a job has completed successfully.
     
     Args:
-        ml_client: Azure ML client used for job operations.
-        job: Completed sweep job instance
+        job: Job instance to validate
+        job_type: Type of job for error messages (e.g., "Dry run sweep", "HPO sweep")
         backbone: Backbone model name for error messages
         
     Raises:
-        ValueError: If validation fails
+        ValueError: If job status is not "Completed"
     """
     if job.status != "Completed":
-        raise ValueError(f"Dry run sweep job for {backbone} failed with status: {job.status}")
+        raise ValueError(f"{job_type} job for {backbone} failed with status: {job.status}")
 
-    child_count = None
-    try:
-        children = list(ml_client.jobs.list(parent_job_name=job.name))
-        child_count = len(children)
-    except Exception:
-        child_count = None
 
+def _get_trial_count(job: Job, ml_client: MLClient | None = None) -> int | None:
+    """
+    Get trial count from job, with fallback to API call if needed.
+    
+    Args:
+        job: Job instance to check
+        ml_client: Optional ML client for fallback API call
+        
+    Returns:
+        Trial count if available, None otherwise
+    """
+    # Check trial_count first (fast, no API call needed)
     if hasattr(job, "trial_count") and job.trial_count and job.trial_count > 0:
-        return
-    if child_count is not None and child_count > 0:
-        return
+        return job.trial_count
+    
+    # Only make expensive API call if trial_count is not available and ml_client provided
+    if ml_client is not None:
+        try:
+            children = list(ml_client.jobs.list(parent_job_name=job.name))
+            return len(children) if children else None
+        except Exception:
+            return None
+    
+    return None
 
-    raise ValueError(
-        f"Dry run sweep job for {backbone} produced no trials (parent run: {job.name}). "
-        f"Check sweep logs and child runs in portal."
-    )
 
-
-def validate_hpo_sweep_job(job: Job, backbone: str, min_expected_trials: int = 5) -> None:
+def validate_sweep_job(
+    job: Job,
+    backbone: str,
+    job_type: str = "Sweep",
+    min_expected_trials: int | None = None,
+    ml_client: MLClient | None = None,
+) -> None:
     """
-    Validate HPO sweep job completed successfully with sufficient trials.
+    Validate sweep job completed successfully with required trials.
+    
+    This is the unified validation function for all sweep job types (dry run, HPO, etc.).
     
     Args:
         job: Completed sweep job instance
         backbone: Backbone model name for error messages
-        min_expected_trials: Minimum number of trials expected (default: 5)
+        job_type: Type of job for error messages (e.g., "Dry run sweep", "HPO sweep")
+        min_expected_trials: Minimum number of trials expected. If None, only checks for > 0 trials.
+        ml_client: Optional ML client for fallback trial count retrieval
         
     Raises:
         ValueError: If validation fails
     """
-    if job.status != "Completed":
-        raise ValueError(f"HPO sweep job for {backbone} failed with status: {job.status}")
+    _validate_job_status(job, job_type, backbone)
     
-    if not hasattr(job, "trial_count") or job.trial_count == 0:
-        raise ValueError(f"HPO sweep job for {backbone} produced no trials")
+    trial_count = _get_trial_count(job, ml_client)
     
-    if job.trial_count < min_expected_trials:
+    if trial_count is None or trial_count == 0:
+        error_msg = f"{job_type} job for {backbone} produced no trials"
+        if job_type == "Dry run sweep":
+            error_msg += f" (parent run: {job.name}). Check sweep logs and child runs in portal."
+        raise ValueError(error_msg)
+    
+    if min_expected_trials is not None and trial_count < min_expected_trials:
         raise ValueError(
-            f"HPO sweep job for {backbone} only produced {job.trial_count} trial(s), "
+            f"{job_type} job for {backbone} only produced {trial_count} trial(s), "
             f"expected at least {min_expected_trials}"
         )
+
+
 
 

@@ -9,25 +9,20 @@ env_config: "env/azure.yaml"
 
 # High-level orchestration design:
 # - Stages: smoke → hpo → training
-# - Each stage can target a specific set of backbones
+# - Smoke and HPO stage backbones are controlled by the HPO config file (search_space.backbone.values)
+# - Training stage can target specific backbones via stage config
 # - AML experiment names are per-stage, optionally per-backbone
 
 stages:
   smoke:
     # AML experiment base name for smoke tests
     aml_experiment: "resume-ner-smoke"
-    # Backbones to include in the smoke stage
-    backbones:
-      - "distilbert"
-      - "deberta"
+    # Backbones are controlled by the HPO config file (hpo_config) via search_space.backbone.values
 
   hpo:
     # AML experiment base name for HPO sweeps
     aml_experiment: "resume-ner-hpo"
-    # Backbones to include in HPO (usually a subset/superset of smoke)
-    backbones:
-      - "distilbert"
-      - "deberta"
+    # Backbones are controlled by the HPO config file (hpo_config) via search_space.backbone.values
 
   training:
     # AML experiment base name for final single-run training
