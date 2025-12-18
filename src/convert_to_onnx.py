@@ -83,7 +83,7 @@ def resolve_checkpoint_dir(checkpoint_path: str) -> Path:
     root = Path(checkpoint_path)
     if not root.exists():
         raise FileNotFoundError(f"Checkpoint path not found: {checkpoint_path}")
-
+    
     # Training saves into `<output_dir>/checkpoint/` using Hugging Face save_pretrained.
     candidates = [root, root / "checkpoint"]
     for d in candidates:
@@ -119,14 +119,13 @@ def _dynamic_axes_for(inputs: Dict[str, torch.Tensor]) -> Dict[str, Dict[int, st
 
 
 def convert_to_onnx(
+    checkpoint_dir: Path,
     output_dir: Path,
     quantize_int8: bool,
 ) -> Path:
-    checkpoint_dir: Path,
-) -> Path:
     """Export a token-classification model to ONNX (and optionally quantize)."""
     output_dir.mkdir(parents=True, exist_ok=True)
-
+    
     # Load model + tokenizer from the saved checkpoint directory
     tokenizer = AutoTokenizer.from_pretrained(checkpoint_dir, use_fast=True)
     model = AutoModelForTokenClassification.from_pretrained(checkpoint_dir)
@@ -233,16 +232,16 @@ def main() -> None:
     config_dir = Path(args.config_dir)
     if not config_dir.exists():
         raise FileNotFoundError(f"Config directory not found: {config_dir}")
-
+    
     checkpoint_dir = resolve_checkpoint_dir(args.checkpoint_path)
     output_dir = Path(args.output_dir)
-
+    
     onnx_path = convert_to_onnx(
         output_dir=output_dir,
         quantize_int8=args.quantize_int8,
         checkpoint_dir=checkpoint_dir,
     )
-
+    
     if args.run_smoke_test:
         run_smoke_test(onnx_path, checkpoint_dir)
 

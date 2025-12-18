@@ -146,7 +146,6 @@ def create_dry_run_sweep_job_for_backbone(
         sampling_algorithm=smoke_hpo_config["sampling"]["algorithm"],
         objective=objective,
         limits=limits,
-        compute=compute_cluster,
         inputs={"data": data_input},
         experiment_name=aml_experiment_name,
         tags={
