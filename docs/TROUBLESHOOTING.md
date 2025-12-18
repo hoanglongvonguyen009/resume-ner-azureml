@@ -480,65 +480,122 @@ print(f"Error: {getattr(job, 'error', None)}")
 
 ```
 
-### Problem: Checkpoint File Not Found During Conversion
+### Problem: Checkpoint or ONNX Model Conversion Fails
 
 #### Symptoms
 
-- Conversion job (e.g. `quiet_onion_*`) fails in `convert_to_onnx.py`
-- Error: `FileNotFoundError: Checkpoint file not found in: <checkpoint_path>` or similar
+- Conversion job (e.g. `quiet_onion_*`, `purple_wall_*`) fails in `convert_to_onnx.py`
+- Error: `ScriptExecution.StreamAccess.NotFound` on a checkpoint input data asset such as
+  `azureml_<job>_input_data_checkpoint:1`
+- Error: `FileNotFoundError: Checkpoint file not found in: <checkpoint_path>`
+- Error: `ModuleNotFoundError: No module named 'onnxscript'`
+- Job remains in `Running` state for a long time with no logs, then fails during ONNX export
 
-#### Root Cause
+#### Root Causes
 
-- The training script saves the Hugging Face checkpoint under a nested `checkpoint/`
-  subdirectory inside the Azure ML output folder:
-  - Training writes to `<AZURE_ML_OUTPUT_DIR>/checkpoint/…`
-  - The conversion script originally only looked for `model.pt` / `pytorch_model.bin`
-    directly under `<AZURE_ML_OUTPUT_DIR>`, not inside the `checkpoint/` folder.
+1. **Empty or non-materialized checkpoint output**
+   - Training writes no files to the `checkpoint` output folder, so the
+     auto-registered data asset (e.g. `azureml_<job>_output_data_checkpoint:1`) is empty.
+   - The conversion job uses that empty data asset as its checkpoint input.
+2. **Mismatch between training output layout and conversion script**
+   - Training saves Hugging Face weights under a nested `checkpoint/` directory
+     (e.g. `<AZURE_ML_OUTPUT_DIR>/checkpoint/…`), but the conversion script only
+     searched the root folder.
+3. **Missing ONNX / onnxscript dependencies**
+   - The environment does not include `onnxscript`, so `torch.onnx.export` fails on import.
+4. **Slow or hanging ONNX export with no diagnostics**
+   - `torch.onnx.export` can be slow or appear to hang on CPU-only compute without
+     explicit logging or conservative settings.
 
-#### Solution
+#### Solutions
 
-- Make the conversion script search both the root and the `checkpoint/` subdirectory
-  for standard Hugging Face weight filenames:
+1. **Ensure checkpoint output is always materialized**
 
-```python
-def load_checkpoint(checkpoint_path: str) -> Dict[str, Any]:
-    checkpoint_path_obj = Path(checkpoint_path)
+   In `src/train.py`, always create the `checkpoint` output directory and write a
+   placeholder file so Azure ML materializes the output and auto-registers it as a
+   data asset:
 
-    if not checkpoint_path_obj.exists():
-        raise FileNotFoundError(f"Checkpoint path not found: {checkpoint_path}")
+   ```python
+   output_dir = Path(os.getenv("AZURE_ML_OUTPUT_checkpoint") or os.getenv("AZURE_ML_OUTPUT_DIR", "./outputs"))
+   output_dir.mkdir(parents=True, exist_ok=True)
+   (output_dir / "checkpoint_placeholder.txt").write_text(
+       "Placeholder to ensure checkpoint output is materialized."
+   )
+   ```
 
-    if checkpoint_path_obj.is_file():
-        checkpoint_file = checkpoint_path_obj
-    else:
-        candidate_dirs = [checkpoint_path_obj, checkpoint_path_obj / "checkpoint"]
-        candidate_files = ["model.pt", "pytorch_model.bin"]
+2. **Use the auto-registered checkpoint data asset in orchestration**
 
-        checkpoint_file = None
-        for base_dir in candidate_dirs:
-            for filename in candidate_files:
-                candidate = base_dir / filename
-                if candidate.exists():
-                    checkpoint_file = candidate
-                    break
-            if checkpoint_file is not None:
-                break
+   In `src/orchestration/jobs/conversion.py`, use
+   `get_checkpoint_output_from_training_job` together with `MLClient` to resolve the
+   checkpoint input to a proper asset reference like:
 
-        if checkpoint_file is None:
-            raise FileNotFoundError(
-                f"Checkpoint file not found under: {checkpoint_path}. "
-                "Expected one of {candidate_files} in either the root or a "
-                "'checkpoint/' subdirectory."
-            )
+   ```python
+   checkpoint_input = Input(
+       type="uri_folder",
+       path=f"azureml:{data_asset.name}:{data_asset.version}",
+       mode="mount",
+   )
+   ```
 
-    return {"path": str(checkpoint_file)}
-```
+   This avoids manually constructing datastore URIs and prevents
+   `ScriptExecution.StreamAccess.NotFound` on empty or incorrect paths.
+
+3. **Make the conversion script search nested `checkpoint/` directories**
+
+   In `src/convert_to_onnx.py`, search both the root of the mounted checkpoint folder and
+   any nested `checkpoint/` subdirectory for standard Hugging Face weight filenames (for
+   example `pytorch_model.bin` or `model.safetensors`) before raising `FileNotFoundError`.
+
+4. **Install required ONNX dependencies**
+
+   Add compatible `onnx` and `onnxscript` versions to `config/environment/conda.yaml`:
+
+   ```yaml
+   dependencies:
+     - numpy>=1.24.0,<2.0
+     - onnx>=1.16.0
+     - pip:
+         - onnxscript>=0.1.0
+   ```
+
+5. **Improve ONNX export robustness and logging**
+
+   In `convert_to_onnx`, call `torch.onnx.export` with explicit settings and
+   detailed logging, for example:
+
+   ```python
+   torch.onnx.export(
+       model,
+       example_inputs,
+       str(onnx_path),
+       input_names=["input_ids", "attention_mask"],
+       output_names=["logits"],
+       dynamic_axes={
+           "input_ids": {0: "batch", 1: "seq"},
+           "attention_mask": {0: "batch", 1: "seq"},
+           "logits": {0: "batch", 1: "seq"},
+       },
+       opset_version=18,
+       do_constant_folding=True,
+       dynamo=False,
+   )
+   ```
+
+   Wrap export, quantization, and smoke tests in `try/except` blocks and log each
+   phase with `print(..., flush=True)` or a helper like `_log("Starting FP32 ONNX export…")`
+   so you can see long-running steps in `user_logs/std_log.txt`.
 
 #### Prevention
 
 - Keep the training output layout (`<output_dir>/checkpoint/`) and the conversion
   script’s search logic in sync whenever you change where checkpoints are saved.
-- When debugging, inspect the remote output directory structure for a failing
-  conversion job using `ml_client.jobs.download(job_id, all=True, ...)`.
+- Always materialize the `checkpoint` output (even in smoke tests or dry runs) so the
+  conversion job’s input data asset is not empty.
+- Use asset references (`azureml:name:version`) for checkpoint inputs instead of
+  hand-built datastore URIs.
+- Pin compatible versions of `numpy`, `onnx`, and `onnxscript` in the environment.
+- Use detailed, flushed logging in `convert_to_onnx.py` so you can quickly see
+  where a conversion job is stuck.
 
 ## Prevention Checklist
 
