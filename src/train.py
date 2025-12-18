@@ -105,16 +105,16 @@ def log_training_parameters(config: dict) -> None:
 def main() -> None:
     """Main training entry point."""
     args = parse_arguments()
-    
+
     config_dir = Path(args.config_dir)
     if not config_dir.exists():
         raise FileNotFoundError(f"Config directory not found: {config_dir}")
-    
+
     config = build_training_config(args, config_dir)
 
     seed = config["training"].get("random_seed")
     set_seed(seed)
-    
+
     dataset = load_dataset(args.data_asset)
 
     # Azure ML automatically sets AZURE_ML_OUTPUT_<output_name> for each named output.
@@ -141,10 +141,8 @@ def main() -> None:
     # We should NOT call mlflow.start_run() when running in Azure ML, as it creates
     # a nested/separate run, causing metrics to be logged to the wrong run.
     # Detect Azure ML execution by checking for AZURE_ML_* environment variables.
-    is_azure_ml_job = any(
-        key.startswith("AZURE_ML_") for key in os.environ.keys()
-    )
-    
+    is_azure_ml_job = any(key.startswith("AZURE_ML_") for key in os.environ.keys())
+
     if is_azure_ml_job:
         # Running in Azure ML - use the automatically created MLflow run context
         # Do NOT start a new run, just log directly
@@ -156,7 +154,7 @@ def main() -> None:
         with mlflow.start_run():
             log_training_parameters(config)
             metrics = train_model(config, dataset, output_dir)
-        log_metrics(output_dir, metrics)
+            log_metrics(output_dir, metrics)
 
 
 if __name__ == "__main__":

@@ -67,12 +67,8 @@ def create_final_training_job(
     environment: Environment,
     compute_cluster: str,
     final_config: Dict[str, Any],
-    configs: Dict[str, Any],
-    config_metadata: Dict[str, str],
-    best_trial_name: str,
-    best_value: float,
     aml_experiment_name: str,
-    stage: str,
+    tags: Dict[str, str],
 ) -> Any:
     """
     Build the final, single-run training job using the best HPO config.
@@ -87,12 +83,8 @@ def create_final_training_job(
         environment: Azure ML environment to run the job in.
         compute_cluster: Name of the compute cluster to target.
         final_config: Selected hyperparameter configuration.
-        configs: Global configuration mapping (for context only).
-        config_metadata: Precomputed configuration metadata for tagging.
-        best_trial_name: Identifier of the best sweep trial.
-        best_value: Best metric value obtained in the sweep.
         aml_experiment_name: AML experiment name for this stage/backbone.
-        stage: Logical experiment stage (e.g. ``training``).
+        tags: Fully prepared tags dictionary for the job.
 
     Returns:
         Configured command job ready for submission.
@@ -132,14 +124,7 @@ def create_final_training_job(
         environment=environment,
         compute=compute_cluster,
         experiment_name=aml_experiment_name,
-        tags={
-            **config_metadata,
-            "job_type": "final_training",
-            "backbone": final_config["backbone"],
-            "best_trial": best_trial_name,
-            "best_metric_value": str(best_value),
-            "stage": stage,
-        },
+        tags=tags,
         display_name="final-training",
         description="Final production training with best HPO configuration",
     )

@@ -419,6 +419,69 @@ dependencies:
 - Use `azureml-mlflow` package when running on Azure ML
 - Test metric logging locally before submitting remote jobs
 
+### Problem: Metrics Logged to a Different Run / Unexpected New Job
+
+#### Symptoms
+
+- The Azure ML job you submitted (for example `ivory_planet_*`) shows **no metrics** in
+  Azure ML Studio.
+- A **separate** MLflow run or Azure ML job appears with metrics (for example
+  `tidy_parrot_*`), even though you did not submit it directly.
+- Downstream selection or orchestration code that expects metrics on the original job
+  fails or cannot find them.
+
+#### Root Cause
+
+When running inside Azure ML, the service **already creates and manages an active MLflow
+run** for the job. If your training script unconditionally calls `mlflow.start_run()`,
+this creates a **nested child run** (or even a separate job) and all `mlflow.log_*`
+calls are attached to that child instead of the top-level job run that Azure ML
+tracks in the Studio UI.
+
+#### Solution
+
+- **Detect Azure ML execution and avoid starting a new MLflow run** when one is already
+  active. A common pattern:
+
+  ```python
+  import mlflow
+  import os
+
+  def is_running_in_azure_ml() -> bool:
+      # Heuristic: Azure ML sets these env vars for jobs
+      return any(
+          k in os.environ
+          for k in ["AZUREML_RUN_ID", "AZUREML_EXPERIMENT_NAME", "MLFLOW_TRACKING_URI"]
+      )
+
+  def main():
+      if is_running_in_azure_ml() and mlflow.active_run() is not None:
+          # Use the run created by Azure ML; DO NOT call mlflow.start_run() again
+          run = mlflow.active_run()
+      else:
+          # Local or non-Azure context: create a run explicitly
+          run = mlflow.start_run()
+
+      # Training code and mlflow.log_* calls here
+
+      if not is_running_in_azure_ml():
+          mlflow.end_run()
+  ```
+
+- In this pattern:
+  - On Azure ML, metrics are logged to the **existing** job run, so they appear on the
+    job you submitted.
+  - Locally, `mlflow.start_run()` / `mlflow.end_run()` are still used so metrics are
+    captured in a local MLflow tracking store.
+
+#### Prevention
+
+- Never unconditionally call `mlflow.start_run()` in a script that will run on Azure ML.
+- Always check `mlflow.active_run()` (and optionally Azure ML-specific environment
+  variables) before starting a new run.
+- Verify in Azure ML Studio that metrics appear on the **same job** you submitted,
+  not on a separate child run.
+
 ### Problem: Cannot Retrieve Run Metrics for Model Selection
 
 #### Symptoms
@@ -445,6 +508,186 @@ mlflow.set_tracking_uri(ml_client.tracking_uri)
 run = mlflow.get_run(run_id)
 metrics = run.data.metrics  # Dict of metric_name -> final_value
 ```
+
+## General Debugging Tips
+
+### How to Download Job Logs
+
+```python
+from azure.ai.ml import MLClient
+from azure.identity import DefaultAzureCredential
+from pathlib import Path
+
+ml_client = MLClient(DefaultAzureCredential(), subscription_id, resource_group, workspace_name="resume-ner-ws")
+job_id = "your_job_id"
+
+# Download all logs
+out_dir = Path("aml_logs") / job_id
+out_dir.mkdir(parents=True, exist_ok=True)
+ml_client.jobs.download(job_id, all=True, download_path=str(out_dir))
+
+```
+
+### Key Log Files to Check
+
+1. `user_logs/std_log.txt` - Python script output and errors
+2. `system_logs/lifecycler/execution-wrapper.log` - System-level errors (OOM, etc.)
+3. `azureml-logs/hyperdrive.txt` - Sweep job orchestration logs
+
+### Checking Job Status
+
+```python
+job = ml_client.jobs.get(job_id)
+print(f"Status: {job.status}")
+print(f"Error: {getattr(job, 'error', None)}")
+
+```
+
+### Problem: Checkpoint or ONNX Model Conversion Fails
+
+#### Symptoms
+
+- Conversion job (e.g. `quiet_onion_*`, `purple_wall_*`) fails in `convert_to_onnx.py`
+- Error: `ScriptExecution.StreamAccess.NotFound` on a checkpoint input data asset such as
+  `azureml_<job>_input_data_checkpoint:1`
+- Error: `FileNotFoundError: Checkpoint file not found in: <checkpoint_path>`
+- Error: `ModuleNotFoundError: No module named 'onnxscript'`
+- Job remains in `Running` state for a long time with no logs, then fails during ONNX export
+
+#### Root Causes
+
+1. **Empty or non-materialized checkpoint output**
+   - Training writes no files to the `checkpoint` output folder, so the
+     auto-registered data asset (e.g. `azureml_<job>_output_data_checkpoint:1`) is empty.
+   - The conversion job uses that empty data asset as its checkpoint input.
+2. **Mismatch between training output layout and conversion script**
+   - Training saves Hugging Face weights under a nested `checkpoint/` directory
+     (e.g. `<AZURE_ML_OUTPUT_DIR>/checkpoint/…`), but the conversion script only
+     searched the root folder.
+3. **Missing ONNX / onnxscript dependencies**
+   - The environment does not include `onnxscript`, so `torch.onnx.export` fails on import.
+4. **Slow or hanging ONNX export with no diagnostics**
+   - `torch.onnx.export` can be slow or appear to hang on CPU-only compute without
+     explicit logging or conservative settings.
+
+#### Solutions
+
+1. **Ensure checkpoint output is always materialized**
+
+   In `src/train.py`, always create the `checkpoint` output directory and write a
+   placeholder file so Azure ML materializes the output and auto-registers it as a
+   data asset:
+
+   ```python
+   output_dir = Path(os.getenv("AZURE_ML_OUTPUT_checkpoint") or os.getenv("AZURE_ML_OUTPUT_DIR", "./outputs"))
+   output_dir.mkdir(parents=True, exist_ok=True)
+   (output_dir / "checkpoint_placeholder.txt").write_text(
+       "Placeholder to ensure checkpoint output is materialized."
+   )
+   ```
+
+2. **Use the auto-registered checkpoint data asset in orchestration**
+
+   In `src/orchestration/jobs/conversion.py`, use
+   `get_checkpoint_output_from_training_job` together with `MLClient` to resolve the
+   checkpoint input to a proper asset reference like:
+
+   ```python
+   checkpoint_input = Input(
+       type="uri_folder",
+       path=f"azureml:{data_asset.name}:{data_asset.version}",
+       mode="mount",
+   )
+   ```
+
+   This avoids manually constructing datastore URIs and prevents
+   `ScriptExecution.StreamAccess.NotFound` on empty or incorrect paths.
+
+3. **Make the conversion script search nested `checkpoint/` directories**
+
+   In `src/convert_to_onnx.py`, search both the root of the mounted checkpoint folder and
+   any nested `checkpoint/` subdirectory for standard Hugging Face weight filenames (for
+   example `pytorch_model.bin` or `model.safetensors`) before raising `FileNotFoundError`.
+
+4. **Install required ONNX dependencies**
+
+   Add compatible `onnx` and `onnxscript` versions to `config/environment/conda.yaml`:
+
+   ```yaml
+   dependencies:
+     - numpy>=1.24.0,<2.0
+     - onnx>=1.16.0
+     - pip:
+         - onnxscript>=0.1.0
+   ```
+
+5. **Improve ONNX export robustness and logging**
+
+   In `convert_to_onnx`, call `torch.onnx.export` with explicit settings and
+   detailed logging, for example:
+
+   ```python
+   torch.onnx.export(
+       model,
+       example_inputs,
+       str(onnx_path),
+       input_names=["input_ids", "attention_mask"],
+       output_names=["logits"],
+       dynamic_axes={
+           "input_ids": {0: "batch", 1: "seq"},
+           "attention_mask": {0: "batch", 1: "seq"},
+           "logits": {0: "batch", 1: "seq"},
+       },
+       opset_version=18,
+       do_constant_folding=True,
+       dynamo=False,
+   )
+   ```
+
+   Wrap export, quantization, and smoke tests in `try/except` blocks and log each
+   phase with `print(..., flush=True)` or a helper like `_log("Starting FP32 ONNX export…")`
+   so you can see long-running steps in `user_logs/std_log.txt`.
+
+#### Prevention
+
+- Keep the training output layout (`<output_dir>/checkpoint/`) and the conversion
+  script’s search logic in sync whenever you change where checkpoints are saved.
+- Always materialize the `checkpoint` output (even in smoke tests or dry runs) so the
+  conversion job’s input data asset is not empty.
+- Use asset references (`azureml:name:version`) for checkpoint inputs instead of
+  hand-built datastore URIs.
+- Pin compatible versions of `numpy`, `onnx`, and `onnxscript` in the environment.
+- Use detailed, flushed logging in `convert_to_onnx.py` so you can quickly see
+  where a conversion job is stuck.
+
+## Prevention Checklist
+
+Before submitting jobs, verify:
+
+- [ ] Data assets use `azureml:name:version` references
+
+- [ ] Batch sizes are appropriate for model size and VM memory
+
+- [ ] All dependencies are pinned in `conda.yaml`
+
+- [ ] AML placeholders use double braces `${{{{...}}}}`
+
+- [ ] `SweepJob` uses correct parameter names
+
+- [ ] Code snapshot includes all necessary directories (`code=".."`)
+
+- [ ] Training script calls `mlflow.start_run()` for metric logging
+
+## Related Documentation
+
+- [Clean Code Principles](../docs/rules/CLEAN_CODE.md)
+
+- [Documentation Guidelines](../docs/rules/CLEAN_DOC.md)
+
+- [Training Script](../src/train.py)
+
+- [Orchestration Notebook](../notebooks/01_orchestrate_training.ipynb)
+
 
 ## General Debugging Tips
 

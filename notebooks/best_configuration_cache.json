@@ -1,19 +1,19 @@
 {
-  "trial_name": "sincere_onion_jxjs9zm1pr_0",
-  "trial_id": "/subscriptions/a23fa87c-802c-4fdf-9e59-e3d7969bcf31/resourceGroups/resume_ner_2025-12-14-13-17-35/providers/Microsoft.MachineLearningServices/workspaces/resume-ner-ws/jobs/sincere_onion_jxjs9zm1pr_0",
+  "trial_name": "frosty_nail_dh6526y3kd_1",
+  "trial_id": "/subscriptions/a23fa87c-802c-4fdf-9e59-e3d7969bcf31/resourceGroups/resume_ner_2025-12-14-13-17-35/providers/Microsoft.MachineLearningServices/workspaces/resume-ner-ws/jobs/frosty_nail_dh6526y3kd_1",
   "backbone": "deberta",
   "hyperparameters": {
-    "learning_rate": "1.0000268243753498",
+    "learning_rate": "1.0000330443059944",
     "batch_size": "4",
-    "dropout": "0.14430746590491816",
-    "weight_decay": "1.0846340242099708",
+    "dropout": "0.2561414191558018",
+    "weight_decay": "1.0205121578437533",
     "epochs": "2",
     "backbone": "microsoft/deberta-v3-base"
   },
   "metrics": {
     "macro-f1": 0.056306306306306314,
     "macro-f1-span": 0.30959752321981426,
-    "loss": 135.18899536132812
+    "loss": 92.88750457763672
   },
   "dataset_version": "v2.1",
   "selection_criteria": {

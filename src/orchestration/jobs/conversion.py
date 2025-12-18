@@ -6,6 +6,8 @@ from typing import Any, Dict, Optional
 from azure.ai.ml import Input, MLClient, Output, command
 from azure.ai.ml.entities import Environment, Job
 
+from orchestration.constants import CONVERSION_JOB_NAME
+
 
 def get_checkpoint_output_from_training_job(
     training_job: Job, ml_client: Optional[MLClient] = None
@@ -112,105 +114,35 @@ def _get_job_output_reference(
 
 def create_conversion_job(
     script_path: Path,
-    checkpoint_output: Any,
+    checkpoint_uri: str,
     environment: Environment,
     compute_cluster: str,
-    configs: Dict[str, Any],
-    config_metadata: Dict[str, str],
-    best_config: Dict[str, Any],
-    final_training_job: Job,
-    ml_client: Optional[MLClient] = None,
+    backbone: str,
+    experiment_name: str,
+    tags: Optional[Dict[str, str]] = None,
 ) -> Any:
     """Create Azure ML Command Job for model conversion to ONNX with int8 quantization.
 
-    The conversion step reuses the training environment and consumes the
-    checkpoint artefact produced by the final training job.
-
-    Args:
-        script_path: Path to conversion script.
-        checkpoint_output: Checkpoint output from training job.
-        environment: Azure ML environment to run the job in.
-        compute_cluster: CPU compute cluster name.
-        configs: Global configuration mapping (for context only).
-        config_metadata: Precomputed configuration metadata for tagging.
-        best_config: Best configuration from HPO selection.
-        final_training_job: Completed final training job (for tagging).
-        ml_client: Optional MLClient for fetching data assets if needed.
-
-    Returns:
-        Configured command job ready for submission.
-
-    Raises:
-        FileNotFoundError: If conversion script does not exist.
+    This function assumes:
+    - The checkpoint has already been resolved to a valid AML data asset URI or datastore URI.
+    - All metadata/tags (config hashes, source job, etc.) are prepared by the caller.
     """
     if not script_path.exists():
         raise FileNotFoundError(f"Conversion script not found: {script_path}")
 
-    # Normalise checkpoint output into an Input the command job can consume.
-    #
-    # Azure ML auto-registers job outputs as data assets (e.g.,
-    # ``azureml:azureml_<job_name>_output_data_checkpoint:1``). We prefer using
-    # the actual output reference when available, as it's more reliable than
-    # constructing datastore URIs manually.
-    #
-    # The training script saves checkpoints to `AZURE_ML_OUTPUT_checkpoint/checkpoint/`,
-    # so the actual checkpoint files are at the root of the mounted data asset
-    # under a `checkpoint/` subdirectory. The conversion script will search
-    # for files in both the root and nested `checkpoint/` subdirectory.
-    if isinstance(checkpoint_output, (str, Path)):
-        # Direct URI/path string (e.g., data asset reference like "azureml:...")
-        checkpoint_path = str(checkpoint_output)
-        # Ensure it's a valid data asset reference format
-        if checkpoint_path.startswith("azureml:"):
-            # This is a data asset reference - use it directly
-            pass
-        elif checkpoint_path.startswith("azureml://"):
-            # This is a datastore URI - use it directly
-            pass
-        else:
-            # If it's not a recognized format, try to construct a data asset reference
-            # This shouldn't happen if get_checkpoint_output_from_training_job works correctly
-            raise ValueError(
-                f"Unexpected checkpoint path format: {checkpoint_path}. "
-                "Expected a data asset reference (azureml:...) or datastore URI (azureml://...)."
-            )
-    elif isinstance(checkpoint_output, Job):
-        # Fallback: construct datastore URI from job name
-        # This is used when the job output doesn't expose a URI/path
-        storage_cfg = configs.get("env", {}).get("storage", {})
-        datastore = (
-            storage_cfg.get("output_datastore")
-            or storage_cfg.get("workspace_datastore")
-            or "workspaceblobstore"
-        )
-        checkpoint_path = (
-            f"azureml://datastores/{datastore}/paths/"
-            f"azureml/ExperimentRun/dcid.{checkpoint_output.name}/outputs/checkpoint"
-        )
-    else:
+    # Basic validation of checkpoint format
+    if not (checkpoint_uri.startswith("azureml:") or checkpoint_uri.startswith("azureml://")):
         raise ValueError(
-            f"Unsupported checkpoint_output type: {type(checkpoint_output)}. "
-            "Expected a URI/path string (e.g., data asset reference) or the completed training Job object."
+            f"Unexpected checkpoint URI format: {checkpoint_uri}. "
+            "Expected a data asset reference (azureml:...) or datastore URI (azureml://...)."
         )
 
-    # Validate that we're using the correct checkpoint path from the training job
-    if isinstance(checkpoint_output, str) and checkpoint_output.startswith("azureml:"):
-        # Verify the data asset reference matches the training job name
-        expected_asset_name = f"azureml_{final_training_job.name}_output_data_checkpoint"
-        if expected_asset_name not in checkpoint_path:
-            import warnings
-            warnings.warn(
-                f"Checkpoint path '{checkpoint_path}' does not match expected pattern "
-                f"for training job '{final_training_job.name}'. "
-                f"Expected asset name to contain '{expected_asset_name}'."
-            )
-    
-    checkpoint_input = Input(type="uri_folder", path=checkpoint_path)
+    checkpoint_input = Input(type="uri_folder", path=checkpoint_uri)
 
     command_args = (
         f"--checkpoint-path ${{{{inputs.checkpoint}}}} "
         f"--config-dir config "
-        f"--backbone {best_config['backbone']} "
+        f"--backbone {backbone} "
         f"--output-dir ${{{{outputs.onnx_model}}}} "
         f"--quantize-int8 "
         f"--run-smoke-test"
@@ -228,15 +160,9 @@ def create_conversion_job(
         },
         environment=environment,
         compute=compute_cluster,
-        experiment_name=configs["env"]["logging"]["experiment_name"],
-        tags={
-            **config_metadata,
-            "job_type": "model_conversion",
-            "backbone": best_config["backbone"],
-            "source_training_job": final_training_job.name,
-            "quantization": "int8",
-        },
-        display_name="model-conversion",
+        experiment_name=experiment_name,
+        tags=tags or {},
+        display_name=CONVERSION_JOB_NAME,
         description="Convert PyTorch checkpoint to optimized ONNX model (int8 quantized)",
     )
 
@@ -263,5 +189,4 @@ def validate_conversion_job(job: Job, ml_client: Optional[MLClient] = None) -> N
     onnx_ref = _get_job_output_reference(job, "onnx_model", ml_client=ml_client)
     if not onnx_ref or not (onnx_ref.startswith("azureml:") or onnx_ref.startswith("azureml://")):
         raise ValueError(f"Invalid ONNX model output reference: {onnx_ref}")
-
 

@@ -1,44 +1,32 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
+from .config_loader import ExperimentConfig
 
 
-def get_stage_config(experiment_config: Any, stage_name: str) -> Dict[str, Any]:
-    """Return stage configuration from the experiment YAML (or empty dict).
+def get_stage_config(experiment_config: ExperimentConfig, stage: str) -> Dict[str, Any]:
+    """Return the configuration block for a given stage, if present.
 
-    This is a thin helper around ``experiment_config.stages[stage_name]`` that
-    tolerates missing configuration and always returns a dictionary.
+    This is a thin, read-only helper around ``experiment_config.stages``.
     """
-    stages = getattr(experiment_config, "stages", {}) or {}
-    return stages.get(stage_name, {}) or {}
+    return experiment_config.stages.get(stage, {}) or {}
 
 
 def build_aml_experiment_name(
-    experiment_config: Any,
-    env_config: Dict[str, Any],
-    stage_name: str,
-    backbone: str | None = None,
+    experiment_name: str,
+    stage: str,
+    backbone: Optional[str] = None,
 ) -> str:
-    """Derive AML experiment name from stage config and optional backbone.
+    """Build a simple, stable AML experiment name.
 
-    Resolution order:
-    1. ``experiment_config.stages[stage_name].aml_experiment`` when present
-    2. Fallback to legacy ``env_config['logging']['experiment_name']``
-
-    The experiment-level ``naming.include_backbone_in_experiment`` flag controls
-    whether the backbone suffix is appended to the base name.
+    This intentionally accepts only the minimum information required to build
+    the name and leaves more complex context handling (full configs, hashes,
+    etc.) to the caller.
     """
-    stage_cfg = get_stage_config(experiment_config, stage_name)
-    base_name = stage_cfg.get("aml_experiment") or env_config["logging"]["experiment_name"]
-
-    naming_cfg = getattr(experiment_config, "naming", {}) or {}
-    include_backbone = bool(naming_cfg.get("include_backbone_in_experiment", False))
-
-    if include_backbone and backbone:
-        return f"{base_name}-{backbone}"
-    return base_name
-
-
-
+    parts = [experiment_name, stage]
+    if backbone:
+        parts.append(backbone)
+    return "-".join(parts)
 
 

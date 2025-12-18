@@ -1,9 +1,10 @@
 """Convert a trained Hugging Face token-classification checkpoint to ONNX.
 
 This script is executed inside an Azure ML command job and is expected to:
-- read a training checkpoint (a folder created via ``save_pretrained``),
-- export an ONNX model into the provided output folder, and
-- optionally apply dynamic int8 quantization and run a smoke test.
+
+* Read a training checkpoint (a folder created via ``save_pretrained``)
+* Export an ONNX model into the provided output folder
+* Optionally apply dynamic int8 quantization and run a smoke test
 """
 
 from __future__ import annotations
@@ -24,9 +25,9 @@ def _log(message: str) -> None:
 def parse_arguments() -> argparse.Namespace:
     """
     Parse command-line arguments for model conversion.
-    
+
     Returns:
-        argparse.Namespace: Parsed arguments
+        argparse.Namespace: Parsed arguments.
     """
     parser = argparse.ArgumentParser(description="Convert PyTorch checkpoint to ONNX")
     
@@ -64,7 +65,7 @@ def parse_arguments() -> argparse.Namespace:
         action="store_true",
         help="Run smoke inference test after conversion",
     )
-    
+
     return parser.parse_args()
 
 
@@ -79,6 +80,7 @@ def _list_files(root: Path, limit: int = 40) -> list[str]:
                 if len(files) >= limit:
                     break
     except Exception:
+        # Best-effort listing for diagnostics; ignore traversal errors.
         return files
     return files
 
@@ -89,8 +91,8 @@ def resolve_checkpoint_dir(checkpoint_path: str) -> Path:
     _log(f"Resolving checkpoint directory from '{checkpoint_path}'")
     if not root.exists():
         raise FileNotFoundError(f"Checkpoint path not found: {checkpoint_path}")
-    
-    # Training saves into `<output_dir>/checkpoint/` using Hugging Face save_pretrained.
+
+    # Training saves into `<output_dir>/checkpoint/` using Hugging Face ``save_pretrained``.
     candidates = [root, root / "checkpoint"]
     for d in candidates:
         if not d.exists() or not d.is_dir():
