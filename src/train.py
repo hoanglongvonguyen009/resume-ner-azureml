@@ -5,11 +5,9 @@ Implements a minimal token-classification training/eval loop using transformers.
 """
 
 import argparse
-import os
 from pathlib import Path
 
-import mlflow
-
+from platform_adapters import get_platform_adapter
 from training.config import build_training_config
 from training.data import load_dataset
 from training.trainer import train_model
@@ -89,8 +87,8 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def log_training_parameters(config: dict) -> None:
-    """Log training parameters to MLflow."""
+def log_training_parameters(config: dict, logging_adapter) -> None:
+    """Log training parameters using platform adapter."""
     params = {
         "learning_rate": config["training"].get("learning_rate"),
         "batch_size": config["training"].get("batch_size"),
@@ -99,7 +97,7 @@ def log_training_parameters(config: dict) -> None:
         "epochs": config["training"].get("epochs"),
         "backbone": config["model"].get("backbone"),
     }
-    mlflow.log_params({k: v for k, v in params.items() if v is not None})
+    logging_adapter.log_params({k: v for k, v in params.items() if v is not None})
 
 
 def main() -> None:
@@ -117,44 +115,21 @@ def main() -> None:
 
     dataset = load_dataset(args.data_asset)
 
-    # Azure ML automatically sets AZURE_ML_OUTPUT_<output_name> for each named output.
-    # For a named output called "checkpoint", it sets AZURE_ML_OUTPUT_checkpoint.
-    # Fall back to AZURE_ML_OUTPUT_DIR for backward compatibility when running locally.
-    output_dir = Path(
-        os.getenv("AZURE_ML_OUTPUT_checkpoint")
-        or os.getenv("AZURE_ML_OUTPUT_DIR", "./outputs")
-    )
-    # Ensure the output directory exists and always contains at least one file so that
-    # Azure ML materialises the named output in the datastore. Without this, an
-    # otherwise successful training run that never writes artefacts would result in
-    # the `checkpoint` output not existing at all, leading to
-    # ScriptExecution.StreamAccess.NotFound when downstream jobs try to mount it.
-    output_dir.mkdir(parents=True, exist_ok=True)
-    placeholder = output_dir / "checkpoint_placeholder.txt"
-    if not placeholder.exists():
-        placeholder.write_text(
-            "This file ensures the Azure ML 'checkpoint' output is materialised. "
-            "Real model weights are saved under the 'checkpoint/' subdirectory."
-        )
+    # Get platform adapter for output paths, logging, and MLflow context
+    platform_adapter = get_platform_adapter(default_output_dir=Path("./outputs"))
+    output_resolver = platform_adapter.get_output_path_resolver()
+    logging_adapter = platform_adapter.get_logging_adapter()
+    mlflow_context = platform_adapter.get_mlflow_context_manager()
 
-    # Azure ML automatically creates an MLflow run context for each job.
-    # We should NOT call mlflow.start_run() when running in Azure ML, as it creates
-    # a nested/separate run, causing metrics to be logged to the wrong run.
-    # Detect Azure ML execution by checking for AZURE_ML_* environment variables.
-    is_azure_ml_job = any(key.startswith("AZURE_ML_") for key in os.environ.keys())
+    # Resolve output directory using platform adapter
+    output_dir = output_resolver.resolve_output_path("checkpoint", default=Path("./outputs"))
+    output_dir = output_resolver.ensure_output_directory(output_dir)
 
-    if is_azure_ml_job:
-        # Running in Azure ML - use the automatically created MLflow run context
-        # Do NOT start a new run, just log directly
-        log_training_parameters(config)
+    # Use platform-appropriate MLflow context manager
+    with mlflow_context.get_context():
+        log_training_parameters(config, logging_adapter)
         metrics = train_model(config, dataset, output_dir)
-        log_metrics(output_dir, metrics)
-    else:
-        # Local execution - start our own MLflow run
-        with mlflow.start_run():
-            log_training_parameters(config)
-            metrics = train_model(config, dataset, output_dir)
-            log_metrics(output_dir, metrics)
+        log_metrics(output_dir, metrics, logging_adapter)
 
 
 if __name__ == "__main__":

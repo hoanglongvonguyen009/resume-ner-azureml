@@ -16,6 +16,9 @@ from typing import Any, Dict, Iterable
 import torch
 from transformers import AutoModelForTokenClassification, AutoTokenizer
 
+from platform_adapters import get_platform_adapter
+from platform_adapters.checkpoint_resolver import CheckpointResolver
+
 
 def _log(message: str) -> None:
     """Lightweight logger for Azure ML stdout."""
@@ -69,50 +72,13 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _list_files(root: Path, limit: int = 40) -> list[str]:
-    if not root.exists():
-        return []
-    files: list[str] = []
-    try:
-        for item in root.rglob("*"):
-            if item.is_file():
-                files.append(str(item.relative_to(root)))
-                if len(files) >= limit:
-                    break
-    except Exception:
-        # Best-effort listing for diagnostics; ignore traversal errors.
-        return files
-    return files
-
-
 def resolve_checkpoint_dir(checkpoint_path: str) -> Path:
-    """Resolve an Azure ML mounted input folder to the HF checkpoint directory."""
-    root = Path(checkpoint_path)
+    """Resolve checkpoint path to HF checkpoint directory using platform adapter."""
+    platform_adapter = get_platform_adapter()
+    checkpoint_resolver = platform_adapter.get_checkpoint_resolver()
+    
     _log(f"Resolving checkpoint directory from '{checkpoint_path}'")
-    if not root.exists():
-        raise FileNotFoundError(f"Checkpoint path not found: {checkpoint_path}")
-
-    # Training saves into `<output_dir>/checkpoint/` using Hugging Face ``save_pretrained``.
-    candidates = [root, root / "checkpoint"]
-    for d in candidates:
-        if not d.exists() or not d.is_dir():
-            continue
-        # A HF model directory contains at least one of these.
-        if (d / "config.json").exists() and (
-            (d / "pytorch_model.bin").exists()
-            or (d / "model.safetensors").exists()
-            or (d / "model.pt").exists()
-        ):
-            _log(f"Using checkpoint directory: '{d}'")
-            return d
-
-    files = _list_files(root)
-    raise FileNotFoundError(
-        "Could not locate a Hugging Face checkpoint directory under "
-        f"'{checkpoint_path}'. Expected a folder created by `save_pretrained` "
-        "containing `config.json` and model weights. "
-        f"Found files (up to 40): {files}"
-    )
+    return checkpoint_resolver.resolve_checkpoint_dir(checkpoint_path)
 
 
 def _dynamic_axes_for(inputs: Dict[str, torch.Tensor]) -> Dict[str, Dict[int, str]]:
@@ -281,7 +247,12 @@ def main() -> None:
     _log(f"Using config directory: '{config_dir}'")
 
     checkpoint_dir = resolve_checkpoint_dir(args.checkpoint_path)
-    output_dir = Path(args.output_dir)
+    
+    # Use platform adapter for output directory resolution
+    platform_adapter = get_platform_adapter(default_output_dir=Path(args.output_dir))
+    output_resolver = platform_adapter.get_output_path_resolver()
+    output_dir = output_resolver.resolve_output_path("onnx_model", default=Path(args.output_dir))
+    output_dir = output_resolver.ensure_output_directory(output_dir)
     _log(
         f"Resolved checkpoint directory to '{checkpoint_dir}', "
         f"output directory to '{output_dir}'"

@@ -4,11 +4,21 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-import optuna
+
+def _import_optuna():
+    """Lazy import optuna - only import when actually needed for local execution."""
+    try:
+        import optuna
+        return optuna
+    except ImportError as e:
+        raise ImportError(
+            "optuna is required for local HPO execution. "
+            "Install it with: pip install optuna"
+        ) from e
 
 
 def extract_best_config_from_study(
-    study: optuna.Study,
+    study: Any,
     backbone: str,
     dataset_version: str,
 ) -> Dict[str, Any]:
@@ -28,7 +38,8 @@ def extract_best_config_from_study(
         - selection_criteria
     """
     if study.best_trial is None:
-        raise ValueError(f"No completed trials found in study '{study.study_name}'")
+        raise ValueError(
+            f"No completed trials found in study '{study.study_name}'")
 
     best_trial = study.best_trial
 
@@ -51,7 +62,8 @@ def extract_best_config_from_study(
             metrics["objective_value"] = objective_value
 
     # Get study direction to determine metric name
-    direction = study.direction.name if hasattr(study.direction, "name") else "maximize"
+    direction = study.direction.name if hasattr(
+        study.direction, "name") else "maximize"
     metric_name = "macro-f1"  # Default, should come from HPO config
 
     return {
@@ -71,7 +83,7 @@ def extract_best_config_from_study(
 
 
 def select_best_configuration_across_studies(
-    studies: Dict[str, optuna.Study],
+    studies: Dict[str, Any],
     hpo_config: Dict[str, Any],
     dataset_version: str,
 ) -> Dict[str, Any]:
@@ -89,6 +101,9 @@ def select_best_configuration_across_studies(
     Raises:
         ValueError: If no valid trials found in any study.
     """
+    # Lazy import optuna
+    optuna = _import_optuna()
+
     objective_metric = hpo_config["objective"]["metric"]
     goal = hpo_config["objective"]["goal"]
 
@@ -106,15 +121,18 @@ def select_best_configuration_across_studies(
 
         if best_value is None:
             best_value = trial_value
-            best_config = extract_best_config_from_study(study, backbone, dataset_version)
+            best_config = extract_best_config_from_study(
+                study, backbone, dataset_version)
             best_backbone = backbone
         elif goal == "maximize" and trial_value > best_value:
             best_value = trial_value
-            best_config = extract_best_config_from_study(study, backbone, dataset_version)
+            best_config = extract_best_config_from_study(
+                study, backbone, dataset_version)
             best_backbone = backbone
         elif goal == "minimize" and trial_value < best_value:
             best_value = trial_value
-            best_config = extract_best_config_from_study(study, backbone, dataset_version)
+            best_config = extract_best_config_from_study(
+                study, backbone, dataset_version)
             best_backbone = backbone
 
     if best_config is None:
@@ -124,11 +142,11 @@ def select_best_configuration_across_studies(
             f"Checked {len(studies)} study/studies: {list(studies.keys())}",
         ]
         for backbone, study in list(studies.items())[:3]:
-            completed = len([t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE])
+            completed = len([t for t in study.trials if t.state ==
+                            optuna.trial.TrialState.COMPLETE])
             error_parts.append(
                 f"  {backbone}: {completed} completed trials"
             )
         raise ValueError("\n".join(error_parts))
 
     return best_config
-

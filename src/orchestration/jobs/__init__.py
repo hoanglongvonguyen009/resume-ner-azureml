@@ -45,4 +45,3 @@ __all__ = [
     "select_best_configuration_across_studies",
     "extract_best_config_from_study",
 ]
-

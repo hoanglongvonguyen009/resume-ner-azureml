@@ -1,6 +1,7 @@
 """Local hyperparameter optimization using Optuna."""
 
 from __future__ import annotations
+from shared.json_cache import save_json
 
 import os
 import subprocess
@@ -9,16 +10,28 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 import mlflow
-import optuna
-from optuna.pruners import MedianPruner
-from optuna.samplers import RandomSampler
-from optuna.trial import Trial
 
-from shared.json_cache import save_json
+# Lazy import optuna - only import when actually needed for local execution
+# This prevents optuna from being required when using Azure ML orchestration
+
+
+def _import_optuna():
+    """Lazy import optuna and related modules."""
+    try:
+        import optuna
+        from optuna.pruners import MedianPruner
+        from optuna.samplers import RandomSampler
+        from optuna.trial import Trial
+        return optuna, MedianPruner, RandomSampler, Trial
+    except ImportError as e:
+        raise ImportError(
+            "optuna is required for local HPO execution. "
+            "Install it with: pip install optuna"
+        ) from e
 
 
 def translate_search_space_to_optuna(
-    hpo_config: Dict[str, Any], trial: Trial
+    hpo_config: Dict[str, Any], trial: Any
 ) -> Dict[str, Any]:
     """
     Translate HPO config search space to Optuna trial suggestions.
@@ -63,6 +76,9 @@ def create_optuna_pruner(hpo_config: Dict[str, Any]) -> Optional[Any]:
     """
     if "early_termination" not in hpo_config:
         return None
+
+    # Lazy import optuna
+    _, MedianPruner, _, _ = _import_optuna()
 
     et_cfg = hpo_config["early_termination"]
     policy = et_cfg.get("policy", "").lower()
@@ -142,7 +158,8 @@ def run_training_trial(
 
     # Set output directory
     output_dir.mkdir(parents=True, exist_ok=True)
-    trial_output_dir = output_dir / f"trial_{trial_params.get('trial_number', 'unknown')}"
+    trial_output_dir = output_dir / \
+        f"trial_{trial_params.get('trial_number', 'unknown')}"
     trial_output_dir.mkdir(parents=True, exist_ok=True)
 
     # Set environment variable for output (train.py will use this)
@@ -175,11 +192,12 @@ def run_training_trial(
                 if objective_metric in metrics:
                     return float(metrics[objective_metric])
                 else:
-                    print(f"Warning: Objective metric '{objective_metric}' not found in metrics.json")
+                    print(
+                        f"Warning: Objective metric '{objective_metric}' not found in metrics.json")
                     print(f"Available metrics: {list(metrics.keys())}")
         except Exception as e:
             print(f"Warning: Could not read metrics.json: {e}")
-    
+
     # Fallback: try to read from MLflow
     try:
         mlflow.set_experiment(mlflow_experiment_name)
@@ -197,8 +215,9 @@ def run_training_trial(
                 metrics = run.data.metrics
                 if objective_metric in metrics:
                     return float(metrics[objective_metric])
-        
-        print(f"Warning: Objective metric '{objective_metric}' not found in MLflow")
+
+        print(
+            f"Warning: Objective metric '{objective_metric}' not found in MLflow")
         return 0.0
     except Exception as e:
         print(f"Warning: Could not retrieve metrics from MLflow: {e}")
@@ -214,7 +233,7 @@ def create_local_hpo_objective(
     output_base_dir: Path,
     mlflow_experiment_name: str,
     objective_metric: str = "macro-f1",
-) -> Callable[[Trial], float]:
+) -> Callable[[Any], float]:
     """
     Create Optuna objective function for local HPO.
 
@@ -231,7 +250,7 @@ def create_local_hpo_objective(
         Objective function that takes an Optuna trial and returns metric value.
     """
 
-    def objective(trial: Trial) -> float:
+    def objective(trial: Any) -> float:
         # Sample hyperparameters
         trial_params = translate_search_space_to_optuna(hpo_config, trial)
         trial_params["backbone"] = backbone
@@ -264,7 +283,7 @@ def run_local_hpo_sweep(
     train_config: Dict[str, Any],
     output_dir: Path,
     mlflow_experiment_name: str,
-) -> optuna.Study:
+) -> Any:
     """
     Run a local hyperparameter optimization sweep using Optuna.
 
@@ -280,6 +299,9 @@ def run_local_hpo_sweep(
     Returns:
         Optuna study object with completed trials.
     """
+    # Lazy import optuna
+    optuna, _, RandomSampler, _ = _import_optuna()
+
     objective_metric = hpo_config["objective"]["metric"]
     goal = hpo_config["objective"]["goal"]
     direction = "maximize" if goal == "maximize" else "minimize"
@@ -304,7 +326,7 @@ def run_local_hpo_sweep(
 
     # Get objective metric name
     objective_metric = hpo_config["objective"]["metric"]
-    
+
     # Create objective function
     objective = create_local_hpo_objective(
         dataset_path=dataset_path,
@@ -329,4 +351,3 @@ def run_local_hpo_sweep(
     )
 
     return study
-
