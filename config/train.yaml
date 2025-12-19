@@ -9,6 +9,10 @@ training:
   weight_decay: 0.01
   warmup_steps: 500
   max_grad_norm: 1.0
+  # Data splitting and model-specific settings
+  val_split_divisor: 10  # Divide train set by this to create validation split if none exists
+  deberta_max_batch_size: 8  # Maximum batch size for DeBERTa models (memory constraints)
+  warmup_steps_divisor: 10  # Divide total steps by this to cap warmup steps
   
   # EDA-based metric selection
   metric: "macro-f1"  # Class imbalance requires macro-f1

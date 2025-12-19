@@ -10,7 +10,7 @@ channels:
 dependencies:
   - python=3.10
   - pytorch>=2.6.0  # PyTorch 2.6+ required by transformers>=4.35.0 due to CVE-2025-32434 security fix
-  - cpuonly  # CPU-only PyTorch installation (lightweight, no CUDA)
+  # - cpuonly  # CPU-only PyTorch installation (lightweight, no CUDA)
   - pip
   - pip:
     - azureml-defaults  # Required for Azure ML tracking/logging

@@ -21,6 +21,7 @@ def extract_best_config_from_study(
     study: Any,
     backbone: str,
     dataset_version: str,
+    objective_metric: str = "macro-f1",
 ) -> Dict[str, Any]:
     """
     Extract best configuration from an Optuna study.
@@ -29,6 +30,7 @@ def extract_best_config_from_study(
         study: Completed Optuna study.
         backbone: Model backbone name.
         dataset_version: Dataset version string.
+        objective_metric: Name of the objective metric (from HPO config).
 
     Returns:
         Configuration dictionary matching Azure ML format with:
@@ -61,10 +63,8 @@ def extract_best_config_from_study(
             # For now, we'll use a default name - this should match HPO config
             metrics["objective_value"] = objective_value
 
-    # Get study direction to determine metric name
     direction = study.direction.name if hasattr(
         study.direction, "name") else "maximize"
-    metric_name = "macro-f1"  # Default, should come from HPO config
 
     return {
         "trial_name": f"trial_{best_trial.number}",
@@ -74,7 +74,7 @@ def extract_best_config_from_study(
         "metrics": metrics,
         "dataset_version": dataset_version,
         "selection_criteria": {
-            "metric": metric_name,
+            "metric": objective_metric,
             "goal": direction,
             "best_value": objective_value if best_trial.values else None,
             "backbone": backbone,
@@ -122,17 +122,17 @@ def select_best_configuration_across_studies(
         if best_value is None:
             best_value = trial_value
             best_config = extract_best_config_from_study(
-                study, backbone, dataset_version)
+                study, backbone, dataset_version, objective_metric)
             best_backbone = backbone
         elif goal == "maximize" and trial_value > best_value:
             best_value = trial_value
             best_config = extract_best_config_from_study(
-                study, backbone, dataset_version)
+                study, backbone, dataset_version, objective_metric)
             best_backbone = backbone
         elif goal == "minimize" and trial_value < best_value:
             best_value = trial_value
             best_config = extract_best_config_from_study(
-                study, backbone, dataset_version)
+                study, backbone, dataset_version, objective_metric)
             best_backbone = backbone
 
     if best_config is None:

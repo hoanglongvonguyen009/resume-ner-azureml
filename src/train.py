@@ -97,7 +97,8 @@ def log_training_parameters(config: dict, logging_adapter) -> None:
         "epochs": config["training"].get("epochs"),
         "backbone": config["model"].get("backbone"),
     }
-    logging_adapter.log_params({k: v for k, v in params.items() if v is not None})
+    logging_adapter.log_params(
+        {k: v for k, v in params.items() if v is not None})
 
 
 def main() -> None:
@@ -116,13 +117,15 @@ def main() -> None:
     dataset = load_dataset(args.data_asset)
 
     # Get platform adapter for output paths, logging, and MLflow context
-    platform_adapter = get_platform_adapter(default_output_dir=Path("./outputs"))
+    platform_adapter = get_platform_adapter(
+        default_output_dir=Path("./outputs"))
     output_resolver = platform_adapter.get_output_path_resolver()
     logging_adapter = platform_adapter.get_logging_adapter()
     mlflow_context = platform_adapter.get_mlflow_context_manager()
 
     # Resolve output directory using platform adapter
-    output_dir = output_resolver.resolve_output_path("checkpoint", default=Path("./outputs"))
+    output_dir = output_resolver.resolve_output_path(
+        "checkpoint", default=Path("./outputs"))
     output_dir = output_resolver.ensure_output_directory(output_dir)
 
     # Use platform-appropriate MLflow context manager

@@ -127,7 +127,8 @@ def run_training_trial(
         Objective metric value (e.g., macro-f1).
     """
     # Build command arguments
-    root_dir = Path.cwd()
+    # Derive project root from config_dir (config_dir is ROOT_DIR / "config")
+    root_dir = config_dir.parent
     args = [
         sys.executable,
         str(root_dir / "src" / "train.py"),
@@ -162,9 +163,18 @@ def run_training_trial(
         f"trial_{trial_params.get('trial_number', 'unknown')}"
     trial_output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Set environment variable for output (train.py will use this)
+    # Create MLflow experiment if it doesn't exist
+    mlflow.set_experiment(mlflow_experiment_name)
+    
+    # Set environment variables for output and MLflow (train.py will use these)
     env = os.environ.copy()
     env["AZURE_ML_OUTPUT_checkpoint"] = str(trial_output_dir)
+    
+    # Pass MLflow tracking URI and experiment name to subprocess
+    mlflow_tracking_uri = mlflow.get_tracking_uri()
+    if mlflow_tracking_uri:
+        env["MLFLOW_TRACKING_URI"] = mlflow_tracking_uri
+    env["MLFLOW_EXPERIMENT_NAME"] = mlflow_experiment_name
 
     # Run training (train.py will handle MLflow logging internally)
     result = subprocess.run(

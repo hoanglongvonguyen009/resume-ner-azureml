@@ -24,12 +24,11 @@ def log_metrics(
     metrics_path = output_dir / "metrics.json"
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f)
-    
+
     # Use provided adapter or create default one
     if logging_adapter is None:
         from platform_adapters import get_platform_adapter
         platform_adapter = get_platform_adapter()
         logging_adapter = platform_adapter.get_logging_adapter()
-    
-    logging_adapter.log_metrics(metrics)
 
+    logging_adapter.log_metrics(metrics)
