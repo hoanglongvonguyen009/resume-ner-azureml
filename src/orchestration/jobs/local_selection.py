@@ -66,6 +66,19 @@ def extract_best_config_from_study(
     direction = study.direction.name if hasattr(
         study.direction, "name") else "maximize"
 
+    # Extract CV statistics if available
+    cv_stats = {}
+    if hasattr(best_trial, "user_attrs"):
+        cv_mean = best_trial.user_attrs.get("cv_mean")
+        cv_std = best_trial.user_attrs.get("cv_std")
+        cv_fold_metrics = best_trial.user_attrs.get("cv_fold_metrics")
+        if cv_mean is not None:
+            cv_stats = {
+                "cv_mean": cv_mean,
+                "cv_std": cv_std,
+                "cv_fold_metrics": cv_fold_metrics,
+            }
+
     return {
         "trial_name": f"trial_{best_trial.number}",
         "trial_id": str(best_trial.number),
@@ -79,6 +92,7 @@ def extract_best_config_from_study(
             "best_value": objective_value if best_trial.values else None,
             "backbone": backbone,
         },
+        "cv_statistics": cv_stats if cv_stats else None,
     }
 
 

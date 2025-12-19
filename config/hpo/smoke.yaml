@@ -36,3 +36,9 @@ early_termination:
 objective:
   metric: "macro-f1"
   goal: "maximize"
+
+k_fold:
+  enabled: true
+  n_splits: 2
+  random_seed: 42
+  shuffle: true

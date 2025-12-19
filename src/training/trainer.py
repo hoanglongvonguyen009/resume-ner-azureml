@@ -1,7 +1,7 @@
 """Training loop utilities."""
 
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 import torch
 from torch.utils.data import DataLoader
@@ -14,6 +14,7 @@ from transformers import (
 from .data import ResumeNERDataset, build_label_list
 from .model import create_model_and_tokenizer
 from .evaluator import evaluate_model
+from .cv_utils import load_fold_splits, get_fold_data
 
 # Default constants (can be overridden via config)
 DEFAULT_VAL_SPLIT_DIVISOR = 10
@@ -26,7 +27,10 @@ def prepare_data_loaders(
     dataset: Dict[str, Any],
     tokenizer: AutoTokenizer,
     label2id: Dict[str, int],
-) -> tuple[DataLoader, DataLoader]:
+    train_indices: Optional[List[int]] = None,
+    val_indices: Optional[List[int]] = None,
+    use_all_data: bool = False,
+) -> tuple[DataLoader, Optional[DataLoader]]:
     """
     Prepare training and validation data loaders.
 
@@ -35,13 +39,29 @@ def prepare_data_loaders(
         dataset: Dataset dictionary with "train" and "validation" keys.
         tokenizer: Tokenizer instance.
         label2id: Mapping from label strings to integer IDs.
+        train_indices: Optional list of indices for training subset (for CV).
+        val_indices: Optional list of indices for validation subset (for CV).
+        use_all_data: If True, use all data for training without validation split.
 
     Returns:
-        Tuple of (train_loader, val_loader).
+        Tuple of (train_loader, val_loader). val_loader is None if use_all_data=True.
     """
     train_data = dataset.get("train", [])
+    
+    # Handle fold-based CV: use provided indices if available
+    if train_indices is not None:
+        train_data = [train_data[i] for i in train_indices]
+    
     val_data = dataset.get("validation", [])
-    if not val_data:
+    
+    # Handle fold-based CV: use provided indices if available
+    if val_indices is not None:
+        val_data = [val_data[i] for i in val_indices]
+    elif use_all_data:
+        # Final training: use all data, no validation split
+        val_data = []
+    elif not val_data:
+        # Fallback: only split if not using CV and not using all data
         val_split_divisor = config["training"].get(
             "val_split_divisor", DEFAULT_VAL_SPLIT_DIVISOR)
         val_data = train_data[: max(1, len(train_data) // val_split_divisor)]
@@ -58,15 +78,20 @@ def prepare_data_loaders(
         batch_size = deberta_max_batch_size
 
     train_ds = ResumeNERDataset(train_data, tokenizer, max_length, label2id)
-    val_ds = ResumeNERDataset(val_data, tokenizer, max_length, label2id)
-
+    
     data_collator = DataCollatorForTokenClassification(tokenizer)
     train_loader = DataLoader(
         train_ds, batch_size=batch_size, shuffle=True, collate_fn=data_collator
     )
-    val_loader = DataLoader(
-        val_ds, batch_size=batch_size, shuffle=False, collate_fn=data_collator
-    )
+    
+    # Create validation loader only if validation data exists
+    if val_data:
+        val_ds = ResumeNERDataset(val_data, tokenizer, max_length, label2id)
+        val_loader = DataLoader(
+            val_ds, batch_size=batch_size, shuffle=False, collate_fn=data_collator
+        )
+    else:
+        val_loader = None
 
     return train_loader, val_loader
 
@@ -184,8 +209,31 @@ def train_model(
 
     model, tokenizer, device = create_model_and_tokenizer(
         config, label2id, id2label)
+    
+    # Handle k-fold CV: load fold splits if specified
+    train_indices = None
+    val_indices = None
+    use_all_data = config["training"].get("use_all_data", False)
+    
+    fold_idx = config["training"].get("fold_idx")
+    fold_splits_file = config["training"].get("fold_splits_file")
+    
+    if fold_idx is not None and fold_splits_file:
+        # Load fold splits and extract current fold
+        splits, _ = load_fold_splits(Path(fold_splits_file))
+        if fold_idx < 0 or fold_idx >= len(splits):
+            raise ValueError(
+                f"Fold index {fold_idx} out of range. "
+                f"Expected 0 to {len(splits) - 1}"
+            )
+        train_indices, val_indices = splits[fold_idx]
+    
     train_loader, val_loader = prepare_data_loaders(
-        config, dataset, tokenizer, label2id)
+        config, dataset, tokenizer, label2id,
+        train_indices=train_indices,
+        val_indices=val_indices,
+        use_all_data=use_all_data,
+    )
 
     train_cfg = config["training"]
     epochs = max(1, train_cfg.get("epochs", 1))
@@ -197,7 +245,14 @@ def train_model(
     run_training_loop(model, train_loader, optimizer,
                       scheduler, epochs, max_grad_norm, device)
 
-    metrics = evaluate_model(model, val_loader, device, id2label)
+    # Evaluate only if validation loader exists
+    if val_loader is not None:
+        metrics = evaluate_model(model, val_loader, device, id2label)
+    else:
+        # No validation set (final training on all data)
+        # Return empty metrics or training-only metrics
+        metrics = {"note": "No validation set - training on all data"}
+    
     save_checkpoint(model, tokenizer, output_dir)
 
     return metrics

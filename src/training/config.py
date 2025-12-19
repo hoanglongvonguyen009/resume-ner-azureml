@@ -70,4 +70,12 @@ def _apply_argument_overrides(args: argparse.Namespace, config: Dict[str, Any]) 
         config["training"]["early_stopping"]["enabled"] = enabled
     if args.use_combined_data is not None:
         config["data"]["use_combined_data"] = args.use_combined_data.lower() == "true"
+    if args.fold_idx is not None:
+        config["training"]["fold_idx"] = args.fold_idx
+    if args.fold_splits_file is not None:
+        config["training"]["fold_splits_file"] = args.fold_splits_file
+    if args.k_folds is not None:
+        config["training"]["k_folds"] = args.k_folds
+    if args.use_all_data is not None:
+        config["training"]["use_all_data"] = args.use_all_data.lower() == "true"
 

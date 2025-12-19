@@ -44,6 +44,7 @@ def build_final_training_config(
         "random_seed": random_seed,
         "early_stopping_enabled": False,
         "use_combined_data": True,
+        "use_all_data": True,  # Final training uses all data without validation split
     }
 
 

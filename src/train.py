@@ -84,6 +84,30 @@ def parse_arguments() -> argparse.Namespace:
         default=None,
         help="Use combined train+validation ('true'/'false')",
     )
+    parser.add_argument(
+        "--fold-idx",
+        type=int,
+        default=None,
+        help="Fold index (0 to k-1) for cross-validation training",
+    )
+    parser.add_argument(
+        "--fold-splits-file",
+        type=str,
+        default=None,
+        help="Path to JSON file containing fold splits",
+    )
+    parser.add_argument(
+        "--k-folds",
+        type=int,
+        default=None,
+        help="Number of folds for cross-validation",
+    )
+    parser.add_argument(
+        "--use-all-data",
+        type=str,
+        default=None,
+        help="Use all data for training without validation split ('true'/'false')",
+    )
     return parser.parse_args()
 
 

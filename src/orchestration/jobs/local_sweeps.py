@@ -7,9 +7,10 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, List, Tuple
 
 import mlflow
+import numpy as np
 
 # Lazy import optuna - only import when actually needed for local execution
 # This prevents optuna from being required when using Azure ML orchestration
@@ -109,6 +110,8 @@ def run_training_trial(
     train_config: Dict[str, Any],
     mlflow_experiment_name: str,
     objective_metric: str = "macro-f1",
+    fold_idx: Optional[int] = None,
+    fold_splits_file: Optional[Path] = None,
 ) -> float:
     """
     Execute a single training trial with given hyperparameters.
@@ -157,10 +160,17 @@ def run_training_trial(
     # Enable early stopping for HPO
     args.extend(["--early-stopping-enabled", "true"])
 
+    # Add fold-specific arguments if CV is enabled
+    if fold_idx is not None:
+        args.extend(["--fold-idx", str(fold_idx)])
+    if fold_splits_file is not None:
+        args.extend(["--fold-splits-file", str(fold_splits_file)])
+
     # Set output directory
     output_dir.mkdir(parents=True, exist_ok=True)
+    fold_suffix = f"_fold{fold_idx}" if fold_idx is not None else ""
     trial_output_dir = output_dir / \
-        f"trial_{trial_params.get('trial_number', 'unknown')}"
+        f"trial_{trial_params.get('trial_number', 'unknown')}{fold_suffix}"
     trial_output_dir.mkdir(parents=True, exist_ok=True)
 
     # Create MLflow experiment if it doesn't exist
@@ -234,6 +244,62 @@ def run_training_trial(
         return 0.0
 
 
+def run_training_trial_with_cv(
+    trial_params: Dict[str, Any],
+    dataset_path: str,
+    config_dir: Path,
+    backbone: str,
+    output_dir: Path,
+    train_config: Dict[str, Any],
+    mlflow_experiment_name: str,
+    objective_metric: str,
+    fold_splits: List[Tuple[List[int], List[int]]],
+    fold_splits_file: Path,
+) -> Tuple[float, List[float]]:
+    """
+    Run training trial with k-fold cross-validation.
+
+    Args:
+        trial_params: Hyperparameters for this trial.
+        dataset_path: Path to dataset directory.
+        config_dir: Path to configuration directory.
+        backbone: Model backbone name.
+        output_dir: Output directory for checkpoints.
+        train_config: Training configuration dictionary.
+        mlflow_experiment_name: MLflow experiment name.
+        objective_metric: Name of the objective metric to optimize.
+        fold_splits: List of (train_indices, val_indices) tuples for each fold.
+        fold_splits_file: Path to file containing fold splits (for train.py).
+
+    Returns:
+        Tuple of (average_metric, fold_metrics) where:
+        - average_metric: Average metric across all folds
+        - fold_metrics: List of metrics for each fold
+    """
+    fold_metrics = []
+    
+    for fold_idx, (train_indices, val_indices) in enumerate(fold_splits):
+        # Run training for this fold
+        fold_metric = run_training_trial(
+            trial_params=trial_params,
+            dataset_path=dataset_path,
+            config_dir=config_dir,
+            backbone=backbone,
+            output_dir=output_dir,
+            train_config=train_config,
+            mlflow_experiment_name=mlflow_experiment_name,
+            objective_metric=objective_metric,
+            fold_idx=fold_idx,
+            fold_splits_file=fold_splits_file,
+        )
+        fold_metrics.append(fold_metric)
+    
+    # Calculate average metric
+    average_metric = np.mean(fold_metrics)
+    
+    return average_metric, fold_metrics
+
+
 def create_local_hpo_objective(
     dataset_path: str,
     config_dir: Path,
@@ -243,6 +309,8 @@ def create_local_hpo_objective(
     output_base_dir: Path,
     mlflow_experiment_name: str,
     objective_metric: str = "macro-f1",
+    k_folds: Optional[int] = None,
+    fold_splits_file: Optional[Path] = None,
 ) -> Callable[[Any], float]:
     """
     Create Optuna objective function for local HPO.
@@ -259,6 +327,42 @@ def create_local_hpo_objective(
     Returns:
         Objective function that takes an Optuna trial and returns metric value.
     """
+    # Load or create fold splits if k-fold CV is enabled
+    fold_splits = None
+    if k_folds is not None and k_folds > 1:
+        if fold_splits_file and fold_splits_file.exists():
+            # Load existing splits
+            from training.cv_utils import load_fold_splits
+            fold_splits, _ = load_fold_splits(fold_splits_file)
+        elif fold_splits_file:
+            # Create new splits and save them
+            from training.data import load_dataset
+            from training.cv_utils import create_kfold_splits, save_fold_splits
+            
+            dataset = load_dataset(dataset_path)
+            train_data = dataset.get("train", [])
+            
+            k_fold_config = hpo_config.get("k_fold", {})
+            random_seed = k_fold_config.get("random_seed", 42)
+            shuffle = k_fold_config.get("shuffle", True)
+            
+            fold_splits = create_kfold_splits(
+                dataset=train_data,
+                k=k_folds,
+                random_seed=random_seed,
+                shuffle=shuffle,
+            )
+            
+            # Save splits for reproducibility
+            save_fold_splits(
+                fold_splits,
+                fold_splits_file,
+                metadata={
+                    "k": k_folds,
+                    "random_seed": random_seed,
+                    "shuffle": shuffle,
+                }
+            )
 
     def objective(trial: Any) -> float:
         # Sample hyperparameters
@@ -266,17 +370,40 @@ def create_local_hpo_objective(
         trial_params["backbone"] = backbone
         trial_params["trial_number"] = trial.number
 
-        # Run training
-        metric_value = run_training_trial(
-            trial_params=trial_params,
-            dataset_path=dataset_path,
-            config_dir=config_dir,
-            backbone=backbone,
-            output_dir=output_base_dir,
-            train_config=train_config,
-            mlflow_experiment_name=mlflow_experiment_name,
-            objective_metric=objective_metric,
-        )
+        # Run training with or without CV
+        if fold_splits is not None:
+            # Run k-fold CV
+            average_metric, fold_metrics = run_training_trial_with_cv(
+                trial_params=trial_params,
+                dataset_path=dataset_path,
+                config_dir=config_dir,
+                backbone=backbone,
+                output_dir=output_base_dir,
+                train_config=train_config,
+                mlflow_experiment_name=mlflow_experiment_name,
+                objective_metric=objective_metric,
+                fold_splits=fold_splits,
+                fold_splits_file=fold_splits_file,
+            )
+            
+            # Log CV statistics to trial user attributes
+            trial.set_user_attr("cv_mean", float(average_metric))
+            trial.set_user_attr("cv_std", float(np.std(fold_metrics)))
+            trial.set_user_attr("cv_fold_metrics", [float(m) for m in fold_metrics])
+            
+            metric_value = average_metric
+        else:
+            # Run single training (no CV)
+            metric_value = run_training_trial(
+                trial_params=trial_params,
+                dataset_path=dataset_path,
+                config_dir=config_dir,
+                backbone=backbone,
+                output_dir=output_base_dir,
+                train_config=train_config,
+                mlflow_experiment_name=mlflow_experiment_name,
+                objective_metric=objective_metric,
+            )
 
         # Report to Optuna
         trial.report(metric_value, step=0)
@@ -293,6 +420,8 @@ def run_local_hpo_sweep(
     train_config: Dict[str, Any],
     output_dir: Path,
     mlflow_experiment_name: str,
+    k_folds: Optional[int] = None,
+    fold_splits_file: Optional[Path] = None,
 ) -> Any:
     """
     Run a local hyperparameter optimization sweep using Optuna.
@@ -347,6 +476,8 @@ def run_local_hpo_sweep(
         output_base_dir=output_dir,
         mlflow_experiment_name=mlflow_experiment_name,
         objective_metric=objective_metric,
+        k_folds=k_folds,
+        fold_splits_file=fold_splits_file,
     )
 
     # Run optimization
