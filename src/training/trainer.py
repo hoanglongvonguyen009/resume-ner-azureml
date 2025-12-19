@@ -46,17 +46,20 @@ def prepare_data_loaders(
     Returns:
         Tuple of (train_loader, val_loader). val_loader is None if use_all_data=True.
     """
-    train_data = dataset.get("train", [])
-    
-    # Handle fold-based CV: use provided indices if available
-    if train_indices is not None:
-        train_data = [train_data[i] for i in train_indices]
-    
+    # Get original data before any modifications
+    original_train_data = dataset.get("train", [])
     val_data = dataset.get("validation", [])
     
-    # Handle fold-based CV: use provided indices if available
+    # Handle fold-based CV: validation indices refer to original train_data
     if val_indices is not None:
-        val_data = [val_data[i] for i in val_indices]
+        # For k-fold CV, validation data comes from original train_data using val_indices
+        # val_indices are indices into the original train_data before splitting
+        val_data = [original_train_data[i] for i in val_indices]
+    
+    # Handle fold-based CV: use provided indices for training data
+    train_data = original_train_data
+    if train_indices is not None:
+        train_data = [original_train_data[i] for i in train_indices]
     elif use_all_data:
         # Final training: use all data, no validation split
         val_data = []
