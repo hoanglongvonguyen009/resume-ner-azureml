@@ -2,10 +2,46 @@
 
 import json
 from pathlib import Path
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, Iterable
 
 import numpy as np
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, StratifiedKFold
+
+
+def _entity_presence_labels(
+    dataset: List[Any],
+    entity_types: Optional[Iterable[str]] = None,
+) -> List[tuple]:
+    """
+    Build stratification labels per document based on entity presence.
+    """
+    labels: List[tuple] = []
+    for sample in dataset:
+        annotations = sample.get("annotations", []) if isinstance(sample, dict) else []
+        present = []
+        for ann in annotations or []:
+            if not isinstance(ann, (list, tuple)) or len(ann) < 3:
+                continue
+            ent = ann[2]
+            if entity_types and ent not in entity_types:
+                continue
+            present.append(ent)
+        labels.append(tuple(sorted(set(present))))
+    return labels
+
+
+def _can_stratify(labels: List[tuple], k: int) -> bool:
+    """
+    Determine if stratification is feasible given labels and fold count.
+    """
+    unique_labels = set(labels)
+    if len(unique_labels) <= 1:
+        return False
+    # Ensure each label appears at least k times for StratifiedKFold
+    from collections import Counter
+
+    counts = Counter(labels)
+    return all(count >= k for count in counts.values())
 
 
 def create_kfold_splits(
@@ -13,6 +49,8 @@ def create_kfold_splits(
     k: int = 5,
     random_seed: int = 42,
     shuffle: bool = True,
+    stratified: bool = False,
+    entity_types: Optional[Iterable[str]] = None,
 ) -> List[Tuple[List[int], List[int]]]:
     """
     Create k-fold splits at document level.
@@ -40,14 +78,24 @@ def create_kfold_splits(
             f"Reduce k or increase dataset size."
         )
 
-    if shuffle:
-        kf = KFold(n_splits=k, shuffle=shuffle, random_state=random_seed)
+    # Choose splitter
+    if stratified:
+        labels = _entity_presence_labels(dataset, entity_types)
+        if _can_stratify(labels, k):
+            splitter = StratifiedKFold(
+                n_splits=k, shuffle=shuffle, random_state=random_seed
+            )
+            label_source = labels
+        else:
+            splitter = KFold(n_splits=k, shuffle=shuffle, random_state=random_seed)
+            label_source = None
     else:
-        kf = KFold(n_splits=k, shuffle=shuffle)
+        splitter = KFold(n_splits=k, shuffle=shuffle, random_state=random_seed)
+        label_source = None
     indices = np.arange(n_samples)
 
     splits = []
-    for train_idx, val_idx in kf.split(indices):
+    for train_idx, val_idx in splitter.split(indices, label_source):
         splits.append((train_idx.tolist(), val_idx.tolist()))
 
     return splits
@@ -148,4 +196,42 @@ def load_fold_splits(input_path: Path) -> Tuple[List[Tuple[List[int], List[int]]
     metadata = data.get("metadata", {})
 
     return splits, metadata
+
+
+def validate_splits(
+    dataset: List[Any],
+    splits: List[Tuple[List[int], List[int]]],
+    entity_types: Optional[Iterable[str]] = None,
+) -> Dict[int, Dict[str, int]]:
+    """
+    Validate entity distribution across folds.
+
+    Returns a dict keyed by fold index with counts per entity type.
+    """
+    from collections import Counter, defaultdict
+
+    entity_types = list(entity_types) if entity_types else None
+    summary: Dict[int, Dict[str, int]] = {}
+
+    for fold_idx, (_, val_idx) in enumerate(splits):
+        counts = Counter()
+        for idx in val_idx:
+            sample = dataset[idx]
+            for ann in sample.get("annotations", []) or []:
+                if not isinstance(ann, (list, tuple)) or len(ann) < 3:
+                    continue
+                ent = ann[2]
+                if entity_types and ent not in entity_types:
+                    continue
+                counts[ent] += 1
+        summary[fold_idx] = dict(counts)
+
+    # Print a quick summary to aid debugging
+    for fold_idx, counts in summary.items():
+        missing = []
+        if entity_types:
+            missing = [e for e in entity_types if counts.get(e, 0) == 0]
+        print(f"[CV] Fold {fold_idx}: {counts} | Missing: {missing}")
+
+    return summary
 

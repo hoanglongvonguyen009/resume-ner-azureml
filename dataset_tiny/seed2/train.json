@@ -1,810 +1,215 @@
 [
   {
-    "text": "\"Auto Sales Resume Template    Jason Baker  1234, Wild 68 Street,  Maryland, PA  (123) 456 -5890  xxx@gmail.com  Professional Forte:      Possess extensive knowledge of consumer behavior.   Adept in negotiating skills.   Excellent communication skills.   Good networking skills.   Excellent analytical skills and a good team player.   Proficient in multitasking.  Professional Experience  King Sales Co.  2000 till date  Auto Sales Rep  Key Responsibilities:      Major tasks included demonstration of cars and test drives.  Responsible for handling client queries.   Responsible for generating and analyzing monthly reports.   Prepare seminars and presentations for the clients.   Responsible for developing pricing and sampling strategies for the product.  Car Sales Co. 1996- 2000      Auto Sales Rep  Key Responsibilities:              Major tasks included demonstration of cars and test drives.  Responsible for handling client queries.  Responsible for generating and analyzing monthly reports.  Prepare seminars and presentations for the clients.  Responsible for developing pricing and sampling strategies for the product.    Educational Qualification:      Bachelors degree in Arts, University of CO.   Diploma in Management.  Languages known:      Fluent in English   Latin  Other Interests:      Interested in analyzing social media marketing.   Analyze the technological gadgets.  Significant Achievement:      Responsible for generating 15% boost in sales in the last firm.\"",
+    "text": "KHOLE MOORE\nGRADUATE RESEARCHER\nSKILLS\nMachine Learning Engineer, Data\nAnalyst, Natural Language Processing,\nDeep Learning, Reinforcement\nLearning, Tensorflow, Keras, Scikit\nLearn, Numpy, Pandas, Matplotlib,\nPython. EDUCATION\nB.Tech(Electronics/Telecommunication) from AMIT, Bijnor in 2017\nM.Tech (Advanced Analytics) from KVIT, PilaniPERSONAL PROFILE\nGraduate Research Assistant and currently\nworking as an Analyst intern. Proficient in\nbuilding data models and using Neural\nNetwork architectures on them. Want to\nwork as a Machine Learning Production\nEngineer.WORK BACKGROUND\nLarsen & Toubro \nAnalyst Intern, Jul 2019-Till Date \nBuilding OCR Models based on test report data\nOTHER ACTIVITIES\nResearch Assistant & Teaching Assistant at KVIT \nGold Medalist at AMITPROJECTS\nEmotions Analysis using a variable\ndetection engine in real time.",
     "annotations": [
-      [
-        31,
-        42,
-        "PERSON"
-      ],
-      [
-        1,
-        11,
-        "SKILL"
-      ],
-      [
-        67,
-        79,
-        "LOCATION"
-      ],
-      [
-        98,
-        111,
-        "EMAIL"
-      ],
-      [
-        169,
-        186,
-        "SKILL"
-      ],
-      [
-        199,
-        210,
-        "SKILL"
-      ],
-      [
-        231,
-        244,
-        "SKILL"
-      ],
-      [
-        260,
-        270,
-        "SKILL"
-      ],
-      [
-        291,
-        301,
-        "SKILL"
-      ],
-      [
-        320,
-        331,
-        "SKILL"
-      ],
-      [
-        349,
-        361,
-        "SKILL"
-      ],
-      [
-        389,
-        403,
-        "OTHER"
-      ],
-      [
-        405,
-        419,
-        "EXPERIENCE"
-      ],
-      [
-        421,
-        435,
-        "DESIGNATION"
-      ],
-      [
-        709,
-        740,
-        "SKILL"
-      ],
-      [
-        759,
-        772,
-        "OTHER"
-      ],
-      [
-        773,
-        783,
-        "EXPERIENCE"
-      ],
-      [
-        789,
-        803,
-        "DESIGNATION"
-      ],
-      [
-        1166,
-        1190,
-        "EDUCATION"
-      ],
-      [
-        1192,
-        1208,
-        "PERSON"
-      ],
-      [
-        1212,
-        1233,
-        "EDUCATION"
-      ],
-      [
-        1268,
-        1275,
-        "SKILL"
-      ],
-      [
-        1278,
-        1283,
-        "SKILL"
-      ],
-      [
-        1331,
-        1353,
-        "SKILL"
-      ]
-    ]
-  },
-  {
-    "text": "\"Amy Lynne Anderson  55 Elm St.,  Sometown, AZ 85701  Home: 555-555-5555 | someone@somedomain.com  OBJECTIVE  Recent honors graduate of Sometown High School eager to launch career as a veterinary assistant.  PROFILE  Veterinary assistant candidate whose qualifications include a high school diploma (earned with  honors) and a passion for caring for animals. Experience includes:  Two years of dedicated service as an SPCA animal shelter volunteer;  Four years as an active member/officer in 4-H;  Four years of experience as a horse owner and competitive barrel racer; and  Eight years of experience as a pet owner (dogs, cats, rabbits, macaw).  EDUCATION  SOMETOWN HIGH SCHOOL -- Sometown, AZ  High School Diploma, 2011 (GPA: 3.8)  Honors: National Honor Society  VOLUNTEERISM  SOCIETY FOR THE PREVENTION OF CRUELTY TO ANIMALS -- Sometown, AZ  Animal Ambassador II, 1/10-Present  Animal Ambassador I, 10/09-12/09  Advanced to level II animal ambassador at Sometown SPCA Animal Shelter after completing  intensive \"\"Animal Handling\"\"training and 20 hours of volunteer work in two months. Currently  volunteer for an average of 16 hours monthly, assisting in training, socializing and feeding animals  awaiting adoption as well as handling basic shelter upkeep tasks. Qualified for\"\"Medical Services  Assistant\"\" training, set to begin in January 2012.  ACTIVITIES AND AWARDS  Member/Vice President, 4-H Club (Sometown Chapter), 2007-2011  County Winner (First Place), 4-H Public Speaking Contest, 2011  State 4-H Finalist, Level I Equestrian (Western), 2009  Placed in the Top 3 at eight rodeos as a competitive barrel racer (youth division), 2008-2011    COMPUTER SKILLS  MS Office (Word, Excel, PowerPoint, Outlook); Windows XP/Vista  ADDITIONAL INFORMATION\"",
-    "annotations": [
-      [
-        1,
-        19,
-        "PERSON"
-      ],
-      [
-        75,
-        97,
-        "EMAIL"
-      ],
-      [
-        217,
-        237,
-        "DESIGNATION"
-      ],
-      [
-        381,
-        390,
-        "EXPERIENCE"
-      ],
-      [
-        418,
-        437,
-        "OTHER"
-      ],
       [
         438,
-        447,
-        "DESIGNATION"
-      ],
-      [
-        450,
-        460,
-        "EXPERIENCE"
-      ],
-      [
-        481,
-        488,
-        "DESIGNATION"
-      ],
-      [
-        492,
-        495,
-        "OTHER"
-      ],
-      [
-        1100,
-        1109,
-        "DESIGNATION"
-      ],
-      [
-        185,
-        205,
-        "DESIGNATION"
-      ],
-      [
-        1674,
-        1683,
-        "OTHER"
-      ],
-      [
-        1685,
-        1689,
-        "OTHER"
-      ],
-      [
-        1691,
-        1696,
-        "OTHER"
-      ],
-      [
-        1698,
-        1708,
-        "OTHER"
-      ],
-      [
-        1710,
-        1717,
-        "OTHER"
-      ],
-      [
-        1720,
-        1730,
-        "OTHER"
-      ],
-      [
-        339,
-        357,
+        446,
         "SKILL"
       ],
       [
-        1017,
-        1032,
+        167,
+        173,
         "SKILL"
       ],
       [
-        1283,
-        1310,
-        "SKILL"
-      ]
-    ]
-  },
-  {
-    "text": "CURRICULUM VITAE\nPRIYABRATA SARKAR\nB. Tech in Information Technology                                                \nMobile : 8420858284/8335004648 \nE-mail: priyabrata126@gmail.com\nObjective : \n           Looking for an organization where I can enhance my knowledge and from my academic \nlearning give my best to the organization.\nPersonal Synopsis:\nGood team leader\nLanguage:\nEnglish\nBengali\nHindi\nEducational Qualification :\nDegree/\nClassCollege/School University/\nBoardStreamPassout\nYearPercenta\nge/  CGPA\nB.Tech Adamas\nInstitute    Of\nTechnologyMoulana   Abul\nKalam  Azad\nUniversity   Of\nTechnologyInformatio\nn\nTechnolog\ny20177.27\n(Upto 7th\nSem)\nXIIBarasat Mahatma\nGandhi  Memorial\nHigh SchoolWBCHSE Science201353.6%\nXBarasat Mahatma\nGandhi  Memorial\nHigh SchoolWBBSEAll  Subject 201166.12 %\nTechnical  Skills :\nTheoretical Knowledge Practical Knowledge\nData Structure, DBMS, Operating \nSystem, Networking.C, JAVA, HTML, PHP, SQL, VISUAL \nSTUDIO, Photoshop.\nTraining :\nSummer training in “ Advanced Java” at the GLOBSYN Finishing School \nfrom 11th July 2016 to \n                 10th August 2016. \nWinter training in “ Mobile Application in Android” at the WEBTECH LABS \nPVT. LTD. from 25th  \n                 December 2015  to 31st January 2016. \nProject :\nAdvanced  Java Project (J2EE) on Online Hardware and Software Support\nSystem.\nDatabase Management System using C# in Visual Studio.\n. \nFINAL YEAR PROJECT:\nE Business Using PHP.\nAcademic Achievment:\nPrarambhik Part-1 from Pracheen Kala Kendra  (paint) (year-2007)\nScience Talent Search Examination  with grade ‘A’ (year-2009)\nSanjivan IQ Test  with grade ‘A’ (year-2010)\nJee7 from N.S.D.C (year-2016)\nHobbies and Interests : \nPlaying football and cricket. \nListening to music .\nPainting.\nWebpage designing. \n    Personal  Details : \n   Father                         : Pronob Sarkar  \n   Permanent Address : Nandankanan, P.O.-Nabapally, P.S.-Barasat, \nDist-North 24 Parganas\n                                           Kolkata-700126(W.B.)\n   Date of Birth              : 11th January 1995\n   Nationality                 : Indian \n   Marital Status            : Single\n    I hereby, declare that the above information provided is true to the best of my \nknowledge. \n              \nDate: 02/07/2017        \n_______________________                                    \n                (PRIYABRATA \nSARKAR )",
-    "annotations": [
-      [
-        171,
-        176,
+        245,
+        262,
         "SKILL"
       ],
       [
-        917,
-        921,
+        208,
+        214,
         "SKILL"
       ],
       [
-        256,
-        265,
+        97,
+        107,
         "SKILL"
       ],
       [
-        1321,
-        1337,
+        476,
+        497,
         "SKILL"
       ],
       [
-        58,
-        68,
-        "SKILL"
-      ],
-      [
-        1308,
-        1329,
-        "SKILL"
-      ],
-      [
-        0,
-        16,
-        "SKILL"
-      ],
-      [
-        1186,
-        1189,
-        "SKILL"
-      ],
-      [
-        811,
+        808,
         817,
         "SKILL"
       ],
       [
-        241,
-        244,
+        148,
+        158,
         "SKILL"
       ],
       [
-        46,
-        68,
+        109,
+        122,
         "SKILL"
       ],
       [
-        117,
-        123,
+        196,
+        206,
         "SKILL"
       ],
       [
-        1548,
-        1554,
+        32,
+        38,
         "SKILL"
       ],
       [
-        914,
-        915,
+        833,
+        837,
         "SKILL"
       ],
       [
-        2108,
-        2122,
+        476,
+        483,
         "SKILL"
       ],
       [
-        1292,
-        1296,
+        665,
+        671,
         "SKILL"
       ],
       [
-        288,
-        296,
+        361,
+        379,
         "SKILL"
       ],
       [
-        903,
-        913,
+        307,
+        316,
         "SKILL"
       ],
       [
-        1533,
-        1540,
+        640,
+        643,
         "SKILL"
       ],
       [
-        862,
-        876,
+        782,
+        790,
         "SKILL"
       ],
       [
-        1355,
-        1365,
+        47,
+        55,
         "SKILL"
       ],
       [
-        929,
-        932,
+        216,
+        225,
         "SKILL"
       ],
       [
-        955,
-        964,
+        39,
+        64,
         "SKILL"
       ],
       [
-        1346,
-        1372,
+        447,
+        458,
         "SKILL"
       ],
       [
-        1541,
-        1547,
+        290,
+        291,
         "SKILL"
       ],
       [
-        867,
-        876,
+        88,
+        107,
         "SKILL"
       ],
       [
-        356,
-        360,
+        298,
+        316,
         "SKILL"
       ],
       [
-        966,
-        974,
+        188,
+        194,
         "SKILL"
       ],
       [
-        895,
-        901,
+        66,
+        70,
         "SKILL"
       ],
       [
-        2201,
-        2203,
+        80,
+        107,
         "SKILL"
       ],
       [
-        862,
-        866,
+        56,
+        64,
         "SKILL"
       ],
       [
-        220,
+        12,
+        20,
+        "SKILL"
+      ],
+      [
+        39,
+        55,
+        "SKILL"
+      ],
+      [
+        361,
+        369,
+        "SKILL"
+      ],
+      [
+        542,
+        552,
+        "SKILL"
+      ],
+      [
+        181,
+        186,
+        "SKILL"
+      ],
+      [
+        80,
+        96,
+        "SKILL"
+      ],
+      [
+        71,
+        78,
+        "SKILL"
+      ],
+      [
+        228,
         232,
         "SKILL"
       ],
       [
-        415,
-        428,
+        715,
+        723,
         "SKILL"
       ],
       [
-        397,
-        402,
-        "SKILL"
-      ],
-      [
-        1346,
-        1365,
-        "SKILL"
-      ],
-      [
-        278,
-        286,
-        "SKILL"
-      ],
-      [
-        1743,
-        1748,
-        "SKILL"
-      ],
-      [
-        1136,
-        1147,
-        "SKILL"
-      ],
-      [
-        1863,
-        1872,
-        "SKILL"
-      ],
-      [
-        38,
-        42,
-        "SKILL"
-      ],
-      [
-        820,
-        841,
-        "SKILL"
-      ],
-      [
-        1346,
-        1354,
-        "SKILL"
-      ],
-      [
-        0,
-        10,
-        "SKILL"
-      ],
-      [
-        177,
-        180,
-        "SKILL"
-      ],
-      [
-        46,
-        57,
-        "SKILL"
-      ],
-      [
-        923,
-        927,
-        "SKILL"
-      ],
-      [
-        431,
-        437,
-        "SKILL"
-      ],
-      [
-        1175,
-        1179,
-        "SKILL"
-      ],
-      [
-        1321,
-        1329,
-        "SKILL"
-      ],
-      [
-        2067,
-        2078,
-        "SKILL"
-      ],
-      [
-        1425,
-        1433,
-        "SKILL"
-      ],
-      [
-        1752,
-        1760,
-        "SKILL"
-      ],
-      [
-        379,
-        386,
-        "SKILL"
-      ],
-      [
-        934,
-        937,
-        "SKILL"
-      ],
-      [
-        1308,
-        1316,
-        "SKILL"
-      ],
-      [
-        1151,
-        1158,
-        "SKILL"
-      ],
-      [
-        368,
-        376,
-        "SKILL"
-      ],
-      [
-        878,
-        882,
-        "SKILL"
-      ],
-      [
-        1385,
-        1398,
-        "SKILL"
-      ],
-      [
-        1608,
-        1612,
-        "SKILL"
-      ],
-      [
-        1330,
-        1337,
-        "SKILL"
-      ],
-      [
-        1771,
-        1780,
-        "SKILL"
-      ],
-      [
-        649,
-        652,
-        "SKILL"
-      ],
-      [
-        1730,
-        1739,
-        "SKILL"
-      ],
-      [
-        1258,
-        1265,
-        "SKILL"
-      ],
-      [
-        331,
-        339,
-        "SKILL"
-      ],
-      [
-        1706,
-        1714,
-        "SKILL"
-      ],
-      [
-        800,
-        809,
-        "SKILL"
-      ]
-    ]
-  },
-  {
-    "text": "CURRICULUM VITAE                                                                                               \nPersonal Information :-                                                          \nName               : -Randeri Kishan Ashokumar            \nAddress           : - 3/1881, Bardolipitha ,Salabatpura ,Surat  \n395003.\nContact no.     : - +917874015123\nE-mail               : - randerikishan7874@gmail.com\nDate of birth   : - 10th September 1993.\nLanguage         : -Gujarati, Hindi, English.\nAge     : -21.\nObjective:-\nCan be a good group leader or member of team.\nCan take initiative.\nTo do hard work and give my all effort for growth of my life.\nProblem solving skills and a creative approach for new ideas.\nQualification:-\nCoursesSchool/College Board/UniversityPercentageYear of\n/CGPAPassing\nB.E.Vidhyadeep\ninstituteGujarat Technological May-June\nMechanicalof Management\nAnd 8.28\nUniversity - Ahemdabad 2015\n            Technology\nH.S.CT. & T. V.\nSarvajanik High\nSchool G.S.E.B 64.92%March-2011\nG. & G. V. Kadiwala\n& M. v. Bunki March-2009 S.S.C. G.S.E.B 65.08%\nPage 1 \nExperience:-\nI got vocational training in “SAYAN SUGAR FECTORY” during \n29 days.                                    \nIndustrial visits  : -\nI visited following   Industries during my College time .    \nGujarat Polyfilms Private Limited.  \nSurat District Co- Operative Milk Producer's Union Limit ed. \n(SUMUL Dairy)    \nJyoti CNC Automation Private Limited.                                 \n Project : -                         \nExperimental investigation of thermoelectric refrigerator\nArea of Interest : -\nIn production department & maintenance department.\nIn research and development department.\nTo do work on project.\nIn safety department.  \nHobbies:- \nReading news paper \n Cricket       \nDeclaration:- \nPage 2             I hereby declare that the above information is correct up\nto my knowledge and I bear the responsibility for correctness of\nthe above mentioned particulars. \nYour sincerely\nRanderi Kishan A.  \nPage 3",
-    "annotations": [
-      [
-        667,
-        682,
-        "SKILL"
-      ],
-      [
-        407,
-        412,
-        "SKILL"
-      ],
-      [
-        1893,
-        1902,
-        "SKILL"
-      ],
-      [
-        507,
-        510,
-        "SKILL"
-      ],
-      [
-        942,
-        952,
-        "SKILL"
-      ],
-      [
-        667,
-        689,
-        "SKILL"
-      ],
-      [
-        0,
-        16,
-        "SKILL"
-      ],
-      [
-        1758,
-        1765,
-        "SKILL"
-      ],
-      [
-        1660,
-        1684,
+        452,
+        458,
         "SKILL"
       ],
       [
         683,
-        689,
+        693,
         "SKILL"
       ],
       [
-        1284,
-        1288,
+        233,
+        244,
         "SKILL"
       ],
       [
-        535,
-        538,
-        "SKILL"
-      ],
-      [
-        647,
-        653,
-        "SKILL"
-      ],
-      [
-        1066,
-        1067,
-        "SKILL"
-      ],
-      [
-        610,
-        619,
-        "SKILL"
-      ],
-      [
-        882,
-        892,
-        "SKILL"
-      ],
-      [
-        1538,
-        1551,
-        "SKILL"
-      ],
-      [
-        1039,
-        1040,
-        "SKILL"
-      ],
-      [
-        957,
-        959,
-        "SKILL"
-      ],
-      [
-        767,
-        772,
-        "SKILL"
-      ],
-      [
-        575,
-        579,
-        "SKILL"
-      ],
-      [
-        636,
-        642,
-        "SKILL"
-      ],
-      [
-        759,
-        766,
-        "SKILL"
-      ],
-      [
-        1632,
-        1643,
-        "SKILL"
-      ],
-      [
-        1725,
-        1731,
-        "SKILL"
-      ],
-      [
-        1123,
-        1131,
-        "SKILL"
-      ],
-      [
-        1873,
-        1875,
-        "SKILL"
-      ],
-      [
-        1660,
-        1668,
-        "SKILL"
-      ],
-      [
-        729,
-        742,
-        "SKILL"
-      ],
-      [
-        490,
-        495,
-        "SKILL"
-      ],
-      [
-        1608,
-        1618,
-        "SKILL"
-      ],
-      [
-        1619,
-        1629,
-        "SKILL"
-      ],
-      [
-        1425,
-        1435,
-        "SKILL"
-      ],
-      [
-        0,
-        10,
-        "SKILL"
-      ],
-      [
-        1673,
-        1684,
-        "SKILL"
-      ],
-      [
-        591,
-        601,
-        "SKILL"
-      ],
-      [
-        413,
-        416,
-        "SKILL"
-      ],
-      [
-        121,
-        132,
-        "SKILL"
-      ],
-      [
-        1918,
-        1932,
-        "SKILL"
-      ],
-      [
-        718,
-        727,
-        "SKILL"
-      ],
-      [
-        497,
-        504,
-        "SKILL"
-      ],
-      [
-        460,
-        468,
-        "SKILL"
-      ],
-      [
-        615,
-        619,
-        "SKILL"
-      ],
-      [
-        1487,
-        1494,
-        "SKILL"
-      ],
-      [
-        112,
-        120,
-        "SKILL"
-      ],
-      [
-        1210,
-        1220,
+        88,
+        96,
         "SKILL"
       ],
       [
@@ -813,93 +218,858 @@
         "SKILL"
       ],
       [
-        846,
-        859,
+        515,
+        519,
+        "SKILL"
+      ],
+      [
+        424,
+        434,
+        "SKILL"
+      ],
+      [
+        160,
+        165,
+        "SKILL"
+      ],
+      [
+        484,
+        497,
         "SKILL"
       ]
     ]
   },
   {
-    "text": "CURRICULUM-VITAE\nVillage – Tejpurwa, \nPost – Kishunpur Telaur, \nPS – Patepur, Distt. – Vaishal, \nBihar-843102\nContact No. 07404118574,\n                   07053727888\nEmail. alam1286@gmail.com\nMD. EJAZ AHAMAD\nCAREER OBJECTIVE\nSeeking of careen in field of teaching in a globally challenging environment where\nmy knowledge and expertise blend with my life at the same time providing an ample\nspace from me to learn and grow.\nEDUCATION QUALIFICATION\nPursuing B.A. from B.U Muzaffarpur Bihar\n10+2 Pass from Inter Council Patna\n10 Pass from Bihar School Examination Board Patna\nSOFTWARE SKILL SET\nOperating System :Window XP\nPackages:Ms-Office\nNet Suffering\nEXPERIENCE \n   \nWorking as a Plumber in Ahluwalia Contractors (India) Limited from last 5 years to till\ndate.\nPERSONAL DETAILS\nFather’s Name :Abdul Razzaque \nDate of Birth :02/04/1994\nMarital Status :Unmarried \nSex :Male\nNationality  :Indian \nReligion :Muslim  \nLanguage :Hindi & Urdu \nHobbies :Playing Cricket   \nPlace: Bihar\nDate: (Md. Ejaz Ahamad)",
+    "text": "LIAM ANDREWS\nFRESHER\nWORK EXPERIENCE\nIntern Trainee, Jan 2020 to Apr 2020DICTIS\nResponsible for performing and helping in decision\nmaking. \nACADEMIC PROFILE\nB.Tech(Civil) Garodia Institute of Technosciences,\n2020 EXECUTIVE\nSUMMARY\nFresher with strong statistical and\nanalytic capabilities. Someone who\nis driven by the passion for\nproblem solving. Though I am from\nCivil Engineering background I\nhave always been fascinated with\ndata and how Machine Learning is\nevolving with iit.\nPERSONAL\nSKILLS\nData Analyst, Data Mining, Data\nVisualization, Machine Learning,\nLinear Regression, Statistical\nModeling, Predictive Modeling, SQL\nServer, Oracle, Python.\nPROJECTS\nRailway Signals Determiner using\nrelay weight system.\nEXTRA-CURRICULARS\nData Preprocessing with Python\nData Visualization with Power BI",
     "annotations": [
       [
-        182,
-        187,
+        794,
+        796,
         "SKILL"
       ],
       [
-        312,
-        321,
+        319,
+        326,
         "SKILL"
       ],
       [
-        367,
-        371,
+        331,
+        346,
         "SKILL"
       ],
       [
-        597,
-        613,
+        644,
+        650,
         "SKILL"
       ],
       [
-        845,
-        859,
+        511,
+        522,
         "SKILL"
       ],
       [
-        424,
+        490,
+        496,
+        "SKILL"
+      ],
+      [
+        764,
+        782,
+        "SKILL"
+      ],
+      [
+        652,
+        660,
+        "SKILL"
+      ],
+      [
+        365,
+        382,
+        "SKILL"
+      ],
+      [
+        267,
+        275,
+        "SKILL"
+      ],
+      [
+        700,
+        706,
+        "SKILL"
+      ],
+      [
+        450,
+        458,
+        "SKILL"
+      ],
+      [
+        788,
+        796,
+        "SKILL"
+      ],
+      [
+        516,
+        522,
+        "SKILL"
+      ],
+      [
+        251,
+        262,
+        "SKILL"
+      ],
+      [
+        636,
+        642,
+        "SKILL"
+      ],
+      [
+        21,
+        36,
+        "SKILL"
+      ],
+      [
+        569,
+        579,
+        "SKILL"
+      ],
+      [
+        707,
+        713,
+        "SKILL"
+      ],
+      [
+        302,
+        304,
+        "SKILL"
+      ],
+      [
+        429,
         433,
         "SKILL"
       ],
       [
-        565,
-        570,
+        593,
+        601,
         "SKILL"
       ],
       [
-        607,
-        613,
+        305,
+        311,
         "SKILL"
       ],
       [
-        638,
-        644,
+        733,
+        751,
         "SKILL"
       ],
       [
-        904,
-        912,
+        442,
+        458,
         "SKILL"
       ],
       [
-        434,
-        447,
+        694,
+        699,
         "SKILL"
       ],
       [
-        933,
-        938,
+        140,
+        148,
         "SKILL"
       ],
       [
+        603,
         622,
-        624,
         "SKILL"
       ],
       [
-        635,
-        637,
+        276,
+        288,
+        "SKILL"
+      ],
+      [
+        497,
+        509,
+        "SKILL"
+      ],
+      [
+        502,
+        509,
+        "SKILL"
+      ],
+      [
+        159,
+        163,
+        "SKILL"
+      ],
+      [
+        371,
+        382,
+        "SKILL"
+      ],
+      [
+        788,
+        793,
+        "SKILL"
+      ],
+      [
+        624,
+        627,
+        "SKILL"
+      ],
+      [
+        21,
+        25,
+        "SKILL"
+      ],
+      [
+        562,
+        579,
+        "SKILL"
+      ],
+      [
+        481,
+        489,
+        "SKILL"
+      ],
+      [
+        738,
+        751,
+        "SKILL"
+      ],
+      [
+        529,
+        542,
+        "SKILL"
+      ],
+      [
+        628,
+        634,
+        "SKILL"
+      ]
+    ]
+  },
+  {
+    "text": "Sachin Kumar\nAddress : Room No-22, Building No-137\n: Near Water Pump House\n: DesuWali Gali, Mahipalpur, NewDelhi-110037\nContact : 8471076775 (M), 8009475137 (M)\n Email : sachinbitu@gmail.com\n \nCAREER OBJECTIVE:\n I am an enthusiastic personality striving towards excellence through my potential and\n Skills. Hard work, dedication, honesty and excellent balance of emotional &\n Professional relations help me to achieve strong team spirit and high quality outputs.\nBRIEF OVERVIEW\nOne year computer hardware & networking diploma from oriel international (city&\nguilds), Laxminager NEW DELHI\n EDUCATIONAL QUALIFICATIONS\n         B.A (His)\n        D.D.U.U (Gorakhpur),2011 \n         High Secondary\n        Maharaja College Ara, BIEC board in 2004           \n         Senior Secondary\n         H.N.K high school Ara, BSSEB board in 2000                       \n       ITS SKILLS: MS Word, MS Excel, MS PowerPoint, \n      WORK EXPERIENCE\n 1.     Shivam computers\nRole        : Technical support  \nDuration        : March 2006 – December 2007\n 2.     Computershelpline\n Role                               : Technical support  \n Duration             : January 2007 – April 2011\n3.    Kalpataru power Transmission Ltd\n       +_800 HVDC Gopalgang to Gorakhpur\n  Role                               : Asst. Store Keeper  \n  Duration              : May 2011 – August 2015\n             \n4.     Shree IT Solution PVT LTD\n Role                               : Service Engineer  \n Duration             : September 2015 – Till Date\n    ADDITIONAL INFORMATION: \n   1) Packages   :  MS-Office, Internet surfing,  E-mail, Outlook, outlook express\n SOFTWARE KNOWLEDGE: \n1)Installation of window:  xp,98,2000,2003,2000, vista,2007,2008  \n2)Installation of application: office, tally (all), Auto cad 2006, all type of application.\n3)Installation of Terminal.\n4)Configuration of LAN, Wan,Wi-fi ,printer \n5)Outlook configure \n6)Anti-virus\nACCOLADES\nPlayed Cricket.\nListing music. \nMakes Friends. \nRead story books.\n \n PERSONAL Address\nFather Name :  Lt. Rajbanshi rai\nDate of Birth : 1 January 1986\nMarital Status : Unmarried\nPermanent Address : club road, Ara.\nLanguages Known : English, Hindi\nI hereby declare that the information furnished above is true and reliable the best of\nmy knowledge.\n     Place:\n      \n     Date:\n(Sachin Kumar)",
+    "annotations": [
+      [
+        35,
+        43,
+        "SKILL"
+      ],
+      [
+        181,
+        186,
+        "SKILL"
+      ],
+      [
+        1635,
+        1644,
+        "SKILL"
+      ],
+      [
+        970,
+        987,
+        "SKILL"
+      ],
+      [
+        1204,
+        1207,
+        "SKILL"
+      ],
+      [
+        299,
+        305,
+        "SKILL"
+      ],
+      [
+        1649,
+        1661,
+        "SKILL"
+      ],
+      [
+        2123,
+        2127,
+        "SKILL"
+      ],
+      [
+        795,
+        806,
+        "SKILL"
+      ],
+      [
+        946,
+        955,
+        "SKILL"
+      ],
+      [
+        425,
+        436,
+        "SKILL"
+      ],
+      [
+        1974,
+        1978,
+        "SKILL"
+      ],
+      [
+        2076,
+        2090,
+        "SKILL"
+      ],
+      [
+        307,
+        316,
+        "SKILL"
+      ],
+      [
+        220,
+        232,
+        "SKILL"
+      ],
+      [
+        352,
+        359,
+        "SKILL"
+      ],
+      [
+        893,
+        906,
+        "SKILL"
+      ],
+      [
+        508,
+        518,
+        "SKILL"
+      ],
+      [
+        2238,
+        2246,
+        "SKILL"
+      ],
+      [
+        1600,
+        1607,
+        "SKILL"
+      ],
+      [
+        763,
+        769,
+        "SKILL"
+      ],
+      [
+        142,
+        143,
+        "SKILL"
+      ],
+      [
+        1626,
+        1644,
+        "SKILL"
+      ],
+      [
+        1294,
+        1299,
+        "SKILL"
+      ],
+      [
+        1888,
+        1897,
+        "SKILL"
+      ],
+      [
+        915,
+        930,
+        "SKILL"
+      ],
+      [
+        729,
+        734,
+        "SKILL"
+      ],
+      [
+        425,
+        429,
         "SKILL"
       ],
       [
         711,
-        722,
+        718,
         "SKILL"
       ],
       [
-        166,
-        171,
+        2139,
+        2148,
+        "SKILL"
+      ],
+      [
+        2226,
+        2228,
+        "SKILL"
+      ],
+      [
+        1451,
+        1459,
+        "SKILL"
+      ],
+      [
+        410,
+        417,
+        "SKILL"
+      ],
+      [
+        877,
+        881,
+        "SKILL"
+      ],
+      [
+        233,
+        244,
+        "SKILL"
+      ],
+      [
+        1858,
+        1861,
+        "SKILL"
+      ],
+      [
+        1565,
+        1571,
+        "SKILL"
+      ],
+      [
+        1785,
+        1789,
+        "SKILL"
+      ],
+      [
+        2166,
+        2171,
+        "SKILL"
+      ],
+      [
+        1771,
+        1774,
+        "SKILL"
+      ],
+      [
+        896,
+        906,
+        "SKILL"
+      ],
+      [
+        1853,
+        1856,
+        "SKILL"
+      ],
+      [
+        1443,
+        1450,
+        "SKILL"
+      ],
+      [
+        330,
+        337,
+        "SKILL"
+      ],
+      [
+        1674,
+        1676,
+        "SKILL"
+      ],
+      [
+        262,
+        272,
+        "SKILL"
+      ],
+      [
+        1948,
+        1953,
+        "SKILL"
+      ],
+      [
+        488,
+        505,
+        "SKILL"
+      ],
+      [
+        1732,
+        1743,
+        "SKILL"
+      ],
+      [
+        2103,
+        2112,
+        "SKILL"
+      ],
+      [
+        874,
+        876,
+        "SKILL"
+      ],
+      [
+        162,
+        167,
+        "SKILL"
+      ],
+      [
+        1824,
+        1832,
+        "SKILL"
+      ],
+      [
+        886,
+        891,
+        "SKILL"
+      ],
+      [
+        446,
+        461,
+        "SKILL"
+      ],
+      [
+        187,
+        190,
+        "SKILL"
+      ],
+      [
+        1528,
+        1539,
+        "SKILL"
+      ],
+      [
+        874,
+        881,
+        "SKILL"
+      ],
+      [
+        1185,
+        1190,
+        "SKILL"
+      ],
+      [
+        519,
+        526,
+        "SKILL"
+      ],
+      [
+        488,
+        496,
+        "SKILL"
+      ],
+      [
+        1626,
+        1634,
+        "SKILL"
+      ],
+      [
+        1191,
+        1203,
+        "SKILL"
+      ],
+      [
+        441,
+        453,
+        "SKILL"
+      ],
+      [
+        2157,
+        2164,
+        "SKILL"
+      ],
+      [
+        1385,
+        1387,
+        "SKILL"
+      ],
+      [
+        1617,
+        1624,
+        "SKILL"
+      ],
+      [
+        497,
+        505,
+        "SKILL"
+      ],
+      [
+        602,
+        616,
+        "SKILL"
+      ],
+      [
+        312,
+        316,
+        "SKILL"
+      ],
+      [
+        990,
+        998,
+        "SKILL"
+      ],
+      [
+        1836,
+        1849,
+        "SKILL"
+      ],
+      [
+        980,
+        987,
+        "SKILL"
+      ],
+      [
+        58,
+        63,
+        "SKILL"
+      ],
+      [
+        454,
+        461,
+        "SKILL"
+      ],
+      [
+        883,
+        891,
+        "SKILL"
+      ],
+      [
+        1995,
+        2003,
+        "SKILL"
+      ],
+      [
+        1573,
+        1581,
+        "SKILL"
+      ],
+      [
+        1548,
+        1556,
+        "SKILL"
+      ],
+      [
+        446,
+        453,
+        "SKILL"
+      ],
+      [
+        318,
+        328,
+        "SKILL"
+      ],
+      [
+        970,
+        979,
+        "SKILL"
+      ],
+      [
+        376,
+        388,
+        "SKILL"
+      ]
+    ]
+  },
+  {
+    "text": "CURRICULUM  VITAE\nMD ASLAM\nCivil Engineering (B-Tech)\nContact No. +91-9199499253,\nE-mail:aslamdgi1993@gmail .com\nCAREER OBJECTIVE\nTo get a job that can provide challenge. I believe that I would be the \nmost effective in on organization that trust me with responsibility and \nprovides opportunity to learn and grow.\nBASIC ACADEMIC CREDENTIALS\nExaminationDiscipline/School/College Board/Year ofMarks \n%\nSpecialization university`\npassing\nB-TechCivil \nEngineeringRITS JNTUH201765%\nS.G.S.M.S.M.N.N.J. \nCOLLEGE\nClass 12thP.C.MKhajedih,MadhubaniBSEB \nPatna201260.6%\nSARVODAY\nClass 10ThScience StreamHIGH SCHOOLBSEB \nPatna2009 48%\nDarbhanga (Bihar)\nMINI PROJECTS REPORT\nDurability of Concrete Structure\nMAJOR PROJECTS REPORT\nStrength Parameters of Self Compacting Concrete                            \n                                           USING\n           Fly-Ash And Quarry Dust\nIT PROFICIENCY\nMicrosoft Office Word, Microsoft Office Excel, Microsoft Office Power Point\nAuto CAD:- Civil 2D&3D from ( Cistotech)\nLanguage: C\nGood Communication Skills.\nCO-/EXTRA –CURRICULAR ACTIVITIE\nExecutive Member of sports in Sarvoday high school \n        Darbhanga (Bihar)STRENGTH\n Solving problems quickly\n Confident and Determined\nPositive attitude\nWEAKNESS\nTendency to take on too much\nI quickly believe any Person\nACHIVEMENTS\nParticipate in various sports in inter collage \nINTREST & HOBBIES\nPlaying cricket, listening music\nREFERENCES\nSUBHANI SHAREEF, Head of Department, College of civil Engineering, RITS\nMD RIJWAN AHMAD , Assistant Professor, College of civil Engineering, RITS\nSALMAN SIDDIQUE, Assistant Professor, College of civil Engineering, RITS\nPERSONAL DETAILS\nFather’s Name :- MD JABBAR\nPermanent Address   :- Vill+Post :-Chhaurahi, ps Babubarhi, Dist. Madhubani,\n                                      State (Bihar),\nDECLARATION\n•I do hereby declare that \nthe above information is true to the best of my knowledge .\nPlace : Mumbai\nDate:                                                                                                                             (Signature)Date of Birth :-05 JULY 1993\nLanguage Known :-  English, Hindi & Urdu , Nepali\nMarital Status :-Married\nNationality/Religion :-Indian / Muslim\nInterest & Hobbies :-Playing Cricket ,listening music,",
+    "annotations": [
+      [
+        160,
+        169,
+        "SKILL"
+      ],
+      [
+        102,
+        107,
+        "SKILL"
+      ],
+      [
+        1926,
+        1935,
+        "SKILL"
+      ],
+      [
+        1047,
+        1053,
+        "SKILL"
+      ],
+      [
+        647,
+        655,
+        "SKILL"
+      ],
+      [
+        148,
+        151,
+        "SKILL"
+      ],
+      [
+        1127,
+        1138,
+        "SKILL"
+      ],
+      [
+        896,
+        905,
+        "SKILL"
+      ],
+      [
+        656,
+        662,
+        "SKILL"
+      ],
+      [
+        518,
+        519,
+        "SKILL"
+      ],
+      [
+        2176,
+        2190,
+        "SKILL"
+      ],
+      [
+        993,
+        995,
+        "SKILL"
+      ],
+      [
+        27,
+        44,
+        "SKILL"
+      ],
+      [
+        484,
+        485,
+        "SKILL"
+      ],
+      [
+        642,
+        646,
+        "SKILL"
+      ],
+      [
+        379,
+        384,
+        "SKILL"
+      ],
+      [
+        687,
+        696,
+        "SKILL"
+      ],
+      [
+        371,
+        378,
+        "SKILL"
+      ],
+      [
+        1900,
+        1902,
+        "SKILL"
+      ],
+      [
+        1108,
+        1114,
+        "SKILL"
+      ],
+      [
+        1033,
+        1053,
+        "SKILL"
+      ],
+      [
+        223,
+        235,
+        "SKILL"
+      ],
+      [
+        913,
+        917,
+        "SKILL"
+      ],
+      [
+        896,
+        912,
+        "SKILL"
+      ],
+      [
+        321,
+        341,
+        "SKILL"
+      ],
+      [
+        960,
+        971,
+        "SKILL"
+      ],
+      [
+        906,
+        912,
+        "SKILL"
+      ],
+      [
+        2214,
+        2222,
+        "SKILL"
+      ],
+      [
+        2153,
+        2158,
+        "SKILL"
+      ],
+      [
+        1184,
+        1192,
+        "SKILL"
+      ],
+      [
+        978,
+        981,
+        "SKILL"
+      ],
+      [
+        1824,
+        1829,
+        "SKILL"
+      ],
+      [
+        321,
+        329,
+        "SKILL"
+      ],
+      [
+        1424,
+        1429,
+        "SKILL"
+      ],
+      [
+        1467,
+        1477,
+        "SKILL"
+      ],
+      [
+        1709,
+        1718,
+        "SKILL"
+      ],
+      [
+        48,
+        52,
+        "SKILL"
+      ],
+      [
+        1028,
+        1046,
+        "SKILL"
+      ],
+      [
+        720,
+        728,
+        "SKILL"
+      ],
+      [
+        936,
+        941,
         "SKILL"
       ],
       [
@@ -908,533 +1078,888 @@
         "SKILL"
       ],
       [
-        188,
-        191,
+        109,
+        112,
         "SKILL"
       ],
       [
-        256,
-        264,
+        1888,
+        1899,
         "SKILL"
       ],
       [
-        291,
-        302,
+        1330,
+        1341,
         "SKILL"
       ],
       [
-        577,
-        585,
+        33,
+        44,
         "SKILL"
       ],
       [
+        1230,
+        1247,
+        "SKILL"
+      ],
+      [
+        960,
+        965,
+        "SKILL"
+      ],
+      [
+        241,
+        246,
+        "SKILL"
+      ],
+      [
+        664,
+        674,
+        "SKILL"
+      ],
+      [
+        255,
+        269,
+        "SKILL"
+      ],
+      [
+        2202,
+        2213,
+        "SKILL"
+      ],
+      [
+        2144,
+        2151,
+        "SKILL"
+      ],
+      [
+        919,
+        941,
+        "SKILL"
+      ],
+      [
+        880,
         882,
-        893,
         "SKILL"
       ],
       [
-        923,
-        931,
+        883,
+        894,
         "SKILL"
       ],
       [
-        279,
-        290,
+        729,
+        739,
         "SKILL"
       ],
       [
-        771,
-        779,
+        1015,
+        1023,
         "SKILL"
       ],
       [
-        586,
-        591,
+        1028,
+        1053,
         "SKILL"
       ],
       [
-        350,
-        354,
+        1033,
+        1046,
         "SKILL"
       ],
       [
-        326,
-        335,
+        1414,
+        1423,
         "SKILL"
       ],
       [
-        391,
-        396,
+        1663,
+        1671,
         "SKILL"
       ],
       [
-        626,
-        634,
+        896,
+        917,
+        "SKILL"
+      ],
+      [
+        1430,
+        1440,
+        "SKILL"
+      ],
+      [
+        401,
+        415,
         "SKILL"
       ]
     ]
   },
   {
-    "text": "BIO - DATA\nPOST APPILIED FOR ASSISTANT PLUMBER\nQUALIFICATION 10+2 pass\nTECHNICAL QUALIFICATION I.T.I FITTER\nNATIONALITY INDIAN\nLANGUANGE KNOWN HINDI,  & ENGLISH\nMARITAL STATUS MARRIED\nRELIGION HINDU\nPARTICULARS AS PER PASSPORT\nNAME MR. SUNIL KUMAR \nFATHER S NAME S NAME SHRI. UMA SHANKAR PRASAD\nPASSPORT NO. H  4655820 4655820\nDATE OF ISSUE 26/05/2009\nDATE OF EXPIRY 25/052019\nPLACE OF ISSUE DELHI\nDATE & PALCE OF BIRTH 01/09/1985 DELHI\nPRESENT ADDRESS\nPERMANENT ADDRESS H.NO.53\nBLCOK F GALI NO 4\nMOLARBAND BADARPUR\nNEW DELHI  110044  4655820\nMOB.09560213571 , 8083813362\nE-MAIL ID : skgraphic28@gmail.com  \nJOB DESCRIPTION\nCOMPANY NAME SITE OF WORK PERIOD OF SERVICE\nIN INDIA\nPLUMBING CONTRACTOR Plumber 09/05/2012 TO 25/10/2014\nCOMPUTER KNOWLEDGE:\nGRAPHICDESIGN,BASIC,PHOTOSHOP,CORELDRAW,INDESIGN,ILLUSTARTOR,\nINTERNET ETC,\n(SUNIL KUMAR)SPACE\nFOR\nPHOTO",
+    "text": "Hassna Mohammad                                    mobile:  968-\n95905992                       \nHanif Abbas                             email: \nHassna7676@gmail.com\nJob objective \nSeeking a position that will allow me to utilize my educational background, my \npractical experience, and strong interpersonal skills as well as my eagerness to \ncontribute to a company. Moreover, I would like to work in professional and active \nenvironment where I can apply what I was taught to progress and develop within \nmy job\nEducation\n2015 - 2016 Majan college (University College)\nDiploma in Higher Education in Accounting \n2013 - 2014   Majan college (University College)\nEnglish Language Program (Foundation Program) \n2010 – 2012   Ruwi Girls Secondary School\nGraduated: June 2012 \nAcademic degree: high school diploma in Science studies  (focused on \nEnglish subjects)\nPersonal information \nDate of Birth      : 12th January1994\nSex                   : female\nPlace of Birth     : Muscat, Oman\nLanguages         : Arabic, English, Hindi\nMarital Status        : Single \nSkills \nexcellent written and verbal communication skills\nproficient in Microsoft office (word- excel- PowerPoint etc.) \ncomprehensive understanding of all accounting programs\nteam working, self-motivated, hard working",
     "annotations": [
       [
+        583,
         599,
-        604,
         "SKILL"
       ],
       [
-        742,
-        751,
-        "SKILL"
-      ],
-      [
-        680,
-        688,
-        "SKILL"
-      ],
-      [
-        627,
-        634,
-        "SKILL"
-      ],
-      [
+        156,
         161,
-        175,
         "SKILL"
       ],
       [
-        218,
-        226,
+        1075,
+        1117,
         "SKILL"
       ],
       [
-        733,
-        751,
+        1075,
+        1124,
         "SKILL"
       ],
       [
-        774,
-        783,
+        795,
+        814,
         "SKILL"
       ],
       [
+        826,
+        833,
+        "SKILL"
+      ],
+      [
+        308,
+        314,
+        "SKILL"
+      ],
+      [
+        261,
+        281,
+        "SKILL"
+      ],
+      [
+        1085,
+        1124,
+        "SKILL"
+      ],
+      [
+        359,
+        366,
+        "SKILL"
+      ],
+      [
+        447,
+        450,
+        "SKILL"
+      ],
+      [
+        795,
+        806,
+        "SKILL"
+      ],
+      [
+        1140,
+        1149,
+        "SKILL"
+      ],
+      [
+        51,
+        57,
+        "SKILL"
+      ],
+      [
+        1034,
+        1048,
+        "SKILL"
+      ],
+      [
+        1085,
+        1117,
+        "SKILL"
+      ],
+      [
+        818,
+        825,
+        "SKILL"
+      ],
+      [
+        514,
+        523,
+        "SKILL"
+      ],
+      [
+        294,
+        314,
+        "SKILL"
+      ],
+      [
+        603,
+        613,
+        "SKILL"
+      ],
+      [
+        1246,
+        1250,
+        "SKILL"
+      ],
+      [
+        542,
+        549,
+        "SKILL"
+      ],
+      [
+        991,
+        1000,
+        "SKILL"
+      ],
+      [
+        665,
+        681,
+        "SKILL"
+      ],
+      [
+        1104,
+        1124,
+        "SKILL"
+      ],
+      [
+        1158,
+        1162,
+        "SKILL"
+      ],
+      [
+        1236,
+        1244,
+        "SKILL"
+      ],
+      [
+        1140,
+        1156,
+        "SKILL"
+      ],
+      [
+        1150,
+        1156,
+        "SKILL"
+      ],
+      [
+        1085,
+        1092,
+        "SKILL"
+      ],
+      [
+        318,
+        322,
+        "SKILL"
+      ],
+      [
+        1028,
+        1033,
+        "SKILL"
+      ],
+      [
+        491,
+        498,
+        "SKILL"
+      ],
+      [
+        1171,
+        1181,
+        "SKILL"
+      ],
+      [
+        778,
+        786,
+        "SKILL"
+      ],
+      [
+        1097,
+        1117,
+        "SKILL"
+      ],
+      [
+        1097,
+        1124,
+        "SKILL"
+      ],
+      [
+        1097,
+        1103,
+        "SKILL"
+      ],
+      [
+        137,
+        142,
+        "SKILL"
+      ],
+      [
+        1164,
+        1169,
+        "SKILL"
+      ],
+      [
+        162,
+        165,
+        "SKILL"
+      ],
+      [
+        875,
+        886,
+        "SKILL"
+      ],
+      [
+        1246,
+        1258,
+        "SKILL"
+      ],
+      [
+        787,
+        793,
+        "SKILL"
+      ],
+      [
+        1265,
+        1274,
+        "SKILL"
+      ],
+      [
+        572,
+        579,
+        "SKILL"
+      ],
+      [
+        427,
+        438,
+        "SKILL"
+      ],
+      [
+        665,
+        672,
+        "SKILL"
+      ],
+      [
+        1204,
+        1217,
+        "SKILL"
+      ],
+      [
+        294,
+        307,
+        "SKILL"
+      ],
+      [
+        673,
+        681,
+        "SKILL"
+      ],
+      [
+        287,
+        314,
+        "SKILL"
+      ],
+      [
+        394,
+        398,
+        "SKILL"
+      ],
+      [
+        478,
+        486,
+        "SKILL"
+      ],
+      [
+        1104,
+        1117,
+        "SKILL"
+      ],
+      [
+        1126,
+        1136,
+        "SKILL"
+      ],
+      [
+        866,
+        874,
+        "SKILL"
+      ],
+      [
+        836,
+        843,
+        "SKILL"
+      ],
+      [
+        402,
+        414,
+        "SKILL"
+      ],
+      [
+        950,
+        956,
+        "SKILL"
+      ]
+    ]
+  },
+  {
+    "text": "RESUME\nAzad Ahmed                                                                                        \n         \nAddress:  D/382 Prem Nagar 3rd                                                                                                                                                          \nKirari Suleman Nagar Delhi 86                               \nE-mail add- Azad.ahmed228@gmail.com\nContact No. 9711924187   \nCareer Objective:\nTo obtain a challenging& responsible position in a professionally managed organization\nwhere I can contribute to the successful growth of the organization utilizing my current\nsets skill. \nExperience :\nTotal Experience 4 years.\nWorked with  Global Computer Service  Patel Nagar New Delhi – 1 year As a\nExecutive-IT, Installing OS, configure Outlook, Assembling Desktop, configure\nthe Router and troubleshooting of LAN.\nWorked with Astro Science Technologies Pvt. Ltd.  Pitampura Delhi – 2.3 Years\nAs a Senior Executive-IT, installing windows XP,7,8,10, windows server 2008R2\ntroubleshooting of LAN, Manage the server 2008R2, Manage the switch , router,\nfirewall ADSL and printer.  Configure the outlook and import export outlook data.\nManage the IP Phone, dialer server. Manage the PRI line, lease line, Broadband.\nWorked with Eastern Software System Pvt. Ltd. Noida sec 63 as a IT Support\nExecutive.\nAcademic Qualification:\n2014, B.A. from Monad University Hapur (UP).\n2009, 12th from U P Board, Allahabad.\n2007, 10th from U P Board, Allahabad.\nTechnical Qualification:Completed 18 Months Diploma in Computer Hardware & Networking  from \nJetking Institute Karol Bagh, Delhi in 2012\nTechnical  Skills:\nFormatting and installing of Windows XP, 7,8,10 Windows Server 2008.\nConfiguring & maintaining MS Outlook & Import and export data.\nInstallation & Configuring DHCP, DNS, ADDS.\nInstalling of all peripheral components and devices with their respective Drivers \nand Software and printer.\nTroubleshooting of IP Phone.\nTroubleshooting of Network and configure ADSL Router.\nBasic knowledge of Networking (LAN WAN).\nStrength:\nPositive learning attitude.\nPersonal Details:\n           Date of Birth                   :          31.jul.1991\nFather’s Name                 :          Riyaz Ahmed\n           Gender                             :          Male\n           Marital status                   :            Unmarried\n           Nationality                       :            Indian\n           Proficient in languages    :            Hindi & English\n           Hobbies                            :            Surfing Internet and Playing Cricket\nDeclaration:\n I hereby declare that the particulars of information and facts stated here are true and \ncomplete to the best of my knowledge and belief.\nDATE:\nPLACE:                                                                                  (Azad Ahmed)",
+    "annotations": [
+      [
+        979,
+        989,
+        "SKILL"
+      ],
+      [
+        1737,
+        1748,
+        "SKILL"
+      ],
+      [
+        388,
+        393,
+        "SKILL"
+      ],
+      [
+        2033,
+        2042,
+        "SKILL"
+      ],
+      [
+        1861,
+        1871,
+        "SKILL"
+      ],
+      [
+        1814,
+        1818,
+        "SKILL"
+      ],
+      [
+        0,
         6,
-        10,
         "SKILL"
       ],
       [
         794,
-        802,
+        804,
         "SKILL"
-      ],
-      [
-        184,
-        192,
-        "SKILL"
-      ],
-      [
-        47,
-        60,
-        "SKILL"
-      ],
-      [
-        143,
-        148,
-        "SKILL"
-      ],
-      [
-        689,
-        699,
-        "SKILL"
-      ],
-      [
-        663,
-        670,
-        "SKILL"
-      ],
-      [
-        455,
-        464,
-        "SKILL"
-      ],
-      [
-        214,
-        217,
-        "SKILL"
-      ],
-      [
-        605,
-        608,
-        "SKILL"
-      ],
-      [
-        733,
-        741,
-        "SKILL"
-      ],
-      [
-        108,
-        119,
-        "SKILL"
-      ],
-      [
-        153,
-        160,
-        "SKILL"
-      ],
-      [
-        648,
-        652,
-        "SKILL"
-      ],
-      [
-        817,
-        825,
-        "SKILL"
-      ],
-      [
-        844,
-        849,
-        "SKILL"
-      ],
-      [
-        71,
-        80,
-        "SKILL"
-      ]
-    ]
-  },
-  {
-    "text": "\"Kristen Clyde  2901 Pine Street, Manchester, CT 53431  (000) 999-9999, Email    OBJECTIVE: Seeking a position as a Web Developer at AT Tech utilizing expertise in developing high  quality websites in order to manage a smooth flow of online operations for the company.  KEY QUALIFICATIONS  \\xe2\\x80\\xa2 2 years extensive experience in creation and maintenance of high-quality websites  \\xe2\\x80\\xa2 Functional knowledge of building easy-to-navigate landing pages and blogs  \\xe2\\x80\\xa2 In-depth know-how of bringing innovative technology to the company  \\xe2\\x80\\xa2 Track record of offering insight and executing ideas for social media marketing  \\xe2\\x80\\xa2 Highly experienced in producing and editing creative graphical content for end users  TECHNICAL SKILLS  Web Programming Technologies: HTML/XHTML/DHTML, CSS, ASP.NET, SQL And XML  Web Authoring Software Tools: SharePoint Designer, ColdFusion, and Dreamweaver  Graphic Design: Photoshop, Fireworks, and multimedia development tools.  Scripting Languages: PERL and PYTHON  Microsoft SharePoint and Durpal  AJAX and push technologies  Web Server Management  MAJOR ACHIEVEMENTS  \\xe2\\x80\\xa2 Demonstrated excellence in web development acumen by placing a system that worked with available data  to manage online navigation activities  \\xe2\\x80\\xa2 Devised an anti-virus program for the website which works with new virus definitions to ensure bug free  websites and safe surfing  WORK EXPERIENCE  Calgary Page Inc.  Manchester, CT | March 2014  Present  Web Developer  \\xe2\\x80\\xa2 Manage programming and scripting duties  \\xe2\\x80\\xa2 Create applications and dynamic content for internet users  \\xe2\\x80\\xa2 Integrate databases with web content management systems  \\xe2\\x80\\xa2 Administrate SEOs and related marketing programs  \\xe2\\x80\\xa2 Modify and manage web content for end users  \\xe2\\x80\\xa2 Manage documentation for usability and application solutions  \\xe2\\x80\\xa2 Debug errors and problems within databases and applications  EDUCATIONAL BACKGROUND  University of Manchester  Manchester, CT  2013  Bachelors Degree in Computer Science  GPA: 3.7  ADDITIONAL CAPABILITIES  \\xe2\\x80\\xa2 Thorough knowledge of Internet browsers  \\xe2\\x80\\xa2 Excellent interpersonal and communication skills    \\xe2\\x80\\xa2 High attention to detail  \\xe2\\x80\\xa2 Demonstrated ability to work well under pressure, follow instruction and multitask\"",
-    "annotations": [
-      [
-        1,
-        14,
-        "PERSON"
-      ],
-      [
-        34,
-        48,
-        "LOCATION"
-      ],
-      [
-        116,
-        129,
-        "DESIGNATION"
-      ],
-      [
-        303,
-        331,
-        "EXPERIENCE"
-      ],
-      [
-        1454,
-        1471,
-        "OTHER"
-      ],
-      [
-        1473,
-        1487,
-        "LOCATION"
-      ],
-      [
-        1490,
-        1509,
-        "EXPERIENCE"
-      ],
-      [
-        1511,
-        1524,
-        "DESIGNATION"
-      ],
-      [
-        2017,
-        2041,
-        "OTHER"
-      ],
-      [
-        2043,
-        2057,
-        "LOCATION"
-      ],
-      [
-        2059,
-        2063,
-        "EXPERIENCE"
-      ],
-      [
-        2065,
-        2101,
-        "EDUCATION"
-      ],
-      [
-        164,
-        197,
-        "SKILL"
-      ],
-      [
-        449,
-        462,
-        "SKILL"
-      ],
-      [
-        467,
-        472,
-        "SKILL"
-      ],
-      [
-        625,
-        647,
-        "SKILL"
-      ],
-      [
-        706,
-        732,
-        "SKILL"
-      ],
-      [
-        766,
-        781,
-        "SKILL"
-      ],
-      [
-        796,
-        800,
-        "OTHER"
-      ],
-      [
-        801,
-        806,
-        "OTHER"
-      ],
-      [
-        807,
-        812,
-        "OTHER"
-      ],
-      [
-        814,
-        817,
-        "OTHER"
-      ],
-      [
-        819,
-        826,
-        "OTHER"
-      ],
-      [
-        828,
-        831,
-        "OTHER"
-      ],
-      [
-        836,
-        839,
-        "OTHER"
-      ],
-      [
-        871,
-        881,
-        "OTHER"
-      ],
-      [
-        882,
-        890,
-        "OTHER"
-      ],
-      [
-        892,
-        902,
-        "OTHER"
       ],
       [
         908,
-        919,
-        "OTHER"
-      ],
-      [
-        937,
-        946,
-        "OTHER"
-      ],
-      [
-        948,
-        957,
-        "OTHER"
-      ],
-      [
-        1015,
-        1019,
-        "OTHER"
-      ],
-      [
-        1024,
-        1030,
-        "OTHER"
-      ],
-      [
-        1032,
-        1052,
-        "OTHER"
-      ],
-      [
-        1057,
-        1063,
-        "OTHER"
-      ],
-      [
-        1065,
-        1069,
-        "OTHER"
-      ],
-      [
-        1093,
-        1114,
+        911,
         "SKILL"
       ],
       [
-        2270,
-        2294,
+        1644,
+        1650,
         "SKILL"
       ],
       [
-        2382,
-        2391,
+        1787,
+        1799,
         "SKILL"
       ],
       [
-        2359,
-        2377,
-        "SKILL"
-      ]
-    ]
-  },
-  {
-    "text": "     CURRICULUM – VITAE  \nIMRAN SIDDIQUE\nC-146,  4th Floor, Abul Fazal Enclave-II \nShaheen Bagh, Jamia Nagar \nNew Delhi-110025 \nMobile : +91-8076658437,8882186399\nE-Mail : imransiddique1994@gmail.com \nPost Applied for                                                    :   ……………………………..\nOBJECTIVE:\nTo  provide  comprehensive  care  to  the  patients  with  strict  adherence  to  the\nprofessional ethics by which enhancing knowledge skill and experience. \nEDUCATIONAL QUALIFICATION\n10th Passed from  CBSE. Board, Delhi in2011. \n12th Passed from CBSE. Board, Delhi in 2013.  \nOne year I.T.I. completed with plumber (N.C.V.T) Trade from Govt. I.T.I. \nArab-ki-sarai Nizamuddin New delhi 110013.\nPursuing B.A.(Prog)  final year From Delhi University.   \nWORK EXPERIENCE : \nI have 2 years experience as plumber  technician.\nSTRENGTHS: \nAccepting challenges as opportunity \nHardworking \nHonest, commitment to work \nBelieve in teamwork. \nTECHNICAL SKILLS:  \nBasic Computer Knowledge \nMS Office \nExcel \nInternet Handling \nPage 1 of 2 \n:: 2 ::PERSONAL DETAILS: \nFather’s Name :Mr. Abdul Sattar\nDate of Birth   : 15th July 1994\nMarital Status :  Unmarried \nNationality :Indian \nLanguages Known :Hindi,  English & Urdu \nReligion :Islam \nSex :Male   \nPassport no                                           :         P3843273\nDate of issue                                         :         22/07/2016\nDate of expiry                                       :         21/07/2026\nDECLARATION: \nI hereby declare that the above mentioned particulars are true and correct to the best of\nmy knowledge and belief. \nPlace :  New Delhi \nDate  : _____________           [ IMRAN SIDDIQUE] ",
-    "annotations": [
-      [
-        190,
-        195,
+        1991,
+        1998,
         "SKILL"
       ],
       [
-        424,
-        433,
+        537,
+        540,
         "SKILL"
       ],
       [
-        825,
-        834,
+        570,
+        576,
         "SKILL"
       ],
       [
-        951,
-        957,
+        2317,
+        2331,
         "SKILL"
       ],
       [
-        890,
-        896,
+        685,
+        691,
         "SKILL"
       ],
       [
-        128,
-        134,
+        2088,
+        2096,
         "SKILL"
       ],
       [
-        41,
-        42,
+        1571,
+        1581,
         "SKILL"
       ],
       [
-        1132,
-        1146,
+        882,
+        889,
         "SKILL"
       ],
       [
-        1253,
-        1261,
+        785,
+        792,
         "SKILL"
       ],
       [
-        968,
-        986,
+        947,
+        953,
         "SKILL"
       ],
       [
-        941,
-        957,
+        998,
+        1012,
         "SKILL"
       ],
       [
-        755,
+        775,
+        784,
+        "SKILL"
+      ],
+      [
+        1438,
+        1443,
+        "SKILL"
+      ],
+      [
+        1653,
+        1663,
+        "SKILL"
+      ],
+      [
+        1191,
+        1193,
+        "SKILL"
+      ],
+      [
+        2463,
+        2472,
+        "SKILL"
+      ],
+      [
+        1290,
+        1296,
+        "SKILL"
+      ],
+      [
+        1174,
+        1178,
+        "SKILL"
+      ],
+      [
+        1820,
+        1823,
+        "SKILL"
+      ],
+      [
+        516,
+        528,
+        "SKILL"
+      ],
+      [
+        2672,
+        2677,
+        "SKILL"
+      ],
+      [
+        2062,
+        2065,
+        "SKILL"
+      ],
+      [
+        1356,
+        1369,
+        "SKILL"
+      ],
+      [
+        2489,
+        2494,
+        "SKILL"
+      ],
+      [
+        858,
+        861,
+        "SKILL"
+      ],
+      [
+        1347,
+        1355,
+        "SKILL"
+      ],
+      [
+        701,
+        708,
+        "SKILL"
+      ],
+      [
+        987,
+        989,
+        "SKILL"
+      ],
+      [
+        1551,
+        1568,
+        "SKILL"
+      ],
+      [
+        760,
         770,
         "SKILL"
       ],
       [
-        508,
-        513,
+        1749,
+        1751,
         "SKILL"
       ],
       [
-        1182,
-        1191,
+        890,
+        902,
         "SKILL"
       ],
       [
-        992,
-        998,
-        "SKILL"
-      ],
-      [
-        1223,
-        1231,
-        "SKILL"
-      ],
-      [
-        469,
-        482,
-        "SKILL"
-      ],
-      [
+        1194,
         1199,
-        1204,
         "SKILL"
       ],
       [
-        989,
-        991,
+        2255,
+        2261,
         "SKILL"
       ],
       [
-        782,
-        800,
+        2068,
+        2076,
         "SKILL"
       ],
       [
-        989,
-        998,
+        839,
+        854,
         "SKILL"
       ],
       [
-        876,
-        887,
+        394,
+        397,
         "SKILL"
       ],
       [
-        1001,
+        2656,
+        2667,
+        "SKILL"
+      ],
+      [
+        771,
+        773,
+        "SKILL"
+      ],
+      [
+        1540,
+        1547,
+        "SKILL"
+      ],
+      [
+        1723,
+        1734,
+        "SKILL"
+      ],
+      [
+        692,
+        700,
+        "SKILL"
+      ],
+      [
+        1281,
+        1289,
+        "SKILL"
+      ],
+      [
+        2384,
+        2395,
+        "SKILL"
+      ],
+      [
+        1227,
+        1230,
+        "SKILL"
+      ],
+      [
+        2497,
+        2504,
+        "SKILL"
+      ],
+      [
+        756,
+        758,
+        "SKILL"
+      ],
+      [
+        2088,
+        2105,
+        "SKILL"
+      ],
+      [
+        1825,
+        1829,
+        "SKILL"
+      ],
+      [
+        1325,
+        1335,
+        "SKILL"
+      ],
+      [
+        1560,
+        1568,
+        "SKILL"
+      ],
+      [
+        979,
+        986,
+        "SKILL"
+      ],
+      [
+        454,
+        465,
+        "SKILL"
+      ],
+      [
+        1328,
+        1335,
+        "SKILL"
+      ],
+      [
+        2449,
+        2459,
+        "SKILL"
+      ],
+      [
+        1749,
+        1759,
+        "SKILL"
+      ],
+      [
+        2107,
+        2115,
+        "SKILL"
+      ],
+      [
+        623,
+        628,
+        "SKILL"
+      ],
+      [
+        2572,
+        2580,
+        "SKILL"
+      ],
+      [
+        1313,
+        1316,
+        "SKILL"
+      ],
+      [
         1006,
+        1012,
         "SKILL"
       ],
       [
-        5,
-        15,
+        1495,
+        1504,
+        "SKILL"
+      ]
+    ]
+  },
+  {
+    "text": "                                         Curriculum Vitae           \n                                                                                                                                     \n                                                  \n Vijay Kumar Nigam                                                                           Phone: - \n8085852424                      \nS/o Shri Suresh Prasad Nigam                                                         E-mail I’d.:- \nvijayngm10@gmail.com\n Akash Ganga Nagar Panna Road\nPateri, Satna (M.P.) \nPin: - 485001\nCAREER OBJECTIVE:-                 \nWilling to Work a reputed organization With full devotion, sincerity and honesty up \nto the best of my capabilities.\nQUALIFACTION DETAIL:-\nEXAM/ DEGREE YEAR UNIVERSITY/BOARD\nM.B.A. (H.R./ Marketing) 2011Punjab Technical University\nB.com (Computer Application) 2008A.P.S.U.  REWA (M.P.)\n12 th Board 2005M.P. Board Bhopal\n10 th  Board 2003M.P. Board Bhopal\nTRAINING:-\n.  Training attend on “ Performance Appraisal Of Employees ” from Birla Gold  \nCement Maihar (M.P.)\nCO-CARRICULAR ACTIVITIES:-\n.  Organize Quiz Competition With Management Team.\n.  Participated in Class project.\nPERSONAL SKILLS:-\n.  Ability to deal with people diplomatically..  Willingness to work hard and learn.\n.  Self motivated.\nPERSONAL PROFILE:-\n  Nationality                :  Indian\n  Gender                      :   Male\n Date of Birth            :   5/7/1988\nStatus                          :  married\nFather’s Name           :  Mr. Suresh Prasad Nigam\nPermanent Address:   Akash Ganaga Nagar Panna Road, Pateri, Satna (M.P.)\nWORKEING EXPERIENCE:-\n1:- worked with     “ Oppo Mobile Company. ” with the post of “ O.S.R.E. \n(OPPO SALES RETAIL EXECUTIVE)”  in Satna (m.p.) at least “ 1 \nyear” 2 months .\n2:- Worked with   “Reliance jio ” as a part of “reliance retail \nlimited”. As \n Profile of “cashier/sales associate”  in satna branch (m.p.),   “1 \nyear 4 months”.\n3:- Worked with       “Aero Club “woodland ” Company at Satna Branch As\na post of   “Sales Executive ” for “1 year”.\n Declaration:-\nI hereby declare that above information is correct to the best of my knowledge and \nbelief.\nPlace: - satna (m.p.)                                                                                        \nVijay Kumar Nigam",
+    "annotations": [
+      [
+        1212,
+        1219,
         "SKILL"
       ],
       [
-        196,
-        199,
+        501,
+        506,
+        "SKILL"
+      ],
+      [
+        2156,
+        2165,
+        "SKILL"
+      ],
+      [
+        801,
+        810,
+        "SKILL"
+      ],
+      [
+        1003,
+        1014,
+        "SKILL"
+      ],
+      [
+        41,
+        57,
+        "SKILL"
+      ],
+      [
+        1200,
+        1206,
+        "SKILL"
+      ],
+      [
+        1672,
+        1679,
+        "SKILL"
+      ],
+      [
+        1983,
+        1987,
+        "SKILL"
+      ],
+      [
+        1665,
+        1671,
+        "SKILL"
+      ],
+      [
+        797,
+        798,
+        "SKILL"
+      ],
+      [
+        1140,
+        1150,
+        "SKILL"
+      ],
+      [
+        1897,
+        1906,
+        "SKILL"
+      ],
+      [
+        556,
+        557,
+        "SKILL"
+      ],
+      [
+        781,
+        786,
+        "SKILL"
+      ],
+      [
+        1151,
+        1155,
+        "SKILL"
+      ],
+      [
+        752,
+        756,
+        "SKILL"
+      ],
+      [
+        1028,
+        1037,
         "SKILL"
       ],
       [
@@ -1443,68 +1968,293 @@
         "SKILL"
       ],
       [
-        1161,
-        1172,
+        2127,
+        2129,
         "SKILL"
       ],
       [
-        930,
-        938,
+        639,
+        651,
         "SKILL"
       ],
       [
-        1207,
-        1214,
+        716,
+        728,
         "SKILL"
       ],
       [
-        813,
+        686,
+        693,
+        "SKILL"
+      ],
+      [
+        860,
+        871,
+        "SKILL"
+      ],
+      [
+        1058,
+        1064,
+        "SKILL"
+      ],
+      [
+        1543,
+        1552,
+        "SKILL"
+      ],
+      [
+        347,
+        352,
+        "SKILL"
+      ],
+      [
+        1373,
+        1379,
+        "SKILL"
+      ],
+      [
+        41,
+        51,
+        "SKILL"
+      ],
+      [
+        507,
+        510,
+        "SKILL"
+      ],
+      [
+        2115,
+        2126,
+        "SKILL"
+      ],
+      [
+        758,
+        764,
+        "SKILL"
+      ],
+      [
+        1302,
+        1311,
+        "SKILL"
+      ],
+      [
+        672,
+        681,
+        "SKILL"
+      ],
+      [
+        743,
+        749,
+        "SKILL"
+      ],
+      [
+        851,
+        859,
+        "SKILL"
+      ],
+      [
+        1334,
+        1345,
+        "SKILL"
+      ],
+      [
+        1093,
+        1103,
+        "SKILL"
+      ],
+      [
+        1233,
+        1239,
+        "SKILL"
+      ],
+      [
+        624,
+        628,
+        "SKILL"
+      ],
+      [
+        1718,
+        1723,
+        "SKILL"
+      ],
+      [
+        1182,
+        1189,
+        "SKILL"
+      ],
+      [
+        1191,
+        1199,
+        "SKILL"
+      ],
+      [
+        1109,
+        1117,
+        "SKILL"
+      ],
+      [
+        1003,
+        1024,
+        "SKILL"
+      ],
+      [
         823,
+        832,
         "SKILL"
       ],
       [
-        755,
-        759,
+        1724,
+        1730,
+        "SKILL"
+      ]
+    ]
+  },
+  {
+    "text": "RESUME\nRAVI KUMAR\nV.P.O.  Lamlehri, \nTehsil and Distt. Una (HP) 174303 \nContact No:- 8628904537\nEmail: kmravi199806@gmail.com\nOBJECTIVE\nI am looking forward for a long term relationship with an organization \nwhere I can learn maximise my skills.\nEDUCATIONAL QUALIFICATION\n10TH Passed from HP Board Dharamshala in 2014 .\nTECHNICAL ABILTIES\nExcellent technical skills such as a civil helper, welding and furniture \nwork,\nWORK EXPERIENCE\n\nPERSONAL DETAILS\nFather’s Name :Sh. Shamsher Singh\nDate of Birth :06-01-1998\nMarital status :Single\nSex :Male\nReligion :Hindu\nLanguages Known :English, Hindi & Punjabi \nNationality :Indian\nHobbies :listening to music & Playing\nDeclaration:-        I hereby declare that the information is true & \ncorrect to the best of my knowledge.\nDate:  _________            (Signature)\nPlace:__________ Ravi Kumar",
+    "annotations": [
+      [
+        116,
+        121,
         "SKILL"
       ],
       [
-        1048,
-        1056,
+        762,
+        771,
         "SKILL"
       ],
       [
-        434,
-        439,
+        0,
+        6,
         "SKILL"
       ],
       [
-        1018,
-        1026,
+        238,
+        244,
         "SKILL"
       ],
       [
-        1009,
-        1017,
+        216,
+        219,
         "SKILL"
       ],
       [
-        398,
+        516,
+        530,
+        "SKILL"
+      ],
+      [
+        351,
+        367,
+        "SKILL"
+      ],
+      [
+        421,
+        436,
+        "SKILL"
+      ],
+      [
+        293,
+        298,
+        "SKILL"
+      ],
+      [
+        565,
+        574,
+        "SKILL"
+      ],
+      [
+        725,
+        727,
+        "SKILL"
+      ],
+      [
+        599,
+        606,
+        "SKILL"
+      ],
+      [
+        194,
+        206,
+        "SKILL"
+      ],
+      [
+        173,
+        185,
+        "SKILL"
+      ],
+      [
+        549,
+        557,
+        "SKILL"
+      ],
+      [
+        258,
+        271,
+        "SKILL"
+      ],
+      [
+        591,
+        596,
+        "SKILL"
+      ],
+      [
+        60,
+        62,
+        "SKILL"
+      ],
+      [
+        650,
+        655,
+        "SKILL"
+      ],
+      [
+        96,
+        101,
+        "SKILL"
+      ],
+      [
         404,
+        413,
         "SKILL"
       ],
       [
-        898,
-        908,
+        122,
+        125,
         "SKILL"
       ],
       [
-        941,
-        950,
+        713,
+        724,
         "SKILL"
       ],
       [
-        385,
-        397,
+        608,
+        619,
+        "SKILL"
+      ],
+      [
+        582,
+        589,
+        "SKILL"
+      ],
+      [
+        415,
+        419,
+        "SKILL"
+      ],
+      [
+        637,
+        646,
+        "SKILL"
+      ],
+      [
+        439,
+        447,
+        "SKILL"
+      ],
+      [
+        321,
+        330,
         "SKILL"
       ]
     ]

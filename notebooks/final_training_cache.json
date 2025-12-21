@@ -1,0 +1,16 @@
+{
+  "output_dir": "c:\\Users\\HOANG PHI LONG DANG\\repos\\resume-ner-azureml\\outputs\\final_training\\distilbert",
+  "backbone": "distilbert",
+  "config": {
+    "backbone": "distilbert",
+    "learning_rate": 3.5346976847091155e-05,
+    "dropout": 0.19046637838997804,
+    "weight_decay": 0.005104429197977338,
+    "batch_size": 4,
+    "epochs": 2,
+    "random_seed": 42,
+    "early_stopping_enabled": false,
+    "use_combined_data": true,
+    "use_all_data": true
+  }
+}

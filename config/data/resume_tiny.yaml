@@ -5,6 +5,10 @@ description: "Tiny smoke-test subset of Resume NER dataset \n(short-text version
   \ seeds for broader test coverage.\n"
 local_path: ../dataset_tiny
 seed: 0  # Seed number for dataset subdirectory (seed0, seed1, etc.)
+splitting:
+  train_test_ratio: 0.8
+  stratified: false  # Disabled for tiny datasets (too few samples per entity combination)
+  random_seed: 42
 schema:
   format: json
   annotation_format: character_spans

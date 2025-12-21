@@ -236,10 +236,8 @@ def run_training_trial(
                 metrics = json.load(f)
                 if objective_metric in metrics:
                     metric_value = float(metrics[objective_metric])
-                    # Debug: print which file was read
-                    file_mtime = os.path.getmtime(metrics_file)
-                    print(
-                        f"Read {objective_metric}={metric_value} from {metrics_file} (modified: {file_mtime})")
+                    # Store full metrics for callback display (avoid duplication here)
+                    # Just log that we read the objective metric
                     return metric_value
                 else:
                     print(
@@ -384,12 +382,14 @@ def create_local_hpo_objective(
             k_fold_config = hpo_config.get("k_fold", {})
             random_seed = k_fold_config.get("random_seed", 42)
             shuffle = k_fold_config.get("shuffle", True)
+            stratified = k_fold_config.get("stratified", False)
 
             fold_splits = create_kfold_splits(
                 dataset=train_data,
                 k=k_folds,
                 random_seed=random_seed,
                 shuffle=shuffle,
+                stratified=stratified,
             )
 
             # Save splits for reproducibility
@@ -400,6 +400,7 @@ def create_local_hpo_objective(
                     "k": k_folds,
                     "random_seed": random_seed,
                     "shuffle": shuffle,
+                    "stratified": stratified,
                 }
             )
 
@@ -447,6 +448,46 @@ def create_local_hpo_objective(
                 mlflow_experiment_name=mlflow_experiment_name,
                 objective_metric=objective_metric,
             )
+
+        # Store additional metrics in trial user attributes for callback display
+        # Try to read full metrics from the trial output directory
+        if fold_splits is not None:
+            # CV: read from last fold's output (fold indices are 0-based, so last is len(fold_splits)-1)
+            # Fold output directory format: trial_{number}_fold{fold_idx}
+            last_fold_idx = len(fold_splits) - 1
+            trial_output_dir = output_base_dir / \
+                f"trial_{trial.number}_fold{last_fold_idx}"
+            metrics_file = trial_output_dir / "metrics.json"
+        else:
+            # Single training: read from trial output directory
+            trial_output_dir = output_base_dir / f"trial_{trial.number}"
+            metrics_file = trial_output_dir / "metrics.json"
+
+        if metrics_file.exists():
+            try:
+                import json
+                with open(metrics_file, "r") as f:
+                    all_metrics = json.load(f)
+                    # Store key metrics in user attributes for callback
+                    if "macro-f1-span" in all_metrics:
+                        trial.set_user_attr("macro_f1_span", float(
+                            all_metrics["macro-f1-span"]))
+                    if "loss" in all_metrics:
+                        trial.set_user_attr("loss", float(all_metrics["loss"]))
+                    if "per_entity" in all_metrics and isinstance(all_metrics["per_entity"], dict):
+                        entity_count = len(all_metrics["per_entity"])
+                        trial.set_user_attr("entity_count", entity_count)
+                        # Store average entity F1
+                        entity_f1s = [
+                            v.get("f1", 0.0)
+                            for v in all_metrics["per_entity"].values()
+                            if isinstance(v, dict) and isinstance(v.get("f1"), (int, float))
+                        ]
+                        if entity_f1s:
+                            trial.set_user_attr("avg_entity_f1", float(
+                                sum(entity_f1s) / len(entity_f1s)))
+            except Exception:
+                pass  # Silently fail if we can't read metrics
 
         # Report to Optuna
         trial.report(metric_value, step=0)
@@ -499,6 +540,8 @@ def run_local_hpo_sweep(
         sampler = RandomSampler()  # Default to random
 
     # Create study
+    # Print study creation message explicitly to ensure visibility
+    print(f"\n[HPO] Starting optimization for {backbone}...")
     study = optuna.create_study(
         direction=direction,
         sampler=sampler,
@@ -523,6 +566,28 @@ def run_local_hpo_sweep(
         fold_splits_file=fold_splits_file,
     )
 
+    # Create callback to display additional metrics after each trial
+    def trial_complete_callback(study: Any, trial: Any) -> None:
+        """Callback to print additional metrics after trial completes."""
+        # Import optuna for TrialState enum
+        optuna_module, _, _, _ = _import_optuna()
+        if trial.state == optuna_module.trial.TrialState.COMPLETE:
+            attrs = trial.user_attrs
+            extra_info = []
+
+            if "macro_f1_span" in attrs:
+                extra_info.append(
+                    f"macro-f1-span={attrs['macro_f1_span']:.6f}")
+            if "loss" in attrs:
+                extra_info.append(f"loss={attrs['loss']:.6f}")
+            if "avg_entity_f1" in attrs:
+                entity_count = attrs.get("entity_count", "?")
+                extra_info.append(
+                    f"avg_entity_f1={attrs['avg_entity_f1']:.6f} ({entity_count} entities)")
+
+            if extra_info:
+                print(f"  Additional metrics: {' | '.join(extra_info)}")
+
     # Run optimization
     max_trials = hpo_config["sampling"]["max_trials"]
     timeout_seconds = hpo_config["sampling"]["timeout_minutes"] * 60
@@ -532,6 +597,7 @@ def run_local_hpo_sweep(
         n_trials=max_trials,
         timeout=timeout_seconds,
         show_progress_bar=True,
+        callbacks=[trial_complete_callback],
     )
 
     return study

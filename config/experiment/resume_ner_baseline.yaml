@@ -6,6 +6,7 @@ model_config: "model/distilbert.yaml"
 train_config: "train.yaml"
 hpo_config: "hpo/smoke.yaml"      # default HPO config; stages can override if needed
 env_config: "env/azure.yaml"
+benchmark_config: "benchmark.yaml"
 
 # High-level orchestration design:
 # - Stages: smoke → hpo → training

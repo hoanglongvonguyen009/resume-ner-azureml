@@ -30,9 +30,19 @@ Thumbs.db
 *.pem
 *.key
 
+# Local data and backups
+dataset_backup/
 
+# Planning documents (temporary)
+docs/plans/
 
+# Output directories (generated files)
+outputs/
+mlruns/
+*.db
 
-
+# Cache files
+*.cache
+.coverage
 
 

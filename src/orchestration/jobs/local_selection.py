@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+import json
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+
+# Model speed characteristics (parameter count as proxy for inference speed)
+MODEL_SPEED_SCORES = {
+    "distilbert": 1.0,   # ~66M parameters (baseline)
+    "deberta": 2.79,     # ~184M parameters (~2.79x slower)
+}
 
 
 def _import_optuna():
@@ -97,34 +106,64 @@ def extract_best_config_from_study(
 
 
 def select_best_configuration_across_studies(
-    studies: Dict[str, Any],
-    hpo_config: Dict[str, Any],
-    dataset_version: str,
+    studies: Optional[Dict[str, Any]] = None,
+    hpo_config: Dict[str, Any] = None,
+    dataset_version: str = None,
+    hpo_output_dir: Optional[Path] = None,
+    accuracy_threshold: Optional[float] = None,
+    use_relative_threshold: bool = True,
+    min_accuracy_gain: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Select the best configuration across multiple backbone studies.
 
+    Supports both in-memory Optuna studies and disk-based selection from saved logs.
+    Implements accuracy-speed tradeoff with configurable threshold.
+
     Args:
-        studies: Dictionary mapping backbone names to Optuna studies.
+        studies: Dictionary mapping backbone names to Optuna studies (optional).
         hpo_config: HPO configuration dictionary (for objective metric).
         dataset_version: Dataset version string.
+        hpo_output_dir: Path to HPO outputs directory for disk-based selection (optional).
+        accuracy_threshold: Threshold for accuracy-speed tradeoff (optional).
+        use_relative_threshold: If True, threshold is relative to best accuracy (default: True).
+        min_accuracy_gain: Minimum accuracy gain to justify slower model (optional).
 
     Returns:
         Best configuration dictionary across all backbones.
 
     Raises:
-        ValueError: If no valid trials found in any study.
+        ValueError: If no valid trials found in any study or on disk.
     """
-    # Lazy import optuna
+    # If no studies but hpo_output_dir provided, use disk-based selection
+    if (studies is None or len(studies) == 0) and hpo_output_dir is not None:
+        return select_best_from_disk(
+            hpo_output_dir=hpo_output_dir,
+            hpo_config=hpo_config,
+            dataset_version=dataset_version,
+            accuracy_threshold=accuracy_threshold,
+            use_relative_threshold=use_relative_threshold,
+            min_accuracy_gain=min_accuracy_gain,
+        )
+
+    # Otherwise, use Optuna-based selection (enhanced with accuracy-speed tradeoff)
     optuna = _import_optuna()
 
     objective_metric = hpo_config["objective"]["metric"]
     goal = hpo_config["objective"]["goal"]
 
-    best_config = None
-    best_value = None
-    best_backbone = None
+    # Get config from hpo_config if not provided
+    selection_config = hpo_config.get("selection", {})
+    if accuracy_threshold is None:
+        accuracy_threshold = selection_config.get("accuracy_threshold")
+    if use_relative_threshold is None:
+        use_relative_threshold = selection_config.get(
+            "use_relative_threshold", True)
+    if min_accuracy_gain is None:
+        min_accuracy_gain = selection_config.get("min_accuracy_gain")
 
+    # Collect all candidates with their metrics and speed scores
+    candidates = []
     for backbone, study in studies.items():
         if study.best_trial is None:
             continue
@@ -133,23 +172,34 @@ def select_best_configuration_across_studies(
         if trial_value is None:
             continue
 
-        if best_value is None:
-            best_value = trial_value
-            best_config = extract_best_config_from_study(
-                study, backbone, dataset_version, objective_metric)
-            best_backbone = backbone
-        elif goal == "maximize" and trial_value > best_value:
-            best_value = trial_value
-            best_config = extract_best_config_from_study(
-                study, backbone, dataset_version, objective_metric)
-            best_backbone = backbone
-        elif goal == "minimize" and trial_value < best_value:
-            best_value = trial_value
-            best_config = extract_best_config_from_study(
-                study, backbone, dataset_version, objective_metric)
-            best_backbone = backbone
+        config = extract_best_config_from_study(
+            study, backbone, dataset_version, objective_metric)
 
-    if best_config is None:
+        # Try to load benchmark data if hpo_output_dir is provided
+        speed_score = MODEL_SPEED_SCORES.get(backbone, 10.0)
+        speed_data_source = "parameter_proxy"
+        benchmark_latency = None
+        
+        if hpo_output_dir is not None:
+            # Try to find trial directory and load benchmark
+            trial_number = study.best_trial.number
+            trial_dir = hpo_output_dir / backbone / f"trial_{trial_number}"
+            benchmark_latency = load_benchmark_speed_score(trial_dir)
+            
+            if benchmark_latency is not None:
+                speed_score = benchmark_latency
+                speed_data_source = "benchmark"
+
+        candidates.append({
+            "backbone": backbone,
+            "accuracy": trial_value,
+            "config": config,
+            "speed_score": speed_score,  # Raw latency or proxy score
+            "speed_data_source": speed_data_source,
+            "benchmark_latency_ms": benchmark_latency,
+        })
+
+    if not candidates:
         error_parts = [
             f"No valid trials found in any study.",
             f"Looking for metric '{objective_metric}' with goal '{goal}'.",
@@ -163,4 +213,430 @@ def select_best_configuration_across_studies(
             )
         raise ValueError("\n".join(error_parts))
 
-    return best_config
+    # Normalize speed scores relative to fastest model
+    raw_speed_scores = [c["speed_score"] for c in candidates]
+    fastest_speed = min(raw_speed_scores)
+    
+    for candidate in candidates:
+        # Normalize: fastest model gets 1.0, others are relative multiples
+        candidate["speed_score"] = candidate["speed_score"] / fastest_speed
+
+    # Sort by accuracy (descending)
+    candidates.sort(key=lambda x: x["accuracy"], reverse=True)
+    best_candidate = candidates[0]
+    best_accuracy = best_candidate["accuracy"]
+
+    # Determine effective threshold
+    if accuracy_threshold is not None:
+        if use_relative_threshold:
+            effective_threshold = best_accuracy * accuracy_threshold
+        else:
+            effective_threshold = accuracy_threshold
+    else:
+        effective_threshold = None
+
+    # Apply accuracy-speed tradeoff if threshold is set
+    selected = best_candidate
+    selection_reason = f"Best accuracy ({best_accuracy:.4f})"
+
+    if accuracy_threshold is not None and len(candidates) > 1:
+        # Find fastest candidate within threshold
+        faster_candidates = [
+            c for c in candidates[1:]
+            if c["speed_score"] < best_candidate["speed_score"]
+        ]
+
+        for candidate in faster_candidates:
+            accuracy_diff = best_accuracy - candidate["accuracy"]
+
+            # Check threshold
+            within_threshold = accuracy_diff <= effective_threshold
+
+            # Check minimum gain
+            meets_min_gain = True
+            if min_accuracy_gain is not None:
+                if use_relative_threshold:
+                    relative_gain = accuracy_diff / best_accuracy
+                    meets_min_gain = relative_gain >= min_accuracy_gain
+                else:
+                    meets_min_gain = accuracy_diff >= min_accuracy_gain
+
+            if within_threshold and meets_min_gain:
+                selected = candidate
+                selection_reason = (
+                    f"Accuracy within threshold ({accuracy_threshold:.1%} "
+                    f"{'relative' if use_relative_threshold else 'absolute'}), "
+                    f"preferring faster model ({candidate['backbone']}). "
+                    f"Accuracy diff: {accuracy_diff:.4f}"
+                )
+                break
+
+    # Build result with enhanced metadata
+    result = selected["config"]
+    result["selection_criteria"]["selection_strategy"] = (
+        "accuracy_first_with_threshold" if accuracy_threshold else "accuracy_only"
+    )
+    result["selection_criteria"]["reason"] = selection_reason
+
+    if accuracy_threshold is not None:
+        result["selection_criteria"]["accuracy_threshold"] = accuracy_threshold
+        result["selection_criteria"]["use_relative_threshold"] = use_relative_threshold
+        result["selection_criteria"]["all_candidates"] = [
+            {
+                "backbone": c["backbone"],
+                "accuracy": c["accuracy"],
+                "speed_score": c["speed_score"],
+                "speed_data_source": c.get("speed_data_source", "parameter_proxy"),
+                "benchmark_latency_ms": c.get("benchmark_latency_ms"),
+            }
+            for c in candidates
+        ]
+        
+        # Add speed_data_source for selected model
+        result["selection_criteria"]["speed_data_source"] = selected.get("speed_data_source", "parameter_proxy")
+        if len(candidates) > 1:
+            result["selection_criteria"]["accuracy_diff_from_best"] = (
+                best_accuracy - selected["accuracy"]
+            )
+
+    return result
+
+
+def load_benchmark_speed_score(trial_dir: Path) -> Optional[float]:
+    """
+    Load speed score from benchmark.json if available.
+    
+    Args:
+        trial_dir: Path to trial directory containing benchmark.json.
+    
+    Returns:
+        Latency in milliseconds (batch_size=1 mean), or None if not available.
+    """
+    benchmark_file = trial_dir / "benchmark.json"
+    
+    if not benchmark_file.exists():
+        return None
+    
+    try:
+        with open(benchmark_file, "r") as f:
+            benchmark = json.load(f)
+        
+        # Extract batch_1 mean latency
+        batch_1_data = benchmark.get("batch_1", {})
+        if isinstance(batch_1_data, dict) and "mean_ms" in batch_1_data:
+            return float(batch_1_data["mean_ms"])
+        
+        return None
+    except Exception:
+        # Return None if benchmark file can't be read or parsed
+        return None
+
+
+def load_best_trial_from_disk(
+    hpo_output_dir: Path,
+    backbone: str,
+    objective_metric: str = "macro-f1",
+) -> Optional[Dict[str, Any]]:
+    """
+    Load best trial configuration from saved HPO outputs on disk.
+
+    Works by reading metrics.json files from trial directories.
+    This allows selection even after notebook restart.
+
+    Args:
+        hpo_output_dir: Path to HPO outputs directory (e.g., outputs/hpo).
+        backbone: Model backbone name.
+        objective_metric: Name of the objective metric to optimize.
+
+    Returns:
+        Dictionary with best trial info, or None if no trials found.
+    """
+    backbone_dir = hpo_output_dir / backbone
+
+    if not backbone_dir.exists():
+        return None
+
+    best_metric = None
+    best_trial_dir = None
+    best_trial_name = None
+
+    # Find all trial directories
+    for trial_dir in backbone_dir.iterdir():
+        if not trial_dir.is_dir() or not trial_dir.name.startswith("trial_"):
+            continue
+
+        # Check for metrics.json
+        metrics_file = trial_dir / "metrics.json"
+        if not metrics_file.exists():
+            continue
+
+        # Read metrics
+        try:
+            with open(metrics_file, "r") as f:
+                metrics = json.load(f)
+
+            if objective_metric in metrics:
+                metric_value = metrics[objective_metric]
+
+                # For k-fold CV, we want the average across folds
+                # Check if this is a fold-specific trial or aggregated
+                if "_fold" in trial_dir.name:
+                    # This is a fold-specific trial - we'll aggregate later
+                    continue
+
+                if best_metric is None or metric_value > best_metric:
+                    best_metric = metric_value
+                    best_trial_dir = trial_dir
+                    best_trial_name = trial_dir.name
+        except Exception as e:
+            print(f"Warning: Could not read {metrics_file}: {e}")
+            continue
+
+    # If no aggregated trials found, try to aggregate from fold-specific trials
+    if best_trial_dir is None:
+        # Group by trial number (e.g., trial_0_fold0, trial_0_fold1 -> trial_0)
+        trial_groups = {}
+        for trial_dir in backbone_dir.iterdir():
+            if not trial_dir.is_dir() or not trial_dir.name.startswith("trial_"):
+                continue
+
+            metrics_file = trial_dir / "metrics.json"
+            if not metrics_file.exists():
+                continue
+
+            # Extract trial number (e.g., "trial_0" from "trial_0_fold0")
+            trial_base = trial_dir.name.split("_fold")[0]
+
+            try:
+                with open(metrics_file, "r") as f:
+                    metrics = json.load(f)
+
+                if objective_metric in metrics:
+                    if trial_base not in trial_groups:
+                        trial_groups[trial_base] = []
+                    trial_groups[trial_base].append({
+                        "metric": metrics[objective_metric],
+                        "trial_dir": trial_dir,
+                    })
+            except Exception:
+                continue
+
+        # Find best trial (highest average across folds)
+        for trial_base, fold_metrics in trial_groups.items():
+            avg_metric = sum(m["metric"]
+                             for m in fold_metrics) / len(fold_metrics)
+
+            if best_metric is None or avg_metric > best_metric:
+                best_metric = avg_metric
+                # Use first fold's directory as representative
+                best_trial_dir = fold_metrics[0]["trial_dir"]
+                best_trial_name = trial_base
+
+    if best_trial_dir is None:
+        return None
+
+    # Load metrics
+    metrics_file = best_trial_dir / "metrics.json"
+    with open(metrics_file, "r") as f:
+        metrics = json.load(f)
+
+    return {
+        "backbone": backbone,
+        "trial_name": best_trial_name,
+        "trial_dir": str(best_trial_dir),
+        "accuracy": best_metric,
+        "metrics": metrics,
+    }
+
+
+def select_best_from_disk(
+    hpo_output_dir: Path,
+    hpo_config: Dict[str, Any],
+    dataset_version: str,
+    backbones: Optional[List[str]] = None,
+    accuracy_threshold: Optional[float] = None,
+    use_relative_threshold: bool = True,
+    min_accuracy_gain: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Select best configuration from saved HPO outputs on disk.
+
+    This function works entirely from saved metrics.json files,
+    so it can be used even after notebook restart.
+
+    Args:
+        hpo_output_dir: Path to HPO outputs directory (e.g., outputs/hpo).
+        hpo_config: HPO configuration dictionary.
+        dataset_version: Dataset version string.
+        backbones: List of backbone names to consider (default: all found).
+        accuracy_threshold: Threshold for accuracy-speed tradeoff.
+        use_relative_threshold: If True, threshold is relative to best accuracy.
+        min_accuracy_gain: Minimum accuracy gain to justify slower model.
+
+    Returns:
+        Best configuration dictionary matching existing format.
+
+    Raises:
+        ValueError: If no valid HPO results found.
+    """
+    objective_metric = hpo_config["objective"]["metric"]
+
+    # Get config from hpo_config if not provided
+    selection_config = hpo_config.get("selection", {})
+    if accuracy_threshold is None:
+        accuracy_threshold = selection_config.get("accuracy_threshold")
+    if use_relative_threshold is None:
+        use_relative_threshold = selection_config.get(
+            "use_relative_threshold", True)
+    if min_accuracy_gain is None:
+        min_accuracy_gain = selection_config.get("min_accuracy_gain")
+
+    # Determine backbones to check
+    if backbones is None:
+        # Auto-detect from directory structure
+        backbones = []
+        if hpo_output_dir.exists():
+            for item in hpo_output_dir.iterdir():
+                if item.is_dir() and not item.name.startswith("."):
+                    backbones.append(item.name)
+
+    # Load best trial for each backbone
+    candidates = []
+    for backbone in backbones:
+        candidate = load_best_trial_from_disk(
+            hpo_output_dir, backbone, objective_metric
+        )
+        if candidate:
+            trial_dir = Path(candidate["trial_dir"])
+            
+            # Try to load benchmark data, fall back to parameter proxy
+            benchmark_latency = load_benchmark_speed_score(trial_dir)
+            if benchmark_latency is not None:
+                speed_score = benchmark_latency
+                speed_data_source = "benchmark"
+            else:
+                speed_score = MODEL_SPEED_SCORES.get(backbone, 10.0)
+                speed_data_source = "parameter_proxy"
+            
+            candidates.append({
+                "backbone": candidate["backbone"],
+                "accuracy": candidate["accuracy"],
+                "trial_name": candidate["trial_name"],
+                "trial_dir": candidate["trial_dir"],
+                "metrics": candidate["metrics"],
+                "speed_score": speed_score,  # Raw latency or proxy score
+                "speed_data_source": speed_data_source,
+                "benchmark_latency_ms": benchmark_latency,  # None if not available
+            })
+
+    if not candidates:
+        raise ValueError(
+            f"No valid HPO results found in {hpo_output_dir}. "
+            f"Checked backbones: {backbones}"
+        )
+
+    # Normalize speed scores relative to fastest model
+    # If using benchmark data, normalize latencies; if using proxy, already normalized
+    raw_speed_scores = [c["speed_score"] for c in candidates]
+    fastest_speed = min(raw_speed_scores)
+    
+    for candidate in candidates:
+        # Normalize: fastest model gets 1.0, others are relative multiples
+        candidate["speed_score"] = candidate["speed_score"] / fastest_speed
+
+    # Sort by accuracy (descending)
+    candidates.sort(key=lambda x: x["accuracy"], reverse=True)
+    best_candidate = candidates[0]
+    best_accuracy = best_candidate["accuracy"]
+
+    # Determine effective threshold
+    if accuracy_threshold is not None:
+        if use_relative_threshold:
+            effective_threshold = best_accuracy * accuracy_threshold
+        else:
+            effective_threshold = accuracy_threshold
+    else:
+        effective_threshold = None
+
+    # Select best configuration
+    selected = best_candidate
+    selection_reason = f"Best accuracy ({best_accuracy:.4f})"
+
+    if accuracy_threshold is not None and len(candidates) > 1:
+        # Find fastest candidate within threshold
+        faster_candidates = [
+            c for c in candidates[1:]
+            if c["speed_score"] < best_candidate["speed_score"]
+        ]
+
+        for candidate in faster_candidates:
+            accuracy_diff = best_accuracy - candidate["accuracy"]
+
+            # Check threshold
+            within_threshold = accuracy_diff <= effective_threshold
+
+            # Check minimum gain
+            meets_min_gain = True
+            if min_accuracy_gain is not None:
+                if use_relative_threshold:
+                    relative_gain = accuracy_diff / best_accuracy
+                    meets_min_gain = relative_gain >= min_accuracy_gain
+                else:
+                    meets_min_gain = accuracy_diff >= min_accuracy_gain
+
+            if within_threshold and meets_min_gain:
+                selected = candidate
+                selection_reason = (
+                    f"Accuracy within threshold ({accuracy_threshold:.1%} "
+                    f"{'relative' if use_relative_threshold else 'absolute'}), "
+                    f"preferring faster model ({candidate['backbone']}). "
+                    f"Accuracy diff: {accuracy_diff:.4f}"
+                )
+                break
+
+    # Build result dictionary (matching format from Optuna-based selection)
+    # Note: Hyperparameters are not available from disk, so we leave empty
+    # They can be loaded separately if needed from checkpoint configs
+
+    # Build selection criteria
+    selection_criteria = {
+        "metric": objective_metric,
+        "goal": "maximize",
+        "best_value": selected["accuracy"],
+        "backbone": selected["backbone"],
+        "selection_strategy": (
+            "accuracy_first_with_threshold" if accuracy_threshold else "accuracy_only"
+        ),
+        "reason": selection_reason,
+    }
+
+    if accuracy_threshold is not None:
+        selection_criteria["accuracy_threshold"] = accuracy_threshold
+        selection_criteria["use_relative_threshold"] = use_relative_threshold
+        selection_criteria["all_candidates"] = [
+            {
+                "backbone": c["backbone"],
+                "accuracy": c["accuracy"],
+                "speed_score": c["speed_score"],
+                "speed_data_source": c.get("speed_data_source", "parameter_proxy"),
+                "benchmark_latency_ms": c.get("benchmark_latency_ms"),
+            }
+            for c in candidates
+        ]
+        
+        # Add speed_data_source for selected model
+        selection_criteria["speed_data_source"] = selected.get("speed_data_source", "parameter_proxy")
+        if len(candidates) > 1:
+            selection_criteria["accuracy_diff_from_best"] = (
+                best_accuracy - selected["accuracy"]
+            )
+
+    return {
+        "trial_name": selected["trial_name"],
+        "trial_id": selected["trial_name"],  # Use trial name as ID
+        "backbone": selected["backbone"],
+        "hyperparameters": {},  # Empty - not available from disk
+        "metrics": selected["metrics"],
+        "dataset_version": dataset_version,
+        "selection_criteria": selection_criteria,
+    }

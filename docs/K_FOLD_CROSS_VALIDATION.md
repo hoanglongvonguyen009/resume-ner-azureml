@@ -157,6 +157,13 @@ python src/train.py \
 4. **Document k Value**: Record k value used in experiment logs
 5. **Compare CV vs Non-CV**: Run both to understand impact on model selection
 
+## Stratified CV for Imbalanced NER
+
+- Why: Entity types are highly imbalanced (SKILL dominates; EMAIL/PHONE rare). Stratified folds reduce the chance of missing rare entities in a fold.
+- How: Use entity-presence labels per document (tuple of entity types present) as stratification labels.
+- Config: `config/hpo/*.yaml` → `k_fold.stratified: true`
+- Validation: After split, print per-fold entity counts to verify no entity type is missing.
+
 ## Troubleshooting
 
 ### Error: "Cannot create k folds with only n samples"
@@ -207,4 +214,5 @@ Load fold splits from JSON file.
 
 - [Local Training Guide](LOCAL_TRAINING.md) - Complete local training workflow
 - [Platform Adapter Architecture](PLATFORM_ADAPTER_ARCHITECTURE.md) - How platform adapters work
+
 

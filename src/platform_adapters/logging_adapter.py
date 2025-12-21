@@ -48,13 +48,17 @@ class AzureMLLoggingAdapter(LoggingAdapter):
     def log_metrics(self, metrics: Dict[str, float]) -> None:
         """Log metrics to both MLflow and Azure ML native logging."""
         import mlflow
+        # Only log scalar metrics (skip nested dictionaries like 'per_entity')
         for k, v in metrics.items():
-            mlflow.log_metric(k, v)
+            if isinstance(v, (int, float, str, bool)):
+                mlflow.log_metric(k, v)
+            # Skip nested dictionaries - they're saved in metrics.json but not logged to MLflow
 
         # Also log to Azure ML native logging if available
         if self._azureml_run is not None:
             for k, v in metrics.items():
-                self._azureml_run.log(k, v)
+                if isinstance(v, (int, float, str, bool)):
+                    self._azureml_run.log(k, v)
 
     def log_params(self, params: Dict[str, Any]) -> None:
         """Log parameters to both MLflow and Azure ML native logging."""
@@ -75,8 +79,11 @@ class LocalLoggingAdapter(LoggingAdapter):
     def log_metrics(self, metrics: Dict[str, float]) -> None:
         """Log metrics to MLflow only."""
         import mlflow
+        # Only log scalar metrics (skip nested dictionaries like 'per_entity')
         for k, v in metrics.items():
-            mlflow.log_metric(k, v)
+            if isinstance(v, (int, float, str, bool)):
+                mlflow.log_metric(k, v)
+            # Skip nested dictionaries - they're saved in metrics.json but not logged to MLflow
 
     def log_params(self, params: Dict[str, Any]) -> None:
         """Log parameters to MLflow only."""

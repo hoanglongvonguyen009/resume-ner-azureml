@@ -42,3 +42,4 @@ k_fold:
   n_splits: 3
   random_seed: 42
   shuffle: true
+  stratified: true

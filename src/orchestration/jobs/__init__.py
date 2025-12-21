@@ -25,6 +25,7 @@ from .local_sweeps import (
 from .local_selection import (
     select_best_configuration_across_studies,
     extract_best_config_from_study,
+    load_best_trial_from_disk,
 )
 
 __all__ = [
@@ -44,4 +45,5 @@ __all__ = [
     "translate_search_space_to_optuna",
     "select_best_configuration_across_studies",
     "extract_best_config_from_study",
+    "load_best_trial_from_disk",
 ]
