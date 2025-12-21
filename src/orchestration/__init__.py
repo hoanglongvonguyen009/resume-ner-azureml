@@ -6,8 +6,17 @@ from .constants import (
     MODEL_NAME,
     PROD_STAGE,
     CONVERSION_JOB_NAME,
+    METRICS_FILENAME,
+    BENCHMARK_FILENAME,
+    CHECKPOINT_DIRNAME,
+    OUTPUTS_DIRNAME,
+    MLRUNS_DIRNAME,
+    DEFAULT_RANDOM_SEED,
+    DEFAULT_K_FOLDS,
 )
-from .naming import get_stage_config, build_aml_experiment_name
+from .naming import get_stage_config, build_aml_experiment_name, build_mlflow_experiment_name
+from .mlflow_utils import setup_mlflow_for_stage
+from .benchmark_utils import run_benchmarking
 
 __all__ = [
     "STAGE_SMOKE",
@@ -17,7 +26,17 @@ __all__ = [
     "MODEL_NAME",
     "PROD_STAGE",
     "CONVERSION_JOB_NAME",
+    "METRICS_FILENAME",
+    "BENCHMARK_FILENAME",
+    "CHECKPOINT_DIRNAME",
+    "OUTPUTS_DIRNAME",
+    "MLRUNS_DIRNAME",
+    "DEFAULT_RANDOM_SEED",
+    "DEFAULT_K_FOLDS",
     "get_stage_config",
     "build_aml_experiment_name",
+    "build_mlflow_experiment_name",
+    "setup_mlflow_for_stage",
+    "run_benchmarking",
 ]
 
