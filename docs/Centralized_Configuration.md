@@ -116,14 +116,21 @@ distributed:
   enabled: false         # Set true to enable multi-GPU / DDP
   backend: "nccl"        # Typically 'nccl' for GPUs
   world_size: "auto"     # 'auto' uses all visible GPUs; or set an int
+  init_method: "env://"  # How processes discover each other (usually env://)
+  timeout_seconds: 1800  # Process-group init timeout in seconds
 ```
 
 These settings are:
 
 * **Read once** via `training.config.build_training_config`.
-* Resolved into a small `ResolvedDistributedConfig` dataclass.
+* Resolved into a small `ResolvedDistributedConfig` dataclass, which normalizes:
+  * `enabled` (bool)
+  * `backend` (e.g., `nccl`)
+  * `world_size` (int or `None` for \"auto\")
+  * `init_method` (e.g., `env://`)
+  * `timeout_seconds` (int)
 * Passed to `training.distributed.create_run_context`, which decides whether to
-  use CPU, single-GPU, or (later) DDP based on both config and hardware.
+  use CPU, single-GPU, or DDP based on both config and hardware.
 
 Notebooks and orchestration code **do not** hard-code device or DDP behavior;
 they only consume the centralized config. This keeps device selection and

@@ -68,6 +68,8 @@ class ResolvedDistributedConfig:
     enabled: bool
     backend: str
     world_size: Optional[int]
+    init_method: str
+    timeout_seconds: int
 
 
 def resolve_distributed_config(config: Dict[str, Any]) -> ResolvedDistributedConfig:
@@ -84,6 +86,8 @@ def resolve_distributed_config(config: Dict[str, Any]) -> ResolvedDistributedCon
     enabled = bool(dist_cfg.get("enabled", False))
     backend = dist_cfg.get("backend", "nccl")
     world_size_raw = dist_cfg.get("world_size", "auto")
+    init_method = dist_cfg.get("init_method", "env://")
+    timeout_seconds = int(dist_cfg.get("timeout_seconds", 1800))
 
     world_size: Optional[int]
     if isinstance(world_size_raw, int):
@@ -96,6 +100,8 @@ def resolve_distributed_config(config: Dict[str, Any]) -> ResolvedDistributedCon
         enabled=enabled,
         backend=backend,
         world_size=world_size,
+        init_method=init_method,
+        timeout_seconds=timeout_seconds,
     )
 
 

@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, DistributedSampler
+from torch.nn.parallel import DistributedDataParallel as DDP
 from transformers import (
     AutoTokenizer,
     DataCollatorForTokenClassification,
@@ -31,6 +32,7 @@ def prepare_data_loaders(
     train_indices: Optional[List[int]] = None,
     val_indices: Optional[List[int]] = None,
     use_all_data: bool = False,
+    context: RunContext | None = None,
 ) -> tuple[DataLoader, Optional[DataLoader]]:
     """
     Prepare training and validation data loaders.
@@ -84,16 +86,55 @@ def prepare_data_loaders(
     train_ds = ResumeNERDataset(train_data, tokenizer, max_length, label2id)
 
     data_collator = DataCollatorForTokenClassification(tokenizer)
-    train_loader = DataLoader(
-        train_ds, batch_size=batch_size, shuffle=True, collate_fn=data_collator
-    )
+
+    # Choose sampler based on run context
+    if context is not None and context.distributed:
+        train_sampler: Optional[DistributedSampler] = DistributedSampler(
+            train_ds,
+            num_replicas=context.world_size,
+            rank=context.rank,
+            shuffle=True,
+        )
+        train_loader = DataLoader(
+            train_ds,
+            batch_size=batch_size,
+            sampler=train_sampler,
+            shuffle=False,
+            collate_fn=data_collator,
+        )
+    else:
+        train_loader = DataLoader(
+            train_ds,
+            batch_size=batch_size,
+            shuffle=True,
+            collate_fn=data_collator,
+        )
 
     # Create validation loader only if validation data exists
     if val_data:
         val_ds = ResumeNERDataset(val_data, tokenizer, max_length, label2id)
-        val_loader = DataLoader(
-            val_ds, batch_size=batch_size, shuffle=False, collate_fn=data_collator
-        )
+
+        if context is not None and context.distributed:
+            val_sampler: Optional[DistributedSampler] = DistributedSampler(
+                val_ds,
+                num_replicas=context.world_size,
+                rank=context.rank,
+                shuffle=False,
+            )
+            val_loader = DataLoader(
+                val_ds,
+                batch_size=batch_size,
+                sampler=val_sampler,
+                shuffle=False,
+                collate_fn=data_collator,
+            )
+        else:
+            val_loader = DataLoader(
+                val_ds,
+                batch_size=batch_size,
+                shuffle=False,
+                collate_fn=data_collator,
+            )
     else:
         val_loader = None
 
@@ -158,7 +199,15 @@ def run_training_loop(
     """
     model.train()
     device = context.device
-    for _ in range(epochs):
+    for epoch in range(epochs):
+        # Ensure each epoch sees a different shard order in distributed mode
+        if (
+            context.distributed
+            and hasattr(train_loader, "sampler")
+            and hasattr(train_loader.sampler, "set_epoch")
+        ):
+            train_loader.sampler.set_epoch(epoch)  # type: ignore[attr-defined]
+
         for batch in train_loader:
             batch = {k: v.to(device) for k, v in batch.items()}
             outputs = model(**batch)
@@ -193,6 +242,7 @@ def train_model(
     config: Dict[str, Any],
     dataset: Dict[str, Any],
     output_dir: Path,
+    context: RunContext | None = None,
 ) -> Dict[str, float]:
     """
     Train a token classification model and return evaluation metrics.
@@ -212,17 +262,24 @@ def train_model(
     label2id = {l: i for i, l in enumerate(label_list)}
     id2label = {i: l for l, i in label2id.items()}
 
-    model, tokenizer, device = create_model_and_tokenizer(
-        config, label2id, id2label
-    )
-
-    # Resolve run context from centralized distributed config and hardware.
-    # For now this always returns a single-process context; DDP support will
-    # be added in training.distributed without changing trainer logic.
+    # Resolve or reuse run context from centralized distributed config + hardware.
     from .config import resolve_distributed_config
 
-    dist_cfg = resolve_distributed_config(config)
-    context = create_run_context(dist_cfg)
+    if context is None:
+        dist_cfg = resolve_distributed_config(config)
+        context = create_run_context(dist_cfg)
+
+    model, tokenizer, _ = create_model_and_tokenizer(
+        config, label2id, id2label, device=context.device
+    )
+
+    # Wrap model with DDP when running in distributed mode.
+    if context.distributed:
+        model = DDP(
+            model,
+            device_ids=[context.local_rank],
+            output_device=context.local_rank,
+        )
 
     # Handle k-fold CV: load fold splits if specified
     train_indices = None
@@ -243,10 +300,14 @@ def train_model(
         train_indices, val_indices = splits[fold_idx]
 
     train_loader, val_loader = prepare_data_loaders(
-        config, dataset, tokenizer, label2id,
+        config,
+        dataset,
+        tokenizer,
+        label2id,
         train_indices=train_indices,
         val_indices=val_indices,
         use_all_data=use_all_data,
+        context=context,
     )
 
     train_cfg = config["training"]
@@ -266,14 +327,18 @@ def train_model(
         context,
     )
 
-    # Evaluate only if validation loader exists
-    if val_loader is not None:
+    # Evaluate only if validation loader exists and on main process.
+    if val_loader is not None and context.is_main_process():
         metrics = evaluate_model(model, val_loader, context.device, id2label)
+    elif val_loader is not None:
+        # Non-main processes skip evaluation; metrics not used by callers.
+        metrics = {}
     else:
         # No validation set (final training on all data)
-        # Return empty metrics or training-only metrics
         metrics = {"note": "No validation set - training on all data"}
 
-    save_checkpoint(model, tokenizer, output_dir)
+    # Only main process should write checkpoints to avoid file collisions.
+    if context.is_main_process():
+        save_checkpoint(model, tokenizer, output_dir)
 
     return metrics

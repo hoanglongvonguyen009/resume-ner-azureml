@@ -13,6 +13,7 @@ def create_model_and_tokenizer(
     config: Dict[str, Any],
     label2id: Dict[str, int],
     id2label: Dict[int, str],
+    device: torch.device | None = None,
 ) -> tuple:
     """
     Create model and tokenizer from configuration.
@@ -30,7 +31,7 @@ def create_model_and_tokenizer(
     tokenizer_name = model_cfg.get("tokenizer", backbone)
 
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
-    
+
     model = AutoModelForTokenClassification.from_pretrained(
         backbone,
         num_labels=len(label2id),
@@ -38,9 +39,10 @@ def create_model_and_tokenizer(
         label2id=label2id,
         use_safetensors=True,
     )
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
-    
+
     return model, tokenizer, device
 
