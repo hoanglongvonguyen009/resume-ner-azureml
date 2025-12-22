@@ -169,3 +169,4 @@ print(comparison)
 - The `batch_1` mean latency is typically used as the speed score in model selection
 - Benchmark files are saved alongside `metrics.json` in trial directories
 
+

@@ -45,4 +45,3 @@ def create_model_and_tokenizer(
     model.to(device)
 
     return model, tokenizer, device
-
