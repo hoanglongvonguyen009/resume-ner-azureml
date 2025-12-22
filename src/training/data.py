@@ -163,9 +163,10 @@ def save_split_files(
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    with open(output_dir / "train.json", "w", encoding="utf-8") as f:
+    # Use errors="replace" to avoid UnicodeEncodeError on malformed surrogate pairs
+    with open(output_dir / "train.json", "w", encoding="utf-8", errors="replace") as f:
         json.dump(train_data, f, ensure_ascii=False, indent=2)
-    with open(output_dir / "test.json", "w", encoding="utf-8") as f:
+    with open(output_dir / "test.json", "w", encoding="utf-8", errors="replace") as f:
         json.dump(test_data, f, ensure_ascii=False, indent=2)
 
 
