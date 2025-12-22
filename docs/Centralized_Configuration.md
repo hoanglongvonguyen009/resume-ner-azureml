@@ -66,8 +66,8 @@ python train.py data=resume_v1 model=distilbert hpo=smoke env=azure
 ## Pydantic Validation
 
 * All composed configs are validated via schemas in `src/schemas/` before:
-	* Azure ML job submission
-	* inference or deployment steps
+ * Azure ML job submission
+ * inference or deployment steps
 * Invalid configuration fails immediately.
 * Config objects are treated as immutable after validation.
 
