@@ -207,6 +207,9 @@ def _ddp_worker(local_rank: int, world_size: int, args: argparse.Namespace) -> N
     os.environ.setdefault("WORLD_SIZE", str(world_size))
     os.environ.setdefault("RANK", str(local_rank))
     os.environ.setdefault("LOCAL_RANK", str(local_rank))
+    # Ensure env:// rendezvous has required address/port when using spawn.
+    os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
+    os.environ.setdefault("MASTER_PORT", "29500")
 
     _run_training(args)
 
