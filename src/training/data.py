@@ -165,11 +165,13 @@ def save_split_files(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     # Serialize with defensive encoding to handle malformed surrogate pairs
+
     def _dump_safe(data: List[Dict[str, Any]], path: Path) -> None:
         # Convert to JSON string first
         content = json.dumps(data, ensure_ascii=False, indent=2)
         # Encode/decode with errors="replace" to strip/replace invalid surrogates
-        content = content.encode("utf-8", errors="replace").decode("utf-8", errors="replace")
+        content = content.encode(
+            "utf-8", errors="replace").decode("utf-8", errors="replace")
         with open(path, "w", encoding="utf-8", errors="replace") as f:
             f.write(content)
 

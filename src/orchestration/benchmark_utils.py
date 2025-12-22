@@ -42,7 +42,8 @@ def run_benchmarking(
     # Determine benchmark script path
     if benchmark_script_path is None:
         if project_root is None:
-            raise ValueError("Either benchmark_script_path or project_root must be provided")
+            raise ValueError(
+                "Either benchmark_script_path or project_root must be provided")
         # Benchmarks live at <project_root>/benchmarks, not under src/
         benchmark_script = project_root / "benchmarks" / "benchmark_inference.py"
     else:
@@ -87,4 +88,3 @@ def run_benchmarking(
         return False
 
     return True
-
