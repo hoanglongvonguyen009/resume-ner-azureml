@@ -228,13 +228,15 @@ def save_checkpoint(
     Save model and tokenizer checkpoint.
 
     Args:
-        model: Trained model.
+        model: Trained model (may be wrapped in DDP).
         tokenizer: Tokenizer instance.
         output_dir: Directory to save checkpoint.
     """
     checkpoint_path = output_dir / "checkpoint"
     checkpoint_path.mkdir(parents=True, exist_ok=True)
-    model.save_pretrained(checkpoint_path)
+    # Unwrap DDP model if needed (DDP wraps the model in .module)
+    unwrapped_model = model.module if isinstance(model, DDP) else model
+    unwrapped_model.save_pretrained(checkpoint_path)
     tokenizer.save_pretrained(checkpoint_path)
 
 
