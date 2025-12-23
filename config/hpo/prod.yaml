@@ -1,7 +1,7 @@
 search_space:
   backbone:
     type: "choice"
-    values: ["distilbert", "deberta"]
+    values: ["distilroberta", "deberta"]  # ["distilbert", "distilroberta", "deberta"]
   
   learning_rate:
     type: "loguniform"
@@ -24,7 +24,7 @@ search_space:
 
 sampling:
   algorithm: "random"
-  max_trials: 50
+  max_trials: 20
   timeout_minutes: 480
 
 early_termination:

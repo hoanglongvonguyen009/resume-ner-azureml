@@ -1,7 +1,7 @@
 search_space:
   backbone:
     type: "choice"
-    values: ["distilbert", "deberta"]
+    values: ["distilbert", "distilroberta", "deberta"]
   
   learning_rate:
     type: "loguniform"
