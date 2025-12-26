@@ -9,7 +9,7 @@ Before running tests, ensure you have the required dependencies installed:
 pip install -r requirements-test.txt
 
 # Or install individually
-pip install transformers onnxruntime numpy pytest pytest-cov pytest-mock optuna mlflow
+pip install transformers onnxruntime numpy pytest pytest-cov pytest-mock optuna mlflow fastapi uvicorn httpx python-multipart pyyaml
 ```
 
 **Note**: If using conda, activate your environment first:
@@ -47,6 +47,26 @@ conda activate resume-ner-training
 conda activate resume-ner-training
 pip install pytest pytest-cov pytest-mock
 ```
+
+## Test Structure
+
+- **`tests/e2e/`**: End-to-end workflow tests (standalone scripts, not pytest-based)
+  - **`test_e2e_workflow.py`**: Full training pipeline validation (config → HPO → training)
+  - **`test_hpo_with_tiny_datasets.py`**: HPO pipeline validation with tiny datasets
+  - **Note**: These are standalone Python scripts, not pytest tests. Run them directly with `python`.
+- **`tests/unit/`**: Unit tests with mocked dependencies (pytest-based)
+  - **`api/`**: API unit tests
+  - **`training/`**: Training unit tests
+- **`tests/integration/`**: Integration tests requiring actual models/files (pytest-based)
+  - **`api/`**: API integration tests
+- **`src/testing/`**: Test helper utilities (not test scripts)
+  - **`orchestrators/`**: Test orchestration logic
+  - **`services/`**: Test service modules (HPO execution, k-fold validation, edge case detection)
+  - **`setup/`**: Environment setup and configuration loading
+  - **`validators/`**: Dataset validation utilities
+  - **`aggregators/`**: Result aggregation utilities
+  - **`comparators/`**: Result comparison utilities
+  - **`fixtures/`**: Test fixtures and configuration loaders
 
 ## Running Tests
 
@@ -149,16 +169,6 @@ pytest tests/unit/ --cov=src --cov-report=html
 
 ### Integration Tests
 
-#### HPO Pipeline Integration Tests (pytest)
-
-```bash
-# Run HPO pipeline integration tests
-pytest tests/integration/test_hpo_pipeline.py -v -m integration
-
-# Run with specific markers
-pytest tests/integration/test_hpo_pipeline.py -v -m "integration and slow"
-```
-
 #### API Integration Tests
 
 ```bash
@@ -185,21 +195,162 @@ pytest tests/integration/api/test_tokenization_speed.py --checkpoint <path> -v
 pytest tests/integration/api/test_inference_performance.py --onnx-model "outputs/final_training/distilroberta/distilroberta_model.onnx" --checkpoint "outputs/final_training/distilroberta/checkpoint" -v
 ```
 
-## Test Structure
+#### FastAPI Local Server Tests
 
-- **`tests/e2e/`**: End-to-end workflow tests (standalone scripts, not pytest-based)
-  - **`test_e2e_workflow.py`**: Full training pipeline validation (config → HPO → training)
-  - **`test_hpo_with_tiny_datasets.py`**: HPO pipeline validation with tiny datasets
-  - **Note**: These are standalone Python scripts, not pytest tests. Run them directly with `python`.
-- **`tests/unit/`**: Unit tests with mocked dependencies (pytest-based)
-  - **`api/`**: API unit tests
-  - **`training/`**: Training unit tests
-- **`tests/integration/`**: Integration tests requiring actual models/files (pytest-based)
-  - **`test_hpo_pipeline.py`**: pytest wrappers for HPO tests
-  - **`api/`**: API integration tests
-  - **`orchestrators/`**: Test orchestration logic
-  - **`services/`**: Test service modules
-- **`tests/fixtures/`**: Test data and fixtures
+These tests start a real FastAPI server process and test all endpoints with actual model files. This is different from `test_api.py` which uses mocked `TestClient`.
+
+**Prerequisites:**
+
+- Trained model files in `outputs/final_training/distilroberta/`:
+  - `distilroberta_model.onnx`
+  - `checkpoint/` directory
+- Test data files in `tests/test_data/` (see `tests/test_data/README.md`)
+- Required Python packages:
+
+  ```bash
+  pip install python-multipart httpx pyyaml
+  ```
+
+**Running Tests:**
+
+```bash
+# Run all local server tests
+pytest tests/integration/api/test_api_local_server.py -v
+
+# Run specific test class
+pytest tests/integration/api/test_api_local_server.py::TestServerLifecycle -v
+
+# Run with custom model paths
+pytest tests/integration/api/test_api_local_server.py \
+    --onnx-model outputs/final_training/distilroberta/distilroberta_model.onnx \
+    --checkpoint outputs/final_training/distilroberta/checkpoint \
+    -v
+```
+
+**Test Categories:**
+
+- **Server Lifecycle**: Startup, shutdown, failure handling
+- **Health & Info Endpoints**: `/health`, `/info`
+- **Single Text Prediction** (`/predict`):
+  - Valid inputs: Normal text, various entity types, special characters
+  - Edge cases: Empty string, very long text, unicode characters, whitespace-only text
+  - Error cases: Missing text field, invalid JSON, non-string text value
+- **Batch Text Prediction** (`/predict/batch`):
+  - Valid inputs: Small, medium, large batches
+  - Edge cases: Empty batch, mixed valid/invalid texts, batch with empty text
+  - Error cases: Batch exceeding MAX_BATCH_SIZE, missing texts field, non-list value
+- **File Upload** (`/predict/file`):
+  - Valid inputs: PDF files, PNG images, larger PDF files
+  - Edge cases: Small PDF files
+  - Error cases: Invalid file type, missing file in request
+- **Batch File Upload** (`/predict/file/batch`):
+  - Valid inputs: Small and medium file batches, mixed file types
+  - Edge cases: Empty batch
+  - Error cases: Batch exceeding MAX_BATCH_SIZE
+- **Debug Endpoint**: `/predict/debug` with detailed token-level information
+- **Error Handling**: Invalid inputs, missing fields, malformed requests
+- **Performance**: Latency validation against thresholds (P50, P95, max)
+- **Stability**: Consistency across repeated runs, performance degradation detection
+
+**Configuration:**
+
+Test configuration is in `config/test/api_local_server.yaml`:
+
+- Server settings (host, port, timeouts)
+- Performance thresholds (latency, throughput)
+- Request timeouts
+
+**Test Data:**
+
+Test data fixtures are defined in `tests/test_data/fixtures.py` and documented in `tests/test_data/README.md`. If test files are missing, generate them:
+
+```bash
+cd tests/test_data
+python generate_test_files.py
+```
+
+## Configuration
+
+### Test Configuration
+
+All test configuration is centralized in `config/test/hpo_pipeline.yaml`:
+
+```yaml
+hpo_pipeline_tests:
+  defaults:
+    random_seed: 42
+    minimal_k_folds: 2
+    backbones: ["distilbert", "distilroberta"]  # List of backbones to test
+    metric_decimal_places: 4
+    separator_width: 60
+    very_small_validation_threshold: 2
+  
+  # HPO overrides (applied after loading HPO config from configs.hpo_config)
+  hpo_overrides:
+    max_trials: 2  # Override max_trials (null = use value from HPO config file)
+  
+  datasets:
+    deterministic_path: "dataset_tiny"
+    random_seeds: [0, 1, 2, 3, 4]
+  
+  output:
+    base_dir: "outputs/hpo_tests"
+    mlflow_dir: "mlruns"
+  
+  configs:
+    hpo_config: "hpo/smoke.yaml"
+    train_config: "train.yaml"
+```
+
+### Configuration Loading
+
+Configuration is loaded consistently across all test components:
+
+1. **Config Loader** (`src/testing/fixtures/config/test_config_loader.py`):
+   - `get_test_config(root_dir)` - Returns cached config dictionary
+   - `load_hpo_test_config(config_path, root_dir)` - Loads config from file
+   - Constants are loaded on module import: `DEFAULT_RANDOM_SEED`, `DEFAULT_BACKBONE`, etc.
+
+2. **Environment Setup** (`src/testing/setup/environment_setup.py`):
+   - `setup_test_environment(root_dir, ...)` - Loads all configs and sets up paths
+   - Resolves paths from config (HPO config, train config, output dir, MLflow dir, dataset paths)
+   - Initializes MLflow tracking URI
+   - Returns environment dictionary with all configs and paths
+
+3. **Configuration Precedence**:
+   - CLI arguments (highest priority)
+   - Config file values (default)
+   - Hardcoded fallbacks (lowest priority)
+
+### Changing Configuration
+
+#### Example 1: Change Random Seeds to Test
+
+1. Edit `config/test/hpo_pipeline.yaml`:
+
+   ```yaml
+   datasets:
+     random_seeds: [0, 1, 2]  # Changed from [0]
+   ```
+
+2. The test script automatically uses the new value:
+   - The `--seeds` argument in `test_hpo_with_tiny_datasets.py` uses config value as default
+
+#### Example 2: Override Number of HPO Trials
+
+To change the number of trials without editing the HPO config file:
+
+1. Edit `config/test/hpo_pipeline.yaml`:
+
+   ```yaml
+   hpo_overrides:
+     max_trials: 5  # Override max_trials (was 2 in hpo/smoke.yaml)
+   ```
+
+2. The override is applied when the HPO config is loaded:
+   - The HPO config file (`hpo/smoke.yaml`) is loaded first
+   - Then `hpo_overrides.max_trials` (if not null) replaces the value
+   - Set to `null` to use the value from the HPO config file
 
 ## Test Coverage
 
@@ -229,7 +380,7 @@ If you see `ModuleNotFoundError`:
 2. **Install missing dependencies**:
 
    ```bash
-   pip install transformers onnxruntime numpy pytest optuna mlflow
+   pip install transformers onnxruntime numpy pytest optuna mlflow fastapi uvicorn httpx
    ```
 
 3. **Verify installation**:
@@ -237,6 +388,8 @@ If you see `ModuleNotFoundError`:
    ```bash
    pip list | grep transformers
    ```
+
+4. **Ensure `src/` is in Python path**: Test helper modules are in `src/testing/`, so make sure `src/` is in your Python path when running tests.
 
 ### Test Failures
 
@@ -250,3 +403,4 @@ If you see `ModuleNotFoundError`:
 - **"Dataset directory not found"**: Create tiny datasets first or check dataset path in config
 - **"HPO config not found"**: Verify `config/hpo/smoke.yaml` exists
 - **"Training script not found"**: Ensure `src/training/train.py` exists
+- **"ModuleNotFoundError: No module named 'testing'"**: Ensure `src/` is in Python path (usually handled automatically by test scripts)
