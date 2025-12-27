@@ -1,3 +1,4 @@
+
 """Trial execution utilities for HPO training runs.
 
 Handles subprocess execution, environment setup, and metrics reading.
@@ -172,20 +173,17 @@ class TrialExecutor:
                 env["MLFLOW_TRACKING_URI"] = mlflow_tracking_uri
             env["MLFLOW_EXPERIMENT_NAME"] = self.mlflow_experiment_name
 
-            # Pass parent run ID to subprocess - subprocess will create child run
-            # This is the correct approach for Azure ML nested runs
+            # Pass parent run ID if we're in an active MLflow run
             active_run = mlflow.active_run()
             if active_run is not None:
                 parent_run_id = active_run.info.run_id
-                trial_number = str(trial_params.get("trial_number", "unknown"))
-                
-                # Pass parent run ID and trial number to subprocess
-                # The subprocess will create the child run using create_child_run helper
                 env["MLFLOW_PARENT_RUN_ID"] = parent_run_id
-                env["MLFLOW_TRIAL_NUMBER"] = trial_number
+                env["MLFLOW_TRIAL_NUMBER"] = str(
+                    trial_params.get("trial_number", "unknown")
+                )
                 logger.debug(
                     f"Passing parent run ID to trial: {parent_run_id[:12]}... "
-                    f"(trial {trial_number})"
+                    f"(trial {trial_params.get('trial_number', 'unknown')})"
                 )
             else:
                 logger.warning(

@@ -1,5 +1,5 @@
 {
-  "onnx_model_path": "c:\\Users\\HOANG PHI LONG DANG\\repos\\resume-ner-azureml\\outputs\\conversion\\deberta\\model_int8.onnx",
-  "backbone": "deberta",
-  "checkpoint_dir": "c:\\Users\\HOANG PHI LONG DANG\\repos\\resume-ner-azureml\\outputs\\final_training\\deberta\\checkpoint"
+  "onnx_model_path": "c:\\Users\\HOANG PHI LONG DANG\\repos\\resume-ner-azureml\\outputs\\conversion\\distilbert_20251228_001226\\model_int8.onnx",
+  "backbone": "distilbert",
+  "checkpoint_dir": "c:\\Users\\HOANG PHI LONG DANG\\repos\\resume-ner-azureml\\outputs\\final_training\\distilbert_20251228_000723\\checkpoint"
 }

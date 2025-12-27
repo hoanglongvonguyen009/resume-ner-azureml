@@ -37,18 +37,65 @@ def build_training_config(args: argparse.Namespace, config_dir: Path) -> Dict[st
     Returns:
         Dictionary containing merged configuration.
     """
-    train_config = load_config_file(config_dir, "train.yaml")
+    # Check if CHECKPOINT_PATH is set (indicates continued training)
+    import os
+    has_checkpoint = bool(os.environ.get("CHECKPOINT_PATH"))
+    
+    # Check if continued training config exists
+    continued_config_path = config_dir / "train_continued.yaml"
+    use_continued = continued_config_path.exists() and has_checkpoint
+    
+    if use_continued:
+        # Load continued training config
+        continued_config = load_config_file(config_dir, "train_continued.yaml")
+        # Base config is still train.yaml, but we'll merge continued overrides
+        train_config = load_config_file(config_dir, "train.yaml")
+        
+        # Merge continued training config into base training config
+        # Start with base training config
+        merged_training = train_config.get("training", {}).copy()
+        
+        # Apply continued training overrides
+        continued_training = continued_config.get("training", {})
+        if continued_training:
+            merged_training.update(continued_training)
+            # Deep merge for nested dicts like early_stopping
+            if "early_stopping" in continued_training:
+                base_early_stopping = merged_training.get("early_stopping", {})
+                base_early_stopping.update(continued_training["early_stopping"])
+                merged_training["early_stopping"] = base_early_stopping
+        
+        # Add checkpoint config from continued config
+        checkpoint_config = continued_config.get("checkpoint", {})
+        if checkpoint_config:
+            merged_training["checkpoint"] = checkpoint_config
+        
+        train_config_dict = merged_training
+        base_train_config = train_config  # For distributed config
+    else:
+        # Standard training config
+        train_config = load_config_file(config_dir, "train.yaml")
+        train_config_dict = train_config.get("training", {}).copy()
+        base_train_config = train_config
+    
     model_config = load_config_file(config_dir, f"model/{args.backbone}.yaml")
     data_config = load_config_file(config_dir, "data/resume_v1.yaml")
     
     config = {
         "data": data_config,
         "model": model_config,
-        "training": train_config.get("training", {}).copy(),
+        "training": train_config_dict,
         # Expose distributed section (if present) at top level so orchestration
         # and training logic can consume it without hard-coding defaults.
-        "distributed": train_config.get("distributed", {}).copy(),
+        "distributed": base_train_config.get("distributed", {}).copy(),
+        "_config_dir": config_dir,  # Store for checkpoint resolution
     }
+    
+    # If using continued training, merge data combination config
+    if use_continued:
+        continued_data_config = continued_config.get("data", {})
+        if continued_data_config:
+            config["data"]["continued_training"] = continued_data_config
     
     _apply_argument_overrides(args, config)
     

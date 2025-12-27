@@ -57,6 +57,9 @@ pip install pytest pytest-cov pytest-mock
 - **`tests/unit/`**: Unit tests with mocked dependencies (pytest-based)
   - **`api/`**: API unit tests
   - **`training/`**: Training unit tests
+    - **`test_trainer.py`**: Training loop and data loader tests
+    - **`test_checkpoint_loader.py`**: Checkpoint path resolution and validation tests
+    - **`test_data_combiner.py`**: Dataset combination strategy tests
 - **`tests/integration/`**: Integration tests requiring actual models/files (pytest-based)
   - **`api/`**: API integration tests
 - **`src/testing/`**: Test helper utilities (not test scripts)
@@ -163,9 +166,32 @@ pytest tests/unit/ -v
 pytest tests/unit/api/test_inference_performance.py -v
 pytest tests/unit/api/test_inference_fixes.py -v
 
+# Run training unit tests (including continued training)
+pytest tests/unit/training/ -v
+
+# Run specific continued training tests
+pytest tests/unit/training/test_checkpoint_loader.py -v
+pytest tests/unit/training/test_data_combiner.py -v
+
 # Run with coverage
 pytest tests/unit/ --cov=src --cov-report=html
 ```
+
+#### Training Unit Tests
+
+**Checkpoint Loader Tests** (`test_checkpoint_loader.py`):
+- Validates checkpoint directory structure and required files
+- Tests checkpoint path resolution from environment variables, config files, and cache files
+- Tests pattern resolution (`{backbone}`, `{run_id}`)
+- Tests priority order (env var > config > cache)
+- Edge cases: missing files, invalid paths, non-existent checkpoints
+
+**Data Combiner Tests** (`test_data_combiner.py`):
+- Tests all three data combination strategies (`new_only`, `combined`, `append`)
+- Validates dataset merging and shuffling
+- Tests validation split creation
+- Edge cases: missing validation sets, empty datasets, invalid strategies
+- Error handling for missing dataset paths
 
 ### Integration Tests
 
@@ -359,6 +385,7 @@ The test suite covers:
 - ✅ End-to-end training pipeline (config → HPO → training)
 - ✅ HPO pipeline with tiny datasets
 - ✅ K-fold cross-validation
+- ✅ Continued training (checkpoint loading, data combination)
 - ✅ Edge cases (small datasets, k > n_samples)
 - ✅ Tokenization performance
 - ✅ Entity extraction with offset mapping

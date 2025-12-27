@@ -1,6 +1,8 @@
+
 """Local hyperparameter optimization using Optuna."""
 
 from __future__ import annotations
+import logging
 from shared.json_cache import save_json
 from shared.logging_utils import get_logger
 
@@ -24,6 +26,9 @@ from .hpo_helpers import (
 )
 
 logger = get_logger(__name__)
+
+# Suppress Optuna's verbose output to reduce log clutter
+logging.getLogger("optuna").setLevel(logging.WARNING)
 
 # Lazy import optuna - only import when actually needed for local execution
 # This prevents optuna from being required when using Azure ML orchestration
@@ -91,6 +96,7 @@ def run_training_trial(
     objective_metric: str = "macro-f1",
     fold_idx: Optional[int] = None,
     fold_splits_file: Optional[Path] = None,
+    parent_run_id: Optional[str] = None,
 ) -> float:
     """
     Execute a single training trial with given hyperparameters.
@@ -178,24 +184,32 @@ def run_training_trial(
         env["MLFLOW_TRACKING_URI"] = mlflow_tracking_uri
     env["MLFLOW_EXPERIMENT_NAME"] = mlflow_experiment_name
 
-    # Pass parent run ID if we're in an active MLflow run
-    # The subprocess will create a nested child run using this parent run ID
+    # Pass parent run ID to subprocess
+    # If parent_run_id is provided (e.g., from trial run), use it
+    # Otherwise, try to get from active MLflow run
     try:
-        active_run = mlflow.active_run()
-        if active_run is not None:
-            parent_run_id = active_run.info.run_id
+        if parent_run_id:
+            # Use provided parent run ID (e.g., from trial run for k-fold CV)
             env["MLFLOW_PARENT_RUN_ID"] = parent_run_id
-            # Also pass trial number for run naming
-            env["MLFLOW_TRIAL_NUMBER"] = str(
-                trial_params.get("trial_number", "unknown"))
             logger.debug(
-                f"Passing parent run ID to trial: {parent_run_id[:12]}... (trial {trial_params.get('trial_number', 'unknown')})")
+                f"Using provided parent run ID: {parent_run_id[:12]}... (trial {trial_params.get('trial_number', 'unknown')}, fold {fold_idx if fold_idx is not None else 'N/A'})")
         else:
-            logger.warning(
-                "No active MLflow run - trials will be independent runs")
+            # Try to get from active MLflow run (for single training without CV)
+            active_run = mlflow.active_run()
+            if active_run is not None:
+                parent_run_id = active_run.info.run_id
+                env["MLFLOW_PARENT_RUN_ID"] = parent_run_id
+                logger.debug(
+                    f"Using active run as parent: {parent_run_id[:12]}... (trial {trial_params.get('trial_number', 'unknown')})")
+
+        # Always pass trial number and fold index for run naming
+        env["MLFLOW_TRIAL_NUMBER"] = str(
+            trial_params.get("trial_number", "unknown"))
+        if fold_idx is not None:
+            env["MLFLOW_FOLD_IDX"] = str(fold_idx)
     except Exception as e:
         # If MLflow is not available or no active run, continue without parent run ID
-        logger.warning(f"Could not get active run ID: {e}")
+        logger.warning(f"Could not get parent run ID: {e}")
 
     # Add src directory to PYTHONPATH to allow relative imports in train.py
     src_dir = str(root_dir / "src")
@@ -240,52 +254,35 @@ def run_training_trial(
             )
             metrics_file = default_metrics
 
-    if metrics_file.exists():
-        try:
-            with open(metrics_file, "r") as f:
-                metrics = json.load(f)
-                if objective_metric in metrics:
-                    metric_value = float(metrics[objective_metric])
-                    return metric_value
-                else:
-                    logger.warning(
-                        f"Objective metric '{objective_metric}' not found in metrics.json. "
-                        f"Available metrics: {list(metrics.keys())}"
-                    )
-        except Exception as e:
-            logger.warning(
-                f"Could not read metrics.json from {metrics_file}: {e}")
-    else:
+    # Try to read from metrics.json file first
+    from shared.metrics_utils import read_metrics_from_file, read_metric_from_mlflow
+    from orchestration.constants import METRICS_FILENAME
+
+    default_metrics = Path(root_dir) / "outputs" / METRICS_FILENAME
+    metric_value = read_metrics_from_file(
+        metrics_file=metrics_file,
+        objective_metric=objective_metric,
+        fallback_file=default_metrics if not metrics_file.exists() else None,
+    )
+
+    if metric_value is not None:
+        return metric_value
+
+    # Log error if file doesn't exist
+    if not metrics_file.exists() and not default_metrics.exists():
         logger.error(
-            f"metrics.json not found at expected location: {trial_output_dir / 'metrics.json'}. "
+            f"metrics.json not found at expected location: {trial_output_dir / METRICS_FILENAME}. "
             f"Trial output dir: {trial_output_dir}, Root dir: {root_dir}, "
             f"AZURE_ML_OUTPUT_checkpoint env var: {os.environ.get('AZURE_ML_OUTPUT_checkpoint', 'NOT SET')}"
         )
 
     # Fallback: try to read from MLflow
-    try:
-        mlflow.set_experiment(mlflow_experiment_name)
-        # Get the most recent run for this experiment
-        experiment = mlflow.get_experiment_by_name(mlflow_experiment_name)
-        if experiment:
-            runs = mlflow.search_runs(
-                experiment_ids=[experiment.experiment_id],
-                max_results=1,
-                order_by=["start_time DESC"],
-            )
-            if not runs.empty:
-                run_id = runs.iloc[0]["run_id"]
-                run = mlflow.get_run(run_id)
-                metrics = run.data.metrics
-                if objective_metric in metrics:
-                    return float(metrics[objective_metric])
+    metric_value = read_metric_from_mlflow(
+        experiment_name=mlflow_experiment_name,
+        objective_metric=objective_metric,
+    )
 
-        logger.warning(
-            f"Objective metric '{objective_metric}' not found in MLflow")
-        return 0.0
-    except Exception as e:
-        logger.warning(f"Could not retrieve metrics from MLflow: {e}")
-        return 0.0
+    return metric_value if metric_value is not None else 0.0
 
 
 def run_training_trial_with_cv(
@@ -299,9 +296,14 @@ def run_training_trial_with_cv(
     objective_metric: str,
     fold_splits: List[Tuple[List[int], List[int]]],
     fold_splits_file: Path,
+    hpo_parent_run_id: Optional[str] = None,
 ) -> Tuple[float, List[float]]:
     """
     Run training trial with k-fold cross-validation.
+
+    Creates a nested structure:
+    - Trial run (child of HPO parent) - contains aggregated metrics
+    - Fold runs (children of trial run) - one per fold
 
     Args:
         trial_params: Hyperparameters for this trial.
@@ -314,16 +316,47 @@ def run_training_trial_with_cv(
         objective_metric: Name of the objective metric to optimize.
         fold_splits: List of (train_indices, val_indices) tuples for each fold.
         fold_splits_file: Path to file containing fold splits (for train.py).
+        hpo_parent_run_id: Optional HPO parent run ID to create trial run as child.
 
     Returns:
         Tuple of (average_metric, fold_metrics) where:
         - average_metric: Average metric across all folds
         - fold_metrics: List of metrics for each fold
     """
+    # Create trial-level run (child of HPO parent) if parent is provided
+    trial_run_id = None
+    if hpo_parent_run_id:
+        try:
+            client = mlflow.tracking.MlflowClient()
+            active_run = mlflow.active_run()
+            if active_run:
+                experiment_id = active_run.info.experiment_id
+                trial_number = trial_params.get("trial_number", "unknown")
+
+                # Create trial run as child of HPO parent
+                trial_run = client.create_run(
+                    experiment_id=experiment_id,
+                    tags={
+                        "mlflow.parentRunId": hpo_parent_run_id,
+                        "azureml.runType": "trial",
+                        "azureml.trial": "true",
+                        "trial_number": str(trial_number),
+                    },
+                    run_name=f"trial_{trial_number}"
+                )
+                trial_run_id = trial_run.info.run_id
+                logger.debug(
+                    f"Created trial run: {trial_run_id[:12]}... (trial {trial_number})")
+        except Exception as e:
+            logger.warning(f"Could not create trial run: {e}")
+            # Continue without trial run - folds will be children of HPO parent
+
     fold_metrics = []
 
     for fold_idx, (train_indices, val_indices) in enumerate(fold_splits):
         # Run training for this fold
+        # Pass trial_run_id as parent (if available), otherwise use hpo_parent_run_id
+        fold_parent_id = trial_run_id if trial_run_id else hpo_parent_run_id
         fold_metric = run_training_trial(
             trial_params=trial_params,
             dataset_path=dataset_path,
@@ -335,11 +368,41 @@ def run_training_trial_with_cv(
             objective_metric=objective_metric,
             fold_idx=fold_idx,
             fold_splits_file=fold_splits_file,
+            parent_run_id=fold_parent_id,  # Use trial run as parent for folds
         )
         fold_metrics.append(fold_metric)
 
     # Calculate average metric
     average_metric = np.mean(fold_metrics)
+
+    # Log aggregated metrics to trial run using client (no need to start run)
+    if trial_run_id:
+        try:
+            client = mlflow.tracking.MlflowClient()
+
+            # Log aggregated metrics
+            client.log_metric(trial_run_id, objective_metric, average_metric)
+            client.log_metric(trial_run_id, "cv_std",
+                              float(np.std(fold_metrics)))
+            client.log_metric(trial_run_id, "cv_mean", average_metric)
+
+            # Log individual fold metrics
+            for i, fold_metric in enumerate(fold_metrics):
+                client.log_metric(
+                    trial_run_id, f"fold_{i}_{objective_metric}", fold_metric)
+
+            # Log hyperparameters to trial run
+            for param_name, param_value in trial_params.items():
+                if param_name not in ["trial_number", "run_id", "backbone"]:
+                    client.log_param(trial_run_id, param_name, param_value)
+
+            # End the trial run to mark it as completed
+            client.set_terminated(trial_run_id, status="FINISHED")
+
+            logger.debug(
+                f"Logged aggregated metrics to trial run: {trial_run_id[:12]}... and marked as completed")
+        except Exception as e:
+            logger.warning(f"Could not log metrics to trial run: {e}")
 
     return average_metric, fold_metrics
 
@@ -426,9 +489,18 @@ def create_local_hpo_objective(
         # This avoids issues with ended runs and ensures training logs to the correct run
         # We'll pass the parent run ID and let the subprocess create nested child runs
 
+        # Get HPO parent run ID for nested structure (trial -> folds)
+        hpo_parent_run_id = None
+        try:
+            active_run = mlflow.active_run()
+            if active_run:
+                hpo_parent_run_id = active_run.info.run_id
+        except Exception:
+            pass
+
         # Run training with or without CV
         if fold_splits is not None:
-            # Run k-fold CV
+            # Run k-fold CV with nested structure
             average_metric, fold_metrics = run_training_trial_with_cv(
                 trial_params=trial_params,
                 dataset_path=dataset_path,
@@ -440,6 +512,7 @@ def create_local_hpo_objective(
                 objective_metric=objective_metric,
                 fold_splits=fold_splits,
                 fold_splits_file=fold_splits_file,
+                hpo_parent_run_id=hpo_parent_run_id,  # Pass HPO parent to create trial run
             )
 
             # Log CV statistics to trial user attributes
@@ -562,16 +635,24 @@ def run_local_hpo_sweep(
     else:
         sampler = RandomSampler()  # Default to random
 
-    # Set up checkpoint storage and determine if resuming
-    storage_path, storage_uri, should_resume = setup_checkpoint_storage(
-        output_dir, checkpoint_config, backbone
-    )
+    # Check if checkpointing is enabled
+    checkpoint_enabled = checkpoint_config is not None and checkpoint_config.get(
+        "enabled", False)
 
     # Generate unique run ID
     run_id = generate_run_id()
 
-    # Create study name
-    study_name = create_study_name(backbone, run_id, should_resume)
+    # Resolve study_name FIRST (needed for {study_name} placeholder in storage_path)
+    # Use temporary should_resume=False for initial study_name resolution
+    # We'll recalculate should_resume after checking if study exists
+    study_name = create_study_name(
+        backbone, run_id, should_resume=False, checkpoint_config=checkpoint_config, hpo_config=hpo_config
+    )
+
+    # Set up checkpoint storage with resolved study_name
+    storage_path, storage_uri, should_resume = setup_checkpoint_storage(
+        output_dir, checkpoint_config, backbone, study_name
+    )
 
     if should_resume:
         logger.info(
@@ -586,13 +667,29 @@ def run_local_hpo_sweep(
                 storage=storage_uri,
                 load_if_exists=True,
             )
+
+            # Mark any RUNNING trials as FAILED (they were interrupted)
+            running_trials = [
+                t for t in study.trials
+                if t.state == optuna.trial.TrialState.RUNNING
+            ]
+            if running_trials:
+                logger.warning(
+                    f"Found {len(running_trials)} RUNNING trials from previous session. "
+                    f"Marking them as FAILED (interrupted)."
+                )
+                for trial in running_trials:
+                    study.tell(
+                        trial.number, state=optuna.trial.TrialState.FAIL)
+
             # Count completed trials
             completed_trials = len([
                 t for t in study.trials
                 if t.state == optuna.trial.TrialState.COMPLETE
             ])
             logger.info(
-                f"Loaded {len(study.trials)} existing trials ({completed_trials} completed)")
+                f"Loaded {len(study.trials)} existing trials ({completed_trials} completed, "
+                f"{len(running_trials)} marked as failed)")
         except Exception as e:
             logger.warning(f"Could not load checkpoint: {e}")
             logger.info("Creating new study instead...")
@@ -612,16 +709,64 @@ def run_local_hpo_sweep(
             logger.info(
                 f"[HPO] Starting optimization for {backbone} with checkpointing...")
             logger.debug(f"Checkpoint: {storage_path}")
+            # When checkpointing is enabled, use load_if_exists=True so we can resume
+            # if the study already exists in the database (even if file was just created)
+            load_if_exists = checkpoint_enabled
         else:
             logger.info(f"[HPO] Starting optimization for {backbone}...")
+            load_if_exists = False
+
         study = optuna.create_study(
             direction=direction,
             sampler=sampler,
             pruner=pruner,
             study_name=study_name,
             storage=storage_uri,
-            load_if_exists=False,
+            load_if_exists=load_if_exists,
         )
+
+        # If checkpointing is enabled and we loaded an existing study, check auto_resume
+        if checkpoint_enabled and load_if_exists and len(study.trials) > 0:
+            auto_resume = checkpoint_config.get("auto_resume", True)
+
+            if auto_resume:
+                # User wants to resume - update should_resume
+                should_resume = True
+
+                # Mark any RUNNING trials as FAILED (they were interrupted)
+                running_trials = [
+                    t for t in study.trials
+                    if t.state == optuna.trial.TrialState.RUNNING
+                ]
+                if running_trials:
+                    logger.warning(
+                        f"Found {len(running_trials)} RUNNING trials from previous session. "
+                        f"Marking them as FAILED (interrupted)."
+                    )
+                    for trial in running_trials:
+                        study.tell(
+                            trial.number, state=optuna.trial.TrialState.FAIL)
+
+                completed_trials = len([
+                    t for t in study.trials
+                    if t.state == optuna.trial.TrialState.COMPLETE
+                ])
+                logger.info(
+                    f"Loaded existing study with {len(study.trials)} trials "
+                    f"({completed_trials} completed, {len(running_trials)} marked as failed)")
+            else:
+                # auto_resume: false but existing study found - require new study_name
+                completed_trials = len([
+                    t for t in study.trials
+                    if t.state == optuna.trial.TrialState.COMPLETE
+                ])
+                raise ValueError(
+                    f"❌ Found existing study '{study_name}' with {len(study.trials)} trials "
+                    f"({completed_trials} completed), but auto_resume=false.\n"
+                    f"   To start fresh, you must use a different study_name.\n"
+                    f"   Current study_name: '{study_name}'\n"
+                    f"   Solution: Add 'study_name: \"hpo_{backbone}_new_name\"' to checkpoint config."
+                )
 
     # Get objective metric name
     objective_metric = hpo_config["objective"]["metric"]
@@ -652,38 +797,102 @@ def run_local_hpo_sweep(
         run_id=run_id,
     )
 
-    # Create callback to display additional metrics after each trial
-    def trial_complete_callback(study: Any, trial: Any) -> None:
-        """Callback to print additional metrics after trial completes."""
-        # Import optuna for TrialState enum
-        optuna_module, _, _, _ = _import_optuna()
-        if trial.state == optuna_module.trial.TrialState.COMPLETE:
-            # Print clearer value with metric name (Optuna's default shows "value" which is unclear)
-            # Format: metric_name=value (e.g., macro-f1=0.838824)
-            logger.info(f"{objective_metric}={trial.value:.6f}")
+    # Create callback factory to capture parent_run_id
+    def create_trial_callback(parent_run_id: Optional[str] = None):
+        """Create a trial completion callback with parent run ID captured in closure."""
+        def trial_complete_callback(study: Any, trial: Any) -> None:
+            """Callback to display consolidated metrics and parameters after trial completes."""
+            optuna_module, _, _, _ = _import_optuna()
+            if trial.state == optuna_module.trial.TrialState.COMPLETE:
+                # Get best trial info
+                best_trial = study.best_trial
+                is_best = trial.number == best_trial.number
 
-            attrs = trial.user_attrs
-            extra_info = []
+                attrs = trial.user_attrs
+                parts = [f"{objective_metric}={trial.value:.6f}"]
 
-            if "macro_f1_span" in attrs:
-                extra_info.append(
-                    f"macro-f1-span={attrs['macro_f1_span']:.6f}")
-            if "loss" in attrs:
-                extra_info.append(f"loss={attrs['loss']:.6f}")
-            if "avg_entity_f1" in attrs:
-                entity_count = attrs.get("entity_count", "?")
-                extra_info.append(
-                    f"avg_entity_f1={attrs['avg_entity_f1']:.6f} ({entity_count} entities)")
+                if "macro_f1_span" in attrs:
+                    parts.append(f"span={attrs['macro_f1_span']:.6f}")
+                if "loss" in attrs:
+                    parts.append(f"loss={attrs['loss']:.6f}")
+                if "avg_entity_f1" in attrs:
+                    entity_count = attrs.get("entity_count", "?")
+                    parts.append(
+                        f"entity_f1={attrs['avg_entity_f1']:.6f} ({entity_count} entities)")
 
-            if extra_info:
-                logger.info(f"Additional metrics: {' | '.join(extra_info)}")
+                # Format parameters for display
+                param_parts = []
+                for param_name, param_value in trial.params.items():
+                    if isinstance(param_value, float):
+                        # Format floats with appropriate precision
+                        if param_name == "learning_rate":
+                            param_parts.append(
+                                f"{param_name}={param_value:.2e}")
+                        else:
+                            param_parts.append(
+                                f"{param_name}={param_value:.6f}")
+                    else:
+                        param_parts.append(f"{param_name}={param_value}")
+
+                # Try to get child run ID (just for reference, no URL needed)
+                # MLflow already prints the run links, so we don't need to duplicate
+                run_id_short = ""
+                try:
+                    if parent_run_id:
+                        client = mlflow.tracking.MlflowClient()
+                        active_run = mlflow.active_run()
+                        if active_run:
+                            experiment_id = active_run.info.experiment_id
+                            # Query child runs with matching trial number
+                            # With nested structure, we want the trial run (not fold runs)
+                            all_runs = client.search_runs(
+                                experiment_ids=[experiment_id],
+                                filter_string=f"tags.mlflow.parentRunId = '{parent_run_id}' AND tags.trial_number = '{trial.number}'",
+                                max_results=100,
+                            )
+                            if all_runs:
+                                # Find the trial run (has trial_number but no fold_idx tag)
+                                trial_run = None
+                                for run in all_runs:
+                                    fold_tag = run.data.tags.get("fold_idx")
+                                    if not fold_tag:
+                                        # This is the trial run (no fold_idx = trial level)
+                                        trial_run = run
+                                        break
+
+                                # If no trial run found, use first run (backward compatibility)
+                                if not trial_run:
+                                    trial_run = all_runs[0]
+
+                                child_run_id = trial_run.info.run_id
+                                run_id_short = f" (Run ID: {child_run_id[:12]}...)"
+                except Exception as e:
+                    logger.debug(
+                        f"Could not get run ID for trial {trial.number}: {e}")
+
+                # Add empty line before each trial for clarity
+                logger.info("")  # Empty line to separate trials
+
+                # Format output for better readability
+                status = "[BEST]" if is_best else f"[Trial {trial.number}]"
+                trial_name = f"trial_{trial.number}"
+                metrics_str = ' | '.join(parts)
+                params_str = ' | '.join(param_parts)
+
+                # Log in a more readable format
+                logger.info(f"{status}: {trial_name}")
+                logger.info(f"  Metrics: {metrics_str}")
+                logger.info(f"  Params: {params_str}{run_id_short}")
+
+        return trial_complete_callback
 
     # Calculate remaining trials
     max_trials = hpo_config["sampling"]["max_trials"]
     timeout_seconds = hpo_config["sampling"]["timeout_minutes"] * 60
 
     # Create MLflow parent run for HPO sweep
-    mlflow_run_name = create_mlflow_run_name(backbone, run_id)
+    mlflow_run_name = create_mlflow_run_name(
+        backbone, run_id, study_name, should_resume, checkpoint_enabled)
 
     # Initialize MLflow tracker
     tracker = MLflowSweepTracker(mlflow_experiment_name)
@@ -700,6 +909,120 @@ def run_local_hpo_sweep(
             storage_path=storage_path,
             should_resume=should_resume,
         ) as parent_run:
+            parent_run_id = parent_run.info.run_id if parent_run else None
+
+            # Mark interrupted runs AFTER parent run is created (MLflow is definitely ready now)
+            if (should_resume or checkpoint_enabled) and parent_run_id:
+                try:
+                    import mlflow
+                    client = mlflow.tracking.MlflowClient()
+                    experiment = mlflow.get_experiment_by_name(
+                        mlflow_experiment_name)
+
+                    if not experiment:
+                        # Try alternative lookup
+                        try:
+                            all_experiments = client.search_experiments()
+                            experiment = next(
+                                (exp for exp in all_experiments if exp.name ==
+                                 mlflow_experiment_name),
+                                None
+                            )
+                        except Exception:
+                            pass
+
+                    if experiment:
+                        # Search for all RUNNING runs with matching name
+                        all_running_runs = client.search_runs(
+                            experiment_ids=[experiment.experiment_id],
+                            filter_string="attributes.status = 'RUNNING'",
+                            max_results=1000,
+                        )
+
+                        # Find parent runs with matching name (excluding current one)
+                        matching_parent_runs = [
+                            run for run in all_running_runs
+                            if run.info.run_name == mlflow_run_name
+                            and run.info.run_id != parent_run_id
+                        ]
+
+                        # Find all parent runs with matching name (any status) to check their child runs
+                        all_runs = client.search_runs(
+                            experiment_ids=[experiment.experiment_id],
+                            max_results=1000,
+                        )
+                        parent_runs_with_name = [
+                            run for run in all_runs
+                            if run.info.run_name == mlflow_run_name
+                            and run.info.run_id != parent_run_id
+                        ]
+
+                        # Mark matching parent runs as FAILED
+                        if matching_parent_runs:
+                            logger.warning(
+                                f"Found {len(matching_parent_runs)} interrupted parent run(s) with name '{mlflow_run_name}'. "
+                                f"Marking them as FAILED."
+                            )
+                            for run in matching_parent_runs:
+                                try:
+                                    client.set_terminated(
+                                        run.info.run_id, status="FAILED")
+                                    updated_run = client.get_run(
+                                        run.info.run_id)
+                                    if updated_run.info.status == "FAILED":
+                                        logger.info(
+                                            f"Marked interrupted parent run {run.info.run_id[:12]}... as FAILED"
+                                        )
+                                    else:
+                                        logger.warning(
+                                            f"Parent run {run.info.run_id[:12]}... status is still {updated_run.info.status}"
+                                        )
+                                except Exception as e:
+                                    logger.warning(
+                                        f"Could not mark parent run {run.info.run_id[:12]}... as FAILED: {e}"
+                                    )
+
+                        # Mark all RUNNING child runs from any parent run with matching name as FAILED
+                        all_running_child_runs = []
+                        for parent_run in parent_runs_with_name:
+                            child_runs = client.search_runs(
+                                experiment_ids=[experiment.experiment_id],
+                                filter_string=f"tags.mlflow.parentRunId = '{parent_run.info.run_id}' AND attributes.status = 'RUNNING'",
+                                max_results=1000,
+                            )
+                            all_running_child_runs.extend(child_runs)
+
+                        if all_running_child_runs:
+                            logger.warning(
+                                f"Found {len(all_running_child_runs)} RUNNING child run(s) from parent run(s) with name '{mlflow_run_name}'. "
+                                f"Marking them as FAILED."
+                            )
+                            for child_run in all_running_child_runs:
+                                try:
+                                    trial_num = child_run.data.tags.get(
+                                        "trial_number", "unknown")
+                                    client.set_terminated(
+                                        child_run.info.run_id, status="FAILED")
+                                    updated_run = client.get_run(
+                                        child_run.info.run_id)
+                                    if updated_run.info.status == "FAILED":
+                                        logger.info(
+                                            f"Marked interrupted child run {child_run.info.run_id[:12]}... (trial {trial_num}) as FAILED"
+                                        )
+                                    else:
+                                        logger.warning(
+                                            f"Child run {child_run.info.run_id[:12]}... (trial {trial_num}) status is still {updated_run.info.status}"
+                                        )
+                                except Exception as e:
+                                    logger.warning(
+                                        f"Could not mark child run {child_run.info.run_id[:12]}... as FAILED: {e}"
+                                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Could not mark interrupted runs after parent run creation: {e}")
+
+            trial_callback = create_trial_callback(parent_run_id)
+
             if should_resume:
                 # Count only completed trials (not FAILED, PRUNED, etc.)
                 completed_trials = len([
@@ -717,7 +1040,7 @@ def run_local_hpo_sweep(
                         n_trials=remaining_trials,
                         timeout=timeout_seconds,
                         show_progress_bar=True,
-                        callbacks=[trial_complete_callback],
+                        callbacks=[trial_callback],
                     )
                 else:
                     logger.info(f"All {max_trials} trials already completed!")
@@ -728,20 +1051,22 @@ def run_local_hpo_sweep(
                     n_trials=max_trials,
                     timeout=timeout_seconds,
                     show_progress_bar=True,
-                    callbacks=[trial_complete_callback],
+                    callbacks=[trial_callback],
                 )
 
             # Log final metrics and best trial info
             if parent_run is not None:
                 parent_run_id = parent_run.info.run_id
                 tracker.log_final_metrics(
-                    study, objective_metric, parent_run_id)
+                    study, objective_metric, parent_run_id, mlflow_run_name, should_resume)
     except Exception as e:
         # Gracefully handle MLflow failures - don't fail HPO if MLflow is unavailable
         logger.warning(f"MLflow tracking failed: {e}")
         logger.warning("Continuing HPO without MLflow tracking...")
 
         # Run optimization without MLflow context
+        trial_callback = create_trial_callback(None)
+
         if should_resume:
             completed_trials = len([
                 t for t in study.trials
@@ -758,7 +1083,7 @@ def run_local_hpo_sweep(
                     n_trials=remaining_trials,
                     timeout=timeout_seconds,
                     show_progress_bar=True,
-                    callbacks=[trial_complete_callback],
+                    callbacks=[trial_callback],
                 )
             else:
                 logger.info(f"All {max_trials} trials already completed!")
@@ -768,7 +1093,7 @@ def run_local_hpo_sweep(
                 n_trials=max_trials,
                 timeout=timeout_seconds,
                 show_progress_bar=True,
-                callbacks=[trial_complete_callback],
+                callbacks=[trial_callback],
             )
 
     return study

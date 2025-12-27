@@ -38,7 +38,13 @@ class MLflowSweepTracker:
                 # Azure ML tracking is already configured, just set the experiment
                 logger.debug(
                     f"Using existing Azure ML tracking URI: {current_tracking_uri[:50]}...")
-                mlflow.set_experiment(self.experiment_name)
+                # Use setup_mlflow_cross_platform for consistency (it will use existing tracking URI)
+                from shared.mlflow_setup import setup_mlflow_cross_platform
+                setup_mlflow_cross_platform(
+                    experiment_name=self.experiment_name,
+                    ml_client=None,  # Tracking URI already set, will use it
+                    fallback_to_local=False,  # Don't override Azure ML tracking
+                )
             else:
                 # No Azure ML tracking set, use cross-platform setup
                 from shared.mlflow_setup import setup_mlflow_cross_platform
@@ -137,7 +143,7 @@ class MLflowSweepTracker:
         mlflow.log_param("resumed_from_checkpoint", should_resume)
 
     def log_final_metrics(
-        self, study: Any, objective_metric: str, parent_run_id: str
+        self, study: Any, objective_metric: str, parent_run_id: str, run_name: Optional[str] = None, should_resume: bool = False
     ) -> None:
         """
         Log final metrics and best trial information to parent run.
@@ -146,6 +152,8 @@ class MLflowSweepTracker:
             study: Completed Optuna study.
             objective_metric: Name of the objective metric.
             parent_run_id: ID of the parent MLflow run.
+            run_name: Optional run name (used when resuming to search across all parent runs).
+            should_resume: Whether this is a resumed run.
         """
         # Use optuna module to check trial state properly
         try:
@@ -170,15 +178,17 @@ class MLflowSweepTracker:
                 mlflow.log_param(f"best_{param_name}", param_value)
 
             # Find and log the best trial's MLflow run ID
-            self._log_best_trial_id(study, parent_run_id)
+            self._log_best_trial_id(study, parent_run_id, run_name, should_resume)
 
-    def _log_best_trial_id(self, study: Any, parent_run_id: str) -> None:
+    def _log_best_trial_id(self, study: Any, parent_run_id: str, run_name: Optional[str] = None, should_resume: bool = False) -> None:
         """
         Find and log the best trial's MLflow run ID.
 
         Args:
             study: Completed Optuna study.
             parent_run_id: ID of the parent MLflow run.
+            run_name: Optional run name (used when resuming to search across all parent runs).
+            should_resume: Whether this is a resumed run.
         """
         try:
             client = mlflow.tracking.MlflowClient()
@@ -188,19 +198,48 @@ class MLflowSweepTracker:
 
             experiment_id = active_run.info.experiment_id
 
-            # Query all child runs of this parent
-            # Use both the tag filter and also search by experiment
-            logger.debug(
-                f"Searching for child runs with parent: {parent_run_id[:12]}... in experiment: {experiment_id}")
+            # When resuming, search for child runs from ALL parent runs with the same name
+            # This allows finding trials from previous (now FAILED) parent runs
+            if should_resume and run_name:
+                logger.debug(
+                    f"Resuming: Searching for child runs from all parent runs with name '{run_name}'"
+                )
+                # First, find all parent runs with this name
+                all_parent_runs = client.search_runs(
+                    experiment_ids=[experiment_id],
+                    filter_string=f"attributes.run_name = '{run_name}'",
+                    max_results=100,
+                )
+                parent_run_ids = [run.info.run_id for run in all_parent_runs]
+                logger.debug(
+                    f"Found {len(parent_run_ids)} parent run(s) with name '{run_name}'"
+                )
+                
+                # Search for child runs from all these parent runs
+                all_runs = []
+                for parent_id in parent_run_ids:
+                    child_runs = client.search_runs(
+                        experiment_ids=[experiment_id],
+                        filter_string=f"tags.mlflow.parentRunId = '{parent_id}'",
+                        max_results=1000,
+                    )
+                    all_runs.extend(child_runs)
+                    logger.debug(
+                        f"Found {len(child_runs)} child runs for parent {parent_id[:12]}..."
+                    )
+            else:
+                # Normal case: only search for child runs of current parent
+                logger.debug(
+                    f"Searching for child runs with parent: {parent_run_id[:12]}... in experiment: {experiment_id}")
 
-            all_runs = client.search_runs(
-                experiment_ids=[experiment_id],
-                filter_string=f"tags.mlflow.parentRunId = '{parent_run_id}'",
-                max_results=1000,
-            )
+                all_runs = client.search_runs(
+                    experiment_ids=[experiment_id],
+                    filter_string=f"tags.mlflow.parentRunId = '{parent_run_id}'",
+                    max_results=1000,
+                )
 
             logger.info(
-                f"Found {len(all_runs)} child runs for parent {parent_run_id[:12]}...")
+                f"Found {len(all_runs)} total child runs for best trial search")
 
             # Map trial numbers to run IDs
             trial_to_run_id = {}
@@ -214,7 +253,9 @@ class MLflowSweepTracker:
                 if trial_num_tag:
                     try:
                         trial_num = int(trial_num_tag)
-                        trial_to_run_id[trial_num] = run.info.run_id
+                        # Only keep the first occurrence if there are duplicates
+                        if trial_num not in trial_to_run_id:
+                            trial_to_run_id[trial_num] = run.info.run_id
                     except (ValueError, TypeError):
                         pass
 

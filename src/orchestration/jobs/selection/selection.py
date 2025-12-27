@@ -18,12 +18,20 @@ except ImportError:
 def _configure_mlflow(ml_client: MLClient) -> None:
     """Configure MLflow to use Azure ML workspace tracking URI."""
     from shared.mlflow_setup import setup_mlflow_cross_platform
-    # Get experiment name from workspace if available, or use a default
-    workspace = ml_client.workspaces.get(name=ml_client.workspace_name)
-    tracking_uri = workspace.mlflow_tracking_uri
-    # Use setup_mlflow_cross_platform for consistency, but we already have ml_client
-    # So we'll set the tracking URI directly and let the caller set experiment if needed
-    mlflow.set_tracking_uri(tracking_uri)
+    # Use setup_mlflow_cross_platform for consistency
+    # We use a placeholder experiment name since setup_mlflow_cross_platform requires it
+    # The actual experiment will be set by the caller if needed
+    try:
+        setup_mlflow_cross_platform(
+            experiment_name="placeholder",  # Will be overridden by caller if needed
+            ml_client=ml_client,
+            fallback_to_local=False,
+        )
+    except Exception:
+        # Fallback: manually set tracking URI if setup fails
+        workspace = ml_client.workspaces.get(name=ml_client.workspace_name)
+        tracking_uri = workspace.mlflow_tracking_uri
+        mlflow.set_tracking_uri(tracking_uri)
 
 
 def _get_metrics_from_mlflow(run_id: str) -> Dict[str, float]:

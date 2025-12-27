@@ -1,0 +1,77 @@
+# Continued Training Configuration
+# Used for fine-tuning or training with additional data on top of existing checkpoints
+
+# Checkpoint loading configuration
+checkpoint:
+  # Path to previous training checkpoint (relative to project root or absolute)
+  # Supports pattern resolution: {backbone} and {run_id} will be replaced
+  # Example: "outputs/final_training/{backbone}_{run_id}/checkpoint"
+  # Or explicit: "outputs/final_training/distilbert_20251227_220407/checkpoint"
+  source_path: null  # Set in experiment config or via environment variable CHECKPOINT_PATH
+  
+  # Whether to validate checkpoint exists before loading
+  validate: true
+
+# Dataset combination configuration
+data:
+  # Strategy for combining old and new datasets
+  # - "new_only": Train only on new data
+  # - "combined": Merge and shuffle both old and new datasets
+  # - "append": Append new data to old data without shuffling
+  strategy: "combined"
+  
+  # Path to old dataset (required if strategy is "combined" or "append")
+  old_dataset_path: null  # Set in experiment config
+  
+  # Path to new dataset (required)
+  new_dataset_path: null  # Set in experiment config
+  
+  # Whether to create a new validation split from combined data
+  create_new_validation: true
+  validation_ratio: 0.1
+  
+  # Random seed for shuffling (when strategy is "combined")
+  random_seed: 42
+
+# Training hyperparameters for continued training
+# These override base training config (train.yaml) values
+training:
+  # Typically use lower learning rate for fine-tuning
+  learning_rate: 1e-5  # Override base: 2e-5
+  
+  # Fewer epochs since model is already trained
+  epochs: 3  # Override base: 5
+  
+  # Keep other settings from base config unless overridden
+  batch_size: 12  # Can override if needed
+  weight_decay: 0.01
+  dropout: 0.1
+  
+  # Early stopping (usually disabled for continued training)
+  early_stopping:
+    enabled: false
+    patience: 3
+    min_delta: 0.001
+  
+  # Use all data for final training (no validation split)
+  use_all_data: true
+
+# Output configuration
+output:
+  # Directory pattern for continued training outputs
+  # {backbone} and {run_id} will be replaced at runtime
+  directory_pattern: "outputs/continued_training/{backbone}_{run_id}"
+  
+  # Whether to save intermediate checkpoints
+  save_intermediate: true
+  save_interval: 1000  # steps
+
+# MLflow tracking
+mlflow:
+  # Experiment name pattern
+  experiment_name_pattern: "{experiment_name}-continued-{backbone}"
+  
+  # Tags to add to the run
+  tags:
+    training_type: "continued"
+

@@ -21,7 +21,7 @@ def run_smoke_test(onnx_path: Path, checkpoint_dir: Path) -> None:
         onnx_path: Path to ONNX model file.
         checkpoint_dir: Path to checkpoint directory containing tokenizer.
     """
-    _log(f"Running ONNX smoke test for '{onnx_path}'")
+    _log.info(f"Running ONNX smoke test for '{onnx_path}'")
     try:
         import onnxruntime as ort
     except Exception as e:
@@ -30,7 +30,7 @@ def run_smoke_test(onnx_path: Path, checkpoint_dir: Path) -> None:
         warnings.warn(
             f"Smoke test skipped because onnxruntime is not available: {e}"
         )
-        _log(
+        _log.info(
             "Smoke test skipped because onnxruntime is not available. "
             f"Reason: {type(e).__name__}: {e}"
         )
@@ -56,5 +56,5 @@ def run_smoke_test(onnx_path: Path, checkpoint_dir: Path) -> None:
     outputs = sess.run(None, feeds)
     if not outputs or outputs[0] is None:
         raise RuntimeError("ONNX smoke test failed: no logits returned")
-    _log("ONNX smoke test completed successfully")
+    _log.info("ONNX smoke test completed successfully")
 

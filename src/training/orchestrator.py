@@ -1,3 +1,4 @@
+
 """Training orchestration logic."""
 
 import os
@@ -34,19 +35,19 @@ def log_training_parameters(config: dict, logging_adapter) -> None:
 def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) -> None:
     """
     Run a single training process (rank-agnostic).
-
+    
     This function is used for both single-process training and each rank in
     a DDP run. It is intentionally unaware of world_size; DDP setup is
     handled via `training.distributed`.
-
+    
     Args:
         args: Parsed command-line arguments.
         prebuilt_config: Optional pre-built configuration dictionary.
     """
     config_dir = validate_config_dir(args.config_dir)
-
+    
     config = prebuilt_config or build_training_config(args, config_dir)
-
+    
     # Optionally offset random seed by rank in distributed runs.
     rank_env = os.getenv("RANK")
     if rank_env is not None and "training" in config:
@@ -57,31 +58,31 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
         base_seed = config["training"].get("random_seed")
         if base_seed is not None:
             config["training"]["random_seed"] = int(base_seed) + rank
-
+    
     # Resolve distributed config, create run context, and initialize process
     # group if needed (DDP). Single-process runs will get a SingleProcessContext.
     dist_cfg = resolve_distributed_config(config)
     context = create_run_context(dist_cfg)
     init_process_group_if_needed(context)
-
+    
     seed = config["training"].get("random_seed")
     set_seed(seed)
-
+    
     dataset = load_dataset(args.data_asset)
-
+    
     # Get platform adapter for output paths, logging, and MLflow context
     platform_adapter = get_platform_adapter(
         default_output_dir=Path("./outputs"))
     output_resolver = platform_adapter.get_output_path_resolver()
     logging_adapter = platform_adapter.get_logging_adapter()
     mlflow_context = platform_adapter.get_mlflow_context_manager()
-
+    
     # Resolve output directory using platform adapter
     output_dir = output_resolver.resolve_output_path(
         "checkpoint", default=Path("./outputs")
     )
     output_dir = output_resolver.ensure_output_directory(output_dir)
-
+    
     # CRITICAL: Set up MLflow BEFORE using context manager
     # This ensures tracking URI and experiment are set, and child runs are created correctly
     import mlflow
@@ -104,10 +105,19 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
     # Check if we should create a child run (for HPO trials)
     parent_run_id = os.environ.get("MLFLOW_PARENT_RUN_ID")
     trial_number = os.environ.get("MLFLOW_TRIAL_NUMBER", "unknown")
+    fold_idx = os.environ.get("MLFLOW_FOLD_IDX")
 
     if parent_run_id:
+        # Construct unique run name: include fold index if k-fold CV is enabled
+        if fold_idx is not None:
+            run_name = f"trial_{trial_number}_fold{fold_idx}"
+            trial_display = f"trial {trial_number}, fold {fold_idx}"
+        else:
+            run_name = f"trial_{trial_number}"
+            trial_display = f"trial {trial_number}"
+        
         print(
-            f"  [Training] Creating child run with parent: {parent_run_id[:12]}... (trial {trial_number})", file=sys.stderr, flush=True)
+            f"  [Training] Creating child run with parent: {parent_run_id[:12]}... ({trial_display})", file=sys.stderr, flush=True)
         # Create child run explicitly using tracking client
         client = mlflow.tracking.MlflowClient()
 
@@ -130,12 +140,24 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
                     f"  [Training] Warning: Could not get parent run info: {e}", file=sys.stderr, flush=True)
 
         if experiment_id:
-            # Create child run with parent tag
+            # Create child run with parent tag and Azure ML-specific tags
+            # These tags help Azure ML UI recognize this as a trial and display metrics/parameters
+            tags = {
+                "mlflow.parentRunId": parent_run_id,
+                "azureml.runType": "trial",  # Mark as trial for Azure ML UI
+                "azureml.trial": "true",  # Azure ML-specific tag for trials
+                # Store trial number as tag
+                "trial_number": str(trial_number),
+            }
+            # Add fold index to tags if k-fold CV is enabled
+            if fold_idx is not None:
+                tags["fold_idx"] = str(fold_idx)
+            
             try:
                 run = client.create_run(
                     experiment_id=experiment_id,
-                    tags={"mlflow.parentRunId": parent_run_id},
-                    run_name=f"trial_{trial_number}"
+                    tags=tags,
+                    run_name=run_name
                 )
                 print(
                     f"  [Training] ✓ Created child run: {run.info.run_id[:12]}...", file=sys.stderr, flush=True)
@@ -149,10 +171,10 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
                 import traceback
                 traceback.print_exc()
                 # Fallback to independent run
-                mlflow.start_run(run_name=f"trial_{trial_number}")
+                mlflow.start_run(run_name=run_name)
         else:
             # Fallback to independent run
-            mlflow.start_run(run_name=f"trial_{trial_number}")
+            mlflow.start_run(run_name=run_name)
     else:
         # No parent run ID - use context manager as normal
         context_mgr = mlflow_context.get_context()

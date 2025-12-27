@@ -27,6 +27,7 @@ def setup_checkpoint_storage(
     output_dir: Path,
     checkpoint_config: Optional[Dict[str, Any]],
     backbone: str,
+    study_name: Optional[str] = None,
 ) -> Tuple[Optional[Path], Optional[str], bool]:
     """
     Set up checkpoint storage and determine if resuming.
@@ -35,6 +36,7 @@ def setup_checkpoint_storage(
         output_dir: Base output directory.
         checkpoint_config: Checkpoint configuration dictionary.
         backbone: Model backbone name.
+        study_name: Optional resolved study name (for {study_name} placeholder).
 
     Returns:
         Tuple of (storage_path, storage_uri, should_resume).
@@ -44,6 +46,7 @@ def setup_checkpoint_storage(
         output_dir=output_dir,
         checkpoint_config=checkpoint_config,
         backbone=backbone,
+        study_name=study_name,
     )
     storage_uri = get_storage_uri(storage_path)
 
@@ -62,7 +65,13 @@ def setup_checkpoint_storage(
     return storage_path, storage_uri, should_resume
 
 
-def create_study_name(backbone: str, run_id: str, should_resume: bool) -> str:
+def create_study_name(
+    backbone: str,
+    run_id: str,
+    should_resume: bool,
+    checkpoint_config: Optional[Dict[str, Any]] = None,
+    hpo_config: Optional[Dict[str, Any]] = None,
+) -> str:
     """
     Create Optuna study name.
 
@@ -70,28 +79,64 @@ def create_study_name(backbone: str, run_id: str, should_resume: bool) -> str:
         backbone: Model backbone name.
         run_id: Unique run ID.
         should_resume: Whether resuming from checkpoint.
+        checkpoint_config: Optional checkpoint configuration dictionary.
+        hpo_config: Optional HPO configuration dictionary.
 
     Returns:
         Study name string.
     """
-    if should_resume:
-        # Use base name to resume existing study
+    checkpoint_config = checkpoint_config or {}
+    hpo_config = hpo_config or {}
+    checkpoint_enabled = checkpoint_config.get("enabled", False)
+
+    # Check for custom study_name in checkpoint config first, then HPO config
+    study_name_template = checkpoint_config.get(
+        "study_name") or hpo_config.get("study_name")
+
+    if study_name_template:
+        # Use custom study name (replace {backbone} placeholder if present)
+        study_name = study_name_template.replace("{backbone}", backbone)
+        return study_name
+
+    # Default behavior when no custom study_name is provided
+    if checkpoint_enabled:
+        # When checkpointing is enabled, always use consistent name so it can be resumed
+        # This allows future runs to resume even if the checkpoint file doesn't exist yet
+        return f"hpo_{backbone}"
+    elif should_resume:
+        # Use base name to resume existing study (for backward compatibility)
         return f"hpo_{backbone}"
     else:
-        # Use unique name for fresh start
+        # Use unique name for fresh start (only when checkpointing is disabled)
         return f"hpo_{backbone}_{run_id}"
 
 
-def create_mlflow_run_name(backbone: str, run_id: str) -> str:
+def create_mlflow_run_name(
+    backbone: str,
+    run_id: str,
+    study_name: Optional[str] = None,
+    should_resume: bool = False,
+    checkpoint_enabled: bool = False,
+) -> str:
     """
     Create MLflow run name for HPO sweep.
 
     Args:
         backbone: Model backbone name.
         run_id: Unique run ID.
+        study_name: Optional study name (used when checkpointing is enabled).
+        should_resume: Whether resuming from checkpoint.
+        checkpoint_enabled: Whether checkpointing is enabled.
 
     Returns:
         MLflow run name string.
     """
-    return f"hpo_{backbone}_{run_id}"
-
+    # When checkpointing is enabled, always use study_name (for both new and resumed runs)
+    if checkpoint_enabled and study_name:
+        return study_name
+    elif should_resume and study_name:
+        # When resuming without checkpointing, use study_name
+        return study_name
+    else:
+        # For new runs without checkpointing, use unique name with run_id
+        return f"hpo_{backbone}_{run_id}"

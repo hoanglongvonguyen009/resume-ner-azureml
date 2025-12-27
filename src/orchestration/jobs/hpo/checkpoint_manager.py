@@ -10,6 +10,7 @@ def resolve_storage_path(
     output_dir: Path,
     checkpoint_config: Dict[str, Any],
     backbone: str,
+    study_name: Optional[str] = None,
 ) -> Optional[Path]:
     """
     Resolve checkpoint storage path with platform awareness.
@@ -18,6 +19,7 @@ def resolve_storage_path(
         output_dir: Base output directory for HPO trials
         checkpoint_config: Checkpoint configuration from HPO config
         backbone: Model backbone name (for placeholder substitution)
+        study_name: Optional resolved study name (for {study_name} placeholder)
     
     Returns:
         Resolved Path for checkpoint storage, or None if checkpointing disabled
@@ -33,8 +35,10 @@ def resolve_storage_path(
         f"{{backbone}}/study.db"  # Default: relative to output_dir
     )
     
-    # Replace {backbone} placeholder
+    # Replace placeholders in order: {backbone} first, then {study_name}
     storage_path_str = storage_path_template.replace("{backbone}", backbone)
+    if study_name:
+        storage_path_str = storage_path_str.replace("{study_name}", study_name)
     
     # Resolve with platform-specific optimizations
     platform = detect_platform()

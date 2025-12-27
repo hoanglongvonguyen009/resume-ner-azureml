@@ -25,14 +25,14 @@ def resolve_checkpoint_dir(checkpoint_path: str) -> Path:
     platform_adapter = get_platform_adapter()
     checkpoint_resolver = platform_adapter.get_checkpoint_resolver()
     
-    _log(f"Resolving checkpoint directory from '{checkpoint_path}'")
+    _log.info(f"Resolving checkpoint directory from '{checkpoint_path}'")
     return checkpoint_resolver.resolve_checkpoint_dir(checkpoint_path)
 
 
 def main() -> None:
     """Main conversion entry point."""
     args = parse_conversion_arguments()
-    _log(
+    _log.info(
         "Starting model conversion job with arguments: "
         f"checkpoint_path='{args.checkpoint_path}', "
         f"config_dir='{args.config_dir}', "
@@ -43,7 +43,7 @@ def main() -> None:
     )
     
     config_dir = validate_config_dir(args.config_dir)
-    _log(f"Using config directory: '{config_dir}'")
+    _log.info(f"Using config directory: '{config_dir}'")
     
     checkpoint_dir = resolve_checkpoint_dir(args.checkpoint_path)
     
@@ -52,7 +52,7 @@ def main() -> None:
     output_resolver = platform_adapter.get_output_path_resolver()
     output_dir = output_resolver.resolve_output_path("onnx_model", default=Path(args.output_dir))
     output_dir = output_resolver.ensure_output_directory(output_dir)
-    _log(
+    _log.info(
         f"Resolved checkpoint directory to '{checkpoint_dir}', "
         f"output directory to '{output_dir}'"
     )
@@ -62,16 +62,17 @@ def main() -> None:
         output_dir=output_dir,
         quantize_int8=args.quantize_int8,
     )
-    _log(f"Conversion completed. ONNX model written to '{onnx_path}'")
+    _log.info(f"Conversion completed. ONNX model written to '{onnx_path}'")
     
     if args.run_smoke_test:
         run_smoke_test(onnx_path, checkpoint_dir)
     else:
-        _log("Smoke test not requested; skipping")
+        _log.info("Smoke test not requested; skipping")
 
 
 if __name__ == "__main__":
     main()
+
 
 
 

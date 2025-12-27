@@ -32,9 +32,10 @@ sampling:
 # Checkpoint configuration for HPO resume support
 # Enables saving study state to SQLite database for resuming interrupted runs
 checkpoint:
-  enabled: true  # Set to true to enable checkpointing (useful for Colab/Kaggle)
-  storage_path: "{backbone}/study.db"  # Relative to output_dir, {backbone} placeholder
-  auto_resume: false  # Automatically resume if checkpoint exists (only if enabled=true)
+  enabled: true
+  study_name: "hpo_{backbone}_smoke_test_1.4"
+  storage_path: "{study_name}/study.db"
+  auto_resume: true
 
 early_termination:
   policy: "bandit"
@@ -48,7 +49,7 @@ objective:
 
 k_fold:
   enabled: true
-  n_splits: 3
+  n_splits: 2
   random_seed: 42
   shuffle: true
   stratified: true

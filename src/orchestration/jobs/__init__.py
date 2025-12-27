@@ -19,7 +19,7 @@ try:
         prepare_training_input,
     )
     from .runtime import submit_data_pipeline_job
-    from .selection import select_production_configuration
+    from .selection.selection import select_best_configuration as select_production_configuration
     from .conversion_jobs import (
         register_model_and_get_name,
         create_scoring_job,

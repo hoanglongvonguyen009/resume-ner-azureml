@@ -40,16 +40,16 @@ def export_to_onnx(
     Returns:
         Path to exported ONNX model.
     """
-    _log(f"Starting ONNX export. quantize_int8={quantize_int8}")
+    _log.info(f"Starting ONNX export. quantize_int8={quantize_int8}")
     output_dir.mkdir(parents=True, exist_ok=True)
-    _log(f"Output directory created at '{output_dir}'")
+    _log.info(f"Output directory created at '{output_dir}'")
     
     # Load model + tokenizer from the saved checkpoint directory
-    _log(f"Loading tokenizer and model from checkpoint directory '{checkpoint_dir}'")
+    _log.info(f"Loading tokenizer and model from checkpoint directory '{checkpoint_dir}'")
     tokenizer = AutoTokenizer.from_pretrained(checkpoint_dir, use_fast=True)
     model = AutoModelForTokenClassification.from_pretrained(checkpoint_dir)
     model.eval()
-    _log("Model and tokenizer successfully loaded; building example inputs for tracing")
+    _log.info("Model and tokenizer successfully loaded; building example inputs for tracing")
     
     # Build a tiny example batch for tracing
     example = tokenizer(
@@ -70,7 +70,7 @@ def export_to_onnx(
     dynamic_axes = _dynamic_axes_for(inputs)
     
     fp32_path = output_dir / "model.onnx"
-    _log(f"Exporting FP32 ONNX model to '{fp32_path}' (opset=18, dynamo=False)")
+    _log.info(f"Exporting FP32 ONNX model to '{fp32_path}' (opset=18, dynamo=False)")
     try:
         torch.onnx.export(
             model,
@@ -84,28 +84,28 @@ def export_to_onnx(
             dynamo=False,  # use classic exporter; avoids dynamic_axes+dynamo issues
         )
     except Exception as e:
-        _log(
+        _log.info(
             f"FP32 ONNX export failed with {type(e).__name__}: {e}. "
             "Raising to fail the job so logs capture the stack trace."
         )
         raise
-    _log("FP32 ONNX export completed")
+    _log.info("FP32 ONNX export completed")
     
     if not quantize_int8:
-        _log("Int8 quantization not requested; returning FP32 model")
+        _log.info("Int8 quantization not requested; returning FP32 model")
         return fp32_path
     
     int8_path = output_dir / "model_int8.onnx"
     try:
         from onnxruntime.quantization import QuantType, quantize_dynamic
         
-        _log(f"Starting dynamic int8 quantization. Output path: '{int8_path}'")
+        _log.info(f"Starting dynamic int8 quantization. Output path: '{int8_path}'")
         quantize_dynamic(
             model_input=str(fp32_path),
             model_output=str(int8_path),
             weight_type=QuantType.QInt8,
         )
-        _log("Int8 quantization completed successfully")
+        _log.info("Int8 quantization completed successfully")
         return int8_path
     except Exception as e:
         # Don't fail the whole conversion if quantization tooling isn't available.
@@ -116,7 +116,7 @@ def export_to_onnx(
             f"Int8 quantization requested but failed ({type(e).__name__}: {e}). "
             f"Falling back to fp32 ONNX at {fp32_path}."
         )
-        _log(
+        _log.info(
             f"Int8 quantization failed with {type(e).__name__}: {e}. "
             f"Falling back to FP32 model at '{fp32_path}'"
         )

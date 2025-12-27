@@ -17,6 +17,7 @@ from .model import create_model_and_tokenizer
 from .evaluator import evaluate_model
 from .cv_utils import load_fold_splits, get_fold_data
 from .distributed import RunContext, create_run_context
+from .checkpoint_loader import resolve_checkpoint_path
 
 # Default constants (can be overridden via config)
 DEFAULT_VAL_SPLIT_DIVISOR = 10
@@ -271,8 +272,24 @@ def train_model(
         dist_cfg = resolve_distributed_config(config)
         context = create_run_context(dist_cfg)
 
+    # Resolve checkpoint path if continued training is configured
+    checkpoint_path = None
+    checkpoint_config = config.get("training", {}).get("checkpoint", {})
+    if checkpoint_config:
+        # Get backbone and run_id for pattern resolution if needed
+        backbone = config.get("model", {}).get("backbone", "").split("-")[0] if "-" in config.get("model", {}).get("backbone", "") else config.get("model", {}).get("backbone", "")
+        run_id = config.get("training", {}).get("run_id")
+        
+        resolved_path = resolve_checkpoint_path(
+            config=config,
+            backbone=backbone,
+            run_id=run_id,
+        )
+        if resolved_path:
+            checkpoint_path = str(resolved_path)
+
     model, tokenizer, _ = create_model_and_tokenizer(
-        config, label2id, id2label, device=context.device
+        config, label2id, id2label, device=context.device, checkpoint_path=checkpoint_path
     )
 
     # Wrap model with DDP when running in distributed mode.

@@ -16,6 +16,9 @@ except ImportError:
 
 from shared.platform_detection import detect_platform
 from shared.yaml_utils import load_yaml
+from shared.logging_utils import get_logger
+
+logger = get_logger(__name__)
 
 
 def _load_env_file(env_file_path: Path) -> dict:
@@ -54,7 +57,7 @@ def _load_env_file(env_file_path: Path) -> dict:
                         value = value[1:-1]
                     env_vars[key] = value
     except Exception as e:
-        print(f"  ⚠ Warning: Could not load {env_file_path}: {e}")
+        logger.warning(f"Could not load {env_file_path}: {e}")
 
     return env_vars
 
@@ -84,28 +87,38 @@ def setup_mlflow_cross_platform(
         ImportError: If mlflow is not installed (with helpful error message)
         RuntimeError: If Azure ML required but unavailable and fallback disabled
     """
+    # Check if Azure ML tracking is already configured
+    current_tracking_uri = mlflow.get_tracking_uri()
+    is_azure_ml_already_set = current_tracking_uri and "azureml" in current_tracking_uri.lower()
+    
+    # If Azure ML is already set and we don't have ml_client, preserve it
+    if is_azure_ml_already_set and ml_client is None:
+        logger.debug(f"Preserving existing Azure ML tracking URI: {current_tracking_uri[:50]}...")
+        mlflow.set_experiment(experiment_name)
+        return current_tracking_uri
+
     # Try Azure ML first if ml_client provided
     if ml_client is not None:
         try:
             tracking_uri = _get_azure_ml_tracking_uri(ml_client)
             mlflow.set_tracking_uri(tracking_uri)
             mlflow.set_experiment(experiment_name)
-            print(f"✓ Using Azure ML workspace tracking")
-            print(f"  Tracking URI: {tracking_uri}")
+            logger.info("Using Azure ML workspace tracking")
+            logger.debug(f"Tracking URI: {tracking_uri}")
             return tracking_uri
         except Exception as e:
             if not fallback_to_local:
                 raise RuntimeError(
                     f"Azure ML tracking failed and fallback disabled: {e}"
                 ) from e
-            print(f"⚠ Azure ML tracking failed: {e}")
-            print("  Falling back to local tracking...")
+            logger.warning(f"Azure ML tracking failed: {e}")
+            logger.info("Falling back to local tracking...")
 
     # Fallback to local tracking
     tracking_uri = _get_local_tracking_uri()
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(experiment_name)
-    print(f"✓ Using local tracking: {tracking_uri}")
+    logger.info(f"Using local tracking: {tracking_uri}")
     return tracking_uri
 
 
@@ -226,8 +239,7 @@ def create_ml_client_from_config(
         project_root = config_dir.parent
         config_env_path = project_root / "config.env"
         if config_env_path.exists():
-            print(
-                f"  Environment variables not set, loading from {config_env_path}")
+            logger.info(f"Environment variables not set, loading from {config_env_path}")
             env_vars = _load_env_file(config_env_path)
             subscription_id = subscription_id or env_vars.get(
                 "AZURE_SUBSCRIPTION_ID")
@@ -237,14 +249,13 @@ def create_ml_client_from_config(
                 # Set environment variables for this process
                 os.environ["AZURE_SUBSCRIPTION_ID"] = subscription_id
                 os.environ["AZURE_RESOURCE_GROUP"] = resource_group
-                print(f"  ✓ Loaded credentials from config.env")
-                print(f"    AZURE_SUBSCRIPTION_ID: {subscription_id[:8]}...")
-                print(f"    AZURE_RESOURCE_GROUP: {resource_group}")
+                logger.info("Loaded credentials from config.env")
+                logger.debug(f"AZURE_SUBSCRIPTION_ID: {subscription_id[:8]}...")
+                logger.debug(f"AZURE_RESOURCE_GROUP: {resource_group}")
             else:
-                print(
-                    f"  ⚠ config.env exists but missing AZURE_SUBSCRIPTION_ID or AZURE_RESOURCE_GROUP")
+                logger.warning("config.env exists but missing AZURE_SUBSCRIPTION_ID or AZURE_RESOURCE_GROUP")
         else:
-            print(f"  ⚠ config.env not found at {config_env_path}")
+            logger.warning(f"config.env not found at {config_env_path}")
 
     # If still not set, try loading from infrastructure.yaml
     # (infrastructure.yaml may contain ${AZURE_SUBSCRIPTION_ID} placeholders)
@@ -263,9 +274,8 @@ def create_ml_client_from_config(
 
     # Check if we have required values
     if not subscription_id or not resource_group:
-        print(
-            "⚠ Azure ML enabled but credentials not found. Falling back to local tracking.")
-        print("  Set AZURE_SUBSCRIPTION_ID and AZURE_RESOURCE_GROUP environment variables.")
+        logger.warning("Azure ML enabled but credentials not found. Falling back to local tracking.")
+        logger.info("Set AZURE_SUBSCRIPTION_ID and AZURE_RESOURCE_GROUP environment variables.")
         return None
 
     try:
@@ -278,8 +288,8 @@ def create_ml_client_from_config(
         )
         return ml_client
     except Exception as e:
-        print(f"⚠ Failed to create Azure ML client: {e}")
-        print("  Falling back to local tracking.")
+        logger.warning(f"Failed to create Azure ML client: {e}")
+        logger.info("Falling back to local tracking.")
         return None
 
 
@@ -310,7 +320,7 @@ def setup_mlflow_from_config(
     mlflow_config_path = config_dir / "mlflow.yaml"
     if not mlflow_config_path.exists():
         # If config doesn't exist, use local tracking
-        print("⚠ MLflow config not found, using local tracking")
+        logger.warning("MLflow config not found, using local tracking")
         return setup_mlflow_cross_platform(
             experiment_name=experiment_name,
             ml_client=None,
@@ -323,16 +333,14 @@ def setup_mlflow_from_config(
     ml_client = None
     azure_ml_config = mlflow_config.get("azure_ml", {})
     if azure_ml_config.get("enabled", False):
-        print(f"  Azure ML enabled in config, attempting to connect...")
-        print(
-            f"  Workspace: {azure_ml_config.get('workspace_name', 'unknown')}")
+        logger.info("Azure ML enabled in config, attempting to connect...")
+        logger.debug(f"Workspace: {azure_ml_config.get('workspace_name', 'unknown')}")
         # Always try to create ML client - it will load from config.env if env vars not set
         ml_client = create_ml_client_from_config(config_dir, mlflow_config)
         if ml_client is None:
-            print(
-                f"  ⚠ Warning: Failed to create Azure ML client, falling back to local tracking")
+            logger.warning("Failed to create Azure ML client, falling back to local tracking")
     else:
-        print(f"  Azure ML disabled in config, using local tracking")
+        logger.info("Azure ML disabled in config, using local tracking")
 
     # Setup MLflow with or without Azure ML
     return setup_mlflow_cross_platform(
