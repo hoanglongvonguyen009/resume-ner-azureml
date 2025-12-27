@@ -15,12 +15,15 @@ def test_tokenization_speed(checkpoint_dir, sample_text):
     This test verifies that tokenization doesn't hang and completes
     in reasonable time for different tokenization modes.
     """
-    checkpoint = Path(checkpoint_dir)
+    checkpoint = Path(checkpoint_dir).resolve()
+    
+    if not checkpoint.exists():
+        pytest.skip(f"Checkpoint directory not found: {checkpoint}")
     
     print(f"Loading tokenizer from: {checkpoint}")
     start = time.time()
     tokenizer = AutoTokenizer.from_pretrained(
-        checkpoint,
+        str(checkpoint),
         use_fast=True,
     )
     load_time = time.time() - start

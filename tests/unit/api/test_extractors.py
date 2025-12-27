@@ -44,79 +44,65 @@ class TestFileTypeDetection:
 class TestPDFExtraction:
     """Test PDF text extraction."""
 
-    @patch("src.api.extractors.fitz")
-    def test_extract_pdf_pymupdf(self, mock_fitz):
+    @patch("src.api.extractors._extract_pdf_pymupdf")
+    def test_extract_pdf_pymupdf(self, mock_extract):
         """Test PDF extraction with PyMuPDF."""
         pdf_content = b"%PDF-1.4\n"
         
-        mock_doc = MagicMock()
-        mock_page = MagicMock()
-        mock_page.get_text.return_value = "Extracted text"
-        mock_doc.__iter__.return_value = [mock_page]
-        mock_fitz.open.return_value = mock_doc
+        mock_extract.return_value = "Extracted text"
 
         text = extract_text_from_pdf(pdf_content, extractor="pymupdf")
         assert text == "Extracted text"
+        mock_extract.assert_called_once_with(pdf_content)
 
-    @patch("src.api.extractors.pdfplumber")
-    def test_extract_pdf_pdfplumber(self, mock_pdfplumber):
+    @patch("src.api.extractors._extract_pdf_pdfplumber")
+    def test_extract_pdf_pdfplumber(self, mock_extract):
         """Test PDF extraction with pdfplumber."""
         pdf_content = b"%PDF-1.4\n"
         
-        mock_pdf = MagicMock()
-        mock_page = MagicMock()
-        mock_page.extract_text.return_value = "Extracted text"
-        mock_pdf.pages = [mock_page]
-        mock_pdfplumber.open.return_value.__enter__.return_value = mock_pdf
+        mock_extract.return_value = "Extracted text"
 
         text = extract_text_from_pdf(pdf_content, extractor="pdfplumber")
         assert text == "Extracted text"
+        mock_extract.assert_called_once_with(pdf_content)
 
     def test_extract_pdf_invalid_extractor(self):
         """Test PDF extraction with invalid extractor."""
-        with pytest.raises(ValueError):
+        from src.api.exceptions import TextExtractionError
+        with pytest.raises(TextExtractionError):
             extract_text_from_pdf(b"content", extractor="invalid")
 
 
 class TestImageExtraction:
     """Test image OCR extraction."""
 
-    @patch("src.api.extractors.easyocr")
-    @patch("src.api.extractors.Image")
-    def test_extract_image_easyocr(self, mock_image, mock_easyocr):
+    @patch("src.api.extractors._extract_image_easyocr")
+    def test_extract_image_easyocr(self, mock_extract):
         """Test image extraction with EasyOCR."""
         image_content = b"\x89PNG\r\n\x1a\n"
         
-        mock_reader = MagicMock()
-        mock_reader.readtext.return_value = [
-            (None, "Extracted", None),
-            (None, "text", None),
-        ]
-        mock_easyocr.Reader.return_value = mock_reader
-        
-        mock_img = MagicMock()
-        mock_image.open.return_value = mock_img
+        mock_extract.return_value = "Extracted\ntext"
 
         text = extract_text_from_image(image_content, extractor="easyocr")
         assert "Extracted" in text
         assert "text" in text
+        mock_extract.assert_called_once_with(image_content)
 
-    @patch("src.api.extractors.pytesseract")
-    @patch("src.api.extractors.Image")
-    def test_extract_image_pytesseract(self, mock_image, mock_pytesseract):
+    @patch("src.api.extractors._extract_image_pytesseract")
+    def test_extract_image_pytesseract(self, mock_extract):
         """Test image extraction with pytesseract."""
         image_content = b"\x89PNG\r\n\x1a\n"
         
-        mock_pytesseract.image_to_string.return_value = "Extracted text"
-        mock_img = MagicMock()
-        mock_image.open.return_value = mock_img
+        mock_extract.return_value = "Extracted text"
 
         text = extract_text_from_image(image_content, extractor="pytesseract")
         assert text == "Extracted text"
+        mock_extract.assert_called_once_with(image_content)
 
     def test_extract_image_invalid_extractor(self):
         """Test image extraction with invalid extractor."""
-        with pytest.raises(ValueError):
+        from src.api.exceptions import TextExtractionError
+        with pytest.raises(TextExtractionError):
             extract_text_from_image(b"content", extractor="invalid")
 
 
@@ -127,7 +113,10 @@ class TestFileValidation:
     async def test_validate_file_success(self):
         """Test successful file validation."""
         mock_file = MagicMock()
-        mock_file.read.return_value = b"content"
+        # Mock async read method
+        async def mock_read():
+            return b"content"
+        mock_file.read = mock_read
         
         content = await validate_file(mock_file, max_size=100)
         assert content == b"content"
@@ -136,7 +125,10 @@ class TestFileValidation:
     async def test_validate_file_size_exceeded(self):
         """Test file size validation."""
         mock_file = MagicMock()
-        mock_file.read.return_value = b"x" * 200
+        # Mock async read method
+        async def mock_read():
+            return b"x" * 200
+        mock_file.read = mock_read
         
         with pytest.raises(FileSizeExceededError):
             await validate_file(mock_file, max_size=100)

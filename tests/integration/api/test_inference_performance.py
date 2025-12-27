@@ -37,8 +37,8 @@ class TestInferencePerformanceIntegration:
         from pathlib import Path
         from src.api.exceptions import InferenceError, ModelNotLoadedError
         
-        onnx_path = Path(onnx_model_path)
-        checkpoint = Path(checkpoint_dir)
+        onnx_path = Path(onnx_model_path).resolve()
+        checkpoint = Path(checkpoint_dir).resolve()
         
         # Check files exist
         if not onnx_path.exists():

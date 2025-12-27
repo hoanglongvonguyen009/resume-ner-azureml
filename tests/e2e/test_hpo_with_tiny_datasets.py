@@ -17,43 +17,7 @@ Usage:
 import argparse
 import logging
 import sys
-from datetime import datetime
-from io import StringIO
 from pathlib import Path
-
-
-class TeeOutput:
-    """Capture stdout/stderr and write to both console and log file."""
-    
-    def __init__(self, log_file: Path):
-        self.log_file = log_file
-        self.original_stdout = sys.stdout
-        self.original_stderr = sys.stderr
-        self.file_handle = open(log_file, "a", encoding="utf-8")
-        
-    def write(self, message: str):
-        """Write to both console and log file."""
-        # Write to original stdout (console)
-        self.original_stdout.write(message)
-        self.original_stdout.flush()
-        # Also write to log file (raw output, no timestamp duplication)
-        if self.file_handle is not None:
-            self.file_handle.write(message)
-            self.file_handle.flush()
-        
-    def flush(self):
-        """Flush both outputs."""
-        self.original_stdout.flush()
-        if self.file_handle is not None:
-            self.file_handle.flush()
-        
-    def close(self):
-        """Close the log file and restore original stdout/stderr."""
-        if self.file_handle:
-            self.file_handle.close()
-            self.file_handle = None
-        sys.stdout = self.original_stdout
-        sys.stderr = self.original_stderr
 
 # Add project root to path
 SCRIPT_DIR = Path(__file__).parent
@@ -61,21 +25,21 @@ PROJECT_ROOT = SCRIPT_DIR.parent.parent  # tests/e2e/ -> tests/ -> project root
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from tests.integration.orchestrators.test_orchestrator import (
+from testing.orchestrators.test_orchestrator import (
     test_deterministic_hpo_multiple_backbones,
     test_random_seed_variants_multiple_backbones,
     test_kfold_validation,
     test_edge_case_k_too_large,
     test_edge_cases_suite,
 )
-from tests.integration.aggregators.result_aggregator import (
+from testing.aggregators.result_aggregator import (
     collect_test_results,
     build_test_details,
 )
-from tests.integration.comparators.result_comparator import compare_results
-from tests.integration.setup.environment_setup import setup_test_environment
-from tests.fixtures.config.test_config_loader import get_test_config, BACKBONES_LIST
-from tests.fixtures.hpo_test_helpers import (
+from testing.comparators.result_comparator import compare_results
+from testing.setup.environment_setup import setup_test_environment
+from testing.fixtures.config.test_config_loader import get_test_config, BACKBONES_LIST
+from testing.fixtures.hpo_test_helpers import (
     DEFAULT_RANDOM_SEED,
     MINIMAL_K_FOLDS,
     DEFAULT_BACKBONE,
@@ -89,42 +53,7 @@ from tests.fixtures.hpo_test_helpers import (
     print_edge_case_k_too_large_results,
     print_edge_case_results,
 )
-
-
-def setup_logging(output_dir: Path, log_file: Path = None) -> tuple[logging.Logger, Path]:
-    """
-    Setup logging to both console and file.
-    
-    Args:
-        output_dir: Directory where log file will be created (if log_file not provided)
-        log_file: Optional specific log file path
-        
-    Returns:
-        Tuple of (logger, log_file_path)
-    """
-    if log_file is None:
-        output_dir.mkdir(parents=True, exist_ok=True)
-        # Create log file with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = output_dir / f"test_hpo_{timestamp}.log"
-    else:
-        log_file.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.FileHandler(log_file, encoding="utf-8"),
-            logging.StreamHandler(sys.stdout),
-        ],
-        force=True,  # Override any existing configuration
-    )
-    
-    logger = logging.getLogger(__name__)
-    logger.info(f"Log file: {log_file}")
-    
-    return logger, log_file
+from testing.fixtures.logging_utils import setup_logging, setup_tee_output
 
 
 def main():
@@ -225,9 +154,7 @@ Examples:
         
         # Setup TeeOutput to capture all print statements to log file
         # This will capture all stdout/stderr output to the log file
-        tee = TeeOutput(actual_log_file)
-        sys.stdout = tee
-        sys.stderr = tee
+        tee = setup_tee_output(actual_log_file)
         
         print(f"Project root: {root_dir}")
         print(f"Log file: {actual_log_file}")

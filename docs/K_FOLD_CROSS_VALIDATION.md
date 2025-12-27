@@ -104,7 +104,7 @@ save_fold_splits(splits, Path("fold_splits.json"))
 
 ```python
 # Train on fold 0
-python src/train.py \
+python src/training/train.py \
     --data-asset dataset \
     --config-dir config \
     --backbone distilbert \
@@ -116,7 +116,7 @@ python src/train.py \
 
 ```python
 # Train on all data without validation split
-python src/train.py \
+python src/training/train.py \
     --data-asset dataset \
     --config-dir config \
     --backbone distilbert \
@@ -210,8 +210,19 @@ Load fold splits from JSON file.
 
 **Returns**: Tuple of (splits, metadata)
 
+## Checkpoint and Resume Compatibility
+
+K-fold cross-validation is fully compatible with HPO checkpoint/resume functionality. When checkpointing is enabled:
+
+- **Fold splits are preserved**: The same fold splits are used when resuming, ensuring consistency
+- **Trial state is saved**: Each trial's fold-level results are saved in the checkpoint
+- **Resume works seamlessly**: You can interrupt and resume k-fold CV HPO runs just like regular HPO
+
+For more information, see [HPO Checkpoint and Resume Support](./HPO_CHECKPOINT_RESUME.md).
+
 ## Related Documentation
 
+- [HPO Checkpoint and Resume Support](./HPO_CHECKPOINT_RESUME.md) - Checkpoint/resume functionality
 - [Local Training Guide](LOCAL_TRAINING.md) - Complete local training workflow
 - [Platform Adapter Architecture](PLATFORM_ADAPTER_ARCHITECTURE.md) - How platform adapters work
 

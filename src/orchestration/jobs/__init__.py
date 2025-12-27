@@ -39,7 +39,7 @@ except ImportError:
     register_online_endpoints = None
 
 # Local-only utilities (always available)
-from .local_sweeps import (
+from .hpo.local_sweeps import (
     run_local_hpo_sweep,
     translate_search_space_to_optuna,
 )

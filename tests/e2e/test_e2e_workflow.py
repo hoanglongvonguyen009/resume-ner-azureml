@@ -16,9 +16,11 @@ Usage:
 
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
@@ -47,6 +49,7 @@ from orchestration.config_loader import (
 )
 from orchestration.jobs.local_sweeps import run_local_hpo_sweep
 from orchestration.jobs.local_selection import select_best_configuration_across_studies
+from testing.fixtures.logging_utils import setup_logging, setup_tee_output
 
 
 def setup_paths() -> Tuple[Path, Path, Path]:
@@ -226,6 +229,9 @@ def run_hpo_sweep(
     k_folds_enabled = k_fold_config.get("enabled", False)
     k_folds_param = k_fold_config.get("n_splits", 3) if k_folds_enabled else None
 
+    # Extract checkpoint configuration
+    checkpoint_config = hpo_config.get("checkpoint", {})
+
     studies = {}
 
     for backbone in backbone_values:
@@ -245,6 +251,7 @@ def run_hpo_sweep(
             mlflow_experiment_name=mlflow_experiment_name,
             k_folds=k_folds_param,
             fold_splits_file=fold_splits_file,
+            checkpoint_config=checkpoint_config,
         )
 
         studies[backbone] = study
@@ -481,20 +488,35 @@ def main():
         default=EXPERIMENT_NAME,
         help=f"Experiment name (default: {EXPERIMENT_NAME})",
     )
+    parser.add_argument(
+        "--log-file",
+        type=str,
+        default=None,
+        help="Path to log file (default: auto-generated in output directory)",
+    )
 
     args = parser.parse_args()
 
+    # Setup logging early
+    root_dir = PROJECT_ROOT
+    if args.output_dir:
+        output_dir = Path(args.output_dir)
+    else:
+        output_dir = root_dir / "outputs" / "e2e_test"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    log_file_path = Path(args.log_file) if args.log_file else None
+    logger, actual_log_file = setup_logging(output_dir, log_file_path, log_prefix="test_e2e_workflow")
+    
+    # Setup TeeOutput to capture all print statements to log file
+    tee = setup_tee_output(actual_log_file)
+    
     try:
         # Setup
         root_dir, src_dir, config_dir = setup_paths()
 
-        # Determine output directory
-        if args.output_dir:
-            output_dir = Path(args.output_dir)
-        else:
-            output_dir = root_dir / "outputs" / "e2e_test"
-        output_dir.mkdir(parents=True, exist_ok=True)
         print(f"✓ Output directory: {output_dir}")
+        print(f"✓ Log file: {actual_log_file}")
 
         # Load configs
         experiment_config, configs = load_configs(config_dir, args.experiment)
@@ -569,6 +591,10 @@ def main():
         import traceback
         traceback.print_exc()
         return 1
+    finally:
+        # Restore original stdout/stderr and close log file
+        if 'tee' in locals():
+            tee.close()
 
 
 if __name__ == "__main__":

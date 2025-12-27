@@ -15,8 +15,13 @@ def test_direct_inference(onnx_model_path, checkpoint_dir, sample_text):
     This test verifies that the inference engine works correctly
     when called directly, including step-by-step timing analysis.
     """
-    onnx_path = Path(onnx_model_path)
-    checkpoint = Path(checkpoint_dir)
+    onnx_path = Path(onnx_model_path).resolve()
+    checkpoint = Path(checkpoint_dir).resolve()
+    
+    if not onnx_path.exists():
+        pytest.skip(f"ONNX model not found: {onnx_path}")
+    if not checkpoint.exists():
+        pytest.skip(f"Checkpoint directory not found: {checkpoint}")
     
     print(f"Loading model from: {onnx_path}")
     print(f"Loading tokenizer from: {checkpoint}")

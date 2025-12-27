@@ -16,13 +16,18 @@ def test_onnx_inference_speed(onnx_model_path, checkpoint_dir, sample_text):
     
     This test isolates ONNX inference performance from other components.
     """
-    onnx_path = Path(onnx_model_path)
-    checkpoint = Path(checkpoint_dir)
+    onnx_path = Path(onnx_model_path).resolve()
+    checkpoint = Path(checkpoint_dir).resolve()
+    
+    if not onnx_path.exists():
+        pytest.skip(f"ONNX model not found: {onnx_path}")
+    if not checkpoint.exists():
+        pytest.skip(f"Checkpoint directory not found: {checkpoint}")
     
     print(f"Loading ONNX model from: {onnx_path}")
     start = time.time()
     session = ort.InferenceSession(
-        onnx_path,
+        str(onnx_path),
         providers=["CPUExecutionProvider"],
     )
     load_time = time.time() - start
@@ -35,7 +40,7 @@ def test_onnx_inference_speed(onnx_model_path, checkpoint_dir, sample_text):
     print(f"\nLoading tokenizer from: {checkpoint}")
     start = time.time()
     tokenizer = AutoTokenizer.from_pretrained(
-        checkpoint,
+        str(checkpoint),
         use_fast=True,
     )
     load_time = time.time() - start

@@ -5,7 +5,7 @@ hpo_pipeline_tests:
   defaults:
     random_seed: 42
     minimal_k_folds: 2
-    backbones: ["distilbert", "deberta"]  # List of backbones to test
+    backbones: ["distilbert", "distilroberta"]  # List of backbones to test (deberta excluded due to CUDA/NVRTC issues on Windows)
     metric_decimal_places: 4
     separator_width: 60
     very_small_validation_threshold: 2

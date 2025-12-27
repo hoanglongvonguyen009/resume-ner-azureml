@@ -2,8 +2,8 @@
 # Applied to all training runs
 
 training:
-  epochs: 5
-  batch_size: 12 
+  epochs: 2  # 5
+  batch_size: 4  # 12 
   gradient_accumulation_steps: 2
   learning_rate: 2e-5
   weight_decay: 0.01
@@ -11,7 +11,7 @@ training:
   max_grad_norm: 1.0
   # Data splitting and model-specific settings
   val_split_divisor: 10  # Divide train set by this to create validation split if none exists
-  deberta_max_batch_size: 16  # Maximum batch size for DeBERTa models (memory constraints)
+  deberta_max_batch_size: 8  # 16  # Maximum batch size for DeBERTa models (memory constraints)
   warmup_steps_divisor: 10  # Divide total steps by this to cap warmup steps
   
   # EDA-based metric selection
@@ -38,7 +38,7 @@ checkpointing:
 # decide whether to run single-GPU vs multi-GPU. If no multiple GPUs or DDP
 # backend are available, it will safely fall back to single-GPU.
 distributed:
-  enabled: true         # Set true to enable multi-GPU / DDP
+  enabled: false         # Set true to enable multi-GPU / DDP
   backend: "nccl"        # Typically 'nccl' for GPUs
   world_size: "auto"     # 'auto' = use all visible GPUs; or set an int
   init_method: "env://"  # Default init method; can be overridden if needed

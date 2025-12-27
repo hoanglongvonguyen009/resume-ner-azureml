@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tests.fixtures.config.test_config_loader import get_test_config
+from testing.fixtures.config.test_config_loader import get_test_config
 
 
 @pytest.fixture(scope="session")

@@ -146,7 +146,7 @@ python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA:', to
 Run a quick smoke test to verify the setup:
 
 ```bash
-python src/train.py \
+python src/training/train.py \
   --data-asset dataset_tiny \
   --config-dir config \
   --backbone distilbert \

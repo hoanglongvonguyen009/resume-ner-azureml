@@ -371,11 +371,18 @@ class TestRunTrainingLoop:
         
         mock_optimizer = MagicMock()
         mock_scheduler = MagicMock()
-        device = torch.device("cpu")
+        
+        # Create a mock RunContext
+        from training.distributed import RunContext
+        mock_context = MagicMock(spec=RunContext)
+        mock_context.device = torch.device("cpu")
+        mock_context.is_distributed = False
+        mock_context.rank = 0
+        mock_context.world_size = 1
         
         run_training_loop(
             mock_model, mock_train_loader, mock_optimizer,
-            mock_scheduler, epochs=1, max_grad_norm=1.0, device=device
+            mock_scheduler, epochs=1, max_grad_norm=1.0, context=mock_context
         )
         
         mock_model.train.assert_called_once()
@@ -411,11 +418,18 @@ class TestRunTrainingLoop:
         
         mock_optimizer = MagicMock()
         mock_scheduler = MagicMock()
-        device = torch.device("cpu")
+        
+        # Create a mock RunContext
+        from training.distributed import RunContext
+        mock_context = MagicMock(spec=RunContext)
+        mock_context.device = torch.device("cpu")
+        mock_context.is_distributed = False
+        mock_context.rank = 0
+        mock_context.world_size = 1
         
         run_training_loop(
             mock_model, mock_train_loader, mock_optimizer,
-            mock_scheduler, epochs=3, max_grad_norm=1.0, device=device
+            mock_scheduler, epochs=3, max_grad_norm=1.0, context=mock_context
         )
         
         assert mock_optimizer.step.call_count == 3
@@ -425,13 +439,13 @@ class TestRunTrainingLoop:
 class TestSaveCheckpoint:
     """Tests for save_checkpoint function."""
 
-    def test_save_checkpoint_success(self, temp_dir):
+    def test_save_checkpoint_success(self, tmp_path):
         """Test successful checkpoint saving."""
         from training.trainer import save_checkpoint
         
         mock_model = MagicMock()
         mock_tokenizer = MagicMock()
-        output_dir = temp_dir
+        output_dir = tmp_path
         
         save_checkpoint(mock_model, mock_tokenizer, output_dir)
         
@@ -440,13 +454,13 @@ class TestSaveCheckpoint:
         mock_model.save_pretrained.assert_called_once_with(checkpoint_path)
         mock_tokenizer.save_pretrained.assert_called_once_with(checkpoint_path)
 
-    def test_save_checkpoint_creates_directory(self, temp_dir):
+    def test_save_checkpoint_creates_directory(self, tmp_path):
         """Test that checkpoint directory is created if it doesn't exist."""
         from training.trainer import save_checkpoint
         
         mock_model = MagicMock()
         mock_tokenizer = MagicMock()
-        output_dir = temp_dir / "outputs"
+        output_dir = tmp_path / "outputs"
         
         save_checkpoint(mock_model, mock_tokenizer, output_dir)
         
