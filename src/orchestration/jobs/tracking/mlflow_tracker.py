@@ -6,7 +6,8 @@ Handles parent run creation, child run tracking, and best trial identification.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any, Dict, Optional, List
 
 import mlflow
 from shared.logging_utils import get_logger
@@ -143,7 +144,17 @@ class MLflowSweepTracker:
         mlflow.log_param("resumed_from_checkpoint", should_resume)
 
     def log_final_metrics(
-        self, study: Any, objective_metric: str, parent_run_id: str, run_name: Optional[str] = None, should_resume: bool = False
+        self,
+        study: Any,
+        objective_metric: str,
+        parent_run_id: str,
+        run_name: Optional[str] = None,
+        should_resume: bool = False,
+        hpo_output_dir: Optional[Path] = None,
+        backbone: Optional[str] = None,
+        run_id: Optional[str] = None,
+        fold_splits: Optional[List] = None,
+        hpo_config: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Log final metrics and best trial information to parent run.
@@ -154,6 +165,11 @@ class MLflowSweepTracker:
             parent_run_id: ID of the parent MLflow run.
             run_name: Optional run name (used when resuming to search across all parent runs).
             should_resume: Whether this is a resumed run.
+            hpo_output_dir: Path to HPO output directory containing trial checkpoints.
+            backbone: Model backbone name (e.g., "distilbert").
+            run_id: HPO run identifier for directory resolution.
+            fold_splits: Optional list of fold splits (if k-fold CV used).
+            hpo_config: HPO configuration dictionary containing MLflow settings.
         """
         # Use optuna module to check trial state properly
         try:
@@ -178,7 +194,24 @@ class MLflowSweepTracker:
                 mlflow.log_param(f"best_{param_name}", param_value)
 
             # Find and log the best trial's MLflow run ID
-            self._log_best_trial_id(study, parent_run_id, run_name, should_resume)
+            self._log_best_trial_id(
+                study, parent_run_id, run_name, should_resume)
+
+            # Log best trial checkpoint to MLflow if configured
+            if hpo_config and hpo_config.get("mlflow", {}).get("log_best_checkpoint", True):
+                if hpo_output_dir and backbone:
+                    try:
+                        self._log_best_trial_checkpoint(
+                            study=study,
+                            hpo_output_dir=hpo_output_dir,
+                            backbone=backbone,
+                            run_id=run_id,
+                            fold_splits=fold_splits,
+                        )
+                    except Exception as e:
+                        # Don't fail HPO if checkpoint logging fails
+                        logger.warning(
+                            f"Could not log best trial checkpoint to MLflow: {e}")
 
     def _log_best_trial_id(self, study: Any, parent_run_id: str, run_name: Optional[str] = None, should_resume: bool = False) -> None:
         """
@@ -229,14 +262,14 @@ class MLflowSweepTracker:
                     )
             else:
                 # Normal case: only search for child runs of current parent
-                logger.debug(
-                    f"Searching for child runs with parent: {parent_run_id[:12]}... in experiment: {experiment_id}")
+            logger.debug(
+                f"Searching for child runs with parent: {parent_run_id[:12]}... in experiment: {experiment_id}")
 
-                all_runs = client.search_runs(
-                    experiment_ids=[experiment_id],
-                    filter_string=f"tags.mlflow.parentRunId = '{parent_run_id}'",
-                    max_results=1000,
-                )
+            all_runs = client.search_runs(
+                experiment_ids=[experiment_id],
+                filter_string=f"tags.mlflow.parentRunId = '{parent_run_id}'",
+                max_results=1000,
+            )
 
             logger.info(
                 f"Found {len(all_runs)} total child runs for best trial search")
@@ -255,7 +288,7 @@ class MLflowSweepTracker:
                         trial_num = int(trial_num_tag)
                         # Only keep the first occurrence if there are duplicates
                         if trial_num not in trial_to_run_id:
-                            trial_to_run_id[trial_num] = run.info.run_id
+                        trial_to_run_id[trial_num] = run.info.run_id
                     except (ValueError, TypeError):
                         pass
 
@@ -279,6 +312,486 @@ class MLflowSweepTracker:
         except Exception as e:
             # Don't fail if we can't find the best trial run ID
             logger.warning(f"Could not retrieve best trial run ID: {e}")
+
+    def _log_best_trial_checkpoint(
+        self,
+        study: Any,
+        hpo_output_dir: Path,
+        backbone: str,
+        run_id: Optional[str] = None,
+        fold_splits: Optional[List] = None,
+    ) -> None:
+        """
+        Log best trial checkpoint to MLflow parent run.
+
+        Args:
+            study: Completed Optuna study.
+            hpo_output_dir: Path to HPO output directory containing trial checkpoints.
+            backbone: Model backbone name.
+            run_id: HPO run identifier for directory resolution.
+            fold_splits: Optional list of fold splits (if k-fold CV used).
+        """
+        if study.best_trial is None:
+            logger.warning("No best trial found, skipping checkpoint logging")
+            return
+
+        best_trial_number = study.best_trial.number
+
+        # Resolve checkpoint directory
+        # Note: hpo_output_dir may already include backbone (if passed from notebook)
+        # or may be the base directory. Check if backbone is already in the path.
+        # Single training: {hpo_output_dir}/{backbone}/trial_{number}_{run_id}/checkpoint/
+        # K-fold CV: {hpo_output_dir}/{backbone}/trial_{number}_{run_id}_fold{last_idx}/checkpoint/
+
+        # Check if hpo_output_dir already includes backbone (e.g., outputs/hpo/distilbert)
+        if hpo_output_dir.name == backbone:
+            # hpo_output_dir already includes backbone
+            base_dir = hpo_output_dir
+        else:
+            # hpo_output_dir is base directory (e.g., outputs/hpo), add backbone
+            base_dir = hpo_output_dir / backbone
+
+        # Try to find checkpoint directory
+        # When resuming, run_id changes, so we need to search for the actual checkpoint
+        checkpoint_dir = None
+
+        if fold_splits is not None and len(fold_splits) > 0:
+            # K-fold CV: use last fold's checkpoint
+            last_fold_idx = len(fold_splits) - 1
+            # First try with the provided run_id
+            if run_id:
+                run_suffix = f"_{run_id}"
+                checkpoint_dir = (
+                    base_dir /
+                    f"trial_{best_trial_number}{run_suffix}_fold{last_fold_idx}" /
+                    "checkpoint"
+                )
+
+            # If not found, search for any trial directory matching the trial number and fold
+            if not checkpoint_dir or not checkpoint_dir.exists():
+                import glob
+                pattern = str(
+                    base_dir / f"trial_{best_trial_number}_*_fold{last_fold_idx}" / "checkpoint")
+                matches = glob.glob(pattern)
+                if matches:
+                    checkpoint_dir = Path(matches[0])
+                else:
+                    # Try without run_id suffix
+                    checkpoint_dir = (
+                        base_dir /
+                        f"trial_{best_trial_number}_fold{last_fold_idx}" /
+                        "checkpoint"
+                    )
+        else:
+            # Single training
+            # First try with the provided run_id
+            if run_id:
+                run_suffix = f"_{run_id}"
+                checkpoint_dir = (
+                    base_dir /
+                    f"trial_{best_trial_number}{run_suffix}" /
+                    "checkpoint"
+                )
+
+            # If not found, search for any trial directory matching the trial number
+            if not checkpoint_dir or not checkpoint_dir.exists():
+                import glob
+                pattern = str(
+                    base_dir / f"trial_{best_trial_number}_*" / "checkpoint")
+                matches = glob.glob(pattern)
+                if matches:
+                    checkpoint_dir = Path(matches[0])
+                else:
+                    # Try without run_id suffix
+                    checkpoint_dir = (
+                        base_dir /
+                        f"trial_{best_trial_number}" /
+                        "checkpoint"
+                    )
+
+        if not checkpoint_dir or not checkpoint_dir.exists():
+            logger.warning(
+                f"Best trial checkpoint not found for trial {best_trial_number}. "
+                f"Searched in: {base_dir}. "
+                f"Skipping MLflow checkpoint logging."
+            )
+            return
+
+        try:
+            # Log checkpoint directory as artifact to MLflow
+            # Prefer best trial's child run over parent run for artifact upload
+
+            # Get the parent run ID from the current active run
+            parent_run_id_for_artifacts = None
+            best_trial_run_id = None
+
+            try:
+                active_run = mlflow.active_run()
+                if active_run:
+                    parent_run_id_for_artifacts = active_run.info.run_id
+
+                    # Try to get the best trial's child run ID from MLflow tags on the parent run
+                    try:
+                        client = mlflow.tracking.MlflowClient()
+                        parent_run_data = client.get_run(
+                            parent_run_id_for_artifacts)
+                        if parent_run_data and parent_run_data.data and parent_run_data.data.tags:
+                            tags = parent_run_data.data.tags
+                            best_trial_run_id = tags.get("best_trial_run_id")
+                    except Exception:
+                        pass
+
+                    # Fallback: If best_trial_run_id not found in tags, search child runs by trial number
+                    if not best_trial_run_id:
+                        try:
+                            client = mlflow.tracking.MlflowClient()
+                            experiment_id = active_run.info.experiment_id
+                            # Search for child runs of the parent run with matching trial number
+                            child_runs = client.search_runs(
+                                experiment_ids=[experiment_id],
+                                filter_string=f"tags.mlflow.parentRunId = '{parent_run_id_for_artifacts}' AND (tags.trial_number = '{best_trial_number}' OR tags.optuna.trial.number = '{best_trial_number}')",
+                                max_results=1
+                            )
+                            if child_runs:
+                                best_trial_run_id = child_runs[0].info.run_id
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+            # Check if we're using Azure ML
+            tracking_uri = mlflow.get_tracking_uri()
+            is_azure_ml = tracking_uri and "azureml" in tracking_uri.lower()
+
+            artifact_logged = False
+
+            if is_azure_ml:
+                try:
+                    active_run = mlflow.active_run()
+                    if not active_run:
+                        raise ValueError(
+                            "No active MLflow run for artifact logging")
+
+                    # Prefer best trial's child run over parent run for artifact upload
+                    run_id_to_use = best_trial_run_id or active_run.info.run_id
+
+                    run_id = run_id_to_use
+
+                    logger.info(
+                        "Uploading best trial checkpoint to Azure ML...")
+                    try:
+                        from azureml.core import Run as AzureMLRun
+                        from azureml.core import Workspace
+                        import os
+
+                        # Get Azure ML workspace - try multiple methods
+                        workspace = None
+
+                        # Method 1: Try from config.json (if available)
+                        try:
+                            workspace = Workspace.from_config()
+                        except Exception as ws_error1:
+
+                            # Method 2: Try from environment variables
+                            subscription_id = os.environ.get(
+                                "AZURE_SUBSCRIPTION_ID")
+                            resource_group = os.environ.get(
+                                "AZURE_RESOURCE_GROUP")
+                            workspace_name = os.environ.get(
+                                "AZURE_WORKSPACE_NAME", "resume-ner-ws")  # Default from codebase
+
+                            if subscription_id and resource_group:
+                                try:
+                                    workspace = Workspace(
+                                        subscription_id=subscription_id,
+                                        resource_group=resource_group,
+                                        workspace_name=workspace_name
+                                    )
+                                except Exception:
+                                    pass
+
+                            # Method 3: Try loading from config.env file (same as mlflow_setup.py)
+                            if not workspace:
+                                try:
+                                    # Path is already imported at module level
+                                    project_root = Path.cwd()
+                                    # Try to find config.env in project root or parent
+                                    config_env_paths = [
+                                        project_root / "config.env",
+                                        project_root.parent / "config.env",
+                                    ]
+
+                                    for config_env_path in config_env_paths:
+                                        if config_env_path.exists():
+                                            # Simple .env parser
+                                            env_vars = {}
+                                            with open(config_env_path, "r", encoding="utf-8") as f:
+                                                for line in f:
+                                                    line = line.strip()
+                                                    if not line or line.startswith("#"):
+                                                        continue
+                                                    if "=" in line:
+                                                        key, value = line.split(
+                                                            "=", 1)
+                                                        key = key.strip()
+                                                        value = value.strip().strip('"').strip("'")
+                                                        env_vars[key] = value
+
+                                            subscription_id = env_vars.get(
+                                                "AZURE_SUBSCRIPTION_ID") or subscription_id
+                                            resource_group = env_vars.get(
+                                                "AZURE_RESOURCE_GROUP") or resource_group
+                                            workspace_name = env_vars.get(
+                                                "AZURE_WORKSPACE_NAME", workspace_name)
+
+                                            if subscription_id and resource_group:
+                                                workspace = Workspace(
+                                                    subscription_id=subscription_id,
+                                                    resource_group=resource_group,
+                                                    workspace_name=workspace_name
+                                                )
+                                                break
+                                except Exception:
+                                    pass
+
+                            # Method 4: Try parsing from MLflow tracking URI
+                            if not workspace:
+                                try:
+                                    tracking_uri = mlflow.get_tracking_uri()
+                                    # Azure ML tracking URI format: azureml://<region>.api.azureml.ms/mlflow/v2.0/subscriptions/<sub_id>/resourceGroups/<rg>/providers/Microsoft.MachineLearningServices/workspaces/<ws_name>
+                                    if "azureml" in tracking_uri.lower() and "/subscriptions/" in tracking_uri:
+                                        import re
+                                        sub_match = re.search(
+                                            r'/subscriptions/([^/]+)', tracking_uri)
+                                        rg_match = re.search(
+                                            r'/resourceGroups/([^/]+)', tracking_uri)
+                                        ws_match = re.search(
+                                            r'/workspaces/([^/]+)', tracking_uri)
+
+                                        if sub_match and rg_match and ws_match:
+                                            workspace = Workspace(
+                                                subscription_id=sub_match.group(
+                                                    1),
+                                                resource_group=rg_match.group(
+                                                    1),
+                                                workspace_name=ws_match.group(
+                                                    1)
+                                            )
+                                except Exception:
+                                    pass
+
+                            if not workspace:
+                                raise RuntimeError(
+                                    f"Could not load Azure ML workspace. Tried: config.json, environment variables, config.env, and tracking URI parsing. "
+                                    f"Last error: {ws_error1}"
+                                )
+
+                        # Get experiment ID and run name from MLflow run
+                        experiment_id = active_run.info.experiment_id
+                        run_name = active_run.info.run_name
+
+                        # Get the Azure ML experiment
+                        try:
+                            experiment = workspace.experiments[experiment_id]
+                        except Exception as exp_err1:
+                            # Try to find experiment by name
+                            try:
+                                experiment_name = mlflow.get_experiment(
+                                    experiment_id).name
+                                experiment = workspace.experiments[experiment_name]
+                            except Exception as exp_err2:
+                                raise ValueError(
+                                    f"Could not find Azure ML experiment for MLflow experiment_id={experiment_id}. "
+                                    f"Errors: by_id={exp_err1}, by_name={exp_err2}"
+                                )
+
+                        # Get the Azure ML run - extract run ID from MLflow artifact URI
+                        # This is the most reliable method for Azure ML
+                        azureml_run = None
+                        try:
+                            mlflow_client = mlflow.tracking.MlflowClient()
+                            mlflow_run_data = mlflow_client.get_run(run_id)
+                            
+                            # Extract Azure ML run ID from artifact URI
+                            # Format: azureml://.../runs/<run_id>/artifacts
+                            if mlflow_run_data.info.artifact_uri and "azureml://" in mlflow_run_data.info.artifact_uri and "/runs/" in mlflow_run_data.info.artifact_uri:
+                                import re
+                                run_id_match = re.search(r'/runs/([^/]+)', mlflow_run_data.info.artifact_uri)
+                                if run_id_match:
+                                    azureml_run_id_from_uri = run_id_match.group(1)
+                                    azureml_run = workspace.get_run(azureml_run_id_from_uri)
+                        except Exception as uri_err:
+                            logger.debug(f"Failed to get Azure ML run from artifact URI: {uri_err}")
+
+                        if not azureml_run:
+                            # Fallback: try to get parent run's Azure ML run ID from artifact URI
+                            if parent_run_id_for_artifacts:
+                                try:
+                                    parent_mlflow_run = mlflow.tracking.MlflowClient().get_run(parent_run_id_for_artifacts)
+                                    if parent_mlflow_run.info.artifact_uri and "azureml://" in parent_mlflow_run.info.artifact_uri and "/runs/" in parent_mlflow_run.info.artifact_uri:
+                                        import re
+                                        run_id_match = re.search(r'/runs/([^/]+)', parent_mlflow_run.info.artifact_uri)
+                                        if run_id_match:
+                                            parent_azureml_run_id = run_id_match.group(1)
+                                            azureml_run = workspace.get_run(parent_azureml_run_id)
+                                            logger.warning(
+                                                f"Could not find best trial's Azure ML run, "
+                                                f"uploading checkpoint to current parent run instead"
+                                            )
+                                except Exception:
+                                    pass
+                            
+                            if not azureml_run:
+                                logger.warning(
+                                    f"Could not find Azure ML run for MLflow run_id={run_id}. "
+                                    f"This may happen when resuming from a previous session. "
+                                    f"Best trial checkpoint is available locally at: {checkpoint_dir}"
+                                )
+                                artifact_logged = False
+                                azureml_run = None
+
+                        # Upload artifacts using Azure ML Run's upload_file method
+                        if not azureml_run:
+                            # Already logged warning above, just skip upload
+                            pass
+                        else:
+                            files_uploaded = 0
+                            total_files = sum(len(files)
+                                              for _, _, files in os.walk(checkpoint_dir))
+
+                            # Check run status - completed runs don't accept uploads
+                            run_status = azureml_run.get_status()
+                            if run_status in ["Completed", "Failed", "Canceled"]:
+                                # Try to get the best trial's child run if parent is completed
+                                try:
+                                    child_runs = list(azureml_run.get_children())
+                                    for child_run in child_runs:
+                                        child_tags = {}
+                                        try:
+                                            child_tags = child_run.get_tags() if hasattr(child_run, 'get_tags') else {}
+                                        except Exception:
+                                            pass
+                                        child_name = child_run.name if hasattr(
+                                            child_run, 'name') else str(child_run.id)
+
+                                        trial_tag = child_tags.get('trial_number') or child_tags.get(
+                                            'trial') or child_tags.get('optuna.trial.number')
+                                        if (trial_tag and str(trial_tag) == str(best_trial_number)) or \
+                                           (f"trial_{best_trial_number}" in child_name.lower() or f"trial-{best_trial_number}" in child_name.lower()):
+                                            child_status = child_run.get_status()
+                                            if child_status not in ["Completed", "Failed", "Canceled"]:
+                                                azureml_run = child_run
+                                                break
+                                except Exception:
+                                    pass
+
+                            for root, dirs, files in os.walk(checkpoint_dir):
+                                for file in files:
+                                    file_path = Path(root) / file
+                                    file_path = file_path.resolve()
+
+                                    if not file_path.exists():
+                                        continue
+
+                                    # Try artifact paths: prefer subdirectory, fallback to filename only
+                                    artifact_paths = [
+                                        f"best_trial_checkpoint/{file}",
+                                        file,
+                                    ]
+
+                                    for artifact_path in artifact_paths:
+                                        try:
+                                            azureml_run.upload_file(
+                                                name=artifact_path, path_or_stream=str(file_path))
+                                            files_uploaded += 1
+                                            break
+                                        except Exception as upload_error:
+                                            error_msg = str(upload_error).lower()
+                                            # If artifact already exists, that's okay - count as uploaded
+                                            if "already exists" in error_msg or "resource conflict" in error_msg:
+                                                files_uploaded += 1
+                                                break
+                                            # Otherwise, try next path
+                                            continue
+
+                            if files_uploaded > 0:
+                                artifact_logged = True
+                                logger.info(
+                                    f"Uploaded best trial checkpoint: {files_uploaded}/{total_files} files for trial {best_trial_number}"
+                                )
+                            else:
+                                raise RuntimeError(
+                                    f"No files could be uploaded via Azure ML Run (attempted {total_files} files)")
+                    except ImportError as import_error:
+                        logger.warning(
+                            f"Azure ML SDK (azureml.core) not available: {import_error}")
+                        artifact_logged = False
+                    except Exception as azureml_error:
+                        error_type = type(azureml_error).__name__
+                        error_msg = str(azureml_error)
+                        logger.warning(
+                            f"Failed to upload checkpoint to Azure ML: {error_type}: {error_msg}")
+                        artifact_logged = False
+                except Exception as outer_error:
+                    # Handle errors from the outer try block (e.g., no active run)
+                    logger.warning(
+                        f"Could not upload checkpoint: {outer_error}")
+                    artifact_logged = False
+            else:
+                # For non-Azure ML backends, try standard methods
+                try:
+                    mlflow.log_artifacts(str(checkpoint_dir),
+                                         artifact_path="best_trial_checkpoint")
+                    artifact_logged = True
+                    logger.info(
+                        f"Logged best trial checkpoint to MLflow: trial {best_trial_number} "
+                        f"(path: {checkpoint_dir})"
+                    )
+                except Exception as e:
+                    # Try client method as fallback
+                    try:
+                        client = mlflow.tracking.MlflowClient()
+                        run_id_to_use = parent_run_id_for_artifacts
+                        if not run_id_to_use:
+                            active_run = mlflow.active_run()
+                            if active_run:
+                                run_id_to_use = active_run.info.run_id
+
+                        if run_id_to_use:
+                            client.log_artifacts(
+                                run_id_to_use,
+                                str(checkpoint_dir),
+                                artifact_path="best_trial_checkpoint"
+                            )
+                            artifact_logged = True
+                            logger.info(
+                                f"Logged best trial checkpoint to MLflow using client: trial {best_trial_number} "
+                                f"(path: {checkpoint_dir})"
+                            )
+                        else:
+                            raise ValueError("No MLflow run ID available")
+                    except Exception as client_error:
+                        logger.warning(
+                            f"MLflow artifact logging failed: {client_error}")
+                        artifact_logged = False
+
+            # Log fallback message if upload failed
+            if not artifact_logged:
+                if is_azure_ml:
+                    logger.info(
+                        f"Best trial checkpoint for trial {best_trial_number} is available locally at: {checkpoint_dir}. "
+                        f"Azure ML artifact upload was not successful, but the checkpoint can be accessed directly."
+                    )
+                else:
+                    logger.info(
+                        f"Checkpoint for best trial {best_trial_number} is available locally at: {checkpoint_dir}. "
+                        f"MLflow artifact logging was not successful, but the checkpoint can be accessed directly."
+                    )
+        except Exception as e:
+            # Don't fail HPO if checkpoint logging fails
+            logger.warning(f"Could not log checkpoint to MLflow: {e}")
+            logger.info(
+                f"Checkpoint is available locally at: {checkpoint_dir}")
 
     def log_tracking_info(self) -> None:
         """Log MLflow tracking URI information for user visibility."""
