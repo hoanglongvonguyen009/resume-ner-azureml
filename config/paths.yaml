@@ -294,3 +294,41 @@ notebooks:
   best_config_cache: "best_configuration_cache.json"    # Legacy: notebooks/best_configuration_cache.json
   final_training_cache: "final_training_cache.json"    # Legacy: notebooks/final_training_cache.json
 
+# ----------------------------------------------------------------------------
+# Google Drive Backup Configuration (Colab only)
+# ----------------------------------------------------------------------------
+# Configuration for Google Drive backup when running in Google Colab.
+# The backup mirrors the entire local outputs/ directory structure.
+#
+# Local structure:
+#   outputs/
+#     ├── hpo/
+#     ├── final_training/
+#     ├── conversion/
+#     └── cache/
+#
+# Drive structure (mirrors local):
+#   /content/drive/MyDrive/{backup_base_dir}/outputs/
+#     ├── hpo/
+#     ├── final_training/
+#     ├── conversion/
+#     └── cache/
+#
+# Usage:
+#   from orchestration.paths import get_drive_backup_path, get_drive_backup_base
+#   drive_path = get_drive_backup_path(ROOT_DIR, CONFIG_DIR, local_output_path)
+#   # Returns: /content/drive/MyDrive/resume-ner-checkpoints/outputs/hpo/...
+#
+drive:
+  # Google Drive mount point (standard Colab location)
+  # Full path will be: {mount_point}/MyDrive/{backup_base_dir}
+  mount_point: "/content/drive"
+  
+  # Base backup directory in Google Drive
+  # Full path: {mount_point}/MyDrive/{backup_base_dir}
+  backup_base_dir: "resume-ner-checkpoints"
+  
+  # Optional: Auto-restore from Drive on startup (default: false)
+  # When enabled, checks Drive for missing local files and restores them
+  auto_restore_on_startup: false
+

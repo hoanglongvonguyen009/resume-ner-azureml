@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from shared.logging_utils import get_logger
 
@@ -28,6 +28,7 @@ def setup_checkpoint_storage(
     checkpoint_config: Optional[Dict[str, Any]],
     backbone: str,
     study_name: Optional[str] = None,
+    restore_from_drive: Optional[Callable[[Path], bool]] = None,
 ) -> Tuple[Optional[Path], Optional[str], bool]:
     """
     Set up checkpoint storage and determine if resuming.
@@ -37,6 +38,8 @@ def setup_checkpoint_storage(
         checkpoint_config: Checkpoint configuration dictionary.
         backbone: Model backbone name.
         study_name: Optional resolved study name (for {study_name} placeholder).
+        restore_from_drive: Optional function to restore checkpoint from Drive if missing.
+                          Function should take a Path and return bool (True if restored).
 
     Returns:
         Tuple of (storage_path, storage_uri, should_resume).
@@ -49,6 +52,17 @@ def setup_checkpoint_storage(
         study_name=study_name,
     )
     storage_uri = get_storage_uri(storage_path)
+
+    # If local checkpoint missing and restore_from_drive provided, attempt restore
+    if storage_path is not None and not storage_path.exists() and restore_from_drive is not None:
+        try:
+            restored = restore_from_drive(storage_path)
+            if restored:
+                logger.info(f"Restored HPO checkpoint from Drive: {storage_path}")
+            else:
+                logger.debug(f"Drive backup not found for checkpoint: {storage_path}")
+        except Exception as e:
+            logger.warning(f"Failed to restore checkpoint from Drive: {e}")
 
     # Determine if we should resume
     auto_resume = (

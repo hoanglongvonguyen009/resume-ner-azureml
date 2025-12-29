@@ -28,11 +28,6 @@ logging:
   eval_interval: 500
   save_interval: 1000
 
-checkpointing:
-  save_strategy: "epoch"
-  save_total_limit: 3
-  load_best_model_at_end: true
-
 # NOTE: Multi-GPU / DDP is optional and currently experimental. When enabled,
 # the training code will use this section together with hardware detection to
 # decide whether to run single-GPU vs multi-GPU. If no multiple GPUs or DDP

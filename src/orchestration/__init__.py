@@ -22,6 +22,8 @@ from .paths import (
     get_cache_strategy_config,
     save_cache_with_dual_strategy,
     load_cache_file,
+    get_drive_backup_base,
+    get_drive_backup_path,
 )
 from .naming import get_stage_config, build_aml_experiment_name, build_mlflow_experiment_name
 from .mlflow_utils import setup_mlflow_for_stage
@@ -50,6 +52,8 @@ __all__ = [
     "get_cache_strategy_config",
     "save_cache_with_dual_strategy",
     "load_cache_file",
+    "get_drive_backup_base",
+    "get_drive_backup_path",
     # Other exports
     "get_stage_config",
     "build_aml_experiment_name",
@@ -57,4 +61,3 @@ __all__ = [
     "setup_mlflow_for_stage",
     "run_benchmarking",
 ]
-

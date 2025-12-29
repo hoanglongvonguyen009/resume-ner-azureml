@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
+
+from shared.logging_utils import get_logger
+
+logger = get_logger(__name__)
 
 
 def run_benchmarking(
@@ -19,6 +24,9 @@ def run_benchmarking(
     device: Optional[str] = None,
     benchmark_script_path: Optional[Path] = None,
     project_root: Optional[Path] = None,
+    tracker: Optional[Any] = None,
+    backbone: Optional[str] = None,
+    benchmark_source: str = "final_training",
 ) -> bool:
     """
     Run benchmarking on a model checkpoint.
@@ -35,6 +43,9 @@ def run_benchmarking(
         benchmark_script_path: Path to benchmark script. If None, will try to find
             it at benchmarks/benchmark_inference.py relative to project_root.
         project_root: Project root directory. Required if benchmark_script_path is None.
+        tracker: Optional MLflowBenchmarkTracker instance for logging results.
+        backbone: Optional model backbone name for tracking.
+        benchmark_source: Source of benchmark ("hpo_trial" or "final_training").
 
     Returns:
         True if successful, False otherwise.
@@ -86,5 +97,38 @@ def run_benchmarking(
     if result.returncode != 0:
         print(f"Benchmarking failed: {result.stderr}")
         return False
+
+    # Log results to MLflow if tracker provided
+    if tracker and output_path.exists():
+        try:
+            # Parse benchmark.json
+            with open(output_path, 'r') as f:
+                benchmark_data = json.load(f)
+
+            # Extract backbone from checkpoint_dir if not provided
+            if not backbone:
+                backbone = checkpoint_dir.name
+
+            # Create run name
+            run_name = f"benchmark_{backbone}_{benchmark_source}"
+
+            # Start benchmark run and log results
+            with tracker.start_benchmark_run(
+                run_name=run_name,
+                backbone=backbone,
+                benchmark_source=benchmark_source,
+            ):
+                tracker.log_benchmark_results(
+                    batch_sizes=batch_sizes,
+                    iterations=iterations,
+                    warmup_iterations=warmup_iterations,
+                    max_length=max_length,
+                    device=device,
+                    benchmark_json_path=output_path,
+                    benchmark_data=benchmark_data,
+                )
+        except Exception as e:
+            logger.warning(f"Could not log benchmark results to MLflow: {e}")
+            # Don't fail benchmarking if MLflow logging fails
 
     return True

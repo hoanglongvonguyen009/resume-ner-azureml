@@ -27,3 +27,23 @@ local:
 # Example: "resume_ner_baseline-hpo-distilbert"
 # This is handled automatically by build_mlflow_experiment_name()
 
+# Stage-Specific Tracking Configuration
+# Control MLflow logging per pipeline stage
+tracking:
+  # Benchmarking stage tracking
+  benchmark:
+    enabled: true  # Set to false to disable MLflow tracking for benchmarks
+    log_artifacts: true  # Log benchmark.json artifact
+  
+  # Final training stage tracking
+  training:
+    enabled: true  # Set to false to disable MLflow tracking for training
+    log_checkpoint: true  # Log checkpoint directory as artifact
+    log_metrics_json: true  # Log metrics.json file as artifact
+  
+  # Model conversion stage tracking
+  conversion:
+    enabled: true  # Set to false to disable MLflow tracking for conversion
+    log_onnx_model: true  # Log converted ONNX model as artifact
+    log_conversion_log: true  # Log conversion log file as artifact (if available)
+

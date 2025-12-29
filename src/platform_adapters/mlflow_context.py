@@ -187,4 +187,4 @@ class LocalMLflowContextManager(MLflowContextManager):
                     return mlflow.start_run(run_name=run_name)
             else:
                 print(f"  [MLflow] No MLFLOW_RUN_NAME set, using auto-generated name", file=sys.stderr, flush=True)
-                return mlflow.start_run()
+            return mlflow.start_run()

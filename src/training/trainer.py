@@ -224,6 +224,8 @@ def save_checkpoint(
     model: torch.nn.Module,
     tokenizer: AutoTokenizer,
     output_dir: Path,
+    is_best_trial: bool = False,
+    save_only_best: bool = False,
 ) -> None:
     """
     Save model and tokenizer checkpoint.
@@ -232,7 +234,18 @@ def save_checkpoint(
         model: Trained model (may be wrapped in DDP).
         tokenizer: Tokenizer instance.
         output_dir: Directory to save checkpoint.
+        is_best_trial: Whether this trial is the best so far.
+        save_only_best: If True, only save when is_best_trial is True.
     """
+    # Check if we should skip saving
+    if save_only_best and not is_best_trial:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(
+            f"Skipping checkpoint save (save_only_best=True, is_best_trial=False)"
+        )
+        return
+
     checkpoint_path = output_dir / "checkpoint"
     checkpoint_path.mkdir(parents=True, exist_ok=True)
     # Unwrap DDP model if needed (DDP wraps the model in .module)
@@ -246,6 +259,7 @@ def train_model(
     dataset: Dict[str, Any],
     output_dir: Path,
     context: RunContext | None = None,
+    tracker: Optional[Any] = None,
 ) -> Dict[str, float]:
     """
     Train a token classification model and return evaluation metrics.
@@ -254,11 +268,42 @@ def train_model(
         config: Configuration dictionary.
         dataset: Dataset dictionary.
         output_dir: Directory for outputs and checkpoints.
+        context: Optional distributed training context.
+        tracker: Optional MLflowTrainingTracker instance for logging.
 
     Returns:
         Dictionary of evaluation metrics.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Extract backbone for run naming
+    backbone = config.get("model", {}).get("backbone", "unknown")
+    if "-" in backbone:
+        backbone = backbone.split("-")[0]
+    
+    # Determine training type and checkpoint path
+    checkpoint_config = config.get("training", {}).get("checkpoint", {})
+    checkpoint_path = None
+    training_type = "final"
+    
+    # Check if this is continued training
+    if checkpoint_config:
+        backbone_for_resolve = backbone
+        run_id_for_resolve = config.get("training", {}).get("run_id")
+        resolved_path = resolve_checkpoint_path(
+            config=config,
+            backbone=backbone_for_resolve,
+            run_id=run_id_for_resolve,
+        )
+        if resolved_path:
+            checkpoint_path = str(resolved_path)
+            training_type = "continued"
+    
+    # Start MLflow tracking run if tracker provided
+    run_id = config.get("training", {}).get("run_id", "unknown")
+    run_name = f"{backbone}_{run_id}"
+    
+    # We'll use the tracker context manager later, after training completes
 
     data_cfg = config["data"]
     label_list = build_label_list(data_cfg)
@@ -272,21 +317,6 @@ def train_model(
         dist_cfg = resolve_distributed_config(config)
         context = create_run_context(dist_cfg)
 
-    # Resolve checkpoint path if continued training is configured
-    checkpoint_path = None
-    checkpoint_config = config.get("training", {}).get("checkpoint", {})
-    if checkpoint_config:
-        # Get backbone and run_id for pattern resolution if needed
-        backbone = config.get("model", {}).get("backbone", "").split("-")[0] if "-" in config.get("model", {}).get("backbone", "") else config.get("model", {}).get("backbone", "")
-        run_id = config.get("training", {}).get("run_id")
-        
-        resolved_path = resolve_checkpoint_path(
-            config=config,
-            backbone=backbone,
-            run_id=run_id,
-        )
-        if resolved_path:
-            checkpoint_path = str(resolved_path)
 
     model, tokenizer, _ = create_model_and_tokenizer(
         config, label2id, id2label, device=context.device, checkpoint_path=checkpoint_path
@@ -356,8 +386,76 @@ def train_model(
         # No validation set (final training on all data)
         metrics = {"note": "No validation set - training on all data"}
 
+    # Log to MLflow if tracker provided and on main process
+    if tracker and context.is_main_process():
+        try:
+            import json
+            import random
+            
+            # Use context manager for training run
+            with tracker.start_training_run(
+                run_name=run_name,
+                backbone=backbone,
+                training_type=training_type,
+            ):
+                # Log training parameters
+                data_config = config.get("data", {})
+                random_seed = config.get("training", {}).get("seed") or random.randint(0, 2**31 - 1)
+                data_strategy = config.get("data", {}).get("strategy")  # if continued training
+                
+                tracker.log_training_parameters(
+                    config=config,
+                    data_config=data_config,
+                    source_checkpoint=checkpoint_path,
+                    data_strategy=data_strategy,
+                    random_seed=random_seed,
+                )
+                
+                # Log metrics (extract per_entity if available)
+                metrics_copy = metrics.copy() if isinstance(metrics, dict) else {}
+                per_entity_metrics = metrics_copy.pop("per_entity", None) if isinstance(metrics_copy, dict) else None
+                tracker.log_training_metrics(
+                    metrics=metrics_copy,
+                    per_entity_metrics=per_entity_metrics,
+                )
+                
+                # Save metrics.json for artifact logging
+                metrics_json_path = output_dir / "metrics.json"
+                if isinstance(metrics, dict):
+                    # Use original metrics dict (with per_entity if it exists)
+                    with open(metrics_json_path, 'w') as f:
+                        json.dump(metrics, f, indent=2)
+                
+                # Log artifacts
+                tracker.log_training_artifacts(
+                    checkpoint_dir=output_dir,
+                    metrics_json_path=metrics_json_path if metrics_json_path.exists() else None,
+                )
+        except Exception as e:
+            from shared.logging_utils import get_logger
+            logger = get_logger(__name__)
+            logger.warning(f"Could not log training results to MLflow: {e}")
+
     # Only main process should write checkpoints to avoid file collisions.
     if context.is_main_process():
-        save_checkpoint(model, tokenizer, output_dir)
+        # Read checkpoint saving parameters from config or environment
+        import os
+        checkpoint_config = config.get("training", {}).get("checkpoint", {})
+        save_only_best = checkpoint_config.get("save_only_best", False)
+
+        # Check if this trial is best (from environment variable set by HPO)
+        # Note: This is set AFTER trial completes, so for HPO we'll handle cleanup separately
+        # For now, we'll save the checkpoint and let HPO code handle deletion if needed
+        is_best_trial_env = os.environ.get(
+            "IS_BEST_TRIAL", "false").lower() == "true"
+        is_best_trial = is_best_trial_env
+
+        save_checkpoint(
+            model,
+            tokenizer,
+            output_dir,
+            is_best_trial=is_best_trial,
+            save_only_best=save_only_best,
+        )
 
     return metrics

@@ -66,3 +66,10 @@ checkpoint:
   study_name: "hpo_{backbone}_prod"
   storage_path: "{study_name}/study.db"
   auto_resume: true
+  # Only save checkpoints for best trials locally (reduces storage from ~30 GB to ~300 MB)
+  save_only_best: true
+
+mlflow:
+  # Log best trial checkpoint to MLflow after HPO completes
+  # Set to false to disable MLflow checkpoint logging entirely
+  log_best_checkpoint: true

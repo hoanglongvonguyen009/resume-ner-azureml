@@ -419,7 +419,15 @@ def create_local_hpo_objective(
     k_folds: Optional[int] = None,
     fold_splits_file: Optional[Path] = None,
     run_id: Optional[str] = None,
-) -> Callable[[Any], float]:
+) -> Tuple[Callable[[Any], float], Callable[[], None]]:
+    # Global state for checkpoint cleanup
+    # Use lists/dicts to allow modification in closure
+    best_trial_id = [None]  # Current best trial number
+    best_score = [None]  # Current best score
+    # trial_id -> list of checkpoint paths (one per fold for CV, single for non-CV)
+    checkpoint_map = {}
+    completed_trials = []  # Ordered list of completed trial numbers
+
     """
     Create Optuna objective function for local HPO.
 
@@ -582,9 +590,212 @@ def create_local_hpo_objective(
 
         # Report to Optuna
         trial.report(metric_value, step=0)
+
+        # Check if we should clean up non-best checkpoints
+        # This happens after trial completes, so we can check if it's best
+        checkpoint_config = hpo_config.get("checkpoint", {})
+        save_only_best = checkpoint_config.get("save_only_best", False)
+
+        if save_only_best:
+            # Helper function to get checkpoint paths for a trial
+            def get_checkpoint_paths(trial_num: int) -> List[Path]:
+                """Get all checkpoint paths for a trial (all folds for CV, single for non-CV)."""
+                run_suffix = f"_{run_id}" if run_id else ""
+                paths = []
+                if fold_splits is not None:
+                    # CV: get checkpoints from all folds
+                    for fold_idx in range(len(fold_splits)):
+                        checkpoint_dir = (
+                            output_base_dir /
+                            f"trial_{trial_num}{run_suffix}_fold{fold_idx}" /
+                            "checkpoint"
+                        )
+                        if checkpoint_dir.exists():
+                            paths.append(checkpoint_dir)
+                else:
+                    # Single training: get single checkpoint
+                    checkpoint_dir = (
+                        output_base_dir /
+                        f"trial_{trial_num}{run_suffix}" /
+                        "checkpoint"
+                    )
+                    if checkpoint_dir.exists():
+                        paths.append(checkpoint_dir)
+                return paths
+
+            # Helper function to delete checkpoint paths
+            def delete_checkpoint_paths(paths: List[Path], trial_num: int) -> None:
+                """Delete checkpoint paths and log the operation."""
+                import shutil
+                for path in paths:
+                    try:
+                        shutil.rmtree(path)
+                        logger.debug(
+                            f"Deleted checkpoint for trial {trial_num}: {path}"
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"Could not delete checkpoint for trial {trial_num} at {path}: {e}"
+                        )
+
+            try:
+                # 1. Register checkpoint
+                trial_checkpoint_paths = get_checkpoint_paths(trial.number)
+                if trial_checkpoint_paths:
+                    checkpoint_map[trial.number] = trial_checkpoint_paths
+                completed_trials.append(trial.number)
+
+                # 2. Initialize state from existing study (for resume scenarios)
+                if best_trial_id[0] is None:
+                    # Check if study has existing completed trials (resume scenario)
+                    optuna_module, _, _, _ = _import_optuna()
+                    try:
+                        study = trial.study
+                        goal = hpo_config["objective"]["goal"]
+
+                        # Find best completed trial from existing study
+                        best_existing_trial = None
+                        best_existing_value = None
+
+                        for t in study.trials:
+                            if (t.state == optuna_module.trial.TrialState.COMPLETE and
+                                t.value is not None and
+                                    t.number != trial.number):  # Exclude current trial
+
+                                # Register existing trial's checkpoint if it exists
+                                existing_paths = get_checkpoint_paths(t.number)
+                                if existing_paths:
+                                    checkpoint_map[t.number] = existing_paths
+                                # Note: Don't add to completed_trials - those are already in the study,
+                                # we just need to track checkpoints and find the best
+
+                                # Track best existing trial
+                                if best_existing_value is None:
+                                    best_existing_trial = t.number
+                                    best_existing_value = t.value
+                                else:
+                                    if goal == "maximize":
+                                        if t.value > best_existing_value:
+                                            best_existing_trial = t.number
+                                            best_existing_value = t.value
+                                    else:  # minimize
+                                        if t.value < best_existing_value:
+                                            best_existing_trial = t.number
+                                            best_existing_value = t.value
+
+                        # Initialize state with best existing trial if found
+                        if best_existing_trial is not None:
+                            best_trial_id[0] = best_existing_trial
+                            best_score[0] = best_existing_value
+                            logger.debug(
+                                f"Resumed: Found existing best trial {best_existing_trial} "
+                                f"(metric={best_existing_value:.6f}) from {len([t for t in study.trials if t.state == optuna_module.trial.TrialState.COMPLETE])} completed trials"
+                            )
+                        else:
+                            # No existing completed trials - this is truly the first trial
+                            best_trial_id[0] = trial.number
+                            best_score[0] = metric_value
+                            logger.debug(
+                                f"First trial {trial.number} is best (metric={metric_value:.6f})"
+                            )
+                            return metric_value
+                    except (AttributeError, Exception) as e:
+                        # If we can't access study, assume this is the first trial
+                        best_trial_id[0] = trial.number
+                        best_score[0] = metric_value
+                        logger.debug(
+                            f"Could not access study, assuming first trial {trial.number} "
+                            f"(metric={metric_value:.6f}): {e}"
+                        )
+                        return metric_value
+
+                # 3. Check if this is a new best trial
+                goal = hpo_config["objective"]["goal"]
+                is_new_best = False
+
+                if goal == "maximize":
+                    is_new_best = metric_value > best_score[0]
+                else:  # minimize
+                    is_new_best = metric_value < best_score[0]
+
+                if is_new_best:
+                    # New best trial found - delete ALL non-best checkpoints
+                    old_best = best_trial_id[0]
+                    best_trial_id[0] = trial.number
+                    best_score[0] = metric_value
+
+                    logger.debug(
+                        f"New best trial {trial.number} (metric={metric_value:.6f}, "
+                        f"previous best: trial {old_best})"
+                    )
+
+                    # Delete all non-best checkpoints
+                    for trial_id, checkpoint_paths in list(checkpoint_map.items()):
+                        if trial_id != best_trial_id[0]:
+                            delete_checkpoint_paths(checkpoint_paths, trial_id)
+                            del checkpoint_map[trial_id]
+
+                    return metric_value
+
+                # 4. Not a new best - delete this trial's checkpoint immediately
+                # Since we know the best trial, we can safely delete non-best checkpoints
+                logger.debug(
+                    f"Trial {trial.number} is not best (metric={metric_value:.6f}, "
+                    f"best: trial {best_trial_id[0]} with {best_score[0]:.6f})"
+                )
+
+                # Delete this non-best trial's checkpoint
+                if trial.number in checkpoint_map:
+                    delete_checkpoint_paths(
+                        checkpoint_map[trial.number], trial.number)
+                    del checkpoint_map[trial.number]
+
+            except Exception as e:
+                # Don't fail HPO if checkpoint cleanup fails
+                logger.warning(
+                    f"Error during checkpoint cleanup for trial {trial.number}: {e}"
+                )
+
         return metric_value
 
-    return objective
+    def cleanup_non_best_checkpoints() -> None:
+        """Final cleanup: delete all non-best checkpoints after HPO completes."""
+        checkpoint_config = hpo_config.get("checkpoint", {})
+        save_only_best = checkpoint_config.get("save_only_best", False)
+
+        if not save_only_best:
+            return
+
+        if best_trial_id[0] is None:
+            return
+
+        # Helper function to delete checkpoint paths
+        def delete_checkpoint_paths(paths: List[Path], trial_num: int) -> None:
+            """Delete checkpoint paths and log the operation."""
+            import shutil
+            for path in paths:
+                try:
+                    shutil.rmtree(path)
+                    logger.debug(
+                        f"Deleted checkpoint for trial {trial_num}: {path}"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Could not delete checkpoint for trial {trial_num} at {path}: {e}"
+                    )
+
+        # Delete all non-best checkpoints
+        for trial_id, checkpoint_paths in list(checkpoint_map.items()):
+            if trial_id != best_trial_id[0]:
+                delete_checkpoint_paths(checkpoint_paths, trial_id)
+                del checkpoint_map[trial_id]
+
+        logger.info(
+            f"Final cleanup: kept checkpoint for best trial {best_trial_id[0]} "
+            f"(metric={best_score[0]:.6f}), deleted {len(completed_trials) - 1} non-best checkpoints"
+        )
+
+    return objective, cleanup_non_best_checkpoints
 
 
 def run_local_hpo_sweep(
@@ -598,6 +809,7 @@ def run_local_hpo_sweep(
     k_folds: Optional[int] = None,
     fold_splits_file: Optional[Path] = None,
     checkpoint_config: Optional[Dict[str, Any]] = None,
+    restore_from_drive: Optional[Callable[[Path], bool]] = None,
 ) -> Any:
     """
     Run a local hyperparameter optimization sweep using Optuna.
@@ -614,6 +826,8 @@ def run_local_hpo_sweep(
         fold_splits_file: Optional path to fold splits file.
         checkpoint_config: Optional checkpoint configuration dict with 'enabled', 
                           'storage_path', and 'auto_resume' keys.
+        restore_from_drive: Optional function to restore checkpoint from Drive if missing.
+                          Function should take a Path and return bool (True if restored).
 
     Returns:
         Optuna study object with completed trials.
@@ -651,7 +865,7 @@ def run_local_hpo_sweep(
 
     # Set up checkpoint storage with resolved study_name
     storage_path, storage_uri, should_resume = setup_checkpoint_storage(
-        output_dir, checkpoint_config, backbone, study_name
+        output_dir, checkpoint_config, backbone, study_name, restore_from_drive=restore_from_drive
     )
 
     if should_resume:
@@ -667,6 +881,24 @@ def run_local_hpo_sweep(
                 storage=storage_uri,
                 load_if_exists=True,
             )
+
+            # Check if HPO is already complete
+            user_attrs = study.user_attrs if hasattr(
+                study, 'user_attrs') else {}
+            hpo_complete = user_attrs.get(
+                "hpo_complete", "false").lower() == "true"
+            checkpoint_uploaded = user_attrs.get(
+                "checkpoint_uploaded", "false").lower() == "true"
+
+            if hpo_complete and checkpoint_uploaded:
+                best_trial_num = user_attrs.get("best_trial_number", "unknown")
+                completion_time = user_attrs.get(
+                    "completion_timestamp", "unknown")
+                logger.info(
+                    f"✓ HPO already completed and checkpoint uploaded (best trial: {best_trial_num}, "
+                    f"completed: {completion_time}). Skipping HPO execution."
+                )
+                return study
 
             # Mark any RUNNING trials as FAILED (they were interrupted)
             running_trials = [
@@ -782,8 +1014,8 @@ def run_local_hpo_sweep(
         logger.warning(f"Could not set MLflow experiment: {e}")
         logger.warning("Continuing without MLflow tracking...")
 
-    # Create objective function
-    objective = create_local_hpo_objective(
+    # Create objective function and cleanup function
+    objective, cleanup_checkpoints = create_local_hpo_objective(
         dataset_path=dataset_path,
         config_dir=config_dir,
         backbone=backbone,
@@ -914,7 +1146,7 @@ def run_local_hpo_sweep(
             # Mark interrupted runs AFTER parent run is created (MLflow is definitely ready now)
             if (should_resume or checkpoint_enabled) and parent_run_id:
                 try:
-                    import mlflow
+                    # mlflow is already imported at module level
                     client = mlflow.tracking.MlflowClient()
                     experiment = mlflow.get_experiment_by_name(
                         mlflow_experiment_name)
@@ -1057,8 +1289,30 @@ def run_local_hpo_sweep(
             # Log final metrics and best trial info
             if parent_run is not None:
                 parent_run_id = parent_run.info.run_id
+
+                # Load fold splits if k-fold CV was used (needed for checkpoint path resolution)
+                fold_splits_for_logging = None
+                if k_folds is not None and k_folds > 1 and fold_splits_file and fold_splits_file.exists():
+                    try:
+                        from training.cv_utils import load_fold_splits
+                        fold_splits_for_logging, _ = load_fold_splits(
+                            fold_splits_file)
+                    except Exception as e:
+                        logger.warning(
+                            f"Could not load fold splits for checkpoint logging: {e}")
+
                 tracker.log_final_metrics(
-                    study, objective_metric, parent_run_id, mlflow_run_name, should_resume)
+                    study=study,
+                    objective_metric=objective_metric,
+                    parent_run_id=parent_run_id,
+                    run_name=mlflow_run_name,
+                    should_resume=should_resume,
+                    hpo_output_dir=output_dir,
+                    backbone=backbone,
+                    run_id=run_id,
+                    fold_splits=fold_splits_for_logging,
+                    hpo_config=hpo_config,
+                )
     except Exception as e:
         # Gracefully handle MLflow failures - don't fail HPO if MLflow is unavailable
         logger.warning(f"MLflow tracking failed: {e}")
@@ -1087,6 +1341,12 @@ def run_local_hpo_sweep(
                 )
             else:
                 logger.info(f"All {max_trials} trials already completed!")
+
+            # Final cleanup: delete all non-best checkpoints
+            try:
+                cleanup_checkpoints()
+            except Exception as e:
+                logger.warning(f"Error during final checkpoint cleanup: {e}")
         else:
             study.optimize(
                 objective,
@@ -1095,5 +1355,11 @@ def run_local_hpo_sweep(
                 show_progress_bar=True,
                 callbacks=[trial_callback],
             )
+
+            # Final cleanup: delete all non-best checkpoints
+            try:
+                cleanup_checkpoints()
+            except Exception as e:
+                logger.warning(f"Error during final checkpoint cleanup: {e}")
 
     return study
