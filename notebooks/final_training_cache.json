@@ -1,12 +1,12 @@
 {
-  "output_dir": "c:\\Users\\HOANG PHI LONG DANG\\repos\\resume-ner-azureml\\outputs\\final_training\\distilbert_20251228_000723",
+  "output_dir": "c:\\Users\\HOANG PHI LONG DANG\\repos\\resume-ner-azureml\\outputs\\final_training\\distilbert_trial_1",
   "backbone": "distilbert",
-  "run_id": "20251228_000723",
+  "run_id": "distilbert_trial_1",
   "config": {
     "backbone": "distilbert",
-    "learning_rate": 1.850331567345489e-05,
-    "dropout": 0.1846357866460817,
-    "weight_decay": 0.03697191631420018,
+    "learning_rate": 3.8488941253366036e-05,
+    "dropout": 0.13788999781953512,
+    "weight_decay": 0.0019691682991202575,
     "batch_size": 3,
     "epochs": 1,
     "random_seed": 42,
@@ -15,9 +15,9 @@
     "use_all_data": true
   },
   "metrics": {
-    "macro-f1": 0.2900154400411734,
-    "macro-f1-span": 0.060606060606060615,
-    "loss": 2.014418840408325,
+    "macro-f1": 0.44096618357487916,
+    "macro-f1-span": 0.046511627906976744,
+    "loss": 1.7586220502853394,
     "per_entity": {
       "AME": {
         "precision": 0.0,
@@ -25,25 +25,13 @@
         "f1": 0.0,
         "support": 0
       },
-      "ESIGNATION": {
-        "precision": 0.0,
-        "recall": 0.0,
-        "f1": 0.0,
-        "support": 0
-      },
       "KILL": {
-        "precision": 0.375,
-        "recall": 0.14285714285714285,
-        "f1": 0.20689655172413796,
+        "precision": 0.25,
+        "recall": 0.047619047619047616,
+        "f1": 0.08,
         "support": 21
       },
       "MAIL": {
-        "precision": 0.0,
-        "recall": 0.0,
-        "f1": 0.0,
-        "support": 0
-      },
-      "XPERIENCE": {
         "precision": 0.0,
         "recall": 0.0,
         "f1": 0.0,

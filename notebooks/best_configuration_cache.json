@@ -1,31 +1,43 @@
 {
-  "trial_name": "trial_0",
-  "trial_id": "0",
+  "trial_name": "trial_1",
+  "trial_id": "1",
   "backbone": "distilbert",
   "hyperparameters": {
-    "learning_rate": 1.850331567345489e-05,
+    "learning_rate": 3.8488941253366036e-05,
     "batch_size": 4,
-    "dropout": 0.1846357866460817,
-    "weight_decay": 0.03697191631420018
+    "dropout": 0.13788999781953512,
+    "weight_decay": 0.0019691682991202575
   },
   "metrics": {
-    "objective_value": 0.21057640369044836
+    "objective_value": 0.29433316001408316
   },
   "dataset_version": "v3",
   "selection_criteria": {
     "metric": "macro-f1",
     "goal": "MAXIMIZE",
-    "best_value": 0.21057640369044836,
+    "best_value": 0.29433316001408316,
     "backbone": "distilbert",
-    "selection_strategy": "accuracy_only",
-    "reason": "Best accuracy (0.2106)"
+    "selection_strategy": "accuracy_first_with_threshold",
+    "reason": "Best accuracy (0.2943)",
+    "accuracy_threshold": 0.015,
+    "use_relative_threshold": true,
+    "all_candidates": [
+      {
+        "backbone": "distilbert",
+        "accuracy": 0.29433316001408316,
+        "speed_score": 1.0,
+        "speed_data_source": "parameter_proxy",
+        "benchmark_latency_ms": null
+      }
+    ],
+    "speed_data_source": "parameter_proxy"
   },
   "cv_statistics": {
-    "cv_mean": 0.21057640369044836,
-    "cv_std": 0.04408198140271932,
+    "cv_mean": 0.29433316001408316,
+    "cv_std": 0.12401831743537255,
     "cv_fold_metrics": [
-      0.2546583850931677,
-      0.16649442228772904
+      0.4183514774494557,
+      0.17031484257871063
     ]
   }
 }
