@@ -478,8 +478,8 @@ def save_metadata_with_fingerprints(
     # Merge metadata_content into additional_metadata
     merged_metadata = {**additional_metadata, **metadata_content}
     
-    # Call the actual save function
-    return save_metadata_with_fingerprints(
+    # Call the actual save function (low-level implementation)
+    return _save_metadata_with_fingerprints_impl(
         metadata_path=metadata_path,
         spec_fp=spec_fp,
         exec_fp=exec_fp,

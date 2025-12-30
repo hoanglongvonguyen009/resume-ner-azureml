@@ -50,7 +50,6 @@ base:
 #     │   └── distilbert_20251228_000723/
 #     │       ├── checkpoint/
 #     │       └── metrics.json
-#     ├── continued_training/     # Continued training runs
 #     ├── conversion/             # ONNX model conversions
 #     │   └── distilbert_20251228_001226/
 #     │       └── model_int8.onnx
@@ -61,9 +60,11 @@ outputs:
   hpo: "hpo"                      # HPO sweep results: outputs/hpo/{backbone}/trial_{n}_{run_id}/
   hpo_tests: "hpo_tests"          # HPO test/smoke run outputs
   
+  # Benchmarking outputs
+  benchmarking: "benchmarking"    # Benchmarking results: outputs/benchmarking/{environment}/{model}/trial_{trial_id}/
+  
   # Training outputs
   final_training: "final_training"        # Final training: outputs/final_training/{backbone}_{run_id}/
-  continued_training: "continued_training" # Continued training: outputs/continued_training/{backbone}_{run_id}/
   dry_run: "dry_run"                      # Dry run/test training outputs
   
   # Model conversion outputs
@@ -140,37 +141,30 @@ files:
 # Patterns for generating directory and file names with dynamic values.
 # Placeholders are replaced at runtime with actual values.
 #
-# Placeholders:
+# Placeholders for v2 patterns (fingerprint-based):
+#   - {environment}: Execution environment (e.g., "local", "colab", "kaggle", "azure")
+#   - {model}: Model backbone name (e.g., "distilbert", "distilroberta")
+#   - {spec_fp}: Specification fingerprint (platform-independent experiment identity)
+#   - {exec_fp}: Execution fingerprint (toolchain/runtime identity)
+#   - {variant}: Variant number for final_training (e.g., 1, 2, 3)
+#   - {trial_id}: Trial identifier for HPO/benchmarking (e.g., "trial_1_20251229_100000")
+#   - {parent_training_id}: Parent training identifier for conversion (e.g., "spec_abc_exec_xyz/v1")
+#   - {conv_fp}: Conversion fingerprint for conversion variants
+#
+# Placeholders for cache file patterns:
 #   - {backbone}: Model backbone name (e.g., "distilbert", "distilroberta")
 #   - {run_id}: Unique run identifier (e.g., "20251228_000723")
-#   - {number}: Trial number (e.g., "2", "5")
-#   - {fold_idx}: K-fold cross-validation fold index (e.g., "0", "1")
 #   - {trial}: Trial identifier (e.g., "trial_2", "trial_5")
 #   - {timestamp}: Timestamp string (e.g., "20251228_001000")
 #
-# Examples:
-#   final_training pattern: "{backbone}_{run_id}"
-#   With backbone="distilbert", run_id="20251228_000723"
-#   Result: "distilbert_20251228_000723"
-#   Full path: outputs/final_training/distilbert_20251228_000723/
+# Examples (v2 patterns):
+#   final_training_v2: "{environment}/{model}/spec_{spec_fp}_exec_{exec_fp}/v{variant}"
+#   With environment="local", model="distilbert", spec_fp="abc123", exec_fp="xyz789", variant=1
+#   Result: "local/distilbert/spec_abc123_exec_xyz789/v1"
+#   Full path: outputs/final_training/local/distilbert/spec_abc123_exec_xyz789/v1/
 #
 patterns:
-  # Final training output directory pattern
-  # Example: outputs/final_training/distilbert_20251228_000723/
-  final_training: "{backbone}_{run_id}"
-  
-  # Continued training output directory pattern
-  # Example: outputs/continued_training/distilbert_20251228_001500/
-  continued_training: "{backbone}_{run_id}"
-  
-  # HPO trial directory pattern (relative to outputs/hpo/)
-  # Example: outputs/hpo/distilbert/trial_2_20251227_175111/
-  hpo_trial: "{backbone}/trial_{number}_{run_id}"
-  
-  # HPO trial with k-fold CV pattern
-  # Example: outputs/hpo/distilbert/trial_2_20251227_175111_fold0/
-  hpo_trial_fold: "{backbone}/trial_{number}_{run_id}_fold{fold_idx}"
-  
+  # Cache file patterns (still used by cache system)
   # Best configuration cache file pattern
   # Example: best_config_distilbert_trial_2_20251227_220407.json
   # Location: outputs/cache/best_configurations/
@@ -181,7 +175,11 @@ patterns:
   # Location: outputs/cache/final_training/
   final_training_cache_file: "final_training_{backbone}_{run_id}_{timestamp}.json"
 
-  # New patterns for fingerprint-based paths (v2)
+  # Fingerprint-based paths (v2) - used by build_output_path()
+  # These patterns are used by build_output_path() in naming_centralized.py
+  # to generate fingerprint-based, environment-aware output paths.
+  # Pattern placeholders are replaced at runtime with values from NamingContext.
+  #
   # Final training with fingerprints
   final_training_v2: "{environment}/{model}/spec_{spec_fp}_exec_{exec_fp}/v{variant}"
   
@@ -291,24 +289,6 @@ cache_strategies:
       filename: "final_training_index.json"
       max_entries: 20  # Keep last 20 training runs in index
       include_metadata: true  # Include metrics, config, checkpoint path in index
-
-# ----------------------------------------------------------------------------
-# Legacy Notebook Cache Files
-# ----------------------------------------------------------------------------
-# These are kept for backward compatibility with older notebook code.
-# New code should use the centralized cache system in outputs/cache/.
-#
-# Location: notebooks/{filename}
-# These files are still created/updated alongside the new cache system
-# to ensure existing notebooks continue to work.
-#
-# Migration:
-#   Old: notebooks/best_configuration_cache.json
-#   New: outputs/cache/best_configurations/latest_best_configuration.json
-#
-notebooks:
-  best_config_cache: "best_configuration_cache.json"    # Legacy: notebooks/best_configuration_cache.json
-  final_training_cache: "final_training_cache.json"    # Legacy: notebooks/final_training_cache.json
 
 # ----------------------------------------------------------------------------
 # Google Drive Backup Configuration (Colab only)

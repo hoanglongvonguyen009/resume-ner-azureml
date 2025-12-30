@@ -37,36 +37,17 @@ def build_training_config(args: argparse.Namespace, config_dir: Path) -> Dict[st
     Returns:
         Dictionary containing merged configuration.
     """
-    # Check if CHECKPOINT_PATH is set (indicates continued training)
+    # Check if CHECKPOINT_PATH is set (for checkpoint loading)
     import os
     has_checkpoint = bool(os.environ.get("CHECKPOINT_PATH"))
     
-    # Check if continued training config exists
-    continued_config_path = config_dir / "train_continued.yaml"
-    use_continued = continued_config_path.exists() and has_checkpoint
+    # Load base training config
+    train_config = load_config_file(config_dir, "train.yaml")
     
-    if use_continued:
-        # Load continued training config
-        continued_config = load_config_file(config_dir, "train_continued.yaml")
-        # Base config is still train.yaml, but we'll merge continued overrides
-        train_config = load_config_file(config_dir, "train.yaml")
-        
-        # Merge continued training config into base training config
-        # Start with base training config
-        merged_training = train_config.get("training", {}).copy()
-        
-        # Apply continued training overrides
-        continued_training = continued_config.get("training", {})
-        if continued_training:
-            merged_training.update(continued_training)
-            # Deep merge for nested dicts like early_stopping
-            if "early_stopping" in continued_training:
-                base_early_stopping = merged_training.get("early_stopping", {})
-                base_early_stopping.update(continued_training["early_stopping"])
-                merged_training["early_stopping"] = base_early_stopping
-        
-        # Add checkpoint config from continued config
-        checkpoint_config = continued_config.get("checkpoint", {})
+    if has_checkpoint:
+        # Checkpoint loading is handled via CHECKPOINT_PATH environment variable
+        # The checkpoint path is resolved by the training script or orchestration layer
+        checkpoint_config = {}
         if checkpoint_config:
             merged_training["checkpoint"] = checkpoint_config
         
@@ -90,12 +71,6 @@ def build_training_config(args: argparse.Namespace, config_dir: Path) -> Dict[st
         "distributed": base_train_config.get("distributed", {}).copy(),
         "_config_dir": config_dir,  # Store for checkpoint resolution
     }
-    
-    # If using continued training, merge data combination config
-    if use_continued:
-        continued_data_config = continued_config.get("data", {})
-        if continued_data_config:
-            config["data"]["continued_training"] = continued_data_config
     
     _apply_argument_overrides(args, config)
     

@@ -15,7 +15,6 @@ from .metrics import compute_metrics
 from .logging import log_metrics
 from .utils import set_seed
 from .checkpoint_loader import resolve_checkpoint_path, validate_checkpoint
-from .data_combiner import combine_datasets
 
 __all__ = [
     "build_training_config",
@@ -33,6 +32,5 @@ __all__ = [
     "set_seed",
     "resolve_checkpoint_path",
     "validate_checkpoint",
-    "combine_datasets",
 ]
 

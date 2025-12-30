@@ -270,12 +270,12 @@ class MLflowSweepTracker:
             import time
             max_retries = 3
             retry_delay = 1.0  # seconds
-            
+
             # Get the best trial number we're looking for
             best_trial_number = study.best_trial.number
             best_run_id = None
             trial_to_run_id = {}
-            
+
             for attempt in range(max_retries):
                 # Re-search on each retry to get latest runs
                 if should_resume and run_name:
@@ -295,7 +295,7 @@ class MLflowSweepTracker:
                         filter_string=f"tags.mlflow.parentRunId = '{parent_run_id}'",
                         max_results=1000,
                     )
-                
+
                 logger.info(
                     f"Found {len(all_runs)} total child runs for best trial search (attempt {attempt + 1}/{max_retries})")
 
@@ -319,14 +319,14 @@ class MLflowSweepTracker:
 
                 # Get the best trial's run ID
                 best_run_id = trial_to_run_id.get(best_trial_number)
-                
+
                 # If we found the best trial, break early
                 if best_run_id:
                     logger.debug(
                         f"Found best trial {best_trial_number} run ID: {best_run_id[:12]}..."
                     )
                     break
-                
+
                 # If this is not the last attempt, wait and retry
                 if attempt < max_retries - 1:
                     logger.debug(
@@ -831,8 +831,10 @@ class MLflowSweepTracker:
                     from datetime import datetime
                     study.set_user_attr("hpo_complete", "true")
                     study.set_user_attr("checkpoint_uploaded", "true")
-                    study.set_user_attr("completion_timestamp", datetime.now().isoformat())
-                    study.set_user_attr("best_trial_number", str(best_trial_number))
+                    study.set_user_attr(
+                        "completion_timestamp", datetime.now().isoformat())
+                    study.set_user_attr("best_trial_number",
+                                        str(best_trial_number))
                     logger.info(
                         f"Marked study as complete with checkpoint uploaded (best trial: {best_trial_number})"
                     )
@@ -840,7 +842,7 @@ class MLflowSweepTracker:
                     logger.warning(
                         f"Could not mark study as complete: {attr_error}"
                     )
-            
+
             # Log fallback message if upload failed
             if not artifact_logged:
                 if is_azure_ml:
@@ -1019,29 +1021,33 @@ class MLflowBenchmarkTracker:
             if benchmark_json_path.exists():
                 tracking_uri = mlflow.get_tracking_uri()
                 is_azure_ml = tracking_uri and "azureml" in tracking_uri.lower()
-                
+
                 if is_azure_ml:
                     # Use Azure ML SDK for artifact upload (same approach as HPO checkpoint logging)
                     try:
                         active_run = mlflow.active_run()
                         if not active_run:
-                            raise ValueError("No active MLflow run for artifact logging")
-                        
+                            raise ValueError(
+                                "No active MLflow run for artifact logging")
+
                         run_id = active_run.info.run_id
-                        
+
                         from azureml.core import Run as AzureMLRun
                         from azureml.core import Workspace
                         import os
-                        
+
                         # Get Azure ML workspace (same logic as HPO checkpoint logging)
                         workspace = None
                         try:
                             workspace = Workspace.from_config()
                         except Exception:
-                            subscription_id = os.environ.get("AZURE_SUBSCRIPTION_ID")
-                            resource_group = os.environ.get("AZURE_RESOURCE_GROUP")
-                            workspace_name = os.environ.get("AZURE_WORKSPACE_NAME", "resume-ner-ws")
-                            
+                            subscription_id = os.environ.get(
+                                "AZURE_SUBSCRIPTION_ID")
+                            resource_group = os.environ.get(
+                                "AZURE_RESOURCE_GROUP")
+                            workspace_name = os.environ.get(
+                                "AZURE_WORKSPACE_NAME", "resume-ner-ws")
+
                             if subscription_id and resource_group:
                                 try:
                                     workspace = Workspace(
@@ -1051,20 +1057,23 @@ class MLflowBenchmarkTracker:
                                     )
                                 except Exception:
                                     pass
-                        
+
                         if workspace:
                             # Get Azure ML run ID from MLflow artifact URI
                             mlflow_client = mlflow.tracking.MlflowClient()
                             mlflow_run_data = mlflow_client.get_run(run_id)
-                            
+
                             azureml_run = None
                             if mlflow_run_data.info.artifact_uri and "azureml://" in mlflow_run_data.info.artifact_uri and "/runs/" in mlflow_run_data.info.artifact_uri:
                                 import re
-                                run_id_match = re.search(r'/runs/([^/]+)', mlflow_run_data.info.artifact_uri)
+                                run_id_match = re.search(
+                                    r'/runs/([^/]+)', mlflow_run_data.info.artifact_uri)
                                 if run_id_match:
-                                    azureml_run_id_from_uri = run_id_match.group(1)
-                                    azureml_run = workspace.get_run(azureml_run_id_from_uri)
-                            
+                                    azureml_run_id_from_uri = run_id_match.group(
+                                        1)
+                                    azureml_run = workspace.get_run(
+                                        azureml_run_id_from_uri)
+
                             if azureml_run:
                                 # Upload artifact using Azure ML SDK
                                 file_path = benchmark_json_path.resolve()
@@ -1072,13 +1081,17 @@ class MLflowBenchmarkTracker:
                                     name="benchmark.json",
                                     path_or_stream=str(file_path)
                                 )
-                                logger.debug(f"Uploaded benchmark.json to Azure ML run {azureml_run.id}")
+                                logger.debug(
+                                    f"Uploaded benchmark.json to Azure ML run {azureml_run.id}")
                             else:
-                                logger.warning("Could not find Azure ML run for benchmark artifact upload")
+                                logger.warning(
+                                    "Could not find Azure ML run for benchmark artifact upload")
                         else:
-                            logger.warning("Could not get Azure ML workspace for benchmark artifact upload")
+                            logger.warning(
+                                "Could not get Azure ML workspace for benchmark artifact upload")
                     except Exception as azureml_err:
-                        logger.warning(f"Failed to upload benchmark artifact to Azure ML: {azureml_err}")
+                        logger.warning(
+                            f"Failed to upload benchmark artifact to Azure ML: {azureml_err}")
                 else:
                     # Use standard MLflow for non-Azure ML backends
                     mlflow.log_artifact(str(benchmark_json_path),
@@ -1260,29 +1273,32 @@ class MLflowTrainingTracker:
         try:
             tracking_uri = mlflow.get_tracking_uri()
             is_azure_ml = tracking_uri and "azureml" in tracking_uri.lower()
-            
+
             if is_azure_ml:
                 # Use Azure ML SDK for artifact upload (same approach as HPO checkpoint logging)
                 try:
                     active_run = mlflow.active_run()
                     if not active_run:
-                        raise ValueError("No active MLflow run for artifact logging")
-                    
+                        raise ValueError(
+                            "No active MLflow run for artifact logging")
+
                     run_id = active_run.info.run_id
-                    
+
                     from azureml.core import Run as AzureMLRun
                     from azureml.core import Workspace
                     import os
-                    
+
                     # Get Azure ML workspace (same logic as HPO checkpoint logging)
                     workspace = None
                     try:
                         workspace = Workspace.from_config()
                     except Exception:
-                        subscription_id = os.environ.get("AZURE_SUBSCRIPTION_ID")
+                        subscription_id = os.environ.get(
+                            "AZURE_SUBSCRIPTION_ID")
                         resource_group = os.environ.get("AZURE_RESOURCE_GROUP")
-                        workspace_name = os.environ.get("AZURE_WORKSPACE_NAME", "resume-ner-ws")
-                        
+                        workspace_name = os.environ.get(
+                            "AZURE_WORKSPACE_NAME", "resume-ner-ws")
+
                         if subscription_id and resource_group:
                             try:
                                 workspace = Workspace(
@@ -1292,20 +1308,22 @@ class MLflowTrainingTracker:
                                 )
                             except Exception:
                                 pass
-                    
+
                     if workspace:
                         # Get Azure ML run ID from MLflow artifact URI
                         mlflow_client = mlflow.tracking.MlflowClient()
                         mlflow_run_data = mlflow_client.get_run(run_id)
-                        
+
                         azureml_run = None
                         if mlflow_run_data.info.artifact_uri and "azureml://" in mlflow_run_data.info.artifact_uri and "/runs/" in mlflow_run_data.info.artifact_uri:
                             import re
-                            run_id_match = re.search(r'/runs/([^/]+)', mlflow_run_data.info.artifact_uri)
+                            run_id_match = re.search(
+                                r'/runs/([^/]+)', mlflow_run_data.info.artifact_uri)
                             if run_id_match:
                                 azureml_run_id_from_uri = run_id_match.group(1)
-                                azureml_run = workspace.get_run(azureml_run_id_from_uri)
-                        
+                                azureml_run = workspace.get_run(
+                                    azureml_run_id_from_uri)
+
                         if azureml_run:
                             # Upload checkpoint directory files
                             if checkpoint_dir.exists():
@@ -1315,14 +1333,15 @@ class MLflowTrainingTracker:
                                     for file in files:
                                         file_path = Path(root) / file
                                         file_path = file_path.resolve()
-                                        
+
                                         if not file_path.exists():
                                             continue
-                                        
+
                                         # Create artifact path relative to checkpoint_dir
-                                        rel_path = file_path.relative_to(checkpoint_dir)
+                                        rel_path = file_path.relative_to(
+                                            checkpoint_dir)
                                         artifact_path = f"checkpoint/{rel_path}"
-                                        
+
                                         try:
                                             azureml_run.upload_file(
                                                 name=artifact_path,
@@ -1335,11 +1354,13 @@ class MLflowTrainingTracker:
                                             if "already exists" in error_msg or "resource conflict" in error_msg:
                                                 files_uploaded += 1
                                             else:
-                                                logger.debug(f"Failed to upload {file_path.name}: {upload_err}")
-                                
+                                                logger.debug(
+                                                    f"Failed to upload {file_path.name}: {upload_err}")
+
                                 if files_uploaded > 0:
-                                    logger.debug(f"Uploaded {files_uploaded} checkpoint files to Azure ML run {azureml_run.id}")
-                            
+                                    logger.debug(
+                                        f"Uploaded {files_uploaded} checkpoint files to Azure ML run {azureml_run.id}")
+
                             # Upload metrics.json if provided
                             if metrics_json_path and metrics_json_path.exists():
                                 file_path = metrics_json_path.resolve()
@@ -1348,17 +1369,22 @@ class MLflowTrainingTracker:
                                         name="metrics.json",
                                         path_or_stream=str(file_path)
                                     )
-                                    logger.debug(f"Uploaded metrics.json to Azure ML run {azureml_run.id}")
+                                    logger.debug(
+                                        f"Uploaded metrics.json to Azure ML run {azureml_run.id}")
                                 except Exception as upload_err:
                                     error_msg = str(upload_err).lower()
                                     if "already exists" not in error_msg and "resource conflict" not in error_msg:
-                                        logger.warning(f"Failed to upload metrics.json: {upload_err}")
+                                        logger.warning(
+                                            f"Failed to upload metrics.json: {upload_err}")
                         else:
-                            logger.warning("Could not find Azure ML run for training artifact upload")
+                            logger.warning(
+                                "Could not find Azure ML run for training artifact upload")
                     else:
-                        logger.warning("Could not get Azure ML workspace for training artifact upload")
+                        logger.warning(
+                            "Could not get Azure ML workspace for training artifact upload")
                 except Exception as azureml_err:
-                    logger.warning(f"Failed to upload training artifacts to Azure ML: {azureml_err}")
+                    logger.warning(
+                        f"Failed to upload training artifacts to Azure ML: {azureml_err}")
             else:
                 # Use standard MLflow for non-Azure ML backends
                 # Log checkpoint directory
@@ -1395,7 +1421,8 @@ class MLflowConversionTracker:
 
             if is_azure_ml:
                 logger.debug(
-                    f"Using existing Azure ML tracking URI: {current_tracking_uri[:50]}...")
+                    f"Using existing Azure ML tracking URI: {current_tracking_uri[:50]}..."
+                )
                 from shared.mlflow_setup import setup_mlflow_cross_platform
                 setup_mlflow_cross_platform(
                     experiment_name=self.experiment_name,
@@ -1422,18 +1449,9 @@ class MLflowConversionTracker:
     ):
         """
         Start a MLflow run for model conversion.
-
-        Args:
-            run_name: Name for the conversion run.
-            conversion_type: Type of conversion ("onnx_int8" or "onnx_fp32").
-            source_training_run: Run ID of training that produced checkpoint (optional).
-
-        Yields:
-            Active MLflow run context.
         """
         try:
             with mlflow.start_run(run_name=run_name) as conversion_run:
-                # Set tags
                 mlflow.set_tag("conversion_type", conversion_type)
                 mlflow.set_tag("mlflow.runType", "conversion")
                 if source_training_run:
@@ -1454,16 +1472,6 @@ class MLflowConversionTracker:
         opset_version: int,
         backbone: str,
     ) -> None:
-        """
-        Log conversion parameters to MLflow.
-
-        Args:
-            checkpoint_path: Path to source checkpoint.
-            conversion_target: Target format ("onnx_int8" or "onnx_fp32").
-            quantization: Quantization type ("int8" or "none").
-            opset_version: ONNX opset version.
-            backbone: Model backbone name.
-        """
         try:
             mlflow.log_param("conversion_source", checkpoint_path)
             mlflow.log_param("conversion_target", conversion_target)
@@ -1472,7 +1480,8 @@ class MLflowConversionTracker:
             mlflow.log_param("conversion_backbone", backbone)
         except Exception as e:
             logger.warning(
-                f"Could not log conversion parameters to MLflow: {e}")
+                f"Could not log conversion parameters to MLflow: {e}"
+            )
 
     def log_conversion_results(
         self,
@@ -1482,162 +1491,172 @@ class MLflowConversionTracker:
         smoke_test_passed: Optional[bool] = None,
         conversion_log_path: Optional[Path] = None,
     ) -> None:
-        """
-        Log conversion results to MLflow.
-
-        Args:
-            conversion_success: Whether conversion succeeded.
-            onnx_model_path: Path to converted ONNX model.
-            original_checkpoint_size: Size of original checkpoint in MB (optional).
-            smoke_test_passed: Whether smoke test passed (optional).
-            conversion_log_path: Path to conversion log file (optional).
-        """
         try:
-            # Log metrics
-            mlflow.log_metric("conversion_success",
-                              1 if conversion_success else 0)
+            mlflow.log_metric(
+                "conversion_success",
+                1 if conversion_success else 0,
+            )
 
             if onnx_model_path and onnx_model_path.exists():
-                # Calculate model size
                 model_size_mb = onnx_model_path.stat().st_size / (1024 * 1024)
                 mlflow.log_metric("onnx_model_size_mb", model_size_mb)
 
-                # Calculate compression ratio if original size provided
                 if original_checkpoint_size:
                     compression_ratio = original_checkpoint_size / model_size_mb
                     mlflow.log_metric("compression_ratio", compression_ratio)
 
             if smoke_test_passed is not None:
-                mlflow.log_metric("smoke_test_passed",
-                                  1 if smoke_test_passed else 0)
+                mlflow.log_metric(
+                    "smoke_test_passed",
+                    1 if smoke_test_passed else 0,
+                )
 
-            # Log artifacts - use Azure ML SDK for Azure ML, standard MLflow for others
             tracking_uri = mlflow.get_tracking_uri()
             is_azure_ml = tracking_uri and "azureml" in tracking_uri.lower()
-            
+
             if is_azure_ml:
-                # Use Azure ML SDK for artifact upload (same approach as HPO checkpoint logging)
                 try:
                     active_run = mlflow.active_run()
                     if not active_run:
-                        raise ValueError("No active MLflow run for artifact logging")
-                    
+                        raise ValueError(
+                            "No active MLflow run for artifact logging")
+
                     run_id = active_run.info.run_id
-                    
+
                     from azureml.core import Run as AzureMLRun
                     from azureml.core import Workspace
                     import os
-                    
-                    # Get Azure ML workspace (same logic as HPO checkpoint logging)
+
                     workspace = None
                     try:
                         workspace = Workspace.from_config()
                     except Exception:
-                        subscription_id = os.environ.get("AZURE_SUBSCRIPTION_ID")
+                        subscription_id = os.environ.get(
+                            "AZURE_SUBSCRIPTION_ID")
                         resource_group = os.environ.get("AZURE_RESOURCE_GROUP")
-                        workspace_name = os.environ.get("AZURE_WORKSPACE_NAME", "resume-ner-ws")
-                        
+                        workspace_name = os.environ.get(
+                            "AZURE_WORKSPACE_NAME",
+                            "resume-ner-ws",
+                        )
+
                         if subscription_id and resource_group:
                             try:
                                 workspace = Workspace(
                                     subscription_id=subscription_id,
                                     resource_group=resource_group,
-                                    workspace_name=workspace_name
+                                    workspace_name=workspace_name,
                                 )
                             except Exception:
                                 pass
-                    
+
                     if workspace:
-                        # Get Azure ML run ID from MLflow artifact URI
                         mlflow_client = mlflow.tracking.MlflowClient()
                         mlflow_run_data = mlflow_client.get_run(run_id)
-                        
+
                         azureml_run = None
-                        if mlflow_run_data.info.artifact_uri and "azureml://" in mlflow_run_data.info.artifact_uri and "/runs/" in mlflow_run_data.info.artifact_uri:
+                        if (
+                            mlflow_run_data.info.artifact_uri
+                            and "azureml://" in mlflow_run_data.info.artifact_uri
+                            and "/runs/" in mlflow_run_data.info.artifact_uri
+                        ):
                             import re
-                            run_id_match = re.search(r'/runs/([^/]+)', mlflow_run_data.info.artifact_uri)
+                            run_id_match = re.search(
+                                r"/runs/([^/]+)",
+                                mlflow_run_data.info.artifact_uri,
+                            )
                             if run_id_match:
                                 azureml_run_id_from_uri = run_id_match.group(1)
-                                azureml_run = workspace.get_run(azureml_run_id_from_uri)
-                        
+                                azureml_run = workspace.get_run(
+                                    azureml_run_id_from_uri
+                                )
+
                         if azureml_run:
-                            # Upload ONNX model if available
                             if onnx_model_path and onnx_model_path.exists():
                                 artifact_name = onnx_model_path.name
                                 file_path = onnx_model_path.resolve()
                                 try:
                                     azureml_run.upload_file(
                                         name=artifact_name,
-                                        path_or_stream=str(file_path)
+                                        path_or_stream=str(file_path),
                                     )
-                                    logger.debug(f"Uploaded {artifact_name} to Azure ML run {azureml_run.id}")
                                 except Exception as upload_err:
                                     error_msg = str(upload_err).lower()
-                                    if "already exists" not in error_msg and "resource conflict" not in error_msg:
-                                        logger.warning(f"Failed to upload {artifact_name}: {upload_err}")
-                            
-                            # Upload conversion log if available
+                                    if (
+                                        "already exists" not in error_msg
+                                        and "resource conflict" not in error_msg
+                                    ):
+                                        logger.warning(
+                                            f"Failed to upload {artifact_name}: {upload_err}"
+                                        )
+
                             if conversion_log_path and conversion_log_path.exists():
                                 file_path = conversion_log_path.resolve()
                                 try:
                                     azureml_run.upload_file(
                                         name="conversion_log.txt",
-                                        path_or_stream=str(file_path)
+                                        path_or_stream=str(file_path),
                                     )
-                                    logger.debug(f"Uploaded conversion_log.txt to Azure ML run {azureml_run.id}")
                                 except Exception as upload_err:
                                     error_msg = str(upload_err).lower()
-                                    if "already exists" not in error_msg and "resource conflict" not in error_msg:
-                                        logger.warning(f"Failed to upload conversion_log.txt: {upload_err}")
+                                    if (
+                                        "already exists" not in error_msg
+                                        and "resource conflict" not in error_msg
+                                    ):
+                                        logger.warning(
+                                            f"Failed to upload conversion_log.txt: {upload_err}"
+                                        )
                         else:
-                            logger.warning("Could not find Azure ML run for conversion artifact upload")
+                            logger.warning(
+                                "Could not find Azure ML run for conversion artifact upload"
+                            )
                     else:
-                        logger.warning("Could not get Azure ML workspace for conversion artifact upload")
+                        logger.warning(
+                            "Could not get Azure ML workspace for conversion artifact upload"
+                        )
                 except Exception as azureml_err:
-                    logger.warning(f"Failed to upload conversion artifacts to Azure ML: {azureml_err}")
+                    logger.warning(
+                        f"Failed to upload conversion artifacts to Azure ML: {azureml_err}"
+                    )
             else:
-                # Use standard MLflow for non-Azure ML backends
                 if onnx_model_path and onnx_model_path.exists():
                     artifact_name = onnx_model_path.name
-                    # Add retry logic for artifact upload (handles SSL/network timeouts)
                     max_retries = 3
-                    retry_delay = 2  # seconds
+                    retry_delay = 2
                     for attempt in range(max_retries):
                         try:
-                            mlflow.log_artifact(str(onnx_model_path),
-                                                artifact_path=artifact_name)
-                            logger.debug(f"Successfully uploaded {artifact_name} to MLflow")
+                            mlflow.log_artifact(
+                                str(onnx_model_path),
+                                artifact_path=artifact_name,
+                            )
                             break
                         except Exception as upload_err:
                             if attempt < max_retries - 1:
-                                wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
-                                logger.warning(
-                                    f"Failed to upload {artifact_name} (attempt {attempt + 1}/{max_retries}): {upload_err}. "
-                                    f"Retrying in {wait_time}s..."
-                                )
+                                wait_time = retry_delay * (2 ** attempt)
                                 time.sleep(wait_time)
                             else:
-                                logger.warning(f"Failed to upload {artifact_name} after {max_retries} attempts: {upload_err}")
+                                logger.warning(
+                                    f"Failed to upload {artifact_name} after "
+                                    f"{max_retries} attempts: {upload_err}"
+                                )
 
                 if conversion_log_path and conversion_log_path.exists():
-                    # Add retry logic for log upload
                     max_retries = 3
-                    retry_delay = 2  # seconds
+                    retry_delay = 2
                     for attempt in range(max_retries):
                         try:
-                            mlflow.log_artifact(str(conversion_log_path),
-                                                artifact_path="conversion_log.txt")
-                            logger.debug("Successfully uploaded conversion_log.txt to MLflow")
+                            mlflow.log_artifact(
+                                str(conversion_log_path),
+                                artifact_path="conversion_log.txt",
+                            )
                             break
                         except Exception as upload_err:
                             if attempt < max_retries - 1:
-                                wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
-                                logger.warning(
-                                    f"Failed to upload conversion_log.txt (attempt {attempt + 1}/{max_retries}): {upload_err}. "
-                                    f"Retrying in {wait_time}s..."
-                                )
+                                wait_time = retry_delay * (2 ** attempt)
                                 time.sleep(wait_time)
                             else:
-                                logger.warning(f"Failed to upload conversion_log.txt after {max_retries} attempts: {upload_err}")
+                                logger.warning(
+                                    "Failed to upload conversion_log.txt after "
+                                    f"{max_retries} attempts: {upload_err}"
+                                )
         except Exception as e:
             logger.warning(f"Could not log conversion results to MLflow: {e}")

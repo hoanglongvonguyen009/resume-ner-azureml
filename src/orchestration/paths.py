@@ -30,8 +30,8 @@ def _get_default_paths() -> Dict[str, Any]:
         "base": {"outputs": "outputs"},
         "outputs": {
             "hpo": "hpo",
+            "benchmarking": "benchmarking",
             "final_training": "final_training",
-            "continued_training": "continued_training",
             "conversion": "conversion",
             "cache": "cache",
         },
@@ -51,7 +51,6 @@ def _get_default_paths() -> Dict[str, Any]:
             },
         },
         "patterns": {
-            "final_training": "{backbone}_{run_id}",
             "best_config_file": "best_config_{backbone}_{trial}_{timestamp}.json",
             "final_training_cache_file": "final_training_{backbone}_{run_id}_{timestamp}.json",
         },

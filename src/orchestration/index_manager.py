@@ -245,3 +245,4 @@ def get_latest_entry(
     entries.sort(key=lambda e: e.get("last_updated", ""), reverse=True)
     return entries[0]
 
+

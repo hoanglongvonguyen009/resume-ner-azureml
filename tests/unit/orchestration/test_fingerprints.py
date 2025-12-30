@@ -155,3 +155,4 @@ def test_compute_hardware_fp_empty():
     
     assert fp == "unknown"
 
+

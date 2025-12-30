@@ -286,7 +286,7 @@ def train_model(
     checkpoint_path = None
     training_type = "final"
     
-    # Check if this is continued training
+    # Check if checkpoint should be loaded
     if checkpoint_config:
         backbone_for_resolve = backbone
         run_id_for_resolve = config.get("training", {}).get("run_id")
@@ -297,7 +297,8 @@ def train_model(
         )
         if resolved_path:
             checkpoint_path = str(resolved_path)
-            training_type = "continued"
+            # Checkpoint loading is part of final training workflow
+            training_type = "final"
     
     # Start MLflow tracking run if tracker provided
     run_id = config.get("training", {}).get("run_id", "unknown")
@@ -401,7 +402,6 @@ def train_model(
                 # Log training parameters
                 data_config = config.get("data", {})
                 random_seed = config.get("training", {}).get("seed") or random.randint(0, 2**31 - 1)
-                data_strategy = config.get("data", {}).get("strategy")  # if continued training
                 
                 tracker.log_training_parameters(
                     config=config,
