@@ -280,12 +280,12 @@ def train_model(
     backbone = config.get("model", {}).get("backbone", "unknown")
     if "-" in backbone:
         backbone = backbone.split("-")[0]
-    
+
     # Determine training type and checkpoint path
     checkpoint_config = config.get("training", {}).get("checkpoint", {})
     checkpoint_path = None
     training_type = "final"
-    
+
     # Check if checkpoint should be loaded
     if checkpoint_config:
         backbone_for_resolve = backbone
@@ -299,11 +299,65 @@ def train_model(
             checkpoint_path = str(resolved_path)
             # Checkpoint loading is part of final training workflow
             training_type = "final"
-    
+
     # Start MLflow tracking run if tracker provided
-    run_id = config.get("training", {}).get("run_id", "unknown")
-    run_name = f"{backbone}_{run_id}"
-    
+    # Try to use systematic naming if context information is available
+    run_name = None
+
+    # First, check if MLFLOW_RUN_NAME is set (from notebook/environment)
+    import os
+    env_run_name = os.environ.get("MLFLOW_RUN_NAME")
+    if env_run_name:
+        run_name = env_run_name
+
+    # If not set, try to build systematic name from config
+    if not run_name:
+        try:
+            from orchestration.naming_centralized import create_naming_context
+            from orchestration.jobs.tracking.mlflow_naming import build_mlflow_run_name
+            from shared.platform_detection import detect_platform
+
+            # Try to extract fingerprints from config if available
+            spec_fp = config.get("fingerprints", {}).get("spec_fp")
+            exec_fp = config.get("fingerprints", {}).get("exec_fp")
+            variant = config.get("fingerprints", {}).get("variant", 1)
+
+            # Infer config_dir from output_dir if possible
+            config_dir = None
+            if output_dir:
+                # Try to find config directory: go up from outputs/ to root, then to config/
+                current = output_dir
+                for _ in range(5):  # Limit search depth
+                    if current.name == "outputs" and (current.parent / "config").exists():
+                        config_dir = current.parent / "config"
+                        break
+                    current = current.parent
+                    if not current or current == current.parent:  # Reached root
+                        break
+
+            # Build NamingContext if we have required fields
+            if spec_fp and exec_fp:
+                training_context = create_naming_context(
+                    process_type="final_training",
+                    model=backbone,
+                    spec_fp=spec_fp,
+                    exec_fp=exec_fp,
+                    environment=detect_platform(),
+                    variant=variant,
+                )
+                run_name = build_mlflow_run_name(training_context, config_dir)
+        except Exception as e:
+            # If systematic naming fails, fallback to manual construction
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(
+                f"Could not build systematic run name: {e}, using fallback")
+
+    # Fallback to manual construction if systematic naming didn't work
+    if not run_name:
+        run_id = config.get("training", {}).get("run_id", "unknown")
+        run_name = f"{backbone}_{run_id}"
+
     # We'll use the tracker context manager later, after training completes
 
     data_cfg = config["data"]
@@ -317,7 +371,6 @@ def train_model(
     if context is None:
         dist_cfg = resolve_distributed_config(config)
         context = create_run_context(dist_cfg)
-
 
     model, tokenizer, _ = create_model_and_tokenizer(
         config, label2id, id2label, device=context.device, checkpoint_path=checkpoint_path
@@ -392,7 +445,7 @@ def train_model(
         try:
             import json
             import random
-            
+
             # Use context manager for training run
             with tracker.start_training_run(
                 run_name=run_name,
@@ -401,8 +454,9 @@ def train_model(
             ):
                 # Log training parameters
                 data_config = config.get("data", {})
-                random_seed = config.get("training", {}).get("seed") or random.randint(0, 2**31 - 1)
-                
+                random_seed = config.get("training", {}).get(
+                    "seed") or random.randint(0, 2**31 - 1)
+
                 tracker.log_training_parameters(
                     config=config,
                     data_config=data_config,
@@ -410,22 +464,23 @@ def train_model(
                     data_strategy=data_strategy,
                     random_seed=random_seed,
                 )
-                
+
                 # Log metrics (extract per_entity if available)
                 metrics_copy = metrics.copy() if isinstance(metrics, dict) else {}
-                per_entity_metrics = metrics_copy.pop("per_entity", None) if isinstance(metrics_copy, dict) else None
+                per_entity_metrics = metrics_copy.pop(
+                    "per_entity", None) if isinstance(metrics_copy, dict) else None
                 tracker.log_training_metrics(
                     metrics=metrics_copy,
                     per_entity_metrics=per_entity_metrics,
                 )
-                
+
                 # Save metrics.json for artifact logging
                 metrics_json_path = output_dir / "metrics.json"
                 if isinstance(metrics, dict):
                     # Use original metrics dict (with per_entity if it exists)
                     with open(metrics_json_path, 'w') as f:
                         json.dump(metrics, f, indent=2)
-                
+
                 # Log artifacts
                 tracker.log_training_artifacts(
                     checkpoint_dir=output_dir,

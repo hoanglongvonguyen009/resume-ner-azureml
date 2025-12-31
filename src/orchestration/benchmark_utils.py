@@ -27,6 +27,8 @@ def run_benchmarking(
     tracker: Optional[Any] = None,
     backbone: Optional[str] = None,
     benchmark_source: str = "final_training",
+    study_key_hash: Optional[str] = None,
+    trial_key_hash: Optional[str] = None,
 ) -> bool:
     """
     Run benchmarking on a model checkpoint.
@@ -46,6 +48,8 @@ def run_benchmarking(
         tracker: Optional MLflowBenchmarkTracker instance for logging results.
         backbone: Optional model backbone name for tracking.
         benchmark_source: Source of benchmark ("hpo_trial" or "final_training").
+        study_key_hash: Optional study key hash from HPO trial (for grouping tags).
+        trial_key_hash: Optional trial key hash from HPO trial (for grouping tags).
 
     Returns:
         True if successful, False otherwise.
@@ -109,14 +113,72 @@ def run_benchmarking(
             if not backbone:
                 backbone = checkpoint_dir.name
 
-            # Create run name
-            run_name = f"benchmark_{backbone}_{benchmark_source}"
+            # Build run name using systematic naming with auto-increment
+            from orchestration.naming_centralized import create_naming_context
+            from orchestration.jobs.tracking.mlflow_naming import build_mlflow_run_name
+            from shared.platform_detection import detect_platform
+            from pathlib import Path
+            
+            # Infer root_dir and config_dir from output_path
+            root_dir = project_root if project_root else Path.cwd()
+            config_dir = root_dir / "config" if root_dir else None
+            
+            # Extract trial_id from checkpoint path if benchmarking an HPO trial
+            extracted_trial_id = None
+            if benchmark_source == "hpo_trial" and checkpoint_dir:
+                # Try to extract trial_id from checkpoint path (e.g., outputs/hpo/local/distilbert/trial_1_20251231_161745/checkpoints)
+                checkpoint_parent = checkpoint_dir.parent
+                if checkpoint_parent.name.startswith("trial_"):
+                    extracted_trial_id = checkpoint_parent.name
+                    logger.info(
+                        f"[Benchmark Run Name] Extracted trial_id from checkpoint path: {extracted_trial_id}"
+                    )
+                elif "trial" in str(checkpoint_dir):
+                    # Fallback: try to extract from path
+                    parts = str(checkpoint_dir).split("trial")
+                    if len(parts) > 1:
+                        trial_part = "trial" + parts[1].split("/")[0].split("\\")[0]
+                        extracted_trial_id = trial_part
+                        logger.info(
+                            f"[Benchmark Run Name] Extracted trial_id from path (fallback): {extracted_trial_id}"
+                        )
+            
+            # Create NamingContext for benchmarking
+            # For HPO trial benchmarks, trial_id should be the trial identifier
+            # For final training benchmarks, trial_id can be None or a variant identifier
+            benchmark_context = create_naming_context(
+                process_type="benchmarking",
+                model=backbone.split("-")[0] if backbone and "-" in backbone else backbone,
+                environment=detect_platform(),
+                trial_id=extracted_trial_id,  # Use extracted trial_id if available
+            )
+            
+            logger.info(
+                f"[Benchmark Run Name] Building run name: trial_id={benchmark_context.trial_id}, "
+                f"root_dir={root_dir}, config_dir={config_dir}"
+            )
+            
+            # Build systematic run name with auto-increment
+            run_name = build_mlflow_run_name(
+                benchmark_context,
+                config_dir=config_dir,
+                root_dir=root_dir,
+                output_dir=output_path.parent if output_path else None,
+            )
+            
+            logger.info(
+                f"[Benchmark Run Name] Generated run name: {run_name}"
+            )
 
             # Start benchmark run and log results
             with tracker.start_benchmark_run(
                 run_name=run_name,
                 backbone=backbone,
                 benchmark_source=benchmark_source,
+                context=benchmark_context,
+                output_dir=output_path.parent if output_path else None,
+                study_key_hash=study_key_hash,
+                trial_key_hash=trial_key_hash,
             ):
                 tracker.log_benchmark_results(
                     batch_sizes=batch_sizes,

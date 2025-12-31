@@ -40,7 +40,7 @@ def load_mlflow_config(config_dir: Optional[Path] = None) -> Dict[str, Any]:
     
     # Load config
     if not config_path.exists():
-        logger.debug(f"MLflow config not found at {config_path}, using defaults")
+        logger.info(f"[MLflow Config] Config file not found at {config_path}, using defaults")
         _config_cache = {}
         _config_cache_path = config_path
         return _config_cache
@@ -48,10 +48,11 @@ def load_mlflow_config(config_dir: Optional[Path] = None) -> Dict[str, Any]:
     try:
         _config_cache = load_yaml(config_path)
         _config_cache_path = config_path
-        logger.debug(f"Loaded MLflow config from {config_path}")
+        logger.info(f"[MLflow Config] Loaded config from {config_path}")
+        logger.debug(f"[MLflow Config] Config contents: {_config_cache}")
         return _config_cache
     except Exception as e:
-        logger.warning(f"Failed to load MLflow config from {config_path}: {e}")
+        logger.warning(f"[MLflow Config] Failed to load config from {config_path}: {e}", exc_info=True)
         _config_cache = {}
         _config_cache_path = config_path
         return _config_cache
@@ -340,7 +341,16 @@ def get_auto_increment_config(
     run_name_config = naming_config.get("run_name", {})
     auto_inc_config = run_name_config.get("auto_increment", {})
     
+    logger.info(
+        f"[Auto-Increment Config] Loading from config_dir={config_dir}, "
+        f"raw_auto_inc_config={auto_inc_config}"
+    )
+    
     result = _validate_auto_increment_config(auto_inc_config)
+    
+    logger.info(
+        f"[Auto-Increment Config] Validated config: {result}, process_type={process_type}"
+    )
     
     # If process_type provided, add enabled_for_process flag
     if process_type:

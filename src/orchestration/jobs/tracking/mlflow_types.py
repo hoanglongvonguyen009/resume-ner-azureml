@@ -17,6 +17,9 @@ class RunHandle:
     experiment_name: str
     tracking_uri: str
     artifact_uri: Optional[str] = None
+    # Grouping tags for cross-platform aggregation (optional, for HPO parent runs)
+    study_key_hash: Optional[str] = None
+    study_family_hash: Optional[str] = None
     
     def __post_init__(self):
         """Validate required fields."""

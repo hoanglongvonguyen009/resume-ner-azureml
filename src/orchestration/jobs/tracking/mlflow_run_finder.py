@@ -290,3 +290,83 @@ def find_mlflow_run(
         logger.warning(report.error)
     
     return report
+
+
+def find_run_by_trial_id(
+    trial_id: str,
+    experiment_name: Optional[str] = None,
+    config_dir: Optional[Path] = None,
+) -> RunLookupReport:
+    """
+    Find MLflow run by trial_id tag.
+    
+    This is a convenience function for finding HPO trial runs by their trial_id.
+    
+    Args:
+        trial_id: Trial ID to search for (e.g., "trial_1_20251231_161745").
+        experiment_name: Optional experiment name (if None, searches all experiments).
+        config_dir: Optional config directory.
+    
+    Returns:
+        RunLookupReport with found status, run_id if found, strategy used, and any errors.
+    """
+    report = RunLookupReport(found=False)
+    report.strategies_attempted.append("trial_id_tag_search")
+    
+    try:
+        client = MlflowClient()
+        
+        # Build filter string
+        filter_string = f"tags.code.trial_id = '{trial_id}' AND (tags.code.interrupted != 'true' OR tags.code.interrupted IS NULL)"
+        
+        if experiment_name:
+            # Search in specific experiment
+            experiment = mlflow.get_experiment_by_name(experiment_name)
+            if not experiment:
+                report.error = f"Experiment '{experiment_name}' not found"
+                logger.warning(f"[Find Run by Trial ID] Experiment '{experiment_name}' not found")
+                return report
+            
+            runs = client.search_runs(
+                experiment_ids=[experiment.experiment_id],
+                filter_string=filter_string,
+                max_results=1,
+                order_by=["start_time DESC"],
+            )
+        else:
+            # Search all experiments (slower but more flexible)
+            experiments = client.search_experiments()
+            runs = []
+            for exp in experiments:
+                try:
+                    exp_runs = client.search_runs(
+                        experiment_ids=[exp.experiment_id],
+                        filter_string=filter_string,
+                        max_results=1,
+                        order_by=["start_time DESC"],
+                    )
+                    if exp_runs:
+                        runs.extend(exp_runs)
+                        break  # Found it, stop searching
+                except Exception as e:
+                    logger.debug(f"Error searching experiment {exp.name}: {e}")
+                    continue
+        
+        if runs:
+            found_run_id = runs[0].info.run_id
+            report.found = True
+            report.run_id = found_run_id
+            report.strategy_used = "trial_id_tag_search"
+            logger.info(
+                f"[Find Run by Trial ID] Found run {found_run_id[:12]}... for trial_id={trial_id}"
+            )
+            return report
+        else:
+            report.error = f"No run found with trial_id='{trial_id}'"
+            logger.debug(f"[Find Run by Trial ID] No run found with trial_id='{trial_id}'")
+            return report
+            
+    except Exception as e:
+        report.error = f"Trial ID search failed: {e}"
+        logger.warning(f"[Find Run by Trial ID] Search failed: {e}", exc_info=True)
+        return report

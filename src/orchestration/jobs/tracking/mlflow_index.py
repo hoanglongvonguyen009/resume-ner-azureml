@@ -311,25 +311,66 @@ def reserve_run_name_version(
     """
     counter_path = get_run_name_counter_path(root_dir, config_dir)
     
+    logger.info(
+        f"[Reserve Version] Starting reservation: counter_key={counter_key[:60]}..., "
+        f"root_dir={root_dir}, config_dir={config_dir}, counter_path={counter_path}"
+    )
+    
     # Acquire lock
     lock_fd = _acquire_lock(counter_path, timeout=10.0)
     if lock_fd is None:
-        logger.warning(f"Could not acquire lock for {counter_path}, proceeding with non-atomic write")
+        logger.warning(
+            f"[Reserve Version] Could not acquire lock for {counter_path}, "
+            f"proceeding with non-atomic write"
+        )
     
     try:
         # Load existing allocations
         counter_data = load_json(counter_path, default={"allocations": []})
         allocations: List[Dict[str, any]] = counter_data.get("allocations", [])
+        logger.info(
+            f"[Reserve Version] Loaded {len(allocations)} existing allocations from {counter_path}"
+        )
         
         # Find max committed version for this counter_key
         max_version = 0
+        matching_allocations = []
+        committed_versions = []
+        reserved_versions = []
+        expired_versions = []
+        
         for alloc in allocations:
-            if (alloc.get("counter_key") == counter_key and 
-                alloc.get("status") == "committed"):
-                max_version = max(max_version, alloc.get("version", 0))
+            if alloc.get("counter_key") == counter_key:
+                matching_allocations.append(alloc)
+                status = alloc.get("status", "unknown")
+                version = alloc.get("version", 0)
+                
+                if status == "committed":
+                    max_version = max(max_version, version)
+                    committed_versions.append(version)
+                elif status == "reserved":
+                    reserved_versions.append(version)
+                elif status == "expired":
+                    expired_versions.append(version)
+        
+        logger.info(
+            f"[Reserve Version] Found {len(matching_allocations)} allocations for counter_key: "
+            f"committed={committed_versions}, reserved={reserved_versions}, expired={expired_versions}, "
+            f"max_committed_version={max_version}"
+        )
+        
+        if matching_allocations:
+            logger.info(
+                f"[Reserve Version] Allocation details: "
+                f"{[(a.get('version'), a.get('status'), a.get('run_id', '')[:12]) for a in matching_allocations]}"
+            )
         
         # Increment to get next version (never reuse)
         next_version = max_version + 1
+        logger.info(
+            f"[Reserve Version] Reserving next version: {next_version} "
+            f"(incremented from max_committed={max_version})"
+        )
         
         # Add new reservation entry
         new_allocation = {
@@ -354,12 +395,17 @@ def reserve_run_name_version(
                     counter_path.unlink()
             temp_path.replace(counter_path)
             
-            logger.debug(
-                f"Reserved version {next_version} for counter_key {counter_key[:50]}... "
+            logger.info(
+                f"[Reserve Version] ✓ Successfully reserved version {next_version} "
+                f"for counter_key {counter_key[:50]}... "
                 f"(run_id: {run_id[:12] if run_id != 'pending' else 'pending'}...)"
             )
         except Exception as e:
             temp_path.unlink(missing_ok=True)
+            logger.error(
+                f"[Reserve Version] ✗ Failed to save reservation: {e}",
+                exc_info=True
+            )
             raise
         
         return next_version
@@ -390,40 +436,67 @@ def commit_run_name_version(
     """
     counter_path = get_run_name_counter_path(root_dir, config_dir)
     
+    logger.info(
+        f"[Commit Version] Starting commit: counter_key={counter_key[:60]}..., "
+        f"version={version}, run_id={run_id[:12]}..., counter_path={counter_path}"
+    )
+    
     # Acquire lock
     lock_fd = _acquire_lock(counter_path, timeout=10.0)
     if lock_fd is None:
-        logger.warning(f"Could not acquire lock for {counter_path}, proceeding with non-atomic write")
+        logger.warning(
+            f"[Commit Version] Could not acquire lock for {counter_path}, proceeding with non-atomic write"
+        )
     
     try:
         # Load existing allocations
         counter_data = load_json(counter_path, default={"allocations": []})
         allocations: List[Dict[str, any]] = counter_data.get("allocations", [])
+        logger.info(
+            f"[Commit Version] Loaded {len(allocations)} existing allocations from {counter_path}"
+        )
         
         # Find matching reservation entry
         found = False
+        matching_reservations = []
+        all_matching = []
+        
         for alloc in allocations:
-            if (alloc.get("counter_key") == counter_key and
-                alloc.get("version") == version and
-                alloc.get("status") == "reserved"):
-                # Update to committed
-                alloc["status"] = "committed"
-                alloc["committed_at"] = datetime.now().isoformat()
-                # Update run_id if it was "pending"
-                if alloc.get("run_id") == "pending" or run_id != "pending":
-                    alloc["run_id"] = run_id
-                found = True
-                logger.debug(
-                    f"Committed version {version} for counter_key {counter_key[:50]}... "
-                    f"(run_id: {run_id[:12]}...)"
-                )
-                break
+            if alloc.get("counter_key") == counter_key:
+                all_matching.append(alloc)
+                if alloc.get("version") == version:
+                    matching_reservations.append(alloc)
+                    if alloc.get("status") == "reserved":
+                        # Update to committed
+                        old_status = alloc.get("status")
+                        alloc["status"] = "committed"
+                        alloc["committed_at"] = datetime.now().isoformat()
+                        # Update run_id if it was "pending"
+                        if alloc.get("run_id") == "pending" or run_id != "pending":
+                            alloc["run_id"] = run_id
+                        found = True
+                        logger.info(
+                            f"[Commit Version] ✓ Found and committed reservation: version={version}, "
+                            f"status changed from '{old_status}' to 'committed', "
+                            f"run_id={run_id[:12]}..., counter_key={counter_key[:50]}..."
+                        )
+                        break
         
         if not found:
             logger.warning(
-                f"Could not find reservation to commit: counter_key={counter_key[:50]}..., "
-                f"version={version}, run_id={run_id[:12]}... (may have been cleaned up)"
+                f"[Commit Version] ✗ Could not find reservation to commit: counter_key={counter_key[:50]}..., "
+                f"version={version}, run_id={run_id[:12]}... "
             )
+            if matching_reservations:
+                logger.warning(
+                    f"[Commit Version] Found {len(matching_reservations)} matching allocations with version {version}: "
+                    f"{[(a.get('version'), a.get('status'), a.get('run_id', '')[:12]) for a in matching_reservations]}"
+                )
+            if all_matching:
+                logger.warning(
+                    f"[Commit Version] All allocations for counter_key: "
+                    f"{[(a.get('version'), a.get('status'), a.get('run_id', '')[:12]) for a in all_matching]}"
+                )
             # Don't fail - idempotent operation
         
         # Save atomically
@@ -437,8 +510,17 @@ def commit_run_name_version(
                 if counter_path.exists():
                     counter_path.unlink()
             temp_path.replace(counter_path)
+            
+            if found:
+                logger.info(
+                    f"[Commit Version] ✓ Successfully saved committed version {version} to {counter_path}"
+                )
         except Exception as e:
             temp_path.unlink(missing_ok=True)
+            logger.error(
+                f"[Commit Version] ✗ Failed to save commit: {e}",
+                exc_info=True
+            )
             raise
         
     finally:

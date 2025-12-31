@@ -68,7 +68,7 @@ naming:
     # Auto-increment configuration
     # Enables atomic version numbering for run names (prevents race conditions)
     auto_increment:
-      enabled: false  # Global toggle (default: false for backward compatibility)
+      enabled: true  # Global toggle (default: false for backward compatibility)
       processes:
         hpo: true  # Enable auto-increment for HPO run names
         benchmarking: true  # Enable auto-increment for benchmarking run names

@@ -7,13 +7,200 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Callable
 import time
+import tarfile
+import tempfile
+import json
+import random
+import sys
+import os
 
 import mlflow
 from shared.logging_utils import get_logger
 
+from orchestration.jobs.tracking.mlflow_types import RunHandle
+from orchestration.jobs.tracking.mlflow_naming import build_mlflow_tags, build_mlflow_run_key, build_mlflow_run_key_hash
+from orchestration.jobs.tracking.mlflow_index import update_mlflow_index
+
 logger = get_logger(__name__)
+
+
+def retry_with_backoff(
+    func: Callable,
+    max_retries: int = 5,
+    base_delay: float = 1.0,
+    max_delay: float = 60.0,
+    operation_name: str = "operation"
+) -> Any:
+    """
+    Retry a function with exponential backoff and jitter.
+
+    Args:
+        func: Function to retry (callable that takes no arguments).
+        max_retries: Maximum number of retry attempts.
+        base_delay: Base delay in seconds for exponential backoff.
+        max_delay: Maximum delay in seconds.
+        operation_name: Name of operation for logging.
+
+    Returns:
+        Result of func() if successful.
+
+    Raises:
+        Exception: Original exception if all retries exhausted.
+    """
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except Exception as e:
+            error_str = str(e).lower()
+            # Detect retryable errors
+            is_retryable = any(
+                code in error_str
+                for code in ['429', '503', '504', 'timeout', 'connection', 'temporary', 'rate limit']
+            )
+
+            if not is_retryable or attempt == max_retries - 1:
+                # Not retryable or last attempt - raise original exception
+                raise
+
+            # Exponential backoff with jitter
+            delay = min(base_delay * (2 ** attempt), max_delay)
+            jitter = random.uniform(0, delay * 0.1)  # 10% jitter
+            total_delay = delay + jitter
+
+            logger.debug(
+                f"Retry {attempt + 1}/{max_retries} for {operation_name} "
+                f"after {total_delay:.2f}s (error: {str(e)[:100]})"
+            )
+            time.sleep(total_delay)
+
+    # Should never reach here, but just in case
+    raise RuntimeError(f"Retry logic exhausted for {operation_name}")
+
+
+def _should_skip_file(file_path: Path, relative_path: str) -> bool:
+    """
+    Determine if a file should be skipped when creating archive.
+
+    Args:
+        file_path: Absolute path to file.
+        relative_path: Relative path within checkpoint directory.
+
+    Returns:
+        True if file should be skipped, False otherwise.
+    """
+    # Skip patterns
+    skip_patterns = ['.tmp', '.cache', '__pycache__', '.pyc', '.log']
+    skip_extensions = ['.tmp', '.cache']
+
+    name = file_path.name
+    if any(pattern in name for pattern in skip_patterns):
+        return True
+
+    if file_path.suffix.lower() in skip_extensions:
+        return True
+
+    # Skip very large files (>100MB) unless they're model files
+    try:
+        file_size = file_path.stat().st_size
+        if file_size > 100 * 1024 * 1024:  # 100MB
+            if file_path.suffix.lower() not in ['.pt', '.pth', '.onnx', '.bin', '.safetensors']:
+                logger.debug(
+                    f"Skipping large non-model file: {relative_path} ({file_size / 1024 / 1024:.1f}MB)")
+                return True
+    except OSError:
+        # Can't stat file, skip it
+        return True
+
+    return False
+
+
+def _create_checkpoint_archive(
+    checkpoint_dir: Path,
+    trial_number: int,
+    output_path: Optional[Path] = None
+) -> tuple[Path, Dict[str, Any]]:
+    """
+    Create compressed archive from checkpoint directory.
+
+    Args:
+        checkpoint_dir: Path to checkpoint directory.
+        trial_number: Trial number for manifest.
+        output_path: Optional output path for archive. If None, uses temp file.
+
+    Returns:
+        Tuple of (archive_path, manifest_dict).
+    """
+    if output_path is None:
+        # Create temp file
+        temp_fd, temp_path = tempfile.mkstemp(
+            suffix='.tar.gz', prefix='checkpoint_')
+        output_path = Path(temp_path)
+        # Close the file descriptor, we'll open it with tarfile
+        os.close(temp_fd)
+
+    manifest = {
+        "trial_number": trial_number,
+        "archive_format": "tar.gz",
+        "extracted_path": "best_trial_checkpoint",
+        "files": [],
+        "total_size": 0,
+        "created_at": time.strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+    checkpoint_dir = checkpoint_dir.resolve()
+    files_added = 0
+
+    with tarfile.open(output_path, 'w:gz') as tar:
+        for root, dirs, files in os.walk(checkpoint_dir):
+            # Filter out directories to skip
+            dirs[:] = [d for d in dirs if not any(pattern in d for pattern in [
+                                                  '.tmp', '.cache', '__pycache__'])]
+
+            for file in files:
+                file_path = Path(root) / file
+                try:
+                    file_path = file_path.resolve()
+
+                    if not file_path.exists():
+                        continue
+
+                    # Get relative path for archive
+                    try:
+                        relative_path = file_path.relative_to(checkpoint_dir)
+                    except ValueError:
+                        # File is outside checkpoint_dir, skip
+                        continue
+
+                    # Check if should skip
+                    if _should_skip_file(file_path, str(relative_path)):
+                        continue
+
+                    # Add to archive
+                    arcname = f"best_trial_checkpoint/{relative_path}"
+                    tar.add(file_path, arcname=arcname, recursive=False)
+
+                    # Update manifest
+                    file_size = file_path.stat().st_size
+                    manifest["files"].append({
+                        "path": str(relative_path),
+                        "size": file_size
+                    })
+                    manifest["total_size"] += file_size
+                    files_added += 1
+
+                except Exception as e:
+                    logger.warning(f"Error adding {file_path} to archive: {e}")
+                    continue
+
+    manifest["file_count"] = files_added
+    logger.info(
+        f"Created checkpoint archive: {output_path} "
+        f"({files_added} files, {manifest['total_size'] / 1024 / 1024:.1f}MB)"
+    )
+
+    return output_path, manifest
 
 
 class MLflowSweepTracker:
@@ -69,6 +256,11 @@ class MLflowSweepTracker:
         checkpoint_config: Dict[str, Any],
         storage_path: Optional[Any],
         should_resume: bool,
+        context: Optional[Any] = None,  # NamingContext
+        output_dir: Optional[Path] = None,
+        group_id: Optional[str] = None,
+        data_config: Optional[Dict[str, Any]] = None,
+        benchmark_config: Optional[Dict[str, Any]] = None,
     ):
         """
         Start a parent MLflow run for HPO sweep.
@@ -81,18 +273,142 @@ class MLflowSweepTracker:
             checkpoint_config: Checkpoint configuration.
             storage_path: Path to checkpoint storage.
             should_resume: Whether this is a resumed run.
+            context: Optional NamingContext for tag-based identification.
+            output_dir: Optional output directory for metadata persistence.
+            group_id: Optional group/session identifier.
+            data_config: Optional data configuration dictionary (for grouping tags).
+            benchmark_config: Optional benchmark configuration dictionary (for grouping tags).
 
         Yields:
-            Active MLflow run context.
+            RunHandle with run information.
         """
         try:
             with mlflow.start_run(run_name=run_name) as parent_run:
+                run_id = parent_run.info.run_id
+                experiment_id = parent_run.info.experiment_id
+                tracking_uri = mlflow.get_tracking_uri()
+
+                # Infer config_dir from output_dir
+                config_dir = None
+                if output_dir:
+                    root_dir_for_config = output_dir.parent.parent if output_dir.parent.name == "outputs" else output_dir.parent.parent.parent
+                    config_dir = root_dir_for_config / "config" if root_dir_for_config else None
+
+                # Compute study grouping hashes if configs available
+                study_key_hash = None
+                study_family_hash = None
+                if hpo_config and data_config and context and context.model:
+                    try:
+                        from orchestration.jobs.tracking.mlflow_naming import (
+                            build_hpo_study_key,
+                            build_hpo_study_family_key,
+                            build_hpo_study_key_hash,
+                            build_hpo_study_family_hash,
+                        )
+                        study_key = build_hpo_study_key(
+                            data_config, hpo_config, context.model, benchmark_config
+                        )
+                        study_family_key = build_hpo_study_family_key(
+                            data_config, hpo_config, benchmark_config
+                        )
+                        study_key_hash = build_hpo_study_key_hash(study_key)
+                        study_family_hash = build_hpo_study_family_hash(study_family_key)
+                        logger.info(
+                            f"[START_SWEEP_RUN] Computed grouping hashes: "
+                            f"study_key_hash={study_key_hash[:16]}..., "
+                            f"study_family_hash={study_family_hash[:16]}..."
+                        )
+                        # Store study_key in tags so trial runs can retrieve it for trial_key_hash computation
+                        # Note: study_key is a JSON string, but it's typically < 500 chars, so it should fit in tags
+                        # If it's too long, we'll hash it, but for now try to store it
+                        if len(study_key) <= 200:  # Safe limit for tags
+                            tags_to_set_later = {"code.study_key": study_key}
+                        else:
+                            tags_to_set_later = {}
+                            logger.warning(
+                                f"[START_SWEEP_RUN] study_key too long ({len(study_key)} chars), "
+                                f"not storing in tags. Trial runs will need to reconstruct it."
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            f"[START_SWEEP_RUN] Could not compute study grouping hashes: {e}",
+                            exc_info=True
+                        )
+
+                # Build and set tags atomically
+                logger.info(
+                    f"[START_SWEEP_RUN] Building tags with grouping hashes: "
+                    f"study_key_hash={study_key_hash[:16] if study_key_hash else None}..., "
+                    f"study_family_hash={study_family_hash[:16] if study_family_hash else None}..."
+                )
+                tags = build_mlflow_tags(
+                    context=context,
+                    output_dir=output_dir,
+                    group_id=group_id,
+                    config_dir=config_dir,
+                    study_key_hash=study_key_hash,
+                    study_family_hash=study_family_hash,
+                    hpo_config=hpo_config,
+                    data_config=data_config,
+                    benchmark_config=benchmark_config,
+                )
+                # Add study_key if it was stored (for trial runs to compute trial_key_hash)
+                if 'tags_to_set_later' in locals() and tags_to_set_later:
+                    tags.update(tags_to_set_later)
+                
+                logger.info(
+                    f"[START_SWEEP_RUN] Built tags, grouping tags present: "
+                    f"study_key_hash={'code.study_key_hash' in tags}, "
+                    f"study_family_hash={'code.study_family_hash' in tags}, "
+                    f"study_key={'code.study_key' in tags}"
+                )
+                mlflow.set_tags(tags)
+
+                # Build RunHandle
+                run_key = build_mlflow_run_key(context) if context else None
+                run_key_hash = build_mlflow_run_key_hash(
+                    run_key) if run_key else None
+
+                handle = RunHandle(
+                    run_id=run_id,
+                    run_key=run_key or "",
+                    run_key_hash=run_key_hash or "",
+                    experiment_id=experiment_id,
+                    experiment_name=self.experiment_name,
+                    tracking_uri=tracking_uri,
+                    artifact_uri=parent_run.info.artifact_uri,
+                    study_key_hash=study_key_hash,
+                    study_family_hash=study_family_hash,
+                )
+
+                # Update local index
+                if run_key_hash:
+                    try:
+                        root_dir = output_dir.parent.parent if output_dir else Path.cwd()
+                        update_mlflow_index(
+                            root_dir=root_dir,
+                            run_key_hash=run_key_hash,
+                            run_id=run_id,
+                            experiment_id=experiment_id,
+                            tracking_uri=tracking_uri,
+                            config_dir=config_dir,
+                        )
+                    except Exception as e:
+                        logger.debug(f"Could not update MLflow index: {e}")
+
                 self._log_sweep_metadata(
                     hpo_config, backbone, study_name, checkpoint_config, storage_path, should_resume
                 )
-                yield parent_run
+                logger.info(
+                    f"[START_SWEEP_RUN] Yielding RunHandle. run_id={run_id[:12]}...")
+                yield handle
+                logger.info(
+                    f"[START_SWEEP_RUN] Context manager exiting normally. run_id={run_id[:12]}...")
         except Exception as e:
-            logger.warning(f"MLflow tracking failed: {e}")
+            import traceback
+            logger.error(f"[START_SWEEP_RUN] MLflow tracking failed: {e}")
+            logger.error(
+                f"[START_SWEEP_RUN] Traceback: {traceback.format_exc()}")
             logger.warning("Continuing HPO without MLflow tracking...")
             # Yield a dummy context manager that does nothing
             from contextlib import nullcontext
@@ -156,73 +472,155 @@ class MLflowSweepTracker:
         run_id: Optional[str] = None,
         fold_splits: Optional[List] = None,
         hpo_config: Optional[Dict[str, Any]] = None,
+        child_runs_map: Optional[List] = None,
     ) -> None:
         """
         Log final metrics and best trial information to parent run.
-
-        Args:
-            study: Completed Optuna study.
-            objective_metric: Name of the objective metric.
-            parent_run_id: ID of the parent MLflow run.
-            run_name: Optional run name (used when resuming to search across all parent runs).
-            should_resume: Whether this is a resumed run.
-            hpo_output_dir: Path to HPO output directory containing trial checkpoints.
-            backbone: Model backbone name (e.g., "distilbert").
-            run_id: HPO run identifier for directory resolution.
-            fold_splits: Optional list of fold splits (if k-fold CV used).
-            hpo_config: HPO configuration dictionary containing MLflow settings.
         """
-        # Use optuna module to check trial state properly
+        logger.info(
+            f"[LOG_FINAL_METRICS] Starting log_final_metrics for "
+            f"parent_run_id={parent_run_id[:12] if parent_run_id else 'None'}..."
+        )
+
         try:
-            import optuna
-            completed_trials = len([
-                t for t in study.trials
-                if t.state == optuna.trial.TrialState.COMPLETE
-            ])
-        except ImportError:
-            # Fallback: count all trials as completed if we can't check state
-            completed_trials = len(study.trials)
+            # Count completed trials
+            try:
+                import optuna
+                completed_trials = len(
+                    [
+                        t for t in study.trials
+                        if t.state == optuna.trial.TrialState.COMPLETE
+                    ]
+                )
+                logger.info(
+                    f"[LOG_FINAL_METRICS] Found {completed_trials} completed trials "
+                    f"out of {len(study.trials)} total"
+                )
+            except ImportError:
+                completed_trials = len(study.trials)
+                logger.warning(
+                    f"[LOG_FINAL_METRICS] Could not import optuna, "
+                    f"counting all {completed_trials} trials as completed"
+                )
 
-        mlflow.log_metric("n_trials", len(study.trials))
-        mlflow.log_metric("n_completed_trials", completed_trials)
+            logger.info(
+                f"[LOG_FINAL_METRICS] Logging metrics: "
+                f"n_trials={len(study.trials)}, "
+                f"n_completed_trials={completed_trials}"
+            )
+            mlflow.log_metric("n_trials", len(study.trials))
+            mlflow.log_metric("n_completed_trials", completed_trials)
 
-        if study.best_trial is not None and study.best_value is not None:
-            # Log only the metric-specific name to avoid duplication
-            mlflow.log_metric(f"best_{objective_metric}", study.best_value)
+            if study.best_trial is not None and study.best_value is not None:
+                logger.info(
+                    f"[LOG_FINAL_METRICS] Logging best trial metrics: "
+                    f"{objective_metric}={study.best_value}"
+                )
 
-            # Log best hyperparameters
-            for param_name, param_value in study.best_params.items():
-                mlflow.log_param(f"best_{param_name}", param_value)
+                mlflow.log_metric(
+                    f"best_{objective_metric}", study.best_value
+                )
 
-            # Find and log the best trial's MLflow run ID
-            self._log_best_trial_id(
-                study, parent_run_id, run_name, should_resume)
+                logger.info(
+                    f"[LOG_FINAL_METRICS] Logging best hyperparameters: "
+                    f"{study.best_params}"
+                )
+                for param_name, param_value in study.best_params.items():
+                    mlflow.log_param(f"best_{param_name}", param_value)
 
-            # Log best trial checkpoint to MLflow if configured
-            if hpo_config and hpo_config.get("mlflow", {}).get("log_best_checkpoint", True):
-                if hpo_output_dir and backbone:
-                    try:
-                        self._log_best_trial_checkpoint(
-                            study=study,
-                            hpo_output_dir=hpo_output_dir,
-                            backbone=backbone,
-                            run_id=run_id,
-                            fold_splits=fold_splits,
+                logger.info(
+                    "[LOG_FINAL_METRICS] Finding and logging best trial run ID..."
+                )
+                self._log_best_trial_id(
+                    study,
+                    parent_run_id,
+                    run_name,
+                    should_resume,
+                    child_runs_map,
+                )
+                logger.info(
+                    "[LOG_FINAL_METRICS] Completed best trial ID logging"
+                )
+
+                log_checkpoint = (
+                    hpo_config
+                    and hpo_config.get("mlflow", {})
+                    .get("log_best_checkpoint", True)
+                )
+                logger.info(
+                    f"[LOG_FINAL_METRICS] Checkpoint logging enabled: {log_checkpoint}"
+                )
+
+                if log_checkpoint:
+                    if hpo_output_dir and backbone:
+                        logger.info(
+                            "[LOG_FINAL_METRICS] Logging best trial checkpoint..."
                         )
-                    except Exception as e:
-                        # Don't fail HPO if checkpoint logging fails
-                        logger.warning(
-                            f"Could not log best trial checkpoint to MLflow: {e}")
+                        try:
+                            self._log_best_trial_checkpoint(
+                                study=study,
+                                hpo_output_dir=hpo_output_dir,
+                                backbone=backbone,
+                                run_id=run_id,
+                                fold_splits=fold_splits,
+                            )
+                            logger.info(
+                                "[LOG_FINAL_METRICS] Successfully logged "
+                                "best trial checkpoint"
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                "[LOG_FINAL_METRICS] Could not log best trial "
+                                f"checkpoint to MLflow: {e}"
+                            )
+                    else:
+                        logger.info(
+                            "[LOG_FINAL_METRICS] Skipping checkpoint logging: "
+                            f"hpo_output_dir={hpo_output_dir}, backbone={backbone}"
+                        )
+                else:
+                    logger.info(
+                        "[LOG_FINAL_METRICS] Checkpoint logging disabled in config"
+                    )
+            else:
+                logger.info(
+                    "[LOG_FINAL_METRICS] No best trial to log "
+                    f"(best_trial={study.best_trial}, "
+                    f"best_value={study.best_value if hasattr(study, 'best_value') else 'N/A'})"
+                )
 
-    def _log_best_trial_id(self, study: Any, parent_run_id: str, run_name: Optional[str] = None, should_resume: bool = False) -> None:
+            logger.info(
+                "[LOG_FINAL_METRICS] Completed log_final_metrics successfully"
+            )
+
+        except Exception as e:
+            import traceback
+            error_msg = str(e)
+            error_traceback = traceback.format_exc()
+            logger.warning(
+                f"[LOG_FINAL_METRICS] Error in log_final_metrics: {error_msg}"
+            )
+            logger.debug(
+                f"[LOG_FINAL_METRICS] Full traceback: {error_traceback}"
+            )
+
+            if "'Run' object has no attribute 'run_id'" in error_msg:
+                logger.warning(
+                    "[LOG_FINAL_METRICS] This error indicates a Run object is "
+                    "missing 'run_id' attribute. Please check MLflow version "
+                    f"compatibility. Error: {e}"
+                )
+
+    def _log_best_trial_id(
+        self,
+        study: Any,
+        parent_run_id: str,
+        run_name: Optional[str] = None,
+        should_resume: bool = False,
+        cached_child_runs: Optional[List] = None,
+    ) -> None:
         """
         Find and log the best trial's MLflow run ID.
-
-        Args:
-            study: Completed Optuna study.
-            parent_run_id: ID of the parent MLflow run.
-            run_name: Optional run name (used when resuming to search across all parent runs).
-            should_resume: Whether this is a resumed run.
         """
         try:
             client = mlflow.tracking.MlflowClient()
@@ -231,127 +629,61 @@ class MLflowSweepTracker:
                 raise ValueError("No active MLflow run")
 
             experiment_id = active_run.info.experiment_id
-
-            # When resuming, search for child runs from ALL parent runs with the same name
-            # This allows finding trials from previous (now FAILED) parent runs
-            if should_resume and run_name:
-                logger.debug(
-                    f"Resuming: Searching for child runs from all parent runs with name '{run_name}'"
-                )
-                # First, find all parent runs with this name
-                all_parent_runs = client.search_runs(
-                    experiment_ids=[experiment_id],
-                    filter_string=f"attributes.run_name = '{run_name}'",
-                    max_results=100,
-                )
-                parent_run_ids = [run.info.run_id for run in all_parent_runs]
-                logger.debug(
-                    f"Found {len(parent_run_ids)} parent run(s) with name '{run_name}'"
-                )
-
-                # Search for child runs from all these parent runs
-                all_runs = []
-                for parent_id in parent_run_ids:
-                    child_runs = client.search_runs(
-                        experiment_ids=[experiment_id],
-                        filter_string=f"tags.mlflow.parentRunId = '{parent_id}'",
-                        max_results=1000,
-                    )
-                    all_runs.extend(child_runs)
-                    logger.debug(
-                        f"Found {len(child_runs)} child runs for parent {parent_id[:12]}..."
-                    )
-            else:
-                # Normal case: search for child runs of current parent
-                logger.debug(
-                    f"Searching for child runs with parent: {parent_run_id[:12]}... in experiment: {experiment_id}")
-
-            # Search with retry to handle cases where runs are still being committed
-            import time
-            max_retries = 3
-            retry_delay = 1.0  # seconds
-
-            # Get the best trial number we're looking for
             best_trial_number = study.best_trial.number
             best_run_id = None
             trial_to_run_id = {}
 
-            for attempt in range(max_retries):
-                # Re-search on each retry to get latest runs
-                if should_resume and run_name:
-                    # Re-search from all parent runs with this name
-                    all_runs = []
-                    for parent_id in parent_run_ids:
-                        child_runs = client.search_runs(
-                            experiment_ids=[experiment_id],
-                            filter_string=f"tags.mlflow.parentRunId = '{parent_id}'",
-                            max_results=1000,
-                        )
-                        all_runs.extend(child_runs)
-                else:
-                    # Normal case: search for child runs of current parent
-                    all_runs = client.search_runs(
-                        experiment_ids=[experiment_id],
-                        filter_string=f"tags.mlflow.parentRunId = '{parent_run_id}'",
-                        max_results=1000,
-                    )
+            all_runs = []
 
-                logger.info(
-                    f"Found {len(all_runs)} total child runs for best trial search (attempt {attempt + 1}/{max_retries})")
+            if cached_child_runs is not None:
+                all_runs = [
+                    run for run in cached_child_runs
+                    if run.data.tags.get("mlflow.parentRunId") == parent_run_id
+                ]
+            else:
+                all_runs = client.search_runs(
+                    experiment_ids=[experiment_id],
+                    filter_string=f"tags.mlflow.parentRunId = '{parent_run_id}'",
+                    max_results=1000,
+                )
 
-                # Map trial numbers to run IDs
-                trial_to_run_id = {}
-                for run in all_runs:
-                    trial_num_tag = run.data.tags.get("trial_number")
-                    parent_tag = run.data.tags.get("mlflow.parentRunId")
-                    logger.debug(
-                        f"Child run {run.info.run_id[:12]}... - trial_number: {trial_num_tag}, "
-                        f"parent: {parent_tag[:12] if parent_tag else 'None'}..."
-                    )
-                    if trial_num_tag:
-                        try:
-                            trial_num = int(trial_num_tag)
-                            # Only keep the first occurrence if there are duplicates
-                            if trial_num not in trial_to_run_id:
-                                trial_to_run_id[trial_num] = run.info.run_id
-                        except (ValueError, TypeError):
-                            pass
+            for run in all_runs:
+                trial_num_tag = run.data.tags.get("trial_number")
+                if trial_num_tag:
+                    try:
+                        trial_num = int(trial_num_tag)
+                        if trial_num not in trial_to_run_id:
+                            trial_to_run_id[trial_num] = run.info.run_id
+                    except (ValueError, TypeError):
+                        pass
 
-                # Get the best trial's run ID
-                best_run_id = trial_to_run_id.get(best_trial_number)
-
-                # If we found the best trial, break early
-                if best_run_id:
-                    logger.debug(
-                        f"Found best trial {best_trial_number} run ID: {best_run_id[:12]}..."
-                    )
-                    break
-
-                # If this is not the last attempt, wait and retry
-                if attempt < max_retries - 1:
-                    logger.debug(
-                        f"Best trial {best_trial_number} not found yet. "
-                        f"Available: {sorted(trial_to_run_id.keys())}. "
-                        f"Retrying in {retry_delay}s..."
-                    )
-                    time.sleep(retry_delay)
+            best_run_id = trial_to_run_id.get(best_trial_number)
 
             if best_run_id:
-                # Log best trial run ID as both parameter and tag for Azure ML UI
                 mlflow.log_param("best_trial_run_id", best_run_id)
                 mlflow.set_tag("best_trial_run_id", best_run_id)
                 mlflow.set_tag("best_trial_number", str(best_trial_number))
                 logger.info(
-                    f"Best trial: {best_trial_number} (run ID: {best_run_id[:12]}...)"
+                    f"Best trial: {best_trial_number} "
+                    f"(run ID: {best_run_id[:12]}...)"
                 )
             else:
                 logger.warning(
                     f"Could not find MLflow run ID for best trial {best_trial_number}. "
                     f"Available trial numbers: {sorted(trial_to_run_id.keys())}"
                 )
+
         except Exception as e:
-            # Don't fail if we can't find the best trial run ID
-            logger.warning(f"Could not retrieve best trial run ID: {e}")
+            error_msg = str(e)
+            if "'Run' object has no attribute 'run_id'" in error_msg:
+                logger.warning(
+                    f"Could not retrieve best trial run ID: {e}. "
+                    f"Use run.info.run_id instead of run.run_id"
+                )
+            else:
+                logger.warning(
+                    f"Could not retrieve best trial run ID: {e}"
+                )
 
     def _log_best_trial_checkpoint(
         self,
@@ -467,7 +799,7 @@ class MLflowSweepTracker:
 
             try:
                 active_run = mlflow.active_run()
-                if active_run:
+                if active_run and hasattr(active_run, 'info') and hasattr(active_run.info, 'run_id'):
                     parent_run_id_for_artifacts = active_run.info.run_id
 
                     # Try to get the best trial's child run ID from MLflow tags on the parent run
@@ -511,6 +843,11 @@ class MLflowSweepTracker:
                     if not active_run:
                         raise ValueError(
                             "No active MLflow run for artifact logging")
+
+                    # Defensive check: ensure active_run has info.run_id
+                    if not hasattr(active_run, 'info') or not hasattr(active_run.info, 'run_id'):
+                        raise ValueError(
+                            "Active MLflow run does not have 'info.run_id' attribute")
 
                     # Prefer best trial's child run over parent run for artifact upload
                     run_id_to_use = best_trial_run_id or active_run.info.run_id
@@ -698,15 +1035,11 @@ class MLflowSweepTracker:
                                 artifact_logged = False
                                 azureml_run = None
 
-                        # Upload artifacts using Azure ML Run's upload_file method
+                        # Upload artifacts using archive (single file upload)
                         if not azureml_run:
                             # Already logged warning above, just skip upload
                             pass
                         else:
-                            files_uploaded = 0
-                            total_files = sum(len(files)
-                                              for _, _, files in os.walk(checkpoint_dir))
-
                             # Check run status - completed runs don't accept uploads
                             run_status = azureml_run.get_status()
                             if run_status in ["Completed", "Failed", "Canceled"]:
@@ -734,44 +1067,86 @@ class MLflowSweepTracker:
                                 except Exception:
                                     pass
 
-                            for root, dirs, files in os.walk(checkpoint_dir):
-                                for file in files:
-                                    file_path = Path(root) / file
-                                    file_path = file_path.resolve()
+                            # Create archive from checkpoint directory
+                            archive_path = None
+                            try:
+                                logger.info("Creating checkpoint archive...")
+                                archive_path, manifest = _create_checkpoint_archive(
+                                    checkpoint_dir, best_trial_number
+                                )
 
-                                    if not file_path.exists():
-                                        continue
+                                # Upload archive with retry logic
+                                logger.info(
+                                    f"Uploading checkpoint archive ({archive_path.stat().st_size / 1024 / 1024:.1f}MB)...")
 
-                                    # Try artifact paths: prefer subdirectory, fallback to filename only
-                                    artifact_paths = [
-                                        f"best_trial_checkpoint/{file}",
-                                        file,
-                                    ]
+                                def upload_archive():
+                                    azureml_run.upload_file(
+                                        name="best_trial_checkpoint.tar.gz",
+                                        path_or_stream=str(archive_path)
+                                    )
 
-                                    for artifact_path in artifact_paths:
-                                        try:
+                                retry_with_backoff(
+                                    upload_archive,
+                                    max_retries=5,
+                                    base_delay=2.0,
+                                    operation_name="checkpoint archive upload"
+                                )
+
+                                # Upload manifest.json
+                                try:
+                                    manifest_json = json.dumps(
+                                        manifest, indent=2)
+                                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_manifest:
+                                        tmp_manifest.write(manifest_json)
+                                        tmp_manifest_path = Path(
+                                            tmp_manifest.name)
+
+                                    try:
+                                        def upload_manifest():
                                             azureml_run.upload_file(
-                                                name=artifact_path, path_or_stream=str(file_path))
-                                            files_uploaded += 1
-                                            break
-                                        except Exception as upload_error:
-                                            error_msg = str(
-                                                upload_error).lower()
-                                            # If artifact already exists, that's okay - count as uploaded
-                                            if "already exists" in error_msg or "resource conflict" in error_msg:
-                                                files_uploaded += 1
-                                                break
-                                            # Otherwise, try next path
-                                            continue
+                                                name="best_trial_checkpoint_manifest.json",
+                                                path_or_stream=str(
+                                                    tmp_manifest_path)
+                                            )
 
-                            if files_uploaded > 0:
+                                        retry_with_backoff(
+                                            upload_manifest,
+                                            max_retries=3,
+                                            base_delay=1.0,
+                                            operation_name="manifest upload"
+                                        )
+                                        logger.debug(
+                                            "Uploaded checkpoint manifest.json")
+                                    finally:
+                                        tmp_manifest_path.unlink(
+                                            missing_ok=True)
+                                except Exception as manifest_error:
+                                    logger.warning(
+                                        f"Could not upload manifest.json: {manifest_error}")
+
                                 artifact_logged = True
                                 logger.info(
-                                    f"Uploaded best trial checkpoint: {files_uploaded}/{total_files} files for trial {best_trial_number}"
+                                    f"Uploaded best trial checkpoint archive: {manifest['file_count']} files "
+                                    f"({manifest['total_size'] / 1024 / 1024:.1f}MB) for trial {best_trial_number}"
                                 )
-                            else:
-                                raise RuntimeError(
-                                    f"No files could be uploaded via Azure ML Run (attempted {total_files} files)")
+                            except Exception as archive_error:
+                                error_type = type(archive_error).__name__
+                                error_msg = str(archive_error)
+                                logger.warning(
+                                    f"Failed to upload checkpoint archive: {error_type}: {error_msg}"
+                                )
+                                artifact_logged = False
+                                raise
+                            finally:
+                                # Clean up temp archive file
+                                if archive_path and archive_path.exists():
+                                    try:
+                                        archive_path.unlink()
+                                        logger.debug(
+                                            f"Cleaned up temporary archive: {archive_path}")
+                                    except Exception as cleanup_error:
+                                        logger.warning(
+                                            f"Could not clean up archive file: {cleanup_error}")
                     except ImportError as import_error:
                         logger.warning(
                             f"Azure ML SDK (azureml.core) not available: {import_error}")
@@ -788,17 +1163,62 @@ class MLflowSweepTracker:
                         f"Could not upload checkpoint: {outer_error}")
                     artifact_logged = False
             else:
-                # For non-Azure ML backends, try standard methods
+                # For non-Azure ML backends, upload archive using standard MLflow methods
+                archive_path = None
                 try:
-                    mlflow.log_artifacts(str(checkpoint_dir),
-                                         artifact_path="best_trial_checkpoint")
+                    logger.info(
+                        "Creating checkpoint archive for non-Azure ML backend...")
+                    archive_path, manifest = _create_checkpoint_archive(
+                        checkpoint_dir, best_trial_number
+                    )
+
+                    # Upload archive with retry
+                    def upload_archive_mlflow():
+                        mlflow.log_artifact(
+                            str(archive_path),
+                            artifact_path="best_trial_checkpoint.tar.gz"
+                        )
+
+                    retry_with_backoff(
+                        upload_archive_mlflow,
+                        max_retries=5,
+                        base_delay=2.0,
+                        operation_name="checkpoint archive upload (MLflow)"
+                    )
+
+                    # Upload manifest
+                    try:
+                        manifest_json = json.dumps(manifest, indent=2)
+                        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_manifest:
+                            tmp_manifest.write(manifest_json)
+                            tmp_manifest_path = Path(tmp_manifest.name)
+
+                        try:
+                            def upload_manifest_mlflow():
+                                mlflow.log_artifact(
+                                    str(tmp_manifest_path),
+                                    artifact_path="best_trial_checkpoint_manifest.json"
+                                )
+
+                            retry_with_backoff(
+                                upload_manifest_mlflow,
+                                max_retries=3,
+                                base_delay=1.0,
+                                operation_name="manifest upload (MLflow)"
+                            )
+                        finally:
+                            tmp_manifest_path.unlink(missing_ok=True)
+                    except Exception as manifest_error:
+                        logger.warning(
+                            f"Could not upload manifest.json: {manifest_error}")
+
                     artifact_logged = True
                     logger.info(
-                        f"Logged best trial checkpoint to MLflow: trial {best_trial_number} "
-                        f"(path: {checkpoint_dir})"
+                        f"Logged best trial checkpoint archive: {manifest['file_count']} files "
+                        f"({manifest['total_size'] / 1024 / 1024:.1f}MB) for trial {best_trial_number}"
                     )
                 except Exception as e:
-                    # Try client method as fallback
+                    # Fallback to client method
                     try:
                         client = mlflow.tracking.MlflowClient()
                         run_id_to_use = parent_run_id_for_artifacts
@@ -807,22 +1227,39 @@ class MLflowSweepTracker:
                             if active_run:
                                 run_id_to_use = active_run.info.run_id
 
-                        if run_id_to_use:
-                            client.log_artifacts(
-                                run_id_to_use,
-                                str(checkpoint_dir),
-                                artifact_path="best_trial_checkpoint"
+                        if run_id_to_use and archive_path:
+                            def upload_archive_client():
+                                client.log_artifact(
+                                    run_id_to_use,
+                                    str(archive_path),
+                                    artifact_path="best_trial_checkpoint.tar.gz"
+                                )
+
+                            retry_with_backoff(
+                                upload_archive_client,
+                                max_retries=5,
+                                base_delay=2.0,
+                                operation_name="checkpoint archive upload (client)"
                             )
                             artifact_logged = True
                             logger.info(
-                                f"Logged best trial checkpoint to MLflow using client: trial {best_trial_number} "
-                                f"(path: {checkpoint_dir})"
+                                f"Logged best trial checkpoint archive using client: trial {best_trial_number}"
                             )
                         else:
                             raise ValueError("No MLflow run ID available")
                     except Exception as client_error:
                         logger.warning(
                             f"MLflow artifact logging failed: {client_error}")
+                finally:
+                    # Clean up temp archive file
+                    if archive_path and archive_path.exists():
+                        try:
+                            archive_path.unlink()
+                            logger.debug(
+                                f"Cleaned up temporary archive: {archive_path}")
+                        except Exception as cleanup_error:
+                            logger.warning(
+                                f"Could not clean up archive file: {cleanup_error}")
                         artifact_logged = False
 
             # Mark study as complete if checkpoint was successfully uploaded
@@ -929,6 +1366,12 @@ class MLflowBenchmarkTracker:
         run_name: str,
         backbone: str,
         benchmark_source: str = "final_training",
+        context: Optional[Any] = None,  # NamingContext
+        output_dir: Optional[Path] = None,
+        parent_run_id: Optional[str] = None,
+        group_id: Optional[str] = None,
+        study_key_hash: Optional[str] = None,
+        trial_key_hash: Optional[str] = None,
     ):
         """
         Start a MLflow run for benchmarking.
@@ -937,17 +1380,165 @@ class MLflowBenchmarkTracker:
             run_name: Name for the benchmark run.
             backbone: Model backbone name.
             benchmark_source: Source of benchmark ("hpo_trial" or "final_training").
+            context: Optional NamingContext for tag-based identification.
+            output_dir: Optional output directory for metadata persistence.
+            parent_run_id: Optional parent MLflow run ID.
+            group_id: Optional group/session identifier.
+            study_key_hash: Optional study key hash from HPO trial (for grouping tags).
+            trial_key_hash: Optional trial key hash from HPO trial (for grouping tags).
 
         Yields:
-            Active MLflow run context.
+            RunHandle with run information.
         """
         try:
             with mlflow.start_run(run_name=run_name) as benchmark_run:
-                # Set tags
-                mlflow.set_tag("benchmark_source", benchmark_source)
-                mlflow.set_tag("benchmarked_model", backbone)
-                mlflow.set_tag("mlflow.runType", "benchmark")
-                yield benchmark_run
+                run_id = benchmark_run.info.run_id
+                experiment_id = benchmark_run.info.experiment_id
+                tracking_uri = mlflow.get_tracking_uri()
+
+                # Infer config_dir from output_dir
+                config_dir = None
+                if output_dir:
+                    root_dir_for_config = output_dir.parent.parent if output_dir.parent.name == "outputs" else output_dir.parent.parent.parent
+                    config_dir = root_dir_for_config / "config" if root_dir_for_config else None
+
+                logger.info(
+                    f"[START_BENCHMARK_RUN] Building tags: context={context}, "
+                    f"study_key_hash={study_key_hash[:16] if study_key_hash else None}..., "
+                    f"trial_key_hash={trial_key_hash[:16] if trial_key_hash else None}..., "
+                    f"context.model={context.model if context else None}, "
+                    f"context.process_type={context.process_type if context else None}"
+                )
+
+                # Build and set tags atomically
+                tags = build_mlflow_tags(
+                    context=context,
+                    output_dir=output_dir,
+                    parent_run_id=parent_run_id,
+                    group_id=group_id,
+                    config_dir=config_dir,
+                    study_key_hash=study_key_hash,
+                    trial_key_hash=trial_key_hash,
+                )
+                
+                logger.info(
+                    f"[START_BENCHMARK_RUN] Built tags, grouping tags present: "
+                    f"study_key_hash={'code.study_key_hash' in tags}, "
+                    f"trial_key_hash={'code.trial_key_hash' in tags}, "
+                    f"code.model={tags.get('code.model')}, "
+                    f"code.stage={tags.get('code.stage')}"
+                )
+                # Add benchmark-specific tags
+                tags["benchmark_source"] = benchmark_source
+                tags["benchmarked_model"] = backbone
+                tags["mlflow.runType"] = "benchmark"
+                mlflow.set_tags(tags)
+                
+                # Commit reserved version if auto-increment was used
+                if context and run_name:
+                    try:
+                        import re
+                        from orchestration.jobs.tracking.mlflow_index import commit_run_name_version
+                        from orchestration.jobs.tracking.mlflow_naming import (
+                            build_mlflow_run_key,
+                            build_mlflow_run_key_hash,
+                            build_counter_key,
+                        )
+                        from orchestration.jobs.tracking.mlflow_config_loader import (
+                            get_naming_config,
+                            get_auto_increment_config,
+                        )
+                        
+                        # Check if auto-increment was used (run name has version suffix like _1, _2, etc.)
+                        version_match = re.search(r'_(\d+)$', run_name)
+                        if version_match:
+                            version = int(version_match.group(1))
+                            logger.info(
+                                f"[Benchmark Commit] Found version {version} in run name '{run_name}'"
+                            )
+                            
+                            # Check if auto-increment is enabled for benchmarking
+                            auto_inc_config = get_auto_increment_config(config_dir, "benchmarking")
+                            if auto_inc_config.get("enabled_for_process", False):
+                                # Rebuild counter_key from context
+                                run_key = build_mlflow_run_key(context)
+                                run_key_hash = build_mlflow_run_key_hash(run_key)
+                                naming_config = get_naming_config(config_dir)
+                                counter_key = build_counter_key(
+                                    naming_config.get("project_name", "resume-ner"),
+                                    "benchmarking",
+                                    run_key_hash,
+                                    context.environment or "",
+                                )
+                                
+                                # Infer root_dir from output_dir
+                                root_dir = None
+                                if output_dir:
+                                    current = output_dir
+                                    while current.name != "outputs" and current.parent != current:
+                                        current = current.parent
+                                    root_dir = current.parent if current.name == "outputs" else output_dir.parent.parent.parent
+                                
+                                if root_dir is None:
+                                    root_dir = Path.cwd()
+                                
+                                logger.info(
+                                    f"[Benchmark Commit] Committing version {version} for run {run_id[:12]}..., "
+                                    f"counter_key={counter_key[:50]}..."
+                                )
+                                
+                                commit_run_name_version(
+                                    counter_key, run_id, version, root_dir, config_dir
+                                )
+                                logger.info(
+                                    f"[Benchmark Commit] ✓ Successfully committed version {version} for benchmark run {run_id[:12]}..."
+                                )
+                            else:
+                                logger.info(
+                                    f"[Benchmark Commit] Auto-increment not enabled for benchmarking, skipping commit"
+                                )
+                        else:
+                            logger.info(
+                                f"[Benchmark Commit] No version pattern found in run name '{run_name}', "
+                                f"skipping commit (auto-increment may not have been used)"
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            f"[Benchmark Commit] ✗ Could not commit reserved version for benchmark run: {e}",
+                            exc_info=True
+                        )
+
+                # Build RunHandle
+                run_key = build_mlflow_run_key(context) if context else None
+                run_key_hash = build_mlflow_run_key_hash(
+                    run_key) if run_key else None
+
+                handle = RunHandle(
+                    run_id=run_id,
+                    run_key=run_key or "",
+                    run_key_hash=run_key_hash or "",
+                    experiment_id=experiment_id,
+                    experiment_name=self.experiment_name,
+                    tracking_uri=tracking_uri,
+                    artifact_uri=benchmark_run.info.artifact_uri,
+                )
+
+                # Update local index
+                if run_key_hash:
+                    try:
+                        root_dir = output_dir.parent.parent if output_dir else Path.cwd()
+                        update_mlflow_index(
+                            root_dir=root_dir,
+                            run_key_hash=run_key_hash,
+                            run_id=run_id,
+                            experiment_id=experiment_id,
+                            tracking_uri=tracking_uri,
+                            config_dir=config_dir,
+                        )
+                    except Exception as e:
+                        logger.debug(f"Could not update MLflow index: {e}")
+
+                yield handle
         except Exception as e:
             logger.warning(f"MLflow tracking failed: {e}")
             logger.warning(
@@ -1145,6 +1736,10 @@ class MLflowTrainingTracker:
         run_name: str,
         backbone: str,
         training_type: str = "final",
+        context: Optional[Any] = None,  # NamingContext
+        output_dir: Optional[Path] = None,
+        parent_run_id: Optional[str] = None,
+        group_id: Optional[str] = None,
     ):
         """
         Start a MLflow run for training.
@@ -1153,16 +1748,101 @@ class MLflowTrainingTracker:
             run_name: Name for the training run.
             backbone: Model backbone name.
             training_type: Type of training ("final" or "continued").
+            context: Optional NamingContext for tag-based identification.
+            output_dir: Optional output directory for metadata persistence.
+            parent_run_id: Optional parent MLflow run ID.
+            group_id: Optional group/session identifier.
 
         Yields:
-            Active MLflow run context.
+            RunHandle with run information.
         """
         try:
             with mlflow.start_run(run_name=run_name) as training_run:
-                # Set tags
-                mlflow.set_tag("mlflow.runType", "training")
-                mlflow.set_tag("training_type", training_type)
-                yield training_run
+                run_id = training_run.info.run_id
+                experiment_id = training_run.info.experiment_id
+                tracking_uri = mlflow.get_tracking_uri()
+
+                # Infer config_dir from output_dir
+                config_dir = None
+                if output_dir:
+                    root_dir_for_config = output_dir.parent.parent if output_dir.parent.name == "outputs" else output_dir.parent.parent.parent
+                    config_dir = root_dir_for_config / "config" if root_dir_for_config else None
+
+                # Build and set tags atomically
+                tags = build_mlflow_tags(
+                    context=context,
+                    output_dir=output_dir,
+                    parent_run_id=parent_run_id,
+                    group_id=group_id,
+                    config_dir=config_dir,
+                )
+                # Add training-specific tags
+                tags["mlflow.runType"] = "training"
+                tags["training_type"] = training_type
+                mlflow.set_tags(tags)
+
+                # Build RunHandle
+                run_key = build_mlflow_run_key(context) if context else None
+                run_key_hash = build_mlflow_run_key_hash(
+                    run_key) if run_key else None
+
+                handle = RunHandle(
+                    run_id=run_id,
+                    run_key=run_key or "",
+                    run_key_hash=run_key_hash or "",
+                    experiment_id=experiment_id,
+                    experiment_name=self.experiment_name,
+                    tracking_uri=tracking_uri,
+                    artifact_uri=training_run.info.artifact_uri,
+                )
+
+                # Update local index
+                if run_key_hash:
+                    try:
+                        root_dir = output_dir.parent.parent if output_dir else Path.cwd()
+                        update_mlflow_index(
+                            root_dir=root_dir,
+                            run_key_hash=run_key_hash,
+                            run_id=run_id,
+                            experiment_id=experiment_id,
+                            tracking_uri=tracking_uri,
+                            config_dir=config_dir,
+                        )
+                    except Exception as e:
+                        logger.debug(f"Could not update MLflow index: {e}")
+
+                # Save MLflow run info to metadata.json if context and output_dir are available
+                if context and output_dir and config_dir:
+                    try:
+                        from orchestration.metadata_manager import save_metadata_with_fingerprints
+
+                        # Build root_dir from output_dir
+                        root_dir = output_dir.parent.parent if output_dir.parent.name == "outputs" else output_dir.parent.parent.parent
+                        if not root_dir or not root_dir.exists():
+                            root_dir = Path.cwd()
+
+                        # Save MLflow run information to metadata
+                        mlflow_info = {
+                            "run_id": run_id,
+                            "experiment_id": experiment_id,
+                            "tracking_uri": tracking_uri,
+                            "run_key": run_key,
+                            "run_key_hash": run_key_hash,
+                        }
+
+                        save_metadata_with_fingerprints(
+                            root_dir=root_dir,
+                            config_dir=config_dir,
+                            context=context,
+                            metadata_content={"mlflow": mlflow_info},
+                        )
+                        logger.debug(
+                            f"Saved MLflow run info to metadata for run {run_id[:12]}...")
+                    except Exception as e:
+                        logger.debug(
+                            f"Could not save MLflow run info to metadata: {e}")
+
+                yield handle
         except Exception as e:
             logger.warning(f"MLflow tracking failed: {e}")
             logger.warning("Continuing training without MLflow tracking...")
@@ -1446,17 +2126,74 @@ class MLflowConversionTracker:
         run_name: str,
         conversion_type: str,
         source_training_run: Optional[str] = None,
+        context: Optional[Any] = None,
+        output_dir: Optional[Path] = None,
+        parent_run_id: Optional[str] = None,
+        group_id: Optional[str] = None,
     ):
         """
         Start a MLflow run for model conversion.
         """
         try:
             with mlflow.start_run(run_name=run_name) as conversion_run:
-                mlflow.set_tag("conversion_type", conversion_type)
-                mlflow.set_tag("mlflow.runType", "conversion")
+                run_id = conversion_run.info.run_id
+                experiment_id = conversion_run.info.experiment_id
+                tracking_uri = mlflow.get_tracking_uri()
+
+                # Infer config_dir from output_dir
+                config_dir = None
+                if output_dir:
+                    if output_dir.parent.name == "outputs":
+                        root_dir_for_config = output_dir.parent.parent
+                    else:
+                        root_dir_for_config = output_dir.parent.parent.parent
+                    config_dir = root_dir_for_config / "config"
+
+                tags = build_mlflow_tags(
+                    context=context,
+                    output_dir=output_dir,
+                    parent_run_id=parent_run_id or source_training_run,
+                    group_id=group_id,
+                    config_dir=config_dir,
+                )
+                tags["conversion_type"] = conversion_type
+                tags["mlflow.runType"] = "conversion"
                 if source_training_run:
-                    mlflow.set_tag("source_training_run", source_training_run)
-                yield conversion_run
+                    tags["source_training_run"] = source_training_run
+                mlflow.set_tags(tags)
+
+                run_key = build_mlflow_run_key(context) if context else None
+                run_key_hash = (
+                    build_mlflow_run_key_hash(run_key) if run_key else None
+                )
+
+                handle = RunHandle(
+                    run_id=run_id,
+                    run_key=run_key or "",
+                    run_key_hash=run_key_hash or "",
+                    experiment_id=experiment_id,
+                    experiment_name=self.experiment_name,
+                    tracking_uri=tracking_uri,
+                    artifact_uri=conversion_run.info.artifact_uri,
+                )
+
+                if run_key_hash:
+                    try:
+                        root_dir = (
+                            output_dir.parent.parent if output_dir else Path.cwd()
+                        )
+                        update_mlflow_index(
+                            root_dir=root_dir,
+                            run_key_hash=run_key_hash,
+                            run_id=run_id,
+                            experiment_id=experiment_id,
+                            tracking_uri=tracking_uri,
+                            config_dir=config_dir,
+                        )
+                    except Exception as e:
+                        logger.debug(f"Could not update MLflow index: {e}")
+
+                yield handle
         except Exception as e:
             logger.warning(f"MLflow tracking failed: {e}")
             logger.warning("Continuing conversion without MLflow tracking...")
@@ -1502,8 +2239,12 @@ class MLflowConversionTracker:
                 mlflow.log_metric("onnx_model_size_mb", model_size_mb)
 
                 if original_checkpoint_size:
-                    compression_ratio = original_checkpoint_size / model_size_mb
-                    mlflow.log_metric("compression_ratio", compression_ratio)
+                    compression_ratio = (
+                        original_checkpoint_size / model_size_mb
+                    )
+                    mlflow.log_metric(
+                        "compression_ratio", compression_ratio
+                    )
 
             if smoke_test_passed is not None:
                 mlflow.log_metric(
@@ -1519,21 +2260,26 @@ class MLflowConversionTracker:
                     active_run = mlflow.active_run()
                     if not active_run:
                         raise ValueError(
-                            "No active MLflow run for artifact logging")
+                            "No active MLflow run for artifact logging"
+                        )
 
                     run_id = active_run.info.run_id
 
-                    from azureml.core import Run as AzureMLRun
                     from azureml.core import Workspace
                     import os
+                    import time
+                    import re
 
                     workspace = None
                     try:
                         workspace = Workspace.from_config()
                     except Exception:
                         subscription_id = os.environ.get(
-                            "AZURE_SUBSCRIPTION_ID")
-                        resource_group = os.environ.get("AZURE_RESOURCE_GROUP")
+                            "AZURE_SUBSCRIPTION_ID"
+                        )
+                        resource_group = os.environ.get(
+                            "AZURE_RESOURCE_GROUP"
+                        )
                         workspace_name = os.environ.get(
                             "AZURE_WORKSPACE_NAME",
                             "resume-ner-ws",
@@ -1559,42 +2305,72 @@ class MLflowConversionTracker:
                             and "azureml://" in mlflow_run_data.info.artifact_uri
                             and "/runs/" in mlflow_run_data.info.artifact_uri
                         ):
-                            import re
-                            run_id_match = re.search(
+                            match = re.search(
                                 r"/runs/([^/]+)",
                                 mlflow_run_data.info.artifact_uri,
                             )
-                            if run_id_match:
-                                azureml_run_id_from_uri = run_id_match.group(1)
+                            if match:
                                 azureml_run = workspace.get_run(
-                                    azureml_run_id_from_uri
+                                    match.group(1)
                                 )
 
                         if azureml_run:
                             if onnx_model_path and onnx_model_path.exists():
                                 artifact_name = onnx_model_path.name
                                 file_path = onnx_model_path.resolve()
-                                try:
-                                    azureml_run.upload_file(
-                                        name=artifact_name,
-                                        path_or_stream=str(file_path),
-                                    )
-                                except Exception as upload_err:
-                                    error_msg = str(upload_err).lower()
-                                    if (
-                                        "already exists" not in error_msg
-                                        and "resource conflict" not in error_msg
-                                    ):
-                                        logger.warning(
-                                            f"Failed to upload {artifact_name}: {upload_err}"
-                                        )
 
-                            if conversion_log_path and conversion_log_path.exists():
-                                file_path = conversion_log_path.resolve()
+                                max_retries = 3
+                                retry_delays = [2.0, 5.0, 10.0]
+
+                                for attempt in range(max_retries):
+                                    try:
+                                        azureml_run.upload_file(
+                                            name=artifact_name,
+                                            path_or_stream=str(file_path),
+                                        )
+                                        if attempt > 0:
+                                            logger.info(
+                                                f"Successfully uploaded "
+                                                f"{artifact_name} after "
+                                                f"{attempt + 1} attempts"
+                                            )
+                                        break
+                                    except Exception as upload_err:
+                                        error_msg = str(upload_err).lower()
+
+                                        if (
+                                            "already exists" in error_msg
+                                            or "resource conflict" in error_msg
+                                        ):
+                                            break
+
+                                        if attempt < max_retries - 1:
+                                            delay = retry_delays[attempt]
+                                            logger.warning(
+                                                f"Upload attempt {attempt + 1}/"
+                                                f"{max_retries} failed for "
+                                                f"{artifact_name}: {upload_err}. "
+                                                f"Retrying in {delay}s..."
+                                            )
+                                            time.sleep(delay)
+                                        else:
+                                            logger.warning(
+                                                f"Failed to upload "
+                                                f"{artifact_name} after "
+                                                f"{max_retries} attempts: "
+                                                f"{upload_err}"
+                                            )
+
+                            if (
+                                conversion_log_path
+                                and conversion_log_path.exists()
+                            ):
                                 try:
                                     azureml_run.upload_file(
                                         name="conversion_log.txt",
-                                        path_or_stream=str(file_path),
+                                        path_or_stream=str(
+                                            conversion_log_path.resolve()
+                                        ),
                                     )
                                 except Exception as upload_err:
                                     error_msg = str(upload_err).lower()
@@ -1603,25 +2379,30 @@ class MLflowConversionTracker:
                                         and "resource conflict" not in error_msg
                                     ):
                                         logger.warning(
-                                            f"Failed to upload conversion_log.txt: {upload_err}"
+                                            "Failed to upload "
+                                            f"conversion_log.txt: {upload_err}"
                                         )
                         else:
                             logger.warning(
-                                "Could not find Azure ML run for conversion artifact upload"
+                                "Could not find Azure ML run for conversion "
+                                "artifact upload"
                             )
                     else:
                         logger.warning(
-                            "Could not get Azure ML workspace for conversion artifact upload"
+                            "Could not get Azure ML workspace for conversion "
+                            "artifact upload"
                         )
                 except Exception as azureml_err:
                     logger.warning(
-                        f"Failed to upload conversion artifacts to Azure ML: {azureml_err}"
+                        "Failed to upload conversion artifacts to Azure ML: "
+                        f"{azureml_err}"
                     )
             else:
                 if onnx_model_path and onnx_model_path.exists():
                     artifact_name = onnx_model_path.name
                     max_retries = 3
                     retry_delay = 2
+
                     for attempt in range(max_retries):
                         try:
                             mlflow.log_artifact(
@@ -1631,8 +2412,9 @@ class MLflowConversionTracker:
                             break
                         except Exception as upload_err:
                             if attempt < max_retries - 1:
-                                wait_time = retry_delay * (2 ** attempt)
-                                time.sleep(wait_time)
+                                time.sleep(
+                                    retry_delay * (2 ** attempt)
+                                )
                             else:
                                 logger.warning(
                                     f"Failed to upload {artifact_name} after "
@@ -1642,6 +2424,7 @@ class MLflowConversionTracker:
                 if conversion_log_path and conversion_log_path.exists():
                     max_retries = 3
                     retry_delay = 2
+
                     for attempt in range(max_retries):
                         try:
                             mlflow.log_artifact(
@@ -1651,12 +2434,15 @@ class MLflowConversionTracker:
                             break
                         except Exception as upload_err:
                             if attempt < max_retries - 1:
-                                wait_time = retry_delay * (2 ** attempt)
-                                time.sleep(wait_time)
+                                time.sleep(
+                                    retry_delay * (2 ** attempt)
+                                )
                             else:
                                 logger.warning(
                                     "Failed to upload conversion_log.txt after "
                                     f"{max_retries} attempts: {upload_err}"
                                 )
         except Exception as e:
-            logger.warning(f"Could not log conversion results to MLflow: {e}")
+            logger.warning(
+                f"Could not log conversion results to MLflow: {e}"
+            )

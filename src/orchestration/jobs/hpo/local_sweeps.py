@@ -297,6 +297,8 @@ def run_training_trial_with_cv(
     fold_splits: List[Tuple[List[int], List[int]]],
     fold_splits_file: Path,
     hpo_parent_run_id: Optional[str] = None,
+    study_key_hash: Optional[str] = None,
+    study_family_hash: Optional[str] = None,
 ) -> Tuple[float, List[float]]:
     """
     Run training trial with k-fold cross-validation.
@@ -317,6 +319,8 @@ def run_training_trial_with_cv(
         fold_splits: List of (train_indices, val_indices) tuples for each fold.
         fold_splits_file: Path to file containing fold splits (for train.py).
         hpo_parent_run_id: Optional HPO parent run ID to create trial run as child.
+        study_key_hash: Optional study key hash from parent run (for grouping tags).
+        study_family_hash: Optional study family hash from parent run (for grouping tags).
 
     Returns:
         Tuple of (average_metric, fold_metrics) where:
@@ -363,12 +367,59 @@ def run_training_trial_with_cv(
                     # Build systematic run name
                     run_name = build_mlflow_run_name(trial_context, config_dir)
 
-                    # Build tags including project identity tags
+                    # Extract hyperparameters (excluding metadata fields)
+                    hyperparameters = {
+                        k: v for k, v in trial_params.items()
+                        if k not in ("backbone", "trial_number", "run_id")
+                    }
+                    
+                    # Compute trial_key_hash if study_key and hyperparameters available
+                    trial_key_hash = None
+                    # Try to get study_key from parent run tags (needed for trial_key computation)
+                    study_key = None
+                    if hpo_parent_run_id:
+                        try:
+                            import mlflow
+                            client = mlflow.tracking.MlflowClient()
+                            parent_run = client.get_run(hpo_parent_run_id)
+                            study_key = parent_run.data.tags.get("code.study_key")
+                            if not study_key and study_key_hash:
+                                logger.warning(
+                                    f"study_key not found in parent run tags, cannot compute trial_key_hash. "
+                                    f"Parent run may have been created before study_key storage was added."
+                                )
+                        except Exception as e:
+                            logger.debug(f"Could not retrieve study_key from parent run: {e}")
+                    
+                    if study_key and hyperparameters:
+                        try:
+                            from orchestration.jobs.tracking.mlflow_naming import (
+                                build_hpo_trial_key,
+                                build_hpo_trial_key_hash,
+                            )
+                            trial_key = build_hpo_trial_key(study_key, hyperparameters)
+                            trial_key_hash = build_hpo_trial_key_hash(trial_key)
+                            logger.info(
+                                f"[Trial Run] Computed trial_key_hash={trial_key_hash[:16]}... "
+                                f"from study_key and hyperparameters"
+                            )
+                        except Exception as e:
+                            logger.warning(f"Could not compute trial_key_hash: {e}", exc_info=True)
+                    elif study_key_hash and not study_key:
+                        logger.debug(
+                            f"[Trial Run] Cannot compute trial_key_hash: have study_key_hash but not study_key. "
+                            f"Trial runs created after parent run stores study_key will have this tag."
+                        )
+                    
+                    # Build tags including project identity tags and grouping tags
                     from orchestration.jobs.tracking.mlflow_naming import build_mlflow_tags
                     trial_tags = build_mlflow_tags(
                         context=trial_context,
                         output_dir=output_dir,
                         config_dir=config_dir,
+                        study_key_hash=study_key_hash,
+                        study_family_hash=study_family_hash,
+                        hyperparameters=hyperparameters,
                     )
                     # Merge with trial-specific tags
                     trial_tags.update({
@@ -568,10 +619,20 @@ def create_local_hpo_objective(
 
         # Get HPO parent run ID for nested structure (trial -> folds)
         hpo_parent_run_id = None
+        study_key_hash = None
+        study_family_hash = None
         try:
             active_run = mlflow.active_run()
             if active_run:
                 hpo_parent_run_id = active_run.info.run_id
+                # Get grouping tags from parent run
+                try:
+                    client = mlflow.tracking.MlflowClient()
+                    parent_run = client.get_run(hpo_parent_run_id)
+                    study_key_hash = parent_run.data.tags.get("code.study_key_hash")
+                    study_family_hash = parent_run.data.tags.get("code.study_family_hash")
+                except Exception as e:
+                    logger.debug(f"Could not get grouping tags from parent run: {e}")
         except Exception:
             pass
 
@@ -590,6 +651,8 @@ def create_local_hpo_objective(
                 fold_splits=fold_splits,
                 fold_splits_file=fold_splits_file,
                 hpo_parent_run_id=hpo_parent_run_id,  # Pass HPO parent to create trial run
+                study_key_hash=study_key_hash,  # Pass grouping tags
+                study_family_hash=study_family_hash,
             )
 
             # Log CV statistics to trial user attributes
@@ -987,6 +1050,8 @@ def run_local_hpo_sweep(
     fold_splits_file: Optional[Path] = None,
     checkpoint_config: Optional[Dict[str, Any]] = None,
     restore_from_drive: Optional[Callable[[Path], bool]] = None,
+    data_config: Optional[Dict[str, Any]] = None,
+    benchmark_config: Optional[Dict[str, Any]] = None,
 ) -> Any:
     """
     Run a local hyperparameter optimization sweep using Optuna.
@@ -1005,6 +1070,8 @@ def run_local_hpo_sweep(
                           'storage_path', and 'auto_resume' keys.
         restore_from_drive: Optional function to restore checkpoint from Drive if missing.
                           Function should take a Path and return bool (True if restored).
+        data_config: Optional data configuration dictionary (for grouping tags).
+        benchmark_config: Optional benchmark configuration dictionary (for grouping tags).
 
     Returns:
         Optuna study object with completed trials.
@@ -1321,10 +1388,32 @@ def run_local_hpo_sweep(
             trial_id=study_name,
         )
 
-        config_dir = output_dir.parent.parent / "config" if output_dir else None
-        root_dir = output_dir.parent.parent if output_dir else Path.cwd()
+        # Infer root_dir from output_dir by finding the "outputs" directory
+        root_dir = None
+        if output_dir:
+            current = output_dir
+            while current.name != "outputs" and current.parent != current:
+                current = current.parent
+            root_dir = current.parent if current.name == "outputs" else output_dir.parent.parent.parent
+        
+        if root_dir is None:
+            root_dir = Path.cwd()
+        
+        # config_dir is inferred in build_mlflow_run_name, but we can set it explicitly here
+        config_dir = root_dir / "config" if root_dir else None
+        
+        logger.info(
+            f"[HPO Parent Run] Building MLflow run name: "
+            f"output_dir={output_dir}, inferred_root_dir={root_dir}, config_dir={config_dir}, "
+            f"trial_id={hpo_parent_context.trial_id if hpo_parent_context else None}"
+        )
+        
         mlflow_run_name = build_mlflow_run_name(
             hpo_parent_context, config_dir, root_dir=root_dir, output_dir=output_dir
+        )
+        
+        logger.info(
+            f"[HPO Parent Run] Generated MLflow run name: {mlflow_run_name}"
         )
     except Exception as e:
         logger.debug(
@@ -1356,6 +1445,8 @@ def run_local_hpo_sweep(
             checkpoint_config=checkpoint_config,
             storage_path=storage_path,
             should_resume=should_resume,
+            data_config=data_config,
+            benchmark_config=benchmark_config,
         ) as parent_run:
 
             parent_run_handle = parent_run
@@ -1376,10 +1467,13 @@ def run_local_hpo_sweep(
                     )
                     from orchestration.jobs.tracking.mlflow_index import commit_run_name_version
 
-                    # Check if auto-increment was used (run name has version suffix like .{number})
-                    version_match = re.search(r'\.(\d+)$', mlflow_run_name)
+                    # Check if auto-increment was used (run name has version suffix like _1, _2, etc.)
+                    version_match = re.search(r'_(\d+)$', mlflow_run_name)
                     if version_match:
                         version = int(version_match.group(1))
+                        logger.info(
+                            f"[HPO Commit] Found version {version} in run name '{mlflow_run_name}'"
+                        )
                         
                         # Check if auto-increment is enabled for HPO
                         auto_inc_config = get_auto_increment_config(config_dir, "hpo")
@@ -1395,16 +1489,31 @@ def run_local_hpo_sweep(
                                 hpo_parent_context.environment or "",
                             )
                             
+                            logger.info(
+                                f"[HPO Commit] Committing version {version} for run {parent_run_id[:12]}..., "
+                                f"counter_key={counter_key[:50]}..."
+                            )
+                            
                             # Commit the reserved version
                             commit_run_name_version(
                                 counter_key, parent_run_id, version, root_dir, config_dir
                             )
-                            logger.debug(
-                                f"Committed version {version} for HPO parent run {parent_run_id[:12]}..."
+                            logger.info(
+                                f"[HPO Commit] ✓ Successfully committed version {version} for HPO parent run {parent_run_id[:12]}..."
                             )
+                        else:
+                            logger.info(
+                                f"[HPO Commit] Auto-increment not enabled for HPO, skipping commit"
+                            )
+                    else:
+                        logger.info(
+                            f"[HPO Commit] No version pattern found in run name '{mlflow_run_name}', "
+                            f"skipping commit (auto-increment may not have been used)"
+                        )
                 except Exception as e:
                     logger.warning(
-                        f"Could not commit reserved version for HPO parent run: {e}"
+                        f"[HPO Commit] ✗ Could not commit reserved version for HPO parent run: {e}",
+                        exc_info=True
                     )
 
             # Cleanup: Tag interrupted runs from previous sessions
