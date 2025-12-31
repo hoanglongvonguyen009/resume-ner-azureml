@@ -47,3 +47,45 @@ tracking:
     log_onnx_model: true  # Log converted ONNX model as artifact
     log_conversion_log: true  # Log conversion log file as artifact (if available)
 
+# Systematic Naming Configuration
+# Settings for tag-based run identification and naming
+naming:
+  # Project identifier for tag namespace
+  # Used in code.project tag to avoid collisions in shared MLflow servers
+  project_name: "resume-ner"
+  
+  # Tag configuration
+  tags:
+    max_length: 250  # MLflow tag value max length (MLflow limit is typically 250-500 chars)
+    sanitize: true   # Enable tag sanitization for backend compatibility (ASCII, trim, etc.)
+  
+  # Run name configuration
+  # Run names are human-readable display names (may be overridden by Azure ML)
+  run_name:
+    max_length: 100  # Recommended max for readability (not enforced, just guidance)
+    shorten_fingerprints: true  # Shorten spec_fp/exec_fp in run names for readability
+    
+    # Auto-increment configuration
+    # Enables atomic version numbering for run names (prevents race conditions)
+    auto_increment:
+      enabled: false  # Global toggle (default: false for backward compatibility)
+      processes:
+        hpo: true  # Enable auto-increment for HPO run names
+        benchmarking: true  # Enable auto-increment for benchmarking run names
+      # Format: base.{version} (e.g., "hpo_distilbert_smoke_test_3.1", "benchmark_distilbert.1")
+      format: "{base}.{version}"
+
+# Index Cache Configuration
+# Local cache for fast run retrieval (run_key_hash -> run_id mapping)
+index:
+  enabled: true  # Enable local index cache (set to false to disable)
+  max_entries: 1000  # Maximum entries before LRU eviction
+  file_name: "mlflow_index.json"  # Index file name in cache directory (outputs/cache/)
+
+# Run Finder Configuration
+# Settings for MLflow run retrieval behavior
+run_finder:
+  strict_mode_default: true  # Default strict mode (fail loud vs. weak fallbacks)
+  # When strict=True: Only use reliable retrieval methods, fail if run not found
+  # When strict=False: Allow weak fallbacks (may attach to wrong run)
+

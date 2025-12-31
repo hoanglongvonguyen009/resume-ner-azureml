@@ -333,20 +333,83 @@ def run_training_trial_with_cv(
                 experiment_id = active_run.info.experiment_id
                 trial_number = trial_params.get("trial_number", "unknown")
 
-                # Create trial run as child of HPO parent
-                trial_run = client.create_run(
-                    experiment_id=experiment_id,
-                    tags={
+                # Build systematic run name using NamingContext
+                run_name = None
+                try:
+                    from orchestration.naming_centralized import create_naming_context
+                    from orchestration.jobs.tracking.mlflow_naming import build_mlflow_run_name
+                    from shared.platform_detection import detect_platform
+
+                    # Extract backbone short name
+                    backbone_full = trial_params.get("backbone", "unknown")
+                    backbone_short = backbone_full.split(
+                        "-")[0] if "-" in backbone_full else backbone_full
+
+                    # Build trial_id from trial_number and run_id if available
+                    run_id = trial_params.get("run_id")
+                    if run_id:
+                        trial_id = f"trial_{trial_number}_{run_id}"
+                    else:
+                        trial_id = f"trial_{trial_number}"
+
+                    # Create NamingContext for HPO trial
+                    trial_context = create_naming_context(
+                        process_type="hpo",
+                        model=backbone_short,
+                        environment=detect_platform(),
+                        trial_id=trial_id,
+                    )
+
+                    # Build systematic run name
+                    run_name = build_mlflow_run_name(trial_context, config_dir)
+
+                    # Build tags including project identity tags
+                    from orchestration.jobs.tracking.mlflow_naming import build_mlflow_tags
+                    trial_tags = build_mlflow_tags(
+                        context=trial_context,
+                        output_dir=output_dir,
+                        config_dir=config_dir,
+                    )
+                    # Merge with trial-specific tags
+                    trial_tags.update({
                         "mlflow.parentRunId": hpo_parent_run_id,
                         "azureml.runType": "trial",
                         "azureml.trial": "true",
                         "trial_number": str(trial_number),
-                    },
-                    run_name=f"trial_{trial_number}"
+                    })
+                except Exception as e:
+                    logger.warning(
+                        f"Could not build systematic run name and tags: {e}, using fallback")
+                    # Fallback to simple name
+                    run_name = f"trial_{trial_number}"
+                    # Fallback to minimal tags - still try to get project name from config
+                    try:
+                        from orchestration.jobs.tracking.mlflow_config_loader import get_naming_config
+                        naming_config = get_naming_config(config_dir)
+                        project_name = naming_config.get(
+                            "project_name", "resume-ner")
+                    except Exception:
+                        project_name = "resume-ner"
+                    trial_tags = {
+                        "mlflow.parentRunId": hpo_parent_run_id,
+                        "azureml.runType": "trial",
+                        "azureml.trial": "true",
+                        "trial_number": str(trial_number),
+                        "code.project": project_name,  # Always include project identity
+                    }
+
+                # Create trial run as child of HPO parent
+                trial_run = client.create_run(
+                    experiment_id=experiment_id,
+                    tags=trial_tags,
+                    run_name=run_name
                 )
                 trial_run_id = trial_run.info.run_id
-                logger.debug(
-                    f"Created trial run: {trial_run_id[:12]}... (trial {trial_number})")
+
+                # DO NOT mark trial run as FINISHED here - it should remain RUNNING until all folds complete
+                # The run will be used by training subprocesses and marked as FINISHED after all folds complete
+                logger.info(
+                    f"[TRIAL_RUN_CV] Created trial run (CV): {trial_run_id[:12]}... (trial {trial_number}). Run remains RUNNING until all folds complete.")
         except Exception as e:
             logger.warning(f"Could not create trial run: {e}")
             # Continue without trial run - folds will be children of HPO parent
@@ -396,11 +459,13 @@ def run_training_trial_with_cv(
                 if param_name not in ["trial_number", "run_id", "backbone"]:
                     client.log_param(trial_run_id, param_name, param_value)
 
-            # End the trial run to mark it as completed
+            # End the trial run to mark it as completed (CV case - after all folds complete)
+            trial_number = trial_params.get('trial_number', 'unknown')
+            logger.info(
+                f"[TRIAL_RUN_CV] All folds completed. Marking trial run {trial_run_id[:12]}... as FINISHED (trial {trial_number})")
             client.set_terminated(trial_run_id, status="FINISHED")
-
-            logger.debug(
-                f"Logged aggregated metrics to trial run: {trial_run_id[:12]}... and marked as completed")
+            logger.info(
+                f"[TRIAL_RUN_CV] Successfully marked trial run {trial_run_id[:12]}... as FINISHED")
         except Exception as e:
             logger.warning(f"Could not log metrics to trial run: {e}")
 
@@ -483,6 +548,9 @@ def create_local_hpo_objective(
                 }
             )
 
+    # Capture run_id in closure to avoid UnboundLocalError
+    captured_run_id = run_id
+
     def objective(trial: Any) -> float:
         # Sample hyperparameters
         # Exclude "backbone" from search space since it's fixed per study
@@ -491,7 +559,8 @@ def create_local_hpo_objective(
         # Set the fixed backbone for this study
         trial_params["backbone"] = backbone
         trial_params["trial_number"] = trial.number
-        trial_params["run_id"] = run_id  # Pass run_id to trial functions
+        # Pass run_id to trial functions (use captured value from outer scope)
+        trial_params["run_id"] = captured_run_id
 
         # Don't create child runs in parent process - let subprocess create them
         # This avoids issues with ended runs and ensures training logs to the correct run
@@ -532,6 +601,100 @@ def create_local_hpo_objective(
             metric_value = average_metric
         else:
             # Run single training (no CV)
+            # Create trial-level run as child of HPO parent for consistency
+            # This ensures trial runs are properly linked and can be found later
+            trial_run_id_for_no_cv = None
+            if hpo_parent_run_id:
+                try:
+                    client = mlflow.tracking.MlflowClient()
+                    active_run = mlflow.active_run()
+                    if active_run:
+                        experiment_id = active_run.info.experiment_id
+                        trial_number = trial_params.get(
+                            "trial_number", "unknown")
+
+                        # Build systematic run name using NamingContext
+                        run_name = None
+                        try:
+                            from orchestration.naming_centralized import create_naming_context
+                            from orchestration.jobs.tracking.mlflow_naming import build_mlflow_run_name
+                            from shared.platform_detection import detect_platform
+
+                            # Extract backbone short name
+                            backbone_full = trial_params.get(
+                                "backbone", "unknown")
+                            backbone_short = backbone_full.split(
+                                "-")[0] if "-" in backbone_full else backbone_full
+
+                            # Build trial_id from trial_number and run_id if available
+                            run_id = trial_params.get("run_id")
+                            if run_id:
+                                trial_id = f"trial_{trial_number}_{run_id}"
+                            else:
+                                trial_id = f"trial_{trial_number}"
+
+                            # Create NamingContext for HPO trial
+                            trial_context = create_naming_context(
+                                process_type="hpo",
+                                model=backbone_short,
+                                environment=detect_platform(),
+                                trial_id=trial_id,
+                            )
+
+                            # Build systematic run name
+                            run_name = build_mlflow_run_name(
+                                trial_context, config_dir)
+
+                            # Build tags including project identity tags
+                            from orchestration.jobs.tracking.mlflow_naming import build_mlflow_tags
+                            trial_tags = build_mlflow_tags(
+                                context=trial_context,
+                                output_dir=output_base_dir,
+                                config_dir=config_dir,
+                            )
+                            # Merge with trial-specific tags
+                            trial_tags.update({
+                                "mlflow.parentRunId": hpo_parent_run_id,
+                                "azureml.runType": "trial",
+                                "azureml.trial": "true",
+                                "trial_number": str(trial_number),
+                            })
+                        except Exception as e:
+                            logger.warning(
+                                f"Could not build systematic run name and tags (no CV): {e}, using fallback")
+                            # Fallback to simple name
+                            run_name = f"trial_{trial_number}"
+                            # Fallback to minimal tags - still try to get project name from config
+                            try:
+                                from orchestration.jobs.tracking.mlflow_config_loader import get_naming_config
+                                naming_config = get_naming_config(config_dir)
+                                project_name = naming_config.get(
+                                    "project_name", "resume-ner")
+                            except Exception:
+                                project_name = "resume-ner"
+                            trial_tags = {
+                                "mlflow.parentRunId": hpo_parent_run_id,
+                                "azureml.runType": "trial",
+                                "azureml.trial": "true",
+                                "trial_number": str(trial_number),
+                                "code.project": project_name,  # Always include project identity
+                            }
+
+                        # Create trial run as child of HPO parent
+                        trial_run = client.create_run(
+                            experiment_id=experiment_id,
+                            tags=trial_tags,
+                            run_name=run_name
+                        )
+                        trial_run_id_for_no_cv = trial_run.info.run_id
+
+                        # DO NOT mark trial run as FINISHED here - it should remain RUNNING until training completes
+                        # The run will be used by training subprocess and marked as FINISHED after training completes
+                        logger.info(
+                            f"[TRIAL_RUN_NO_CV] Created trial run (no CV): {trial_run_id_for_no_cv[:12]}... (trial {trial_number}). Run remains RUNNING until training completes.")
+                except Exception as e:
+                    logger.warning(f"Could not create trial run (no CV): {e}")
+
             metric_value = run_training_trial(
                 trial_params=trial_params,
                 dataset_path=dataset_path,
@@ -541,13 +704,27 @@ def create_local_hpo_objective(
                 train_config=train_config,
                 mlflow_experiment_name=mlflow_experiment_name,
                 objective_metric=objective_metric,
+                parent_run_id=trial_run_id_for_no_cv if trial_run_id_for_no_cv else hpo_parent_run_id,
             )
+
+            # Mark trial run as FINISHED after training completes (no CV case)
+            if trial_run_id_for_no_cv:
+                try:
+                    logger.info(
+                        f"[TRIAL_RUN_NO_CV] Training completed. Marking trial run {trial_run_id_for_no_cv[:12]}... as FINISHED (trial {trial_number})")
+                    client = mlflow.tracking.MlflowClient()
+                    client.set_terminated(
+                        trial_run_id_for_no_cv, status="FINISHED")
+                    logger.info(
+                        f"[TRIAL_RUN_NO_CV] Successfully marked trial run {trial_run_id_for_no_cv[:12]}... as FINISHED")
+                except Exception as e:
+                    logger.warning(
+                        f"[TRIAL_RUN_NO_CV] Could not mark trial run as FINISHED: {e}")
 
         # Store additional metrics in trial user attributes for callback display
         # Try to read full metrics from the trial output directory
-        # Use run_id from closure (parameter) - it was set in trial_params at line 432
-        # Use closure variable directly to avoid UnboundLocalError
-        run_suffix = f"_{run_id}" if run_id else ""
+        # Use captured_run_id from closure to avoid UnboundLocalError
+        run_suffix = f"_{captured_run_id}" if captured_run_id else ""
         if fold_splits is not None:
             # CV: read from last fold's output (fold indices are 0-based, so last is len(fold_splits)-1)
             # Fold output directory format: trial_{number}_{run_id}_fold{fold_idx}
@@ -600,7 +777,7 @@ def create_local_hpo_objective(
             # Helper function to get checkpoint paths for a trial
             def get_checkpoint_paths(trial_num: int) -> List[Path]:
                 """Get all checkpoint paths for a trial (all folds for CV, single for non-CV)."""
-                run_suffix = f"_{run_id}" if run_id else ""
+                run_suffix = f"_{captured_run_id}" if captured_run_id else ""
                 paths = []
                 if fold_splits is not None:
                     # CV: get checkpoints from all folds
@@ -1007,6 +1184,17 @@ def run_local_hpo_sweep(
     # Print it here for user visibility
     logger.debug(f"Run ID: {run_id} (prevents overwriting on reruns)")
 
+    # Load fold splits for logging (if k-fold CV is enabled)
+    fold_splits_for_logging = None
+    if k_folds is not None and k_folds > 1 and fold_splits_file and fold_splits_file.exists():
+        try:
+            from training.cv_utils import load_fold_splits
+            fold_splits_for_logging, _ = load_fold_splits(fold_splits_file)
+            logger.debug(
+                f"Loaded {len(fold_splits_for_logging)} fold splits for logging")
+        except Exception as e:
+            logger.warning(f"Could not load fold splits for logging: {e}")
+
     # Set MLflow experiment (safe to call even if already set)
     try:
         mlflow.set_experiment(mlflow_experiment_name)
@@ -1029,14 +1217,15 @@ def run_local_hpo_sweep(
         run_id=run_id,
     )
 
-    # Create callback factory to capture parent_run_id
+# Create callback factory to capture parent_run_id
     def create_trial_callback(parent_run_id: Optional[str] = None):
         """Create a trial completion callback with parent run ID captured in closure."""
+
         def trial_complete_callback(study: Any, trial: Any) -> None:
             """Callback to display consolidated metrics and parameters after trial completes."""
             optuna_module, _, _, _ = _import_optuna()
+
             if trial.state == optuna_module.trial.TrialState.COMPLETE:
-                # Get best trial info
                 best_trial = study.best_trial
                 is_best = trial.number == best_trial.number
 
@@ -1050,13 +1239,12 @@ def run_local_hpo_sweep(
                 if "avg_entity_f1" in attrs:
                     entity_count = attrs.get("entity_count", "?")
                     parts.append(
-                        f"entity_f1={attrs['avg_entity_f1']:.6f} ({entity_count} entities)")
+                        f"entity_f1={attrs['avg_entity_f1']:.6f} ({entity_count} entities)"
+                    )
 
-                # Format parameters for display
                 param_parts = []
                 for param_name, param_value in trial.params.items():
                     if isinstance(param_value, float):
-                        # Format floats with appropriate precision
                         if param_name == "learning_rate":
                             param_parts.append(
                                 f"{param_name}={param_value:.2e}")
@@ -1066,8 +1254,6 @@ def run_local_hpo_sweep(
                     else:
                         param_parts.append(f"{param_name}={param_value}")
 
-                # Try to get child run ID (just for reference, no URL needed)
-                # MLflow already prints the run links, so we don't need to duplicate
                 run_id_short = ""
                 try:
                     if parent_run_id:
@@ -1075,46 +1261,35 @@ def run_local_hpo_sweep(
                         active_run = mlflow.active_run()
                         if active_run:
                             experiment_id = active_run.info.experiment_id
-                            # Query child runs with matching trial number
-                            # With nested structure, we want the trial run (not fold runs)
                             all_runs = client.search_runs(
                                 experiment_ids=[experiment_id],
-                                filter_string=f"tags.mlflow.parentRunId = '{parent_run_id}' AND tags.trial_number = '{trial.number}'",
+                                filter_string=(
+                                    f"tags.mlflow.parentRunId = '{parent_run_id}' "
+                                    f"AND tags.trial_number = '{trial.number}'"
+                                ),
                                 max_results=100,
                             )
                             if all_runs:
-                                # Find the trial run (has trial_number but no fold_idx tag)
                                 trial_run = None
                                 for run in all_runs:
-                                    fold_tag = run.data.tags.get("fold_idx")
-                                    if not fold_tag:
-                                        # This is the trial run (no fold_idx = trial level)
+                                    if not run.data.tags.get("fold_idx"):
                                         trial_run = run
                                         break
-
-                                # If no trial run found, use first run (backward compatibility)
                                 if not trial_run:
                                     trial_run = all_runs[0]
-
-                                child_run_id = trial_run.info.run_id
-                                run_id_short = f" (Run ID: {child_run_id[:12]}...)"
+                                run_id_short = f" (Run ID: {trial_run.info.run_id[:12]}...)"
                 except Exception as e:
                     logger.debug(
-                        f"Could not get run ID for trial {trial.number}: {e}")
+                        f"Could not get run ID for trial {trial.number}: {e}"
+                    )
 
-                # Add empty line before each trial for clarity
-                logger.info("")  # Empty line to separate trials
-
-                # Format output for better readability
+                logger.info("")
                 status = "[BEST]" if is_best else f"[Trial {trial.number}]"
                 trial_name = f"trial_{trial.number}"
-                metrics_str = ' | '.join(parts)
-                params_str = ' | '.join(param_parts)
-
-                # Log in a more readable format
                 logger.info(f"{status}: {trial_name}")
-                logger.info(f"  Metrics: {metrics_str}")
-                logger.info(f"  Params: {params_str}{run_id_short}")
+                logger.info(f"  Metrics: {' | '.join(parts)}")
+                logger.info(
+                    f"  Params: {' | '.join(param_parts)}{run_id_short}")
 
         return trial_complete_callback
 
@@ -1122,18 +1297,59 @@ def run_local_hpo_sweep(
     max_trials = hpo_config["sampling"]["max_trials"]
     timeout_seconds = hpo_config["sampling"]["timeout_minutes"] * 60
 
-    # Create MLflow parent run for HPO sweep
-    mlflow_run_name = create_mlflow_run_name(
-        backbone, run_id, study_name, should_resume, checkpoint_enabled)
+    # Cleanup stale reservations from crashed processes
+    try:
+        from orchestration.jobs.tracking.mlflow_index import cleanup_stale_reservations
+        root_dir = output_dir.parent.parent if output_dir else Path.cwd()
+        config_dir = output_dir.parent.parent / "config" if output_dir else None
+        cleaned_count = cleanup_stale_reservations(root_dir, config_dir, stale_minutes=30)
+        if cleaned_count > 0:
+            logger.info(f"Cleaned up {cleaned_count} stale run name reservations")
+    except Exception as e:
+        logger.debug(f"Could not cleanup stale reservations: {e}")
 
-    # Initialize MLflow tracker
+    # Create NamingContext for HPO parent run
+    try:
+        from orchestration.naming_centralized import create_naming_context
+        from orchestration.jobs.tracking.mlflow_naming import build_mlflow_run_name
+        from shared.platform_detection import detect_platform
+
+        hpo_parent_context = create_naming_context(
+            process_type="hpo",
+            model=backbone,
+            environment=detect_platform(),
+            trial_id=study_name,
+        )
+
+        config_dir = output_dir.parent.parent / "config" if output_dir else None
+        root_dir = output_dir.parent.parent if output_dir else Path.cwd()
+        mlflow_run_name = build_mlflow_run_name(
+            hpo_parent_context, config_dir, root_dir=root_dir, output_dir=output_dir
+        )
+    except Exception as e:
+        logger.debug(
+            f"Could not create NamingContext for HPO parent run: {e}, using fallback"
+        )
+        hpo_parent_context = None
+        mlflow_run_name = create_mlflow_run_name(
+            backbone,
+            run_id,
+            study_name,
+            should_resume,
+            checkpoint_enabled,
+        )
+
     tracker = MLflowSweepTracker(mlflow_experiment_name)
     tracker.log_tracking_info()
 
-    # Run optimization with MLflow tracking
+    parent_run_id = None
+    parent_run_handle = None
+
     try:
         with tracker.start_sweep_run(
             run_name=mlflow_run_name,
+            context=hpo_parent_context,
+            output_dir=output_dir,
             hpo_config=hpo_config,
             backbone=backbone,
             study_name=study_name,
@@ -1141,132 +1357,419 @@ def run_local_hpo_sweep(
             storage_path=storage_path,
             should_resume=should_resume,
         ) as parent_run:
-            parent_run_id = parent_run.info.run_id if parent_run else None
 
-            # Mark interrupted runs AFTER parent run is created (MLflow is definitely ready now)
-            if (should_resume or checkpoint_enabled) and parent_run_id:
+            parent_run_handle = parent_run
+            parent_run_id = parent_run.run_id if parent_run else None
+
+            # Commit reserved version if auto-increment was used
+            if parent_run_id and hpo_parent_context and mlflow_run_name:
                 try:
-                    # mlflow is already imported at module level
-                    client = mlflow.tracking.MlflowClient()
-                    experiment = mlflow.get_experiment_by_name(
-                        mlflow_experiment_name)
+                    import re
+                    from orchestration.jobs.tracking.mlflow_naming import (
+                        build_mlflow_run_key,
+                        build_mlflow_run_key_hash,
+                        build_counter_key,
+                    )
+                    from orchestration.jobs.tracking.mlflow_config_loader import (
+                        get_naming_config,
+                        get_auto_increment_config,
+                    )
+                    from orchestration.jobs.tracking.mlflow_index import commit_run_name_version
 
-                    if not experiment:
-                        # Try alternative lookup
-                        try:
-                            all_experiments = client.search_experiments()
-                            experiment = next(
-                                (exp for exp in all_experiments if exp.name ==
-                                 mlflow_experiment_name),
-                                None
+                    # Check if auto-increment was used (run name has version suffix like .{number})
+                    version_match = re.search(r'\.(\d+)$', mlflow_run_name)
+                    if version_match:
+                        version = int(version_match.group(1))
+                        
+                        # Check if auto-increment is enabled for HPO
+                        auto_inc_config = get_auto_increment_config(config_dir, "hpo")
+                        if auto_inc_config.get("enabled_for_process", False):
+                            # Rebuild counter_key from context
+                            run_key = build_mlflow_run_key(hpo_parent_context)
+                            run_key_hash = build_mlflow_run_key_hash(run_key)
+                            naming_config = get_naming_config(config_dir)
+                            counter_key = build_counter_key(
+                                naming_config.get("project_name", "resume-ner"),
+                                "hpo",
+                                run_key_hash,
+                                hpo_parent_context.environment or "",
                             )
-                        except Exception:
-                            pass
-
-                    if experiment:
-                        # Search for all RUNNING runs with matching name
-                        all_running_runs = client.search_runs(
-                            experiment_ids=[experiment.experiment_id],
-                            filter_string="attributes.status = 'RUNNING'",
-                            max_results=1000,
-                        )
-
-                        # Find parent runs with matching name (excluding current one)
-                        matching_parent_runs = [
-                            run for run in all_running_runs
-                            if run.info.run_name == mlflow_run_name
-                            and run.info.run_id != parent_run_id
-                        ]
-
-                        # Find all parent runs with matching name (any status) to check their child runs
-                        all_runs = client.search_runs(
-                            experiment_ids=[experiment.experiment_id],
-                            max_results=1000,
-                        )
-                        parent_runs_with_name = [
-                            run for run in all_runs
-                            if run.info.run_name == mlflow_run_name
-                            and run.info.run_id != parent_run_id
-                        ]
-
-                        # Mark matching parent runs as FAILED
-                        if matching_parent_runs:
-                            logger.warning(
-                                f"Found {len(matching_parent_runs)} interrupted parent run(s) with name '{mlflow_run_name}'. "
-                                f"Marking them as FAILED."
+                            
+                            # Commit the reserved version
+                            commit_run_name_version(
+                                counter_key, parent_run_id, version, root_dir, config_dir
                             )
-                            for run in matching_parent_runs:
-                                try:
-                                    client.set_terminated(
-                                        run.info.run_id, status="FAILED")
-                                    updated_run = client.get_run(
-                                        run.info.run_id)
-                                    if updated_run.info.status == "FAILED":
-                                        logger.info(
-                                            f"Marked interrupted parent run {run.info.run_id[:12]}... as FAILED"
-                                        )
-                                    else:
-                                        logger.warning(
-                                            f"Parent run {run.info.run_id[:12]}... status is still {updated_run.info.status}"
-                                        )
-                                except Exception as e:
-                                    logger.warning(
-                                        f"Could not mark parent run {run.info.run_id[:12]}... as FAILED: {e}"
-                                    )
-
-                        # Mark all RUNNING child runs from any parent run with matching name as FAILED
-                        all_running_child_runs = []
-                        for parent_run in parent_runs_with_name:
-                            child_runs = client.search_runs(
-                                experiment_ids=[experiment.experiment_id],
-                                filter_string=f"tags.mlflow.parentRunId = '{parent_run.info.run_id}' AND attributes.status = 'RUNNING'",
-                                max_results=1000,
+                            logger.debug(
+                                f"Committed version {version} for HPO parent run {parent_run_id[:12]}..."
                             )
-                            all_running_child_runs.extend(child_runs)
-
-                        if all_running_child_runs:
-                            logger.warning(
-                                f"Found {len(all_running_child_runs)} RUNNING child run(s) from parent run(s) with name '{mlflow_run_name}'. "
-                                f"Marking them as FAILED."
-                            )
-                            for child_run in all_running_child_runs:
-                                try:
-                                    trial_num = child_run.data.tags.get(
-                                        "trial_number", "unknown")
-                                    client.set_terminated(
-                                        child_run.info.run_id, status="FAILED")
-                                    updated_run = client.get_run(
-                                        child_run.info.run_id)
-                                    if updated_run.info.status == "FAILED":
-                                        logger.info(
-                                            f"Marked interrupted child run {child_run.info.run_id[:12]}... (trial {trial_num}) as FAILED"
-                                        )
-                                    else:
-                                        logger.warning(
-                                            f"Child run {child_run.info.run_id[:12]}... (trial {trial_num}) status is still {updated_run.info.status}"
-                                        )
-                                except Exception as e:
-                                    logger.warning(
-                                        f"Could not mark child run {child_run.info.run_id[:12]}... as FAILED: {e}"
-                                    )
                 except Exception as e:
                     logger.warning(
-                        f"Could not mark interrupted runs after parent run creation: {e}")
+                        f"Could not commit reserved version for HPO parent run: {e}"
+                    )
+
+            # Cleanup: Tag interrupted runs from previous sessions
+            if parent_run_id and hpo_parent_context:
+                try:
+                    logger.info(
+                        f"[CLEANUP] Starting cleanup check: should_resume={should_resume}, "
+                        f"checkpoint_enabled={checkpoint_enabled}, parent_run_id={parent_run_id[:12]}..."
+                    )
+
+                    import mlflow
+                    from mlflow.tracking import MlflowClient
+                    client = MlflowClient()
+
+                    # Get current environment for filtering
+                    from shared.platform_detection import detect_platform
+                    current_env = detect_platform()
+
+                    # Get run_key_hash from context for tag-based search
+                    from orchestration.jobs.tracking.mlflow_naming import build_mlflow_run_key_hash, build_mlflow_run_key
+                    run_key = build_mlflow_run_key(hpo_parent_context)
+                    run_key_hash = build_mlflow_run_key_hash(
+                        run_key) if run_key else None
+
+                    # Load naming config for project name comparison
+                    from orchestration.jobs.tracking.mlflow_config_loader import get_naming_config
+                    config_dir = output_dir.parent.parent / "config" if output_dir else None
+                    naming_config = get_naming_config(config_dir)
+
+                    # Get current run start_time for legacy run validation
+                    current_start_time = None
+                    try:
+                        current_run_info = client.get_run(parent_run_id)
+                        current_start_time = current_run_info.info.start_time
+                    except Exception as e:
+                        logger.warning(
+                            f"[CLEANUP] Could not get current run start_time: {e}. "
+                            f"Legacy run validation will be skipped."
+                        )
+
+                    logger.info(
+                        f"[CLEANUP] MLflow imported successfully. Current env: {current_env}, "
+                        f"run_key_hash: {run_key_hash[:12] if run_key_hash else 'None'}..."
+                    )
+
+                    # Find interrupted parent runs (RUNNING status, same run_key_hash, different run_id, same env)
+                    experiment = mlflow.get_experiment_by_name(
+                        mlflow_experiment_name)
+                    if experiment:
+                        logger.info(
+                            f"[CLEANUP] Retrieved experiment: {experiment.experiment_id}"
+                        )
+
+                        # Optimized cleanup strategy: Single bulk fetch with pagination
+                        # Strategy: Tag-based filtering (primary) with name fallback (legacy runs only)
+                        # - Fetch all runs with pagination (no 100-run cap)
+                        # - Build parent→children map in one pass (eliminates N+1 queries)
+                        # - Use tag-based matching as primary (more reliable than name matching)
+                        # - Strict validation for legacy runs (start_time comparison)
+
+                        import re
+                        base_run_name = re.sub(
+                            r'\s*\(\d+\)\s*$', '', mlflow_run_name).strip()
+
+                        logger.info(
+                            f"[CLEANUP] Fetching all runs in experiment (may paginate for large experiments)..."
+                        )
+
+                        # Fetch all runs (MLflow's search_runs returns a list, not paginated)
+                        # Use max_results=10000 as safety limit (most experiments have <1000 runs)
+                        try:
+                            all_runs = client.search_runs(
+                                experiment_ids=[experiment.experiment_id],
+                                filter_string="",
+                                max_results=10000,  # Safety limit
+                                order_by=["attributes.start_time DESC"],
+                            )
+
+                            if len(all_runs) >= 10000:
+                                logger.warning(
+                                    f"[CLEANUP] Fetched {len(all_runs)} runs (safety limit reached). "
+                                    f"Some older runs may not be processed."
+                                )
+                        except Exception as e:
+                            logger.warning(
+                                f"[CLEANUP] Error fetching runs: {e}. Cleanup may be incomplete."
+                            )
+                            all_runs = []
+
+                        logger.info(
+                            f"[CLEANUP] Fetched {len(all_runs)} total runs from experiment")
+
+                        # Build parent→children map in one pass (eliminates N+1 queries)
+                        parent_to_children = {}
+                        for run in all_runs:
+                            parent_id = run.data.tags.get("mlflow.parentRunId")
+                            if parent_id:
+                                if parent_id not in parent_to_children:
+                                    parent_to_children[parent_id] = []
+                                parent_to_children[parent_id].append(run)
+
+                        logger.info(
+                            f"[CLEANUP] Built parent→children map: {len(parent_to_children)} parents have children"
+                        )
+
+                        # Find interrupted parent runs using tag-based filtering (primary)
+                        interrupted_parents = []
+                        status_counts = {}
+                        tag_based_matches = 0
+                        name_fallback_matches = 0
+
+                        for run in all_runs:
+                            # Track status breakdown
+                            status = run.info.status
+                            status_counts[status] = status_counts.get(
+                                status, 0) + 1
+
+                            # Skip if not RUNNING
+                            if status != "RUNNING":
+                                continue
+
+                            # Skip if already tagged
+                            if run.data.tags.get("code.interrupted") == "true":
+                                continue
+
+                            # Skip if current run
+                            if run.info.run_id == parent_run_id:
+                                continue
+
+                            # Primary strategy: Tag-based filtering (most reliable)
+                            run_hash = run.data.tags.get("code.run_key_hash")
+                            run_project = run.data.tags.get("code.project")
+                            run_env = run.data.tags.get("code.env")
+                            run_stage = run.data.tags.get("code.stage")
+                            run_run_type = run.data.tags.get("mlflow.runType")
+
+                            is_tag_based_match = False
+                            is_name_fallback_match = False
+
+                            # Check if run has required tags for tag-based matching
+                            if run_hash and run_project and run_env:
+                                # Tag-based match: hash matches, project matches, env matches, stage is hpo/sweep
+                                expected_project = naming_config.get(
+                                    "project_name", "resume-ner")
+                                if (run_hash == run_key_hash and
+                                    run_project == expected_project and
+                                    run_env == current_env and
+                                        (run_stage in ["hpo", "sweep"] or run_run_type == "sweep")):
+                                    is_tag_based_match = True
+                                    tag_based_matches += 1
+                                    logger.debug(
+                                        f"[CLEANUP] Tag-based match: {run.info.run_name} "
+                                        f"(run_id: {run.info.run_id[:12]}..., hash: {run_hash[:12]}...)"
+                                    )
+
+                            # Fallback strategy: Name-based matching (only for legacy runs without tags)
+                            if not is_tag_based_match:
+                                # Only use name fallback if run is missing critical tags (legacy run)
+                                if not run_hash and run_project and run_env:
+                                    run_name = run.info.run_name
+                                    if run_name.startswith(base_run_name):
+                                        # Additional safety checks for legacy runs:
+                                        # - Same project
+                                        # - Same environment
+                                        # - Same stage (if present)
+                                        # - Older start time than current run (interrupted before current started)
+                                        expected_project = naming_config.get(
+                                            "project_name", "resume-ner")
+                                        if (run_project == expected_project and
+                                            run_env == current_env and
+                                                (not run_stage or run_stage in ["hpo", "sweep"])):
+
+                                            # Get current run start time for comparison
+                                            if current_start_time is not None:
+                                                run_start_time = run.info.start_time
+
+                                                # Only tag if run started before current run (safety check)
+                                                if run_start_time < current_start_time:
+                                                    is_name_fallback_match = True
+                                                    name_fallback_matches += 1
+                                                    logger.info(
+                                                        f"[CLEANUP] Name fallback match (legacy run): {run_name} "
+                                                        f"(run_id: {run.info.run_id[:12]}..., "
+                                                        f"start_time: {run_start_time}, "
+                                                        f"current_start_time: {current_start_time})"
+                                                    )
+                                            else:
+                                                logger.debug(
+                                                    f"[CLEANUP] Skipping legacy run {run.info.run_id[:12]}... "
+                                                    f"(name: {run_name}) - cannot validate start_time"
+                                                )
+
+                            # Add to interrupted list if matched by either strategy
+                            if is_tag_based_match or is_name_fallback_match:
+                                interrupted_parents.append(run)
+                                logger.info(
+                                    f"[CLEANUP] Found interrupted parent run: {run.info.run_name} "
+                                    f"(run_id: {run.info.run_id[:12]}..., strategy: "
+                                    f"{'tag-based' if is_tag_based_match else 'name-fallback'})"
+                                )
+
+                        logger.info(
+                            f"[CLEANUP] Status breakdown: {status_counts}"
+                        )
+                        logger.info(
+                            f"[CLEANUP] Found {tag_based_matches} tag-based matches, "
+                            f"{name_fallback_matches} name-fallback matches (legacy), "
+                            f"{len(interrupted_parents)} total eligible for tagging"
+                        )
+
+                        # Helper function to safely tag runs as interrupted (uses cached run data)
+                        def should_tag_as_interrupted(run_data, current_run_id: str) -> tuple[bool, str]:
+                            """Check if a run should be tagged as interrupted using cached run data."""
+                            run_id = run_data.info.run_id
+                            if run_id == current_run_id:
+                                return False, "is_current_run"
+
+                            if run_data.data.tags.get("code.interrupted") == "true":
+                                return False, "already_tagged_interrupted"
+
+                            # Only tag runs that have project identity tags
+                            if run_data.data.tags.get("code.project") is None:
+                                return False, "no_project_identity"
+
+                            return True, "ok"
+
+                        # Tag interrupted parent runs and their children (using pre-built map)
+                        if interrupted_parents:
+                            total_tagged_parents = 0
+                            total_tagged_children = 0
+
+                            for run in interrupted_parents:
+                                run_id_to_mark = run.info.run_id
+                                run_name = run.info.run_name
+
+                                should_tag, reason = should_tag_as_interrupted(
+                                    run, parent_run_id)
+                                if not should_tag:
+                                    logger.debug(
+                                        f"[CLEANUP] Skipping parent run {run_id_to_mark[:12]}... (reason: {reason})"
+                                    )
+                                    continue
+
+                                logger.info(
+                                    f"[CLEANUP] Tagging interrupted parent run {run_id_to_mark[:12]}... "
+                                    f"(name: {run_name}, status: {run.info.status})"
+                                )
+
+                                try:
+                                    client.set_tag(
+                                        run_id_to_mark, "code.interrupted", "true")
+                                    total_tagged_parents += 1
+                                    logger.info(
+                                        f"[CLEANUP] Successfully tagged interrupted parent run {run_id_to_mark[:12]}... as interrupted"
+                                    )
+
+                                    # Get child runs from pre-built map (no additional API call!)
+                                    child_runs = parent_to_children.get(
+                                        run_id_to_mark, [])
+
+                                    logger.info(
+                                        f"[CLEANUP] Found {len(child_runs)} child runs for parent {run_id_to_mark[:12]}... "
+                                        f"(from pre-built map, no API call)"
+                                    )
+
+                                    # Tag non-terminal child runs in a single pass
+                                    tagged_children = 0
+                                    skipped_children = 0
+
+                                    for child_run in child_runs:
+                                        child_run_id = child_run.info.run_id
+                                        child_status = child_run.info.status
+                                        child_name = child_run.info.run_name
+
+                                        # Skip if already tagged
+                                        if child_run.data.tags.get("code.interrupted") == "true":
+                                            skipped_children += 1
+                                            continue
+
+                                        # Only tag non-terminal runs
+                                        if child_status not in ["RUNNING", "SCHEDULED", "QUEUED"]:
+                                            skipped_children += 1
+                                            continue
+
+                                        # Check project identity (must have code.project)
+                                        if child_run.data.tags.get("code.project") is None:
+                                            skipped_children += 1
+                                            logger.debug(
+                                                f"[CLEANUP] Skipping child run {child_run_id[:12]}... "
+                                                f"(name: {child_name}, reason: no_project_identity)"
+                                            )
+                                            continue
+
+                                        # Tag the child run
+                                        logger.info(
+                                            f"[CLEANUP] Tagging interrupted child run {child_run_id[:12]}... "
+                                            f"(name: {child_name}, status: {child_status})"
+                                        )
+                                        try:
+                                            client.set_tag(
+                                                child_run_id, "code.interrupted", "true")
+                                            tagged_children += 1
+                                            total_tagged_children += 1
+                                            logger.info(
+                                                f"[CLEANUP] Successfully tagged interrupted child run {child_run_id[:12]}... as interrupted"
+                                            )
+                                        except Exception as e:
+                                            logger.warning(
+                                                f"[CLEANUP] Could not tag child run {child_run_id[:12]}... as interrupted: {e}"
+                                            )
+                                            skipped_children += 1
+
+                                    logger.info(
+                                        f"[CLEANUP] Tagged {tagged_children} interrupted child runs, "
+                                        f"skipped {skipped_children} child runs (terminal or filtered) "
+                                        f"for parent {run_id_to_mark[:12]}..."
+                                    )
+
+                                except Exception as e:
+                                    logger.warning(
+                                        f"[CLEANUP] Could not tag parent run {run_id_to_mark[:12]}... as interrupted: {e}"
+                                    )
+
+                            logger.info(
+                                f"[CLEANUP] Completed cleanup: tagged {total_tagged_parents} parent runs "
+                                f"and {total_tagged_children} child runs"
+                            )
+                        else:
+                            logger.info(
+                                "[CLEANUP] No interrupted parent runs found to tag"
+                            )
+                        
+                        # Store parent_to_children map for reuse in log_final_metrics
+                        # Key: (tracking_uri, experiment_id, parent_run_id) for safe scoping
+                        tracking_uri = mlflow.get_tracking_uri()
+                        child_runs_map_key = (tracking_uri, experiment.experiment_id, parent_run_id)
+                        child_runs_map = parent_to_children.get(parent_run_id, [])
+                        logger.debug(
+                            f"[CLEANUP] Stored child runs map for reuse: "
+                            f"{len(child_runs_map)} child runs for parent {parent_run_id[:12]}..."
+                        )
+                    else:
+                        logger.warning(
+                            f"[CLEANUP] Could not retrieve experiment: {mlflow_experiment_name}"
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"[CLEANUP] Error during cleanup of interrupted runs: {e}"
+                    )
+                    import traceback
+                    logger.debug(
+                        f"[CLEANUP] Cleanup traceback: {traceback.format_exc()}")
 
             trial_callback = create_trial_callback(parent_run_id)
 
             if should_resume:
-                # Count only completed trials (not FAILED, PRUNED, etc.)
-                completed_trials = len([
-                    t for t in study.trials
-                    if t.state == optuna.trial.TrialState.COMPLETE
-                ])
+                completed_trials = len(
+                    [
+                        t for t in study.trials
+                        if t.state == optuna.trial.TrialState.COMPLETE
+                    ]
+                )
                 remaining_trials = max(0, max_trials - completed_trials)
 
                 if remaining_trials > 0:
-                    logger.info(
-                        f"Running {remaining_trials} more trials (already completed {completed_trials}/{max_trials})"
-                    )
                     study.optimize(
                         objective,
                         n_trials=remaining_trials,
@@ -1274,10 +1777,7 @@ def run_local_hpo_sweep(
                         show_progress_bar=True,
                         callbacks=[trial_callback],
                     )
-                else:
-                    logger.info(f"All {max_trials} trials already completed!")
             else:
-                # Run all trials
                 study.optimize(
                     objective,
                     n_trials=max_trials,
@@ -1286,80 +1786,48 @@ def run_local_hpo_sweep(
                     callbacks=[trial_callback],
                 )
 
-            # Log final metrics and best trial info
-            if parent_run is not None:
-                parent_run_id = parent_run.info.run_id
+            if parent_run_id and parent_run_handle:
+                try:
+                    # Pass child_runs_map if available from cleanup
+                    tracker.log_final_metrics(
+                        study=study,
+                        objective_metric=objective_metric,
+                        parent_run_id=parent_run_id,
+                        run_name=mlflow_run_name,
+                        should_resume=should_resume,
+                        hpo_output_dir=output_dir,
+                        backbone=backbone,
+                        run_id=run_id,
+                        fold_splits=fold_splits_for_logging,
+                        hpo_config=hpo_config,
+                        child_runs_map=child_runs_map if 'child_runs_map' in locals() else None,
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"[HPO] Error in log_final_metrics: {e}"
+                    )
+                    import traceback
+                    logger.error(traceback.format_exc())
 
-                # Load fold splits if k-fold CV was used (needed for checkpoint path resolution)
-                fold_splits_for_logging = None
-                if k_folds is not None and k_folds > 1 and fold_splits_file and fold_splits_file.exists():
-                    try:
-                        from training.cv_utils import load_fold_splits
-                        fold_splits_for_logging, _ = load_fold_splits(
-                            fold_splits_file)
-                    except Exception as e:
-                        logger.warning(
-                            f"Could not load fold splits for checkpoint logging: {e}")
-
-                tracker.log_final_metrics(
-                    study=study,
-                    objective_metric=objective_metric,
-                    parent_run_id=parent_run_id,
-                    run_name=mlflow_run_name,
-                    should_resume=should_resume,
-                    hpo_output_dir=output_dir,
-                    backbone=backbone,
-                    run_id=run_id,
-                    fold_splits=fold_splits_for_logging,
-                    hpo_config=hpo_config,
-                )
     except Exception as e:
-        # Gracefully handle MLflow failures - don't fail HPO if MLflow is unavailable
         logger.warning(f"MLflow tracking failed: {e}")
         logger.warning("Continuing HPO without MLflow tracking...")
 
-        # Run optimization without MLflow context
         trial_callback = create_trial_callback(None)
 
-        if should_resume:
-            completed_trials = len([
-                t for t in study.trials
-                if t.state == optuna.trial.TrialState.COMPLETE
-            ])
-            remaining_trials = max(0, max_trials - completed_trials)
+        study.optimize(
+            objective,
+            n_trials=max_trials,
+            timeout=timeout_seconds,
+            show_progress_bar=True,
+            callbacks=[trial_callback],
+        )
 
-            if remaining_trials > 0:
-                logger.info(
-                    f"Running {remaining_trials} more trials (already completed {completed_trials}/{max_trials})"
-                )
-                study.optimize(
-                    objective,
-                    n_trials=remaining_trials,
-                    timeout=timeout_seconds,
-                    show_progress_bar=True,
-                    callbacks=[trial_callback],
-                )
-            else:
-                logger.info(f"All {max_trials} trials already completed!")
-
-            # Final cleanup: delete all non-best checkpoints
-            try:
-                cleanup_checkpoints()
-            except Exception as e:
-                logger.warning(f"Error during final checkpoint cleanup: {e}")
-        else:
-            study.optimize(
-                objective,
-                n_trials=max_trials,
-                timeout=timeout_seconds,
-                show_progress_bar=True,
-                callbacks=[trial_callback],
+        try:
+            cleanup_checkpoints()
+        except Exception as e:
+            logger.warning(
+                f"Error during final checkpoint cleanup: {e}"
             )
-
-            # Final cleanup: delete all non-best checkpoints
-            try:
-                cleanup_checkpoints()
-            except Exception as e:
-                logger.warning(f"Error during final checkpoint cleanup: {e}")
 
     return study
