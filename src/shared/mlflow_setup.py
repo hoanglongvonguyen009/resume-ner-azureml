@@ -249,7 +249,7 @@ def create_ml_client_from_config(
     client_id = os.getenv("AZURE_CLIENT_ID")
     client_secret = os.getenv("AZURE_CLIENT_SECRET")
     tenant_id = os.getenv("AZURE_TENANT_ID")
-    
+
     logger.warning(
         f"[DEBUG] Initial env check - "
         f"subscription_id: {bool(subscription_id)}, "
