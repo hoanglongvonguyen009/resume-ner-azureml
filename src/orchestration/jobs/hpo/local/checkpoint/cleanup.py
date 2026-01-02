@@ -80,8 +80,6 @@ class CheckpointCleanupManager:
                         paths.append(checkpoint_dir)
 
         # OLD STRUCTURE: Check trial_<n>_fold<k>/checkpoint/ directories (backward compatibility)
-        # IMPORTANT: Always check old structure for CV, even if new structure exists, because
-        # training script may create checkpoints in old structure
         if self.fold_splits is not None:
             for fold_idx in range(len(self.fold_splits)):
                 checkpoint_dir = (
@@ -89,14 +87,8 @@ class CheckpointCleanupManager:
                     / f"trial_{trial_num}{run_suffix}_fold{fold_idx}"
                     / "checkpoint"
                 )
-                logger.info(
-                    f"Checking old structure checkpoint for trial {trial_num}, fold {fold_idx}: {checkpoint_dir} (exists={checkpoint_dir.exists()})"
-                )
                 if checkpoint_dir.exists():
                     paths.append(checkpoint_dir)
-                    logger.info(
-                        f"Found old structure checkpoint for trial {trial_num}, fold {fold_idx}: {checkpoint_dir}"
-                    )
         else:
             # Single training: get single checkpoint (if no refit exists)
             if not refit_checkpoint_dir.exists():
@@ -134,9 +126,6 @@ class CheckpointCleanupManager:
             return
 
         trial_checkpoint_paths = self.get_checkpoint_paths(trial_num)
-        logger.info(
-            f"Registering checkpoints for trial {trial_num}: found {len(trial_checkpoint_paths)} paths: {[str(p) for p in trial_checkpoint_paths]}"
-        )
         if trial_checkpoint_paths:
             self.checkpoint_map[trial_num] = trial_checkpoint_paths
         self.completed_trials.append(trial_num)
@@ -306,41 +295,9 @@ class CheckpointCleanupManager:
             return
 
         # For best trial: preserve BOTH refit and CV checkpoints (user requirement)
-        # Re-query checkpoint paths to get latest state (including refit if it was added after trial completion)
+        # Only delete non-best trial checkpoints
         best_trial_num = self.best_trial_id
-        run_suffix = f"_{self.run_id}" if self.run_id else ""
-        trial_base_dir = self.output_base_dir / \
-            f"trial_{best_trial_num}{run_suffix}"
-
-        # Log trial directory structure for debugging
-        logger.info(
-            f"Final cleanup: checking trial_base_dir={trial_base_dir} (exists={trial_base_dir.exists()})")
-        if trial_base_dir.exists():
-            subdirs = [d.name for d in trial_base_dir.iterdir() if d.is_dir()]
-            logger.info(
-                f"Final cleanup: trial_base_dir subdirectories: {subdirs}")
-        else:
-            logger.warning(
-                f"Final cleanup: trial_base_dir does not exist: {trial_base_dir}")
-
-        best_trial_paths = self.get_checkpoint_paths(best_trial_num)
-        logger.info(
-            f"Final cleanup: found {len(best_trial_paths)} checkpoint paths for best trial {best_trial_num}: {[str(p) for p in best_trial_paths]}")
-
-        # Check for old structure checkpoints if new structure not found
-        if not best_trial_paths and self.fold_splits is not None:
-            logger.info(
-                f"Final cleanup: No checkpoints found in new structure, checking old structure...")
-            for fold_idx in range(len(self.fold_splits)):
-                old_structure_path = self.output_base_dir / \
-                    f"trial_{best_trial_num}{run_suffix}_fold{fold_idx}" / \
-                    "checkpoint"
-                logger.info(
-                    f"Final cleanup: Checking old structure path: {old_structure_path} (exists={old_structure_path.exists()})")
-
-        # Update checkpoint_map with latest paths (in case refit was added)
-        if best_trial_paths:
-            self.checkpoint_map[best_trial_num] = best_trial_paths
+        best_trial_paths = self.checkpoint_map.get(best_trial_num, [])
 
         # Check if best trial has refit checkpoint
         has_refit = any("refit" in str(p) for p in best_trial_paths)

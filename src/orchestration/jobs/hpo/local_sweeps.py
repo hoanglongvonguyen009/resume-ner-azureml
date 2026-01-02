@@ -340,6 +340,27 @@ def run_local_hpo_sweep(
     # Get objective metric name
     objective_metric = study_manager.objective_metric
 
+    # Reorganize structure: use study folder as base for trials
+    # Structure: output_dir/study_name/study.db and output_dir/study_name/trial_X/...
+    # The storage_path should already be in study folder based on config (storage_path: "{study_name}/study.db")
+    study_folder = storage_path.parent if storage_path else output_dir / study_name
+    study_folder.mkdir(parents=True, exist_ok=True)
+    
+    # Ensure study.db is in study folder (in case it was created elsewhere)
+    if storage_path and storage_path.parent != study_folder:
+        new_storage_path = study_folder / "study.db"
+        if storage_path.exists() and not new_storage_path.exists():
+            import shutil
+            shutil.move(str(storage_path), str(new_storage_path))
+            logger.info(f"Moved study.db to study folder: {new_storage_path}")
+        # Update storage_path to point to new location
+        storage_path = new_storage_path
+        storage_uri = get_storage_uri(storage_path)
+    
+    # Use study folder as base for trials (so trials are created inside study folder)
+    study_output_dir = study_folder
+    logger.info(f"Using study folder as base for trials: {study_output_dir}")
+
     # Check if checkpointing is enabled (for later use)
     checkpoint_enabled = checkpoint_config is not None and checkpoint_config.get(
         "enabled", False
@@ -370,7 +391,7 @@ def run_local_hpo_sweep(
         backbone=backbone,
         hpo_config=hpo_config,
         train_config=train_config,
-        output_base_dir=output_dir,
+        output_base_dir=study_output_dir,  # Use study folder instead of base output_dir
         mlflow_experiment_name=mlflow_experiment_name,
         objective_metric=objective_metric,
         k_folds=k_folds,
@@ -646,7 +667,7 @@ def run_local_hpo_sweep(
                             dataset_path=dataset_path,
                             config_dir=project_config_dir,  # Use original project config, not HPO output config
                             backbone=backbone,
-                            output_dir=output_dir,
+                            output_dir=study_output_dir,  # Use study folder instead of base output_dir
                             train_config=train_config,
                             mlflow_experiment_name=mlflow_experiment_name,
                             objective_metric=objective_metric,
