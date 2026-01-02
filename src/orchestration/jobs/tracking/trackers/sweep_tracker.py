@@ -1273,10 +1273,12 @@ class MLflowSweepTracker(BaseTracker):
 
         best_trial_number = study.best_trial.number
 
-        # Get run ID - prefer refit run, then parent run, then active run
+        # Get run ID - prefer refit run, then parent run
         # Refit checkpoint should be uploaded to refit run (not parent)
+        # Do NOT rely on mlflow.active_run() when refit_run_id is provided
         run_id_to_use = refit_run_id if refit_run_id else parent_run_id
         if not run_id_to_use:
+            # Only fall back to active_run if neither refit_run_id nor parent_run_id provided
             active_run = mlflow.active_run()
             if active_run:
                 run_id_to_use = active_run.info.run_id
@@ -1474,6 +1476,23 @@ class MLflowSweepTracker(BaseTracker):
                     f"({manifest['total_size'] / 1024 / 1024:.1f}MB) for trial {best_trial_number}"
                 )
 
+                # Mark study as complete after successful checkpoint upload
+                try:
+                    from datetime import datetime
+                    study.set_user_attr("hpo_complete", "true")
+                    study.set_user_attr("checkpoint_uploaded", "true")
+                    study.set_user_attr(
+                        "completion_timestamp", datetime.now().isoformat())
+                    study.set_user_attr("best_trial_number",
+                                        str(best_trial_number))
+                    logger.info(
+                        f"Marked study as complete with checkpoint uploaded (best trial: {best_trial_number})"
+                    )
+                except Exception as attr_error:
+                    logger.warning(
+                        f"Could not mark study as complete: {attr_error}"
+                    )
+
                 # Clean up
                 if archive_path.exists():
                     archive_path.unlink()
@@ -1510,6 +1529,23 @@ class MLflowSweepTracker(BaseTracker):
                 f"Uploaded checkpoint archive: {manifest['file_count']} files "
                 f"({manifest['total_size'] / 1024 / 1024:.1f}MB) for trial {best_trial_number}"
             )
+
+            # Mark study as complete after successful checkpoint upload
+            try:
+                from datetime import datetime
+                study.set_user_attr("hpo_complete", "true")
+                study.set_user_attr("checkpoint_uploaded", "true")
+                study.set_user_attr(
+                    "completion_timestamp", datetime.now().isoformat())
+                study.set_user_attr("best_trial_number",
+                                    str(best_trial_number))
+                logger.info(
+                    f"Marked study as complete with checkpoint uploaded (best trial: {best_trial_number})"
+                )
+            except Exception as attr_error:
+                logger.warning(
+                    f"Could not mark study as complete: {attr_error}"
+                )
 
             # Clean up
             if archive_path.exists():

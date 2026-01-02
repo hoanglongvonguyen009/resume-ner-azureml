@@ -110,30 +110,22 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
     
     # Track whether we started a run directly (needed for cleanup)
     started_run_directly = False
+    # Track if we started an existing run (refit mode) - don't end it here
+    started_existing = False
 
     if use_run_id:
         # Use existing run directly (for refit training)
-        # NEVER create a child - log directly to the specified run
+        # IMPORTANT: Don't start an active run context - use client API instead
+        # This prevents MLflow from auto-ending the run when subprocess exits
         print(
             f"  [Training] Using existing run: {use_run_id[:12]}... (refit mode)", 
             file=sys.stderr, flush=True
         )
-        try:
-            # Ensure no active run before starting (avoid "Run is already active" errors)
-            if mlflow.active_run():
-                mlflow.end_run()
-            mlflow.start_run(run_id=use_run_id)
-            started_run_directly = True
-            print(f"  [Training] ✓ Started existing run", file=sys.stderr, flush=True)
-        except Exception as e:
-            print(
-                f"  [Training] Error starting existing run: {e}", file=sys.stderr, flush=True
-            )
-            import traceback
-            traceback.print_exc()
-            # Fallback to independent run
-            mlflow.start_run(run_name=f"refit_fallback_{use_run_id[:8]}")
-            started_run_directly = True
+        # Don't start an active run - we'll log via client API instead
+        # This keeps the run RUNNING until parent process explicitly terminates it
+        started_run_directly = False  # Don't track as started - we're not using active run
+        started_existing = True  # Mark as existing run (refit mode)
+        print(f"  [Training] ✓ Will log to existing run via client API (run stays RUNNING)", file=sys.stderr, flush=True)
     elif parent_run_id:
         # Construct unique run name: include fold index if k-fold CV is enabled
         if fold_idx is not None:
@@ -222,11 +214,15 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
             log_metrics(output_dir, metrics, logging_adapter)
     finally:
         # End the run if we started it directly
-        if started_run_directly:
+        # EXCEPTION: For refit runs (started_existing=True), we don't have an active run
+        # so there's nothing to end - the parent process will mark it FINISHED after artifact upload
+        if started_existing:
+            # Refit mode: No active run to end - run stays RUNNING until parent terminates it
+            print(f"  [Training] Refit run remains RUNNING (will be marked FINISHED after artifacts)", file=sys.stderr, flush=True)
+        elif started_run_directly:
+            # Non-refit mode: End the run normally
             mlflow.end_run()
-            if use_run_id:
-                print(f"  [Training] Ended existing run (refit mode)", file=sys.stderr, flush=True)
-            elif parent_run_id:
+            if parent_run_id:
                 print(f"  [Training] Ended child run", file=sys.stderr, flush=True)
             else:
                 print(f"  [Training] Ended independent run", file=sys.stderr, flush=True)

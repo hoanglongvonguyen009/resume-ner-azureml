@@ -76,12 +76,23 @@ class AzureMLLoggingAdapter(LoggingAdapter):
     def log_metrics(self, metrics: Dict[str, float]) -> None:
         """Log metrics to both MLflow and Azure ML native logging."""
         import mlflow
+        import os
+        
+        # Check if we should use client API (refit mode without active run)
+        use_run_id = os.environ.get("MLFLOW_RUN_ID") or os.environ.get("MLFLOW_USE_RUN_ID")
+        active_run = mlflow.active_run()
         
         # MLflow only accepts numeric values
         for k, v in metrics.items():
             val = self._to_float_or_none(v)
             if val is not None:
-                mlflow.log_metric(k, val)
+                if use_run_id and not active_run:
+                    # Use client API when logging to existing run without active context
+                    client = mlflow.tracking.MlflowClient()
+                    client.log_metric(use_run_id, k, val)
+                else:
+                    # Use active run context (normal case)
+                    mlflow.log_metric(k, val)
 
         # Azure ML native logging accepts strings too
         if self._azureml_run is not None:
@@ -96,7 +107,20 @@ class AzureMLLoggingAdapter(LoggingAdapter):
     def log_params(self, params: Dict[str, Any]) -> None:
         """Log parameters to both MLflow and Azure ML native logging."""
         import mlflow
-        mlflow.log_params(params)
+        import os
+        
+        # Check if we should use client API (refit mode without active run)
+        use_run_id = os.environ.get("MLFLOW_RUN_ID") or os.environ.get("MLFLOW_USE_RUN_ID")
+        active_run = mlflow.active_run()
+        
+        if use_run_id and not active_run:
+            # Use client API when logging to existing run without active context
+            client = mlflow.tracking.MlflowClient()
+            for k, v in params.items():
+                client.log_param(use_run_id, k, str(v))
+        else:
+            # Use active run context (normal case)
+            mlflow.log_params(params)
 
         # Azure ML native logging doesn't have a direct params equivalent,
         # but we can log them as metrics with a prefix if needed
@@ -140,14 +164,38 @@ class LocalLoggingAdapter(LoggingAdapter):
     def log_metrics(self, metrics: Dict[str, float]) -> None:
         """Log metrics to MLflow only."""
         import mlflow
+        import os
+        
+        # Check if we should use client API (refit mode without active run)
+        use_run_id = os.environ.get("MLFLOW_RUN_ID") or os.environ.get("MLFLOW_USE_RUN_ID")
+        active_run = mlflow.active_run()
         
         # MLflow only accepts numeric values
         for k, v in metrics.items():
             val = self._to_float_or_none(v)
             if val is not None:
-                mlflow.log_metric(k, val)
+                if use_run_id and not active_run:
+                    # Use client API when logging to existing run without active context
+                    client = mlflow.tracking.MlflowClient()
+                    client.log_metric(use_run_id, k, val)
+                else:
+                    # Use active run context (normal case)
+                    mlflow.log_metric(k, val)
 
     def log_params(self, params: Dict[str, Any]) -> None:
         """Log parameters to MLflow only."""
         import mlflow
-        mlflow.log_params(params)
+        import os
+        
+        # Check if we should use client API (refit mode without active run)
+        use_run_id = os.environ.get("MLFLOW_RUN_ID") or os.environ.get("MLFLOW_USE_RUN_ID")
+        active_run = mlflow.active_run()
+        
+        if use_run_id and not active_run:
+            # Use client API when logging to existing run without active context
+            client = mlflow.tracking.MlflowClient()
+            for k, v in params.items():
+                client.log_param(use_run_id, k, str(v))
+        else:
+            # Use active run context (normal case)
+            mlflow.log_params(params)
