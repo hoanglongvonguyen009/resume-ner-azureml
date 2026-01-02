@@ -90,10 +90,11 @@ def setup_mlflow_cross_platform(
     # Check if Azure ML tracking is already configured
     current_tracking_uri = mlflow.get_tracking_uri()
     is_azure_ml_already_set = current_tracking_uri and "azureml" in current_tracking_uri.lower()
-    
+
     # If Azure ML is already set and we don't have ml_client, preserve it
     if is_azure_ml_already_set and ml_client is None:
-        logger.debug(f"Preserving existing Azure ML tracking URI: {current_tracking_uri[:50]}...")
+        logger.debug(
+            f"Preserving existing Azure ML tracking URI: {current_tracking_uri[:50]}...")
         mlflow.set_experiment(experiment_name)
         return current_tracking_uri
 
@@ -219,41 +220,76 @@ def create_ml_client_from_config(
     if not azure_ml_config.get("enabled", False):
         return None
 
+    # Suppress OpenTelemetry warnings (common in Colab/Kaggle)
+    os.environ.setdefault("OTEL_SDK_DISABLED", "false")
+    os.environ.setdefault("OTEL_LOG_LEVEL", "ERROR")
+
     # Try to import Azure ML SDK
     try:
+        # Suppress verbose OpenTelemetry logging
+        import logging
+        logging.getLogger("opentelemetry").setLevel(logging.ERROR)
+
         from azure.ai.ml import MLClient
         from azure.identity import DefaultAzureCredential
     except ImportError:
-        raise ImportError(
+        logger.warning(
             "azure-ai-ml and azure-identity are required for Azure ML tracking. "
-            "Install with: pip install azure-ai-ml azure-identity"
+            "Install with: pip install azure-ai-ml azure-identity. "
+            "Falling back to local tracking."
         )
+        return None
 
     # Get credentials from environment variables
     subscription_id = os.getenv("AZURE_SUBSCRIPTION_ID")
     resource_group = os.getenv("AZURE_RESOURCE_GROUP")
     workspace_name = azure_ml_config.get("workspace_name", "resume-ner-ws")
 
+    # Load Service Principal credentials (for Colab/Kaggle authentication)
+    client_id = os.getenv("AZURE_CLIENT_ID")
+    client_secret = os.getenv("AZURE_CLIENT_SECRET")
+    tenant_id = os.getenv("AZURE_TENANT_ID")
+
     # If environment variables not set, try loading from config.env file (in project root)
-    if not subscription_id or not resource_group:
+    if not subscription_id or not resource_group or not (client_id and client_secret and tenant_id):
         project_root = config_dir.parent
         config_env_path = project_root / "config.env"
         if config_env_path.exists():
-            logger.info(f"Environment variables not set, loading from {config_env_path}")
+            logger.info(
+                f"Environment variables not set, loading from {config_env_path}")
             env_vars = _load_env_file(config_env_path)
             subscription_id = subscription_id or env_vars.get(
                 "AZURE_SUBSCRIPTION_ID")
             resource_group = resource_group or env_vars.get(
                 "AZURE_RESOURCE_GROUP")
+            client_id = client_id or env_vars.get("AZURE_CLIENT_ID")
+            client_secret = client_secret or env_vars.get(
+                "AZURE_CLIENT_SECRET")
+            tenant_id = tenant_id or env_vars.get("AZURE_TENANT_ID")
+
             if subscription_id and resource_group:
                 # Set environment variables for this process
                 os.environ["AZURE_SUBSCRIPTION_ID"] = subscription_id
                 os.environ["AZURE_RESOURCE_GROUP"] = resource_group
-                logger.info("Loaded credentials from config.env")
-                logger.debug(f"AZURE_SUBSCRIPTION_ID: {subscription_id[:8]}...")
+                logger.info(
+                    "Loaded subscription/resource group from config.env")
+                logger.debug(
+                    f"AZURE_SUBSCRIPTION_ID: {subscription_id[:8]}...")
                 logger.debug(f"AZURE_RESOURCE_GROUP: {resource_group}")
+
+            if client_id and client_secret and tenant_id:
+                # Set service principal credentials for authentication
+                os.environ["AZURE_CLIENT_ID"] = client_id
+                os.environ["AZURE_CLIENT_SECRET"] = client_secret
+                os.environ["AZURE_TENANT_ID"] = tenant_id
+                logger.info(
+                    "Loaded service principal credentials from config.env")
+                logger.debug(f"AZURE_CLIENT_ID: {client_id[:8]}...")
+                logger.debug(f"AZURE_TENANT_ID: {tenant_id[:8]}...")
             else:
-                logger.warning("config.env exists but missing AZURE_SUBSCRIPTION_ID or AZURE_RESOURCE_GROUP")
+                logger.debug(
+                    "Service principal credentials not found in config.env. "
+                    "Will try DefaultAzureCredential (may not work in Colab/Kaggle).")
         else:
             logger.warning(f"config.env not found at {config_env_path}")
 
@@ -274,21 +310,75 @@ def create_ml_client_from_config(
 
     # Check if we have required values
     if not subscription_id or not resource_group:
-        logger.warning("Azure ML enabled but credentials not found. Falling back to local tracking.")
-        logger.info("Set AZURE_SUBSCRIPTION_ID and AZURE_RESOURCE_GROUP environment variables.")
+        logger.warning(
+            "Azure ML enabled but subscription/resource group not found. Falling back to local tracking.")
+        logger.info(
+            "Set AZURE_SUBSCRIPTION_ID and AZURE_RESOURCE_GROUP environment variables or add to config.env")
+        return None
+
+    # Determine authentication method
+    platform = detect_platform()
+    has_service_principal = client_id and client_secret and tenant_id
+
+    if platform in ("colab", "kaggle") and not has_service_principal:
+        logger.warning(
+            f"Azure ML authentication requires Service Principal credentials in {platform.upper()} environments. "
+            "Add to config.env: AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID. "
+            "Falling back to local tracking."
+        )
+        logger.info(
+            "To use Azure ML from Colab/Kaggle, create a Service Principal and add credentials to config.env:\n"
+            "  AZURE_CLIENT_ID=<your-client-id>\n"
+            "  AZURE_CLIENT_SECRET=<your-client-secret>\n"
+            "  AZURE_TENANT_ID=<your-tenant-id>"
+        )
         return None
 
     try:
-        credential = DefaultAzureCredential()
+        # Suppress verbose credential chain warnings
+        import logging
+        azure_logger = logging.getLogger("azure.identity")
+        azure_logger.setLevel(logging.ERROR)
+
+        # Use Service Principal if available (required for Colab/Kaggle)
+        if has_service_principal:
+            from azure.identity import ClientSecretCredential
+            logger.info(
+                "Using Service Principal authentication (from config.env)")
+            credential = ClientSecretCredential(
+                tenant_id=tenant_id,
+                client_id=client_id,
+                client_secret=client_secret
+            )
+        else:
+            # Use DefaultAzureCredential (works in local/Azure environments)
+            logger.info(
+                "Using DefaultAzureCredential (trying multiple auth methods)")
+            credential = DefaultAzureCredential()
+
         ml_client = MLClient(
             credential=credential,
             subscription_id=subscription_id,
             resource_group_name=resource_group,
             workspace_name=workspace_name,
         )
+        logger.info(
+            f"Successfully connected to Azure ML workspace: {workspace_name}")
         return ml_client
     except Exception as e:
-        logger.warning(f"Failed to create Azure ML client: {e}")
+        error_msg = str(e)
+        logger.warning(f"Failed to create Azure ML client: {error_msg}")
+
+        # Provide helpful guidance based on platform
+        if platform in ("colab", "kaggle"):
+            logger.info(
+                "For Colab/Kaggle, you need Service Principal credentials in config.env:\n"
+                "  AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID"
+            )
+        else:
+            logger.info(
+                "Ensure you're authenticated (Azure CLI: 'az login' or set Service Principal env vars)"
+            )
         logger.info("Falling back to local tracking.")
         return None
 
@@ -332,13 +422,17 @@ def setup_mlflow_from_config(
     # Try to create MLClient if Azure ML is enabled
     ml_client = None
     azure_ml_config = mlflow_config.get("azure_ml", {})
+    platform = detect_platform()
+
     if azure_ml_config.get("enabled", False):
         logger.info("Azure ML enabled in config, attempting to connect...")
-        logger.debug(f"Workspace: {azure_ml_config.get('workspace_name', 'unknown')}")
-        # Always try to create ML client - it will load from config.env if env vars not set
+        logger.debug(
+            f"Workspace: {azure_ml_config.get('workspace_name', 'unknown')}")
+        # Try to create ML client - it will load from config.env if env vars not set
+        # For Colab/Kaggle, requires Service Principal credentials
         ml_client = create_ml_client_from_config(config_dir, mlflow_config)
         if ml_client is None:
-            logger.warning("Failed to create Azure ML client, falling back to local tracking")
+            logger.info("Falling back to local tracking")
     else:
         logger.info("Azure ML disabled in config, using local tracking")
 

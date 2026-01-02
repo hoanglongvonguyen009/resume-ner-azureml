@@ -19,11 +19,20 @@ from .search_space import (
     translate_search_space_to_optuna as translate_search_space,
 )
 from .study_extractor import extract_best_config_from_study
-from .azureml.sweeps import (
-    create_dry_run_sweep_job_for_backbone,
-    create_hpo_sweep_job_for_backbone,
-    validate_sweep_job,
-)
+
+# Azure ML-dependent imports (optional)
+try:
+    from .azureml.sweeps import (
+        create_dry_run_sweep_job_for_backbone,
+        create_hpo_sweep_job_for_backbone,
+        validate_sweep_job,
+    )
+except ImportError:
+    # Azure ML SDK not available; skip Azure-specific helpers.
+    create_dry_run_sweep_job_for_backbone = None
+    create_hpo_sweep_job_for_backbone = None
+    validate_sweep_job = None
+
 from .local.trial.execution import TrialExecutor
 
 __all__ = [
