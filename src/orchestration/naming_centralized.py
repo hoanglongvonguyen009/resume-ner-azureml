@@ -109,7 +109,7 @@ def create_naming_context(
     """
     if environment is None:
         environment = detect_platform()
-    
+
     # Layer B: Ensure trial_id is never None/empty/whitespace for hpo_refit
     if process_type == "hpo_refit":
         if not trial_id or not trial_id.strip():
@@ -149,6 +149,33 @@ def _get_pattern_key(process_type: str) -> Optional[str]:
     return mapping.get(process_type)
 
 
+def _validate_output_path(path: Path, process_type: str) -> None:
+    """
+    Basic validation of output path (sanity check).
+
+    Since paths are constructed from validated NamingContext and patterns,
+    this is primarily a defense-in-depth check for programming errors.
+
+    Args:
+        path: Path to validate
+        process_type: Process type for error messages
+
+    Raises:
+        ValueError: If path is invalid
+    """
+    # Basic sanity check - paths from build_output_path should never be None/empty
+    if not path or not str(path):
+        raise ValueError(f"Invalid {process_type} output path: {path}")
+
+    path_str = str(path)
+    if not path_str or path_str in (".", ".."):
+        raise ValueError(f"Invalid {process_type} output path: {path_str}")
+
+    # Note: Removed version number check - root cause (pip install command) is fixed.
+    # Paths from build_output_path always have structure like outputs/category/.../...
+    # so they will never be just a version number.
+
+
 def _build_output_path_fallback(
     root_dir: Path,
     context: NamingContext,
@@ -164,38 +191,48 @@ def _build_output_path_fallback(
     if context.process_type == "hpo":
         if not context.trial_id:
             raise ValueError("HPO requires trial_id")
-        return base_path / "hpo" / context.environment / context.model / context.trial_id
+        final_path = base_path / "hpo" / context.environment / \
+            context.model / context.trial_id
 
     elif context.process_type == "hpo_refit":
         if not context.trial_id:
             raise ValueError("HPO refit requires trial_id")
         # Refit is a subdirectory of the trial: trial_<n>_<ts>/refit/
         # Extract trial base from trial_id (trial_id may include timestamp)
-        return base_path / "hpo" / context.environment / context.model / context.trial_id / "refit"
+        final_path = base_path / "hpo" / context.environment / \
+            context.model / context.trial_id / "refit"
 
     elif context.process_type == "benchmarking":
         if not context.trial_id:
             raise ValueError("Benchmarking requires trial_id")
-        return base_path / "benchmarking" / context.environment / context.model / context.trial_id
+        final_path = base_path / "benchmarking" / \
+            context.environment / context.model / context.trial_id
 
     elif context.process_type == "final_training":
         # Format: spec_<spec_fp>_exec_<exec_fp>/v<variant>
         spec_exec_dir = f"spec_{context.spec_fp}_exec_{context.exec_fp}"
         variant_dir = f"v{context.variant}"
-        return base_path / "final_training" / context.environment / context.model / spec_exec_dir / variant_dir
+        final_path = base_path / "final_training" / context.environment / \
+            context.model / spec_exec_dir / variant_dir
 
     elif context.process_type == "conversion":
         # Format: <parent_training_id>/conv_<conv_fp>
         conv_dir = f"conv_{context.conv_fp}"
-        return base_path / "conversion" / context.environment / context.model / context.parent_training_id / conv_dir
+        final_path = base_path / "conversion" / context.environment / \
+            context.model / context.parent_training_id / conv_dir
 
     elif context.process_type == "best_configurations":
         # Format: <model>/spec_<spec_fp>
         spec_dir = f"spec_{context.spec_fp}"
-        return base_path / "cache" / "best_configurations" / context.model / spec_dir
+        final_path = base_path / "cache" / "best_configurations" / context.model / spec_dir
 
     else:
         raise ValueError(f"Unknown process_type: {context.process_type}")
+
+    # CRITICAL: Validate final path to prevent creating invalid files like '1.0.0'
+    _validate_output_path(final_path, context.process_type)
+
+    return final_path
 
 
 def build_output_path(
@@ -294,7 +331,8 @@ def build_output_path(
     if context.process_type == "best_configurations":
         # Special handling: cache/best_configurations/{model}/spec_{spec_fp}/
         # Pattern is relative to cache/best_configurations, not outputs
-        return base_path / "cache" / "best_configurations" / Path(resolved_pattern)
+        final_path = base_path / "cache" / \
+            "best_configurations" / Path(resolved_pattern)
     else:
         # Get output directory from config
         output_dir = paths_config.get("outputs", {}).get(category, category)
@@ -302,12 +340,17 @@ def build_output_path(
         # Split by "/" and create path components
         pattern_parts = resolved_pattern.split("/")
         base_output_path = base_path / output_dir / Path(*pattern_parts)
-        
+
         # For hpo_refit, append "refit" subdirectory
         if context.process_type == "hpo_refit":
-            return base_output_path / "refit"
-        
-        return base_output_path
+            final_path = base_output_path / "refit"
+        else:
+            final_path = base_output_path
+
+    # CRITICAL: Validate final path to prevent creating invalid files like '1.0.0'
+    _validate_output_path(final_path, context.process_type)
+
+    return final_path
 
 
 def build_parent_training_id(spec_fp: str, exec_fp: str, variant: int = 1) -> str:

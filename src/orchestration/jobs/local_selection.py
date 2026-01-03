@@ -337,6 +337,7 @@ def load_best_trial_from_disk(
     hpo_output_dir: Path,
     backbone: str,
     objective_metric: str = "macro-f1",
+    hpo_config: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Load best trial configuration from saved HPO outputs on disk.
@@ -348,6 +349,7 @@ def load_best_trial_from_disk(
         hpo_output_dir: Path to HPO outputs directory (e.g., outputs/hpo).
         backbone: Model backbone name.
         objective_metric: Name of the objective metric to optimize.
+        hpo_config: Optional HPO config for config-aware study folder discovery.
 
     Returns:
         Dictionary with best trial info, or None if no trials found.
@@ -356,6 +358,24 @@ def load_best_trial_from_disk(
 
     if not backbone_dir.exists():
         return None
+    
+    # Try new structure first (if hpo_config provided): study folders with config-aware matching
+    if hpo_config is not None:
+        try:
+            from orchestration.jobs.local_selection_v2 import (
+                find_study_folder_by_config,
+                load_best_trial_from_study_folder,
+            )
+            study_folder = find_study_folder_by_config(
+                backbone_dir, hpo_config, backbone
+            )
+            if study_folder:
+                return load_best_trial_from_study_folder(
+                    study_folder, objective_metric
+                )
+        except Exception:
+            # Fall through to old structure if v2 functions fail
+            pass
 
     best_metric = None
     best_trial_dir = None
@@ -567,7 +587,7 @@ def select_best_from_disk(
     candidates = []
     for backbone in backbones:
         candidate = load_best_trial_from_disk(
-            hpo_output_dir, backbone, objective_metric
+            hpo_output_dir, backbone, objective_metric, hpo_config=hpo_config
         )
         if candidate:
             trial_dir = Path(candidate["trial_dir"])

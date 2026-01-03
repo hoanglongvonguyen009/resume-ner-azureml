@@ -360,6 +360,20 @@ def run_local_hpo_sweep(
     # Use study folder as base for trials (so trials are created inside study folder)
     study_output_dir = study_folder
     logger.info(f"Using study folder as base for trials: {study_output_dir}")
+    
+    # Write .active_study.json marker for fast lookup in selection code
+    try:
+        from orchestration.jobs.local_selection_v2 import write_active_study_marker
+        backbone_dir = study_folder.parent
+        write_active_study_marker(
+            backbone_dir=backbone_dir,
+            study_folder=study_folder,
+            study_name=study_name,
+            study_key_hash=None,  # Will be updated later when MLflow run is created
+        )
+        logger.debug(f"Wrote .active_study.json marker to {backbone_dir / '.active_study.json'}")
+    except Exception as e:
+        logger.debug(f"Could not write .active_study.json marker: {e}")
 
     # Check if checkpointing is enabled (for later use)
     checkpoint_enabled = checkpoint_config is not None and checkpoint_config.get(
@@ -461,6 +475,25 @@ def run_local_hpo_sweep(
                 mlflow_run_name=mlflow_run_name,
                 output_dir=output_dir,
             )
+            
+            # Update .active_study.json marker with study_key_hash from MLflow run
+            try:
+                from orchestration.jobs.local_selection_v2 import write_active_study_marker
+                import mlflow
+                client = mlflow.tracking.MlflowClient()
+                parent_run = client.get_run(parent_run_id)
+                study_key_hash = parent_run.data.tags.get("code.study_key_hash")
+                if study_key_hash:
+                    backbone_dir = study_folder.parent
+                    write_active_study_marker(
+                        backbone_dir=backbone_dir,
+                        study_folder=study_folder,
+                        study_name=study_name,
+                        study_key_hash=study_key_hash,
+                    )
+                    logger.debug(f"Updated .active_study.json marker with study_key_hash")
+            except Exception as e:
+                logger.debug(f"Could not update .active_study.json marker with study_key_hash: {e}")
 
             # Cleanup: Tag interrupted runs from previous sessions
             parent_to_children = cleanup_interrupted_runs(
