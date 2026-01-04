@@ -12,6 +12,8 @@ from .local_selection import (
     load_best_trial_from_disk as load_best_trial,
     select_best_configuration_across_studies,
 )
+from .mlflow_selection import find_best_model_from_mlflow
+from .artifact_acquisition import acquire_best_model_checkpoint
 from .selection import select_best_configuration
 
 # Alias for backward compatibility
@@ -28,6 +30,10 @@ __all__ = [
     "select_best_configuration_across_studies",
     # Azure ML selection
     "select_production_configuration",
+    # MLflow selection
+    "find_best_model_from_mlflow",
+    # Artifact acquisition
+    "acquire_best_model_checkpoint",
     # Selection logic
     "MODEL_SPEED_SCORES",
     "SelectionLogic",
