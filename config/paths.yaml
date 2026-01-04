@@ -74,6 +74,9 @@ outputs:
   # Model conversion outputs
   conversion: "conversion"        # ONNX conversions: outputs/conversion/{environment}/{model}/{parent_training_id}/conv_{conv_fp}/
   
+  # Best model selection outputs
+  best_model_selection: "best_model_selection"  # Best model selection checkpoints: outputs/best_model_selection/{environment}/{model}/sel_{study_hash[:8]}_{trial_hash[:8]}/
+  
   # Cache directories (for metadata and cache files)
   cache: "cache"                  # Cache files: outputs/cache/{cache_type}/
   

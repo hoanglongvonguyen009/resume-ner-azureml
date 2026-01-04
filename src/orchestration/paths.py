@@ -33,6 +33,7 @@ def _get_default_paths() -> Dict[str, Any]:
             "benchmarking": "benchmarking",
             "final_training": "final_training",
             "conversion": "conversion",
+            "best_model_selection": "best_model_selection",
             "cache": "cache",
         },
         "cache": {
