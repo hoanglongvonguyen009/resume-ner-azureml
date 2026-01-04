@@ -15,6 +15,10 @@ from .local_selection import (
 from .mlflow_selection import find_best_model_from_mlflow
 from .artifact_acquisition import acquire_best_model_checkpoint
 from .selection import select_best_configuration
+from .trial_finder import (
+    find_best_trials_for_backbones,
+    find_study_folder_in_backbone_dir,
+)
 
 # Alias for backward compatibility
 select_production_configuration = select_best_configuration
@@ -34,6 +38,9 @@ __all__ = [
     "find_best_model_from_mlflow",
     # Artifact acquisition
     "acquire_best_model_checkpoint",
+    # Trial finding
+    "find_best_trials_for_backbones",
+    "find_study_folder_in_backbone_dir",
     # Selection logic
     "MODEL_SPEED_SCORES",
     "SelectionLogic",

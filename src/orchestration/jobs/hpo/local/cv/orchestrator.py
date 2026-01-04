@@ -132,7 +132,12 @@ def run_training_trial_with_cv(
     study_name = output_dir.name
     
     # Write trial metadata file for easy lookup during selection
+    # Ensure path is absolute and resolved (important for Colab Drive paths)
     try:
+        # Resolve to absolute path to ensure we're writing to the correct location
+        # This is especially important in Colab where output_dir might be in Drive
+        trial_base_dir_abs = Path(trial_base_dir).resolve()
+        
         trial_meta = {
             "study_key_hash": computed_study_key_hash,
             "trial_key_hash": computed_trial_key_hash,
@@ -141,13 +146,18 @@ def run_training_trial_with_cv(
             "run_id": run_id,
             "created_at": datetime.now().isoformat(),
         }
-        trial_meta_path = trial_base_dir / "trial_meta.json"
-        trial_base_dir.mkdir(parents=True, exist_ok=True)
+        trial_meta_path = trial_base_dir_abs / "trial_meta.json"
+        trial_base_dir_abs.mkdir(parents=True, exist_ok=True)
         with open(trial_meta_path, "w") as f:
             json.dump(trial_meta, f, indent=2)
-        logger.debug(f"Wrote trial metadata to {trial_meta_path}")
+        logger.info(f"Wrote trial metadata to {trial_meta_path}")
+        
+        # Update trial_base_dir to use absolute path for consistency
+        trial_base_dir = trial_base_dir_abs
     except Exception as e:
         logger.warning(f"Could not write trial metadata file: {e}")
+        import traceback
+        logger.debug(traceback.format_exc())
     
     for fold_idx, (train_indices, val_indices) in enumerate(fold_splits):
         # Construct fold-specific output directory using new structure

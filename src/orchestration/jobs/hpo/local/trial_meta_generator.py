@@ -1,0 +1,256 @@
+"""Generate missing trial_meta.json files for existing HPO trials.
+
+This module provides utilities to retroactively create trial_meta.json files
+for trials that were created before this feature was added.
+"""
+
+import json
+import re
+from datetime import datetime
+from pathlib import Path
+from typing import Optional, Dict, Any
+
+from shared.logging_utils import get_logger
+
+logger = get_logger(__name__)
+
+
+def extract_trial_info_from_dirname(dirname: str) -> Optional[Dict[str, Any]]:
+    """Extract trial_number and run_id from trial directory name."""
+    match = re.match(r"trial_(\d+)_(.+)", dirname)
+    if match:
+        return {"trial_number": int(match.group(1)), "run_id": match.group(2)}
+    return None
+
+
+def generate_missing_trial_meta(
+    study_folder: Path,
+    backbone: str,
+    study_key_hash: Optional[str] = None,
+) -> int:
+    """
+    Generate missing trial_meta.json files for a study.
+
+    Args:
+        study_folder: Path to study folder containing study.db and trial directories
+        backbone: Model backbone name
+        study_key_hash: Optional study key hash (will try to fetch from MLflow if not provided)
+
+    Returns:
+        Number of trial_meta.json files created
+    """
+    study_db_path = study_folder / "study.db"
+    if not study_db_path.exists():
+        logger.info(f"study.db not found: {study_db_path}")
+        return 0
+
+    study_name = study_folder.name
+    storage_uri = f"sqlite:///{study_db_path.resolve()}"
+
+    # Try to import Optuna
+    try:
+        from orchestration.jobs.hpo.local.optuna.integration import import_optuna
+        optuna, _, _, _ = import_optuna()
+    except ImportError:
+        import optuna
+
+    try:
+        study = optuna.load_study(study_name=study_name, storage=storage_uri)
+        logger.info(f"Loaded study with {len(study.trials)} trials")
+    except Exception as e:
+        logger.error(f"Could not load study: {e}")
+        return 0
+
+    # Try to get study_key_hash from MLflow if not provided
+    if not study_key_hash:
+        try:
+            import mlflow
+            client = mlflow.tracking.MlflowClient()
+            experiments = client.search_experiments()
+            for exp in experiments:
+                runs = client.search_runs(
+                    experiment_ids=[exp.experiment_id],
+                    filter_string=f"tags.code.study_name = '{study_name}' OR tags.code.backbone = '{backbone}'",
+                    max_results=10,
+                )
+                for run in runs:
+                    study_key_hash = run.data.tags.get("code.study_key_hash")
+                    if study_key_hash:
+                        break
+                if study_key_hash:
+                    break
+        except Exception:
+            pass
+
+    # Find trial directories
+    trial_dirs = [d for d in study_folder.iterdir() if d.is_dir() and d.name.startswith("trial_")]
+    created_count = 0
+
+    for trial_dir in trial_dirs:
+        trial_meta_path = trial_dir / "trial_meta.json"
+        if trial_meta_path.exists():
+            continue
+
+        trial_info = extract_trial_info_from_dirname(trial_dir.name)
+        if not trial_info:
+            continue
+
+        trial_number = trial_info["trial_number"]
+        run_id = trial_info["run_id"]
+
+        # Find Optuna trial
+        optuna_trial = None
+        for t in study.trials:
+            if t.number == trial_number:
+                optuna_trial = t
+                break
+
+        if not optuna_trial:
+            continue
+
+        # Try to get trial_key_hash from MLflow
+        trial_key_hash = None
+        if study_key_hash:
+            try:
+                import mlflow
+                from orchestration.jobs.tracking.mlflow_naming import (
+                    build_hpo_trial_key,
+                    build_hpo_trial_key_hash,
+                )
+                client = mlflow.tracking.MlflowClient()
+                experiments = client.search_experiments()
+                for exp in experiments:
+                    runs = client.search_runs(
+                        experiment_ids=[exp.experiment_id],
+                        filter_string=f"tags.code.study_key_hash = '{study_key_hash}' AND tags.code.trial_number = '{trial_number}'",
+                        max_results=10,
+                    )
+                    for run in runs:
+                        trial_key_hash = run.data.tags.get("code.trial_key_hash")
+                        if trial_key_hash:
+                            break
+                    if trial_key_hash:
+                        break
+
+                # If not found, compute it
+                if not trial_key_hash:
+                    hyperparameters = {
+                        k: v
+                        for k, v in optuna_trial.params.items()
+                        if k not in ("backbone", "trial_number", "run_id")
+                    }
+                    trial_key = build_hpo_trial_key(study_key_hash, hyperparameters)
+                    trial_key_hash = build_hpo_trial_key_hash(trial_key)
+            except Exception as e:
+                logger.info(f"Could not compute trial_key_hash: {e}")
+
+        # Create trial_meta.json
+        trial_meta = {
+            "study_key_hash": study_key_hash,
+            "trial_key_hash": trial_key_hash,
+            "trial_number": trial_number,
+            "study_name": study_name,
+            "run_id": run_id,
+            "created_at": datetime.now().isoformat(),
+            "note": "Retroactively generated from existing trial data",
+        }
+
+        try:
+            with open(trial_meta_path, "w") as f:
+                json.dump(trial_meta, f, indent=2)
+            logger.info(f"Created {trial_dir.name}/trial_meta.json")
+            created_count += 1
+        except Exception as e:
+            logger.error(f"Could not create {trial_meta_path}: {e}")
+
+    return created_count
+
+
+def generate_missing_trial_meta_for_all_studies(
+    hpo_studies: Dict[str, Any],
+    backbone_values: list,
+    root_dir: Path,
+    environment: str,
+    hpo_config: dict,
+    backup_enabled: bool = True,
+) -> int:
+    """
+    Generate missing trial_meta.json files for all studies.
+
+    Args:
+        hpo_studies: Dictionary mapping backbone names to Optuna study objects
+        backbone_values: List of backbone names
+        root_dir: Root directory of the project
+        environment: Platform environment (local, colab, kaggle)
+        hpo_config: HPO configuration dict
+        backup_enabled: Whether backup is enabled
+
+    Returns:
+        Total number of trial_meta.json files created
+    """
+    if not backup_enabled:
+        logger.info("Skipping trial_meta.json generation (BACKUP_ENABLED=False)")
+        return 0
+
+    if not hpo_studies:
+        logger.info("Skipping trial_meta.json generation (hpo_studies not available)")
+        return 0
+
+    logger.info("Generating missing trial_meta.json files...")
+    total_created = 0
+
+    from orchestration.path_resolution import resolve_hpo_output_dir
+    from orchestration.jobs.hpo.local.checkpoint.manager import resolve_storage_path
+
+    for backbone_name, study in hpo_studies.items():
+        if not study:
+            continue
+
+        # Find study folder
+        backbone_output_dir = root_dir / "outputs" / "hpo" / environment / backbone_name
+        hpo_backbone_dir = resolve_hpo_output_dir(backbone_output_dir)
+
+        if not hpo_backbone_dir.exists():
+            continue
+
+        # Resolve storage path to get study folder
+        checkpoint_config = hpo_config.get("checkpoint", {})
+        study_name_template = checkpoint_config.get("study_name") or hpo_config.get("study_name")
+        study_name = None
+        if study_name_template:
+            study_name = study_name_template.replace("{backbone}", backbone_name)
+
+        actual_storage_path = resolve_storage_path(
+            output_dir=backbone_output_dir,
+            checkpoint_config=checkpoint_config,
+            backbone=backbone_name,
+            study_name=study_name,
+        )
+
+        if actual_storage_path and actual_storage_path.exists():
+            study_folder = actual_storage_path.parent
+        else:
+            # Fallback: construct from study name
+            study_folder = backbone_output_dir / study_name if study_name else backbone_output_dir
+            # Try to find existing study folder
+            if not study_folder.exists():
+                # Look for any study folder in backbone dir
+                if backbone_output_dir.exists():
+                    study_folders = [
+                        d
+                        for d in backbone_output_dir.iterdir()
+                        if d.is_dir()
+                        and not d.name.startswith("trial_")
+                        and d.name != ".ipynb_checkpoints"
+                    ]
+                    if study_folders:
+                        study_folder = study_folders[0]
+
+        if study_folder:
+            logger.info(f"Processing {backbone_name}: {study_folder.name}")
+            created = generate_missing_trial_meta(study_folder, backbone_name)
+            total_created += created
+
+    logger.info(f"Total: Created {total_created} trial_meta.json files")
+    return total_created
+
