@@ -27,6 +27,8 @@ def generate_missing_trial_meta(
     study_folder: Path,
     backbone: str,
     study_key_hash: Optional[str] = None,
+    hpo_config: Optional[Dict[str, Any]] = None,
+    data_config: Optional[Dict[str, Any]] = None,
 ) -> int:
     """
     Generate missing trial_meta.json files for a study.
@@ -81,6 +83,24 @@ def generate_missing_trial_meta(
                     break
         except Exception:
             pass
+    
+    # If still not found, try to compute from configs
+    if not study_key_hash and hpo_config and data_config:
+        try:
+            from orchestration.jobs.tracking.mlflow_naming import (
+                build_hpo_study_key,
+                build_hpo_study_key_hash,
+            )
+            study_key = build_hpo_study_key(
+                data_config=data_config,
+                hpo_config=hpo_config,
+                backbone=backbone,
+                benchmark_config=None,  # Not needed for hash computation
+            )
+            study_key_hash = build_hpo_study_key_hash(study_key)
+            logger.debug(f"Computed study_key_hash from configs: {study_key_hash[:16]}...")
+        except Exception as e:
+            logger.debug(f"Could not compute study_key_hash from configs: {e}")
 
     # Find trial directories
     trial_dirs = [d for d in study_folder.iterdir() if d.is_dir() and d.name.startswith("trial_")]
@@ -88,8 +108,22 @@ def generate_missing_trial_meta(
 
     for trial_dir in trial_dirs:
         trial_meta_path = trial_dir / "trial_meta.json"
+        
+        # Check if file exists and has valid hashes
+        should_create = True
         if trial_meta_path.exists():
-            continue
+            try:
+                with open(trial_meta_path, "r") as f:
+                    existing_meta = json.load(f)
+                # Only skip if hashes are already set
+                if existing_meta.get("study_key_hash") and existing_meta.get("trial_key_hash"):
+                    continue  # Skip - hashes already exist
+                # Otherwise, update it (hashes are null)
+                logger.info(f"Updating {trial_dir.name}/trial_meta.json (hashes are null)")
+                should_create = False
+            except Exception:
+                # File exists but can't read it, will overwrite
+                pass
 
         trial_info = extract_trial_info_from_dirname(trial_dir.name)
         if not trial_info:
@@ -144,24 +178,41 @@ def generate_missing_trial_meta(
             except Exception as e:
                 logger.info(f"Could not compute trial_key_hash: {e}")
 
-        # Create trial_meta.json
-        trial_meta = {
-            "study_key_hash": study_key_hash,
-            "trial_key_hash": trial_key_hash,
-            "trial_number": trial_number,
-            "study_name": study_name,
-            "run_id": run_id,
-            "created_at": datetime.now().isoformat(),
-            "note": "Retroactively generated from existing trial data",
-        }
+        # Create or update trial_meta.json
+        # Preserve existing fields if updating
+        if should_create:
+            trial_meta = {
+                "study_key_hash": study_key_hash,
+                "trial_key_hash": trial_key_hash,
+                "trial_number": trial_number,
+                "study_name": study_name,
+                "run_id": run_id,
+                "created_at": datetime.now().isoformat(),
+                "note": "Retroactively generated from existing trial data",
+            }
+        else:
+            # Load existing and update hashes
+            with open(trial_meta_path, "r") as f:
+                trial_meta = json.load(f)
+            trial_meta["study_key_hash"] = study_key_hash
+            trial_meta["trial_key_hash"] = trial_key_hash
+            trial_meta["updated_at"] = datetime.now().isoformat()
+            if "note" not in trial_meta:
+                trial_meta["note"] = "Updated with computed hashes"
 
         try:
             with open(trial_meta_path, "w") as f:
                 json.dump(trial_meta, f, indent=2)
-            logger.info(f"Created {trial_dir.name}/trial_meta.json")
+            action = "Created" if should_create else "Updated"
+            logger.info(f"{action} {trial_dir.name}/trial_meta.json")
+            if study_key_hash and trial_key_hash:
+                logger.debug(f"  study_key_hash: {study_key_hash[:16]}...")
+                logger.debug(f"  trial_key_hash: {trial_key_hash[:16]}...")
+            else:
+                logger.warning(f"  Warning: Could not compute hashes (study_key_hash={study_key_hash is not None}, trial_key_hash={trial_key_hash is not None})")
             created_count += 1
         except Exception as e:
-            logger.error(f"Could not create {trial_meta_path}: {e}")
+            logger.error(f"Could not create/update {trial_meta_path}: {e}")
 
     return created_count
 
@@ -172,6 +223,7 @@ def generate_missing_trial_meta_for_all_studies(
     root_dir: Path,
     environment: str,
     hpo_config: dict,
+    data_config: Optional[Dict[str, Any]] = None,
     backup_enabled: bool = True,
 ) -> int:
     """
@@ -183,6 +235,7 @@ def generate_missing_trial_meta_for_all_studies(
         root_dir: Root directory of the project
         environment: Platform environment (local, colab, kaggle)
         hpo_config: HPO configuration dict
+        data_config: Data configuration dict (needed to compute study_key_hash)
         backup_enabled: Whether backup is enabled
 
     Returns:
@@ -248,7 +301,11 @@ def generate_missing_trial_meta_for_all_studies(
 
         if study_folder:
             logger.info(f"Processing {backbone_name}: {study_folder.name}")
-            created = generate_missing_trial_meta(study_folder, backbone_name)
+            created = generate_missing_trial_meta(
+                study_folder, backbone_name,
+                hpo_config=hpo_config,
+                data_config=data_config,
+            )
             total_created += created
 
     logger.info(f"Total: Created {total_created} trial_meta.json files")

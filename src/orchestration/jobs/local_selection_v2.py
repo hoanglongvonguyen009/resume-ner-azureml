@@ -352,3 +352,138 @@ def write_active_study_marker(
         import logging
         logger = logging.getLogger(__name__)
         logger.warning(f"Could not write .active_study.json: {e}")
+
+
+def _get_checkpoint_path_from_trial_dir(trial_dir: Path) -> Optional[Path]:
+    """
+    Get checkpoint path from trial directory.
+    
+    Prefers:
+    1. refit/checkpoint/ (if refit training completed)
+    2. cv/foldN/checkpoint/ (best CV fold based on metrics)
+    3. checkpoint/ (fallback)
+    
+    Args:
+        trial_dir: Path to trial directory
+        
+    Returns:
+        Path to checkpoint directory, or None if not found
+    """
+    if not trial_dir.exists():
+        return None
+    
+    # 1. Check for refit checkpoint
+    refit_checkpoint = trial_dir / "refit" / "checkpoint"
+    if refit_checkpoint.exists():
+        return refit_checkpoint
+    
+    # 2. Check for CV fold checkpoints
+    cv_dir = trial_dir / "cv"
+    if cv_dir.exists():
+        # Find all fold directories
+        fold_dirs = []
+        for item in cv_dir.iterdir():
+            if item.is_dir():
+                import re
+                if re.match(r"fold_?\d+", item.name):
+                    fold_dirs.append(item)
+        
+        if fold_dirs:
+            # Try to find the best fold by looking for metrics.json
+            best_fold = None
+            best_score = None
+            
+            for fold_dir in fold_dirs:
+                metrics_file = fold_dir / "metrics.json"
+                if metrics_file.exists():
+                    try:
+                        with open(metrics_file, "r") as f:
+                            metrics = json.load(f)
+                        # Look for macro-f1 or first numeric metric
+                        score = metrics.get("macro-f1")
+                        if score is None:
+                            # Try to find first numeric value
+                            for key, value in metrics.items():
+                                if isinstance(value, (int, float)):
+                                    score = value
+                                    break
+                        
+                        if score is not None and (best_score is None or score > best_score):
+                            best_score = score
+                            best_fold = fold_dir
+                    except Exception:
+                        continue
+            
+            # Use best fold if found, otherwise use first fold
+            if best_fold:
+                checkpoint = best_fold / "checkpoint"
+                if checkpoint.exists():
+                    return checkpoint
+            
+            # Fallback: try all folds in order
+            for fold_dir in fold_dirs:
+                checkpoint = fold_dir / "checkpoint"
+                if checkpoint.exists():
+                    return checkpoint
+    
+    # 3. Fallback: check root checkpoint
+    root_checkpoint = trial_dir / "checkpoint"
+    if root_checkpoint.exists():
+        return root_checkpoint
+    
+    return None
+
+
+def find_trial_checkpoint_by_hash(
+    hpo_backbone_dir: Path,
+    study_key_hash: str,
+    trial_key_hash: str,
+) -> Optional[Path]:
+    """
+    Find trial checkpoint by study_key_hash and trial_key_hash.
+    
+    Scans trial folders and reads trial_meta.json files to match by hash.
+    This avoids Optuna DB dependencies and hash recomputation issues.
+    
+    Args:
+        hpo_backbone_dir: Backbone directory containing study folders
+        study_key_hash: Target study key hash (64 hex chars)
+        trial_key_hash: Target trial key hash (64 hex chars)
+        
+    Returns:
+        Path to checkpoint directory (prefers refit, else best CV fold), or None if not found
+    """
+    if not hpo_backbone_dir.exists():
+        return None
+    
+    # Scan all study folders
+    for study_folder in hpo_backbone_dir.iterdir():
+        if not study_folder.is_dir() or study_folder.name.startswith("trial_"):
+            continue
+        
+        # Scan all trial folders in this study
+        for trial_dir in study_folder.iterdir():
+            if not trial_dir.is_dir() or not trial_dir.name.startswith("trial_"):
+                continue
+            
+            # Read trial metadata
+            trial_meta_path = trial_dir / "trial_meta.json"
+            if not trial_meta_path.exists():
+                continue
+            
+            try:
+                with open(trial_meta_path, "r") as f:
+                    meta = json.load(f)
+                
+                # Match by hashes
+                if (meta.get("study_key_hash") == study_key_hash and 
+                    meta.get("trial_key_hash") == trial_key_hash):
+                    # Found match! Return checkpoint (prefer refit, else best CV fold)
+                    return _get_checkpoint_path_from_trial_dir(trial_dir)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.debug(f"Error reading trial_meta.json from {trial_meta_path}: {e}")
+                continue
+    
+    return None

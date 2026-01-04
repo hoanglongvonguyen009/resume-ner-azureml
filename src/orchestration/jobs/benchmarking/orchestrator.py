@@ -25,40 +25,58 @@ BENCHMARK_FILENAME = "benchmark.json"
 def find_checkpoint_in_trial_dir(trial_dir: Path) -> Optional[Path]:
     """
     Find checkpoint directory in trial directory.
-    
+
     Prefers:
     1. refit/checkpoint/ (if refit training completed)
     2. cv/foldN/checkpoint/ (best CV fold based on metrics)
     3. checkpoint/ (fallback)
-    
+
     Args:
         trial_dir: Path to trial directory
-        
+
     Returns:
         Path to checkpoint directory, or None if not found
     """
     if not trial_dir.exists():
+        logger.warning(f"Trial directory does not exist: {trial_dir}")
         return None
-    
+
+    # Log what's actually in the directory for debugging
+    try:
+        contents = [item.name for item in trial_dir.iterdir()]
+        logger.warning(f"Trial directory {trial_dir} contains: {contents}")
+    except Exception as e:
+        logger.warning(f"Could not list trial directory contents: {e}")
+
     # 1. Check for refit checkpoint
     refit_checkpoint = trial_dir / "refit" / CHECKPOINT_DIRNAME
+    logger.warning(
+        f"Checking refit checkpoint at: {refit_checkpoint} (exists: {refit_checkpoint.exists()})")
     if refit_checkpoint.exists():
+        logger.warning(f"Found refit checkpoint: {refit_checkpoint}")
         return refit_checkpoint
-    
+
     # 2. Check for CV fold checkpoints
     cv_dir = trial_dir / "cv"
+    logger.warning(
+        f"Checking CV directory at: {cv_dir} (exists: {cv_dir.exists()})")
     if cv_dir.exists():
-        # Find all fold directories
-        fold_dirs = [
-            d for d in cv_dir.iterdir()
-            if d.is_dir() and d.name.startswith("fold")
-        ]
-        
+        # Find all fold directories - handle both "fold0" and "fold_0" patterns
+        fold_dirs = []
+        for item in cv_dir.iterdir():
+            if item.is_dir():
+                # Match patterns: fold0, fold_0, fold1, fold_1, etc.
+                import re
+                if re.match(r"fold_?\d+", item.name):
+                    fold_dirs.append(item)
+
         if fold_dirs:
+            logger.warning(
+                f"Found {len(fold_dirs)} fold directories in {cv_dir}: {[d.name for d in fold_dirs]}")
             # Try to find the best fold by looking for metrics.json
             best_fold = None
             best_score = None
-            
+
             for fold_dir in fold_dirs:
                 metrics_file = fold_dir / "metrics.json"
                 if metrics_file.exists():
@@ -74,29 +92,46 @@ def find_checkpoint_in_trial_dir(trial_dir: Path) -> Optional[Path]:
                                 if isinstance(value, (int, float)):
                                     score = value
                                     break
-                        
+
                         if score is not None and (best_score is None or score > best_score):
                             best_score = score
                             best_fold = fold_dir
-                    except Exception:
+                    except Exception as e:
+                        logger.debug(
+                            f"Error reading metrics from {metrics_file}: {e}")
                         continue
-            
+
             # Use best fold if found, otherwise use first fold
             if best_fold:
                 checkpoint = best_fold / CHECKPOINT_DIRNAME
+                logger.warning(
+                    f"Checking best fold {best_fold.name}: checkpoint at {checkpoint} (exists: {checkpoint.exists()})")
                 if checkpoint.exists():
+                    logger.warning(
+                        f"Found checkpoint in best fold: {checkpoint}")
                     return checkpoint
-            else:
-                # Fallback: use first fold
-                checkpoint = fold_dirs[0] / CHECKPOINT_DIRNAME
+
+            # Fallback: try all folds in order
+            for fold_dir in fold_dirs:
+                checkpoint = fold_dir / CHECKPOINT_DIRNAME
+                logger.warning(
+                    f"Checking fold {fold_dir.name}: checkpoint at {checkpoint} (exists: {checkpoint.exists()})")
                 if checkpoint.exists():
+                    logger.warning(f"Found checkpoint in fold: {checkpoint}")
                     return checkpoint
-    
+        else:
+            logger.warning(f"No fold directories found in {cv_dir}")
+    else:
+        logger.warning(f"CV directory does not exist: {cv_dir}")
+
     # 3. Fallback: check root checkpoint
     root_checkpoint = trial_dir / CHECKPOINT_DIRNAME
+    logger.warning(
+        f"Checking root checkpoint at: {root_checkpoint} (exists: {root_checkpoint.exists()})")
     if root_checkpoint.exists():
+        logger.warning(f"Found root checkpoint: {root_checkpoint}")
         return root_checkpoint
-    
+
     return None
 
 
@@ -105,7 +140,7 @@ def compute_grouping_tags(
     data_config: dict,
     hpo_config: dict,
     benchmark_config: Optional[dict] = None,
-    ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """
     Compute grouping tags (study_key_hash, trial_key_hash, study_family_hash) for a trial.
 
@@ -174,9 +209,11 @@ def compute_grouping_tags(
                 missing.append("data_config")
             if not hpo_config:
                 missing.append("hpo_config")
-            logger.warning(f"Cannot compute grouping tags (missing: {', '.join(missing)})")
+            logger.warning(
+                f"Cannot compute grouping tags (missing: {', '.join(missing)})")
     except Exception as e:
-        logger.warning(f"Could not compute grouping tags locally: {e}", exc_info=True)
+        logger.warning(
+            f"Could not compute grouping tags locally: {e}", exc_info=True)
 
     return study_key_hash, trial_key_hash, study_family_hash
 
@@ -258,7 +295,8 @@ def benchmark_best_trials(
 
         backbone_name = backbone.split("-")[0] if "-" in backbone else backbone
 
-        trial_id_raw = trial_info.get("trial_id") or trial_info.get("trial_name", "unknown")
+        trial_id_raw = trial_info.get(
+            "trial_id") or trial_info.get("trial_name", "unknown")
         if trial_id_raw.startswith("trial_"):
             trial_id = trial_id_raw[6:]
         else:
@@ -284,8 +322,19 @@ def benchmark_best_trials(
 
         if not checkpoint_dir.exists():
             logger.warning(
-                f"Checkpoint not found for {backbone} {trial_info['trial_name']}"
+                f"Checkpoint not found for {backbone} {trial_info['trial_name']} at {checkpoint_dir}"
             )
+            # Log trial directory contents for debugging
+            if "trial_dir" in trial_info and trial_info["trial_dir"]:
+                trial_dir = Path(trial_info["trial_dir"])
+                if trial_dir.exists():
+                    try:
+                        contents = [
+                            item.name for item in trial_dir.iterdir() if item.is_dir()]
+                        logger.debug(
+                            f"Trial directory {trial_dir} contains: {contents}")
+                    except Exception as e:
+                        logger.debug(f"Could not list trial directory: {e}")
             continue
 
         # Check if benchmark already exists (handle both local and Drive paths)
@@ -344,7 +393,8 @@ def benchmark_best_trials(
                 backup_to_drive(benchmark_output, is_directory=False)
                 logger.info("Backed up benchmark results to Drive")
             elif str(benchmark_output).startswith("/content/drive"):
-                logger.info("Benchmark results are already in Drive (no backup needed)")
+                logger.info(
+                    "Benchmark results are already in Drive (no backup needed)")
         else:
             logger.error(f"Benchmark failed for {backbone}")
 
@@ -352,4 +402,3 @@ def benchmark_best_trials(
         f"Benchmarking complete. {len(benchmark_results)}/{len(best_trials)} trials benchmarked."
     )
     return benchmark_results
-

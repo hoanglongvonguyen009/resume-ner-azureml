@@ -4,6 +4,7 @@ This module provides utilities to locate and extract best trial information
 from Optuna studies or from saved outputs on disk.
 """
 
+import json
 import re
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -51,12 +52,14 @@ def find_best_trial_from_study(
     dataset_version: str,
     objective_metric: str,
     hpo_backbone_dir: Path,
+    hpo_config: Optional[Dict[str, Any]] = None,
+    data_config: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Find best trial from an Optuna study object.
 
     Uses study.best_trial (source of truth) and locates the corresponding
-    trial directory on disk.
+    trial directory on disk by matching trial_key_hash.
 
     Args:
         study: Optuna study object
@@ -64,6 +67,8 @@ def find_best_trial_from_study(
         dataset_version: Dataset version string
         objective_metric: Objective metric name
         hpo_backbone_dir: HPO backbone output directory
+        hpo_config: HPO configuration (needed to compute trial_key_hash)
+        data_config: Data configuration (needed to compute trial_key_hash)
 
     Returns:
         Dictionary with best trial info, or None if not found
@@ -81,19 +86,114 @@ def find_best_trial_from_study(
             logger.debug(f"Study folder not found in {hpo_backbone_dir}")
             return None
 
-        # Use study.best_trial directly (source of truth from Optuna)
-        best_trial_number = study.best_trial.number
+        best_trial = study.best_trial
+        best_trial_number = best_trial.number
+
+        # Compute trial_key_hash from Optuna trial hyperparameters
+        computed_trial_key_hash = None
+        if hpo_config and data_config:
+            try:
+                from orchestration.jobs.tracking.mlflow_naming import (
+                    build_hpo_study_key,
+                    build_hpo_study_key_hash,
+                    build_hpo_trial_key,
+                    build_hpo_trial_key_hash,
+                )
+
+                # Compute study_key_hash
+                study_key = build_hpo_study_key(
+                    data_config=data_config,
+                    hpo_config=hpo_config,
+                    backbone=backbone_name,
+                    benchmark_config=None,  # Not needed for trial lookup
+                )
+                study_key_hash = build_hpo_study_key_hash(study_key)
+
+                # Extract hyperparameters (excluding metadata fields)
+                hyperparameters = {
+                    k: v
+                    for k, v in best_trial.params.items()
+                    if k not in ("backbone", "trial_number")
+                }
+
+                # Compute trial_key_hash
+                trial_key = build_hpo_trial_key(
+                    study_key_hash=study_key_hash,
+                    hyperparameters=hyperparameters,
+                )
+                computed_trial_key_hash = build_hpo_trial_key_hash(trial_key)
+
+                logger.debug(
+                    f"Computed trial_key_hash for trial {best_trial_number}: "
+                    f"{computed_trial_key_hash[:16]}..."
+                )
+            except Exception as e:
+                logger.debug(f"Could not compute trial_key_hash: {e}")
+
         best_trial_dir = None
 
-        # Find trial directory matching best_trial.number
-        for trial_dir in study_folder.iterdir():
-            if not trial_dir.is_dir() or not trial_dir.name.startswith("trial_"):
-                continue
-            # Extract trial number from directory name (e.g., trial_1_20260104_201132 -> 1)
-            match = re.match(r"trial_(\d+)_", trial_dir.name)
-            if match and int(match.group(1)) == best_trial_number:
-                best_trial_dir = trial_dir
-                break
+        # Strategy 1: Match by trial_key_hash (most reliable)
+        if computed_trial_key_hash:
+            for trial_dir in study_folder.iterdir():
+                if not trial_dir.is_dir() or not trial_dir.name.startswith("trial_"):
+                    continue
+
+                trial_meta_path = trial_dir / "trial_meta.json"
+                if not trial_meta_path.exists():
+                    continue
+
+                try:
+                    with open(trial_meta_path, "r") as f:
+                        meta = json.load(f)
+
+                    # Match by trial_key_hash
+                    if meta.get("trial_key_hash") == computed_trial_key_hash:
+                        best_trial_dir = trial_dir
+                        logger.info(
+                            f"Found trial {trial_dir.name} by trial_key_hash match "
+                            f"({computed_trial_key_hash[:16]}...)"
+                        )
+                        break
+                except Exception as e:
+                    logger.debug(
+                        f"Error reading trial_meta.json from {trial_meta_path}: {e}")
+                    continue
+
+        # Strategy 2: Fallback to trial number + verify checkpoint exists
+        if best_trial_dir is None:
+            logger.debug(
+                f"Trial not found by trial_key_hash, falling back to trial number {best_trial_number}"
+            )
+            for trial_dir in study_folder.iterdir():
+                if not trial_dir.is_dir() or not trial_dir.name.startswith("trial_"):
+                    continue
+
+                match = re.match(r"trial_(\d+)_", trial_dir.name)
+                if match and int(match.group(1)) == best_trial_number:
+                    # Verify checkpoint exists (prefer refit, else CV, else root)
+                    checkpoint_found = False
+                    if (trial_dir / "refit" / "checkpoint").exists():
+                        checkpoint_found = True
+                    elif (trial_dir / "cv").exists():
+                        # Check if any fold has checkpoint
+                        for fold_dir in (trial_dir / "cv").iterdir():
+                            if fold_dir.is_dir() and (fold_dir / "checkpoint").exists():
+                                checkpoint_found = True
+                                break
+                    elif (trial_dir / "checkpoint").exists():
+                        checkpoint_found = True
+
+                    if checkpoint_found:
+                        best_trial_dir = trial_dir
+                        logger.info(
+                            f"Found trial {trial_dir.name} by trial number {best_trial_number} "
+                            "(with checkpoint)"
+                        )
+                        break
+                    else:
+                        logger.debug(
+                            f"Trial {trial_dir.name} matches number but has no checkpoint, skipping"
+                        )
 
         # Construct best_trial_from_disk from study.best_trial
         if best_trial_dir:
@@ -165,7 +265,8 @@ def find_best_trials_for_backbones(
     for backbone in backbone_values:
         backbone_name = backbone.split("-")[0] if "-" in backbone else backbone
 
-        logger.info(f"Looking for best trial for {backbone} ({backbone_name})...")
+        logger.info(
+            f"Looking for best trial for {backbone} ({backbone_name})...")
 
         best_trial_info = None
 
@@ -177,7 +278,9 @@ def find_best_trials_for_backbones(
 
             if hpo_backbone_dir.exists():
                 best_trial_from_disk = find_best_trial_from_study(
-                    study, backbone_name, dataset_version, objective_metric, hpo_backbone_dir
+                    study, backbone_name, dataset_version, objective_metric, hpo_backbone_dir,
+                    hpo_config=hpo_config,
+                    data_config=data_config,
                 )
 
                 if best_trial_from_disk:
@@ -187,7 +290,8 @@ def find_best_trials_for_backbones(
                         "trial_dir": best_trial_from_disk["trial_dir"],
                         "checkpoint_dir": best_trial_from_disk.get(
                             "checkpoint_dir",
-                            str(Path(best_trial_from_disk["trial_dir"]) / "checkpoint"),
+                            str(Path(
+                                best_trial_from_disk["trial_dir"]) / "checkpoint"),
                         ),
                         "checkpoint_type": best_trial_from_disk.get("checkpoint_type", "unknown"),
                         "accuracy": best_trial_from_disk["accuracy"],
@@ -201,12 +305,14 @@ def find_best_trials_for_backbones(
 
         # Fallback to disk search if study not available or didn't find trial
         if best_trial_info is None:
-            logger.debug(f"Searching disk for best trial for {backbone_name}...")
+            logger.debug(
+                f"Searching disk for best trial for {backbone_name}...")
             local_path = hpo_output_dir_new / backbone_name
             hpo_backbone_dir = resolve_hpo_output_dir(local_path)
 
             if hpo_backbone_dir.exists():
-                study_folder = find_study_folder_in_backbone_dir(hpo_backbone_dir)
+                study_folder = find_study_folder_in_backbone_dir(
+                    hpo_backbone_dir)
                 if study_folder:
                     best_trial_info = load_best_trial_from_disk(
                         study_folder.parent.parent,
@@ -230,9 +336,11 @@ def find_best_trials_for_backbones(
             else:
                 # Try old structure
                 hpo_output_dir_old = root_dir / "outputs" / "hpo"
-                old_backbone_dir = resolve_hpo_output_dir(hpo_output_dir_old / backbone)
+                old_backbone_dir = resolve_hpo_output_dir(
+                    hpo_output_dir_old / backbone)
                 if old_backbone_dir.exists():
-                    study_folder = find_study_folder_in_backbone_dir(old_backbone_dir)
+                    study_folder = find_study_folder_in_backbone_dir(
+                        old_backbone_dir)
                     if study_folder:
                         best_trial_info = load_best_trial_from_disk(
                             study_folder.parent.parent,
@@ -268,4 +376,3 @@ def find_best_trials_for_backbones(
         f"Summary: Found {len(best_trials)} best trial(s) out of {len(backbone_values)} backbone(s)"
     )
     return best_trials
-
