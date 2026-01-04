@@ -104,6 +104,47 @@ def _find_checkpoint_in_directory(directory: Path) -> Optional[Path]:
     return None
 
 
+def _build_checkpoint_dir(
+    root_dir: Path,
+    config_dir: Path,
+    environment: str,
+    backbone: str,
+    artifact_run_id: str,
+    study_key_hash: Optional[str] = None,
+    trial_key_hash: Optional[str] = None,
+) -> Path:
+    """
+    Build systematic checkpoint directory path using centralized paths config.
+    
+    Uses stable naming based on (study_key_hash, trial_key_hash) when available,
+    falling back to run_id for backward compatibility.
+    
+    Path structure:
+      - Preferred: outputs/best_model_selection/{environment}/{backbone}/sel_{study_hash[:8]}_{trial_hash[:8]}/
+      - Fallback: outputs/best_model_selection/{environment}/{backbone}/run_{run_id[:8]}/
+    
+    Args:
+        root_dir: Project root directory
+        config_dir: Config directory
+        environment: Execution environment (local, colab, kaggle)
+        backbone: Model backbone name
+        artifact_run_id: MLflow run ID (for fallback)
+        study_key_hash: Study key hash (preferred for stable naming)
+        trial_key_hash: Trial key hash (preferred for stable naming)
+        
+    Returns:
+        Path to checkpoint directory
+    """
+    from orchestration.paths import resolve_output_path
+    
+    base_dir = resolve_output_path(root_dir, config_dir, "best_model_selection") / environment / backbone
+    
+    if study_key_hash and trial_key_hash:
+        return base_dir / f"sel_{study_key_hash[:8]}_{trial_key_hash[:8]}"
+    
+    return base_dir / f"run_{artifact_run_id[:8]}"
+
+
 def _get_azure_ml_info(config_dir: Path, root_dir: Path, tracking_uri: str) -> tuple[str, str]:
     """
     Extract Azure ML workspace name and resource group from config files.
@@ -233,54 +274,45 @@ def acquire_best_model_checkpoint(
     print(f"[ACQUIRE] Acquiring checkpoint for run {run_id[:8]}...")
     priority = acquisition_config["priority"]
 
-    # Strategy 1: Local disk selection
+    # Strategy 1: Local disk selection (using hashes from best_model)
     if "local" in priority:
         try:
             from orchestration.jobs.local_selection_v2 import (
-                find_study_folder_by_config,
-                load_best_trial_from_study_folder,
+                find_trial_checkpoint_by_hash,
             )
-            from orchestration.config_loader import load_all_configs, load_experiment_config
-            from orchestration import EXPERIMENT_NAME
 
             print(f"\n[Strategy 1] Local disk selection...")
 
-            experiment_config = load_experiment_config(
-                config_dir, EXPERIMENT_NAME)
-            all_configs = load_all_configs(experiment_config)
-            hpo_config = all_configs.get("hpo", {})
-
-            if hpo_config:
+            # Use study_key_hash and trial_key_hash to find exact trial
+            if study_key_hash and trial_key_hash:
                 hpo_output_dir = root_dir / "outputs" / "hpo" / platform / backbone
-                if hpo_output_dir.exists():
-                    study_folder = find_study_folder_by_config(
-                        backbone_dir=hpo_output_dir,
-                        hpo_config=hpo_config,
-                        backbone=backbone,
-                    )
+                checkpoint_path = find_trial_checkpoint_by_hash(
+                    hpo_backbone_dir=hpo_output_dir,
+                    study_key_hash=study_key_hash,
+                    trial_key_hash=trial_key_hash,
+                )
 
-                    if study_folder:
-                        best_trial = load_best_trial_from_study_folder(
-                            study_folder=study_folder,
-                            objective_metric=selection_config["objective"]["metric"],
-                        )
-
-                        if best_trial:
-                            checkpoint_path = Path(
-                                best_trial["checkpoint_dir"])
-
-                            if acquisition_config["local"].get("validate", True):
-                                if _validate_checkpoint(checkpoint_path):
-                                    print(
-                                        f"   [OK] Checkpoint validated: \"{checkpoint_path}\"")
-                                    return checkpoint_path
-                            else:
-                                if checkpoint_path.exists():
-                                    print(
-                                        f"   [OK] Found checkpoint: \"{checkpoint_path}\"")
-                                    return checkpoint_path
-        except Exception:
-            pass
+                if checkpoint_path:
+                    checkpoint_path = Path(checkpoint_path)
+                    if acquisition_config["local"].get("validate", True):
+                        if _validate_checkpoint(checkpoint_path):
+                            print(
+                                f"   [OK] Checkpoint validated: \"{checkpoint_path}\"")
+                            return checkpoint_path
+                    else:
+                        if checkpoint_path.exists():
+                            print(
+                                f"   [OK] Found checkpoint: \"{checkpoint_path}\"")
+                            return checkpoint_path
+                else:
+                    print(f"   [INFO] Trial not found locally by hash (study_key_hash={study_key_hash[:8]}..., trial_key_hash={trial_key_hash[:8]}...)")
+            else:
+                print(f"   [INFO] Missing hashes (study_key_hash={study_key_hash is not None}, trial_key_hash={trial_key_hash is not None})")
+        except Exception as e:
+            import traceback
+            print(f"   [WARN] Strategy 1 failed: {type(e).__name__}: {e}")
+            # Don't print full traceback in normal flow, but keep for debugging
+            # traceback.print_exc()
 
     # Strategy 2: Drive restore (Colab only)
     if "drive" in priority and restore_from_drive and in_colab and acquisition_config["drive"]["enabled"]:
@@ -308,7 +340,10 @@ def acquire_best_model_checkpoint(
     if "mlflow" in priority and acquisition_config["mlflow"]["enabled"]:
         try:
             print(f"\n[Strategy 3] MLflow download...")
-            checkpoint_dir = root_dir / "outputs" / "best_model_checkpoint"
+            checkpoint_dir = _build_checkpoint_dir(
+                root_dir, config_dir, platform, backbone, run_id,
+                study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
+            )
             checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
             import mlflow as mlflow_func
@@ -383,7 +418,10 @@ def acquire_best_model_checkpoint(
             print(f"\n   [WARN] MLflow download failed: {type(e).__name__}")
 
     # All strategies failed - check for manually placed checkpoint
-    checkpoint_dir = root_dir / "outputs" / "best_model_checkpoint"
+    checkpoint_dir = _build_checkpoint_dir(
+        root_dir, config_dir, platform, backbone, run_id,
+        study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
+    )
     manual_checkpoint_path = checkpoint_dir / "checkpoint"
 
     if manual_checkpoint_path.exists() and any(manual_checkpoint_path.iterdir()):

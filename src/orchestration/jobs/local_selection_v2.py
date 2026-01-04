@@ -322,6 +322,119 @@ def load_best_trial_from_study_folder(
     }
 
 
+def find_trial_checkpoint_by_hash(
+    hpo_backbone_dir: Path,
+    study_key_hash: str,
+    trial_key_hash: str,
+) -> Optional[Path]:
+    """
+    Find trial checkpoint by study_key_hash and trial_key_hash.
+    
+    Scans trial folders and reads trial_meta.json files to match by hash.
+    This avoids Optuna DB dependencies and hash recomputation issues.
+    
+    Args:
+        hpo_backbone_dir: Backbone directory containing study folders
+        study_key_hash: Target study key hash (64 hex chars)
+        trial_key_hash: Target trial key hash (64 hex chars)
+        
+    Returns:
+        Path to checkpoint directory (prefers refit, else best CV fold), or None if not found
+    """
+    if not hpo_backbone_dir.exists():
+        return None
+    
+    # Scan all study folders
+    for study_folder in hpo_backbone_dir.iterdir():
+        if not study_folder.is_dir() or study_folder.name.startswith("trial_"):
+            continue
+        
+        # Scan all trial folders in this study
+        for trial_dir in study_folder.iterdir():
+            if not trial_dir.is_dir() or not trial_dir.name.startswith("trial_"):
+                continue
+            
+            # Read trial metadata
+            trial_meta_path = trial_dir / "trial_meta.json"
+            if not trial_meta_path.exists():
+                continue
+            
+            try:
+                with open(trial_meta_path, "r") as f:
+                    meta = json.load(f)
+                
+                # Match by hashes
+                if (meta.get("study_key_hash") == study_key_hash and 
+                    meta.get("trial_key_hash") == trial_key_hash):
+                    # Found match! Return checkpoint (prefer refit, else best CV fold)
+                    return _get_checkpoint_path_from_trial_dir(trial_dir)
+            except Exception:
+                continue
+    
+    return None
+
+
+def _get_checkpoint_path_from_trial_dir(trial_dir: Path) -> Optional[Path]:
+    """
+    Get checkpoint path from trial directory, preferring refit, else best CV fold.
+    
+    Args:
+        trial_dir: Path to trial directory
+        
+    Returns:
+        Path to checkpoint directory, or None if not found
+    """
+    # Prefer refit checkpoint
+    refit_checkpoint = trial_dir / "refit" / "checkpoint"
+    if refit_checkpoint.exists():
+        return refit_checkpoint
+    
+    # Else find best CV fold by metric
+    cv_dir = trial_dir / "cv"
+    if cv_dir.exists():
+        best_fold = None
+        best_metric = None
+        
+        for fold_dir in sorted(cv_dir.iterdir(), key=lambda p: fold_index(p.name)):
+            if not fold_dir.is_dir() or not fold_dir.name.startswith("fold"):
+                continue
+            
+            metrics_file = fold_dir / "metrics.json"
+            if metrics_file.exists():
+                try:
+                    with open(metrics_file, "r") as f:
+                        metrics = json.load(f)
+                    # Use macro-f1 or first available numeric metric
+                    metric_value = metrics.get("macro-f1")
+                    if metric_value is None:
+                        # Try to find first numeric metric
+                        for key, value in metrics.items():
+                            try:
+                                metric_value = float(value)
+                                break
+                            except (TypeError, ValueError):
+                                continue
+                    
+                    if metric_value is not None:
+                        if best_metric is None or metric_value > best_metric:
+                            best_metric = metric_value
+                            best_fold = fold_dir
+                except Exception:
+                    continue
+        
+        if best_fold:
+            fold_checkpoint = best_fold / "checkpoint"
+            if fold_checkpoint.exists():
+                return fold_checkpoint
+    
+    # Fallback: trial root checkpoint
+    trial_checkpoint = trial_dir / "checkpoint"
+    if trial_checkpoint.exists():
+        return trial_checkpoint
+    
+    return None
+
+
 def write_active_study_marker(
     backbone_dir: Path,
     study_folder: Path,

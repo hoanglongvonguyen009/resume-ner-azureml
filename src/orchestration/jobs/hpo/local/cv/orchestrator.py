@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+import json
+from datetime import datetime
 
 import mlflow
 import numpy as np
@@ -81,6 +83,71 @@ def run_training_trial_with_cv(
     run_id = trial_params.get("run_id")
     run_suffix = f"_{run_id}" if run_id else ""
     trial_base_dir = output_dir / f"trial_{trial_number}{run_suffix}"
+    
+    # Compute trial_key_hash for metadata file
+    computed_trial_key_hash = None
+    computed_study_key_hash = study_key_hash
+    
+    # Try to compute study_key_hash if not provided
+    if not computed_study_key_hash and data_config and hpo_config:
+        try:
+            from orchestration.jobs.tracking.mlflow_naming import (
+                build_hpo_study_key,
+                build_hpo_study_key_hash,
+            )
+            study_key = build_hpo_study_key(
+                data_config, hpo_config, backbone, benchmark_config
+            )
+            computed_study_key_hash = build_hpo_study_key_hash(study_key)
+        except Exception as e:
+            logger.debug(f"Could not compute study_key_hash from configs: {e}")
+    
+    # Get from parent run if still missing
+    if not computed_study_key_hash and hpo_parent_run_id:
+        try:
+            client = mlflow.tracking.MlflowClient()
+            parent_run = client.get_run(hpo_parent_run_id)
+            computed_study_key_hash = parent_run.data.tags.get("code.study_key_hash")
+        except Exception:
+            pass
+    
+    # Compute trial_key_hash if we have study_key_hash
+    if computed_study_key_hash:
+        try:
+            from orchestration.jobs.tracking.mlflow_naming import (
+                build_hpo_trial_key,
+                build_hpo_trial_key_hash,
+            )
+            # Extract hyperparameters (excluding metadata fields)
+            hyperparameters = {
+                k: v for k, v in trial_params.items()
+                if k not in ("backbone", "trial_number", "run_id")
+            }
+            trial_key = build_hpo_trial_key(computed_study_key_hash, hyperparameters)
+            computed_trial_key_hash = build_hpo_trial_key_hash(trial_key)
+        except Exception as e:
+            logger.debug(f"Could not compute trial_key_hash: {e}")
+    
+    # Get study name from output_dir (study folder name)
+    study_name = output_dir.name
+    
+    # Write trial metadata file for easy lookup during selection
+    try:
+        trial_meta = {
+            "study_key_hash": computed_study_key_hash,
+            "trial_key_hash": computed_trial_key_hash,
+            "trial_number": trial_number,
+            "study_name": study_name,
+            "run_id": run_id,
+            "created_at": datetime.now().isoformat(),
+        }
+        trial_meta_path = trial_base_dir / "trial_meta.json"
+        trial_base_dir.mkdir(parents=True, exist_ok=True)
+        with open(trial_meta_path, "w") as f:
+            json.dump(trial_meta, f, indent=2)
+        logger.debug(f"Wrote trial metadata to {trial_meta_path}")
+    except Exception as e:
+        logger.warning(f"Could not write trial metadata file: {e}")
     
     for fold_idx, (train_indices, val_indices) in enumerate(fold_splits):
         # Construct fold-specific output directory using new structure
