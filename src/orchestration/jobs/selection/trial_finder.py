@@ -81,7 +81,31 @@ def find_best_trial_from_study(
             study, backbone_name, dataset_version, objective_metric
         )
 
-        study_folder = find_study_folder_in_backbone_dir(hpo_backbone_dir)
+        # Use resolve_storage_path to find the correct study folder (same logic as trial_meta_generator)
+        from orchestration.jobs.hpo.local.checkpoint.manager import resolve_storage_path
+
+        checkpoint_config = hpo_config.get(
+            "checkpoint", {}) if hpo_config else {}
+        study_name_template = checkpoint_config.get("study_name") or (
+            hpo_config.get("study_name") if hpo_config else None)
+        study_name = None
+        if study_name_template:
+            study_name = study_name_template.replace(
+                "{backbone}", backbone_name)
+
+        actual_storage_path = resolve_storage_path(
+            output_dir=hpo_backbone_dir,
+            checkpoint_config=checkpoint_config,
+            backbone=backbone_name,
+            study_name=study_name,
+        )
+
+        if actual_storage_path and actual_storage_path.exists():
+            study_folder = actual_storage_path.parent
+        else:
+            # Fallback: use find_study_folder_in_backbone_dir
+            study_folder = find_study_folder_in_backbone_dir(hpo_backbone_dir)
+
         if not study_folder:
             logger.debug(f"Study folder not found in {hpo_backbone_dir}")
             return None
@@ -271,8 +295,61 @@ def find_best_trials_for_backbones(
         best_trial_info = None
 
         # Try to use in-memory study if available
+        study = None
         if hpo_studies and backbone_name in hpo_studies:
             study = hpo_studies[backbone_name]
+
+        # If study not in memory, try to load from disk
+        if not study:
+            local_path = hpo_output_dir_new / backbone_name
+            hpo_backbone_dir = resolve_hpo_output_dir(local_path)
+
+            if hpo_backbone_dir.exists():
+                # Try to load study from disk
+                from orchestration.jobs.hpo.local.checkpoint.manager import resolve_storage_path
+
+                checkpoint_config = hpo_config.get("checkpoint", {})
+                study_name_template = checkpoint_config.get(
+                    "study_name") or hpo_config.get("study_name")
+                study_name = None
+                if study_name_template:
+                    study_name = study_name_template.replace(
+                        "{backbone}", backbone_name)
+
+                actual_storage_path = resolve_storage_path(
+                    output_dir=hpo_backbone_dir,
+                    checkpoint_config=checkpoint_config,
+                    backbone=backbone_name,
+                    study_name=study_name,
+                )
+
+                if actual_storage_path and actual_storage_path.exists():
+                    study_folder = actual_storage_path.parent
+                else:
+                    study_folder = find_study_folder_in_backbone_dir(
+                        hpo_backbone_dir)
+
+                if study_folder:
+                    study_db_path = study_folder / "study.db"
+                    if study_db_path.exists():
+                        try:
+                            from orchestration.jobs.hpo.local.optuna.integration import import_optuna
+                            optuna, _, _, _ = import_optuna()
+                        except ImportError:
+                            import optuna
+
+                        try:
+                            storage_uri = f"sqlite:///{study_db_path.resolve()}"
+                            study = optuna.load_study(
+                                study_name=study_folder.name, storage=storage_uri)
+                            logger.debug(
+                                f"Loaded study for {backbone_name} from disk: {study_folder.name}")
+                        except Exception as e:
+                            logger.debug(
+                                f"Could not load study from disk for {backbone_name}: {e}")
+
+        # Use study (from memory or disk) to find best trial
+        if study:
             local_path = hpo_output_dir_new / backbone_name
             hpo_backbone_dir = resolve_hpo_output_dir(local_path)
 
@@ -284,10 +361,15 @@ def find_best_trials_for_backbones(
                 )
 
                 if best_trial_from_disk:
+                    # Extract study name from trial_dir path
+                    trial_dir_path = Path(best_trial_from_disk["trial_dir"])
+                    study_name = trial_dir_path.parent.name if trial_dir_path.parent else None
+
                     best_trial_info = {
                         "backbone": backbone_name,
                         "trial_name": best_trial_from_disk["trial_name"],
                         "trial_dir": best_trial_from_disk["trial_dir"],
+                        "study_name": study_name,  # Add study name
                         "checkpoint_dir": best_trial_from_disk.get(
                             "checkpoint_dir",
                             str(Path(
@@ -311,14 +393,39 @@ def find_best_trials_for_backbones(
             hpo_backbone_dir = resolve_hpo_output_dir(local_path)
 
             if hpo_backbone_dir.exists():
-                study_folder = find_study_folder_in_backbone_dir(
-                    hpo_backbone_dir)
+                # Use resolve_storage_path to find the correct study folder
+                from orchestration.jobs.hpo.local.checkpoint.manager import resolve_storage_path
+
+                checkpoint_config = hpo_config.get("checkpoint", {})
+                study_name_template = checkpoint_config.get(
+                    "study_name") or hpo_config.get("study_name")
+                study_name = None
+                if study_name_template:
+                    study_name = study_name_template.replace(
+                        "{backbone}", backbone_name)
+
+                actual_storage_path = resolve_storage_path(
+                    output_dir=hpo_backbone_dir,
+                    checkpoint_config=checkpoint_config,
+                    backbone=backbone_name,
+                    study_name=study_name,
+                )
+
+                if actual_storage_path and actual_storage_path.exists():
+                    study_folder = actual_storage_path.parent
+                else:
+                    # Fallback: use find_study_folder_in_backbone_dir
+                    study_folder = find_study_folder_in_backbone_dir(
+                        hpo_backbone_dir)
+
                 if study_folder:
                     best_trial_info = load_best_trial_from_disk(
                         study_folder.parent.parent,
                         f"{backbone_name}/{study_folder.name}",
                         objective_metric,
                     )
+                    if best_trial_info:
+                        best_trial_info["study_name"] = study_folder.name
                 elif str(hpo_backbone_dir).startswith("/content/drive"):
                     drive_hpo_dir = hpo_backbone_dir.parent.parent
                     relative_backbone = f"{environment}/{backbone_name}"
@@ -327,12 +434,22 @@ def find_best_trials_for_backbones(
                         relative_backbone,
                         objective_metric,
                     )
+                    # Try to extract study_name from trial_dir if available
+                    if best_trial_info and "trial_dir" in best_trial_info:
+                        trial_dir_path = Path(best_trial_info["trial_dir"])
+                        if trial_dir_path.parent:
+                            best_trial_info["study_name"] = trial_dir_path.parent.name
                 else:
                     best_trial_info = load_best_trial_from_disk(
                         hpo_output_dir_new.parent,
                         f"{environment}/{backbone_name}",
                         objective_metric,
                     )
+                    # Try to extract study_name from trial_dir if available
+                    if best_trial_info and "trial_dir" in best_trial_info:
+                        trial_dir_path = Path(best_trial_info["trial_dir"])
+                        if trial_dir_path.parent:
+                            best_trial_info["study_name"] = trial_dir_path.parent.name
             else:
                 # Try old structure
                 hpo_output_dir_old = root_dir / "outputs" / "hpo"
@@ -347,6 +464,8 @@ def find_best_trials_for_backbones(
                             f"{backbone}/{study_folder.name}",
                             objective_metric,
                         )
+                        if best_trial_info:
+                            best_trial_info["study_name"] = study_folder.name
                     elif str(old_backbone_dir).startswith("/content/drive"):
                         drive_hpo_dir = old_backbone_dir.parent
                         best_trial_info = load_best_trial_from_disk(
@@ -354,14 +473,39 @@ def find_best_trials_for_backbones(
                             backbone,
                             objective_metric,
                         )
+                        # Try to extract study_name from trial_dir if available
+                        if best_trial_info and "trial_dir" in best_trial_info:
+                            trial_dir_path = Path(best_trial_info["trial_dir"])
+                            if trial_dir_path.parent:
+                                best_trial_info["study_name"] = trial_dir_path.parent.name
                     else:
                         best_trial_info = load_best_trial_from_disk(
                             hpo_output_dir_old,
                             backbone,
                             objective_metric,
                         )
+                        # Try to extract study_name from trial_dir if available
+                        if best_trial_info and "trial_dir" in best_trial_info:
+                            trial_dir_path = Path(best_trial_info["trial_dir"])
+                            if trial_dir_path.parent:
+                                best_trial_info["study_name"] = trial_dir_path.parent.name
 
             if best_trial_info:
+                # Extract study_name from trial_dir if not already present
+                if "study_name" not in best_trial_info and "trial_dir" in best_trial_info:
+                    trial_dir_path = Path(best_trial_info["trial_dir"])
+                    if trial_dir_path.exists() or str(trial_dir_path):
+                        # Extract study name from path: .../backbone/study_name/trial_...
+                        parts = trial_dir_path.parts
+                        # Find backbone name in path, study_name should be next
+                        for i, part in enumerate(parts):
+                            if part == backbone_name and i + 1 < len(parts):
+                                best_trial_info["study_name"] = parts[i + 1]
+                                break
+                        # Fallback: use parent directory name
+                        if "study_name" not in best_trial_info:
+                            best_trial_info["study_name"] = trial_dir_path.parent.name if trial_dir_path.parent else None
+
                 logger.info(
                     f"Found best trial for {backbone}: {best_trial_info.get('trial_name', 'unknown')} "
                     f"({objective_metric}={best_trial_info.get('accuracy', 0):.4f})"

@@ -105,6 +105,7 @@ def generate_missing_trial_meta(
     # Find trial directories
     trial_dirs = [d for d in study_folder.iterdir() if d.is_dir() and d.name.startswith("trial_")]
     created_count = 0
+    updated_count = 0
 
     for trial_dir in trial_dirs:
         trial_meta_path = trial_dir / "trial_meta.json"
@@ -206,15 +207,21 @@ def generate_missing_trial_meta(
             action = "Created" if should_create else "Updated"
             logger.info(f"{action} {trial_dir.name}/trial_meta.json")
             if study_key_hash and trial_key_hash:
-                logger.debug(f"  study_key_hash: {study_key_hash[:16]}...")
-                logger.debug(f"  trial_key_hash: {trial_key_hash[:16]}...")
+                logger.info(f"  study_key_hash: {study_key_hash[:16]}...")
+                logger.info(f"  trial_key_hash: {trial_key_hash[:16]}...")
             else:
                 logger.warning(f"  Warning: Could not compute hashes (study_key_hash={study_key_hash is not None}, trial_key_hash={trial_key_hash is not None})")
-            created_count += 1
+            if should_create:
+                created_count += 1
+            else:
+                updated_count += 1
         except Exception as e:
             logger.error(f"Could not create/update {trial_meta_path}: {e}")
 
-    return created_count
+    if updated_count > 0:
+        logger.debug(f"  Created: {created_count}, Updated: {updated_count}")
+    
+    return created_count + updated_count  # Return total count (created + updated)
 
 
 def generate_missing_trial_meta_for_all_studies(
@@ -251,19 +258,27 @@ def generate_missing_trial_meta_for_all_studies(
 
     logger.info("Generating missing trial_meta.json files...")
     total_created = 0
+    total_updated = 0
 
     from orchestration.path_resolution import resolve_hpo_output_dir
     from orchestration.jobs.hpo.local.checkpoint.manager import resolve_storage_path
 
-    for backbone_name, study in hpo_studies.items():
+    # Process all backbones from backbone_values, not just those in hpo_studies
+    # This ensures we process all backbones even if studies are no longer in memory
+    processed_backbones = set()
+    
+    # First, process backbones that have in-memory studies
+    for backbone_name, study in (hpo_studies or {}).items():
         if not study:
             continue
-
+        processed_backbones.add(backbone_name)
+        
         # Find study folder
         backbone_output_dir = root_dir / "outputs" / "hpo" / environment / backbone_name
         hpo_backbone_dir = resolve_hpo_output_dir(backbone_output_dir)
 
         if not hpo_backbone_dir.exists():
+            logger.debug(f"Skipping {backbone_name}: backbone directory not found")
             continue
 
         # Resolve storage path to get study folder
@@ -299,15 +314,72 @@ def generate_missing_trial_meta_for_all_studies(
                     if study_folders:
                         study_folder = study_folders[0]
 
-        if study_folder:
+        if study_folder and study_folder.exists():
             logger.info(f"Processing {backbone_name}: {study_folder.name}")
-            created = generate_missing_trial_meta(
+            result = generate_missing_trial_meta(
                 study_folder, backbone_name,
                 hpo_config=hpo_config,
                 data_config=data_config,
             )
-            total_created += created
+            # result is tuple (created, updated) if generate_missing_trial_meta returns it
+            # For now, it returns count, but we'll update it to return (created, updated)
+            total_created += result
+    
+    # Then process remaining backbones from backbone_values (even without in-memory studies)
+    for backbone_name in backbone_values:
+        if backbone_name in processed_backbones:
+            continue
+        
+        # Find study folder
+        backbone_output_dir = root_dir / "outputs" / "hpo" / environment / backbone_name
+        hpo_backbone_dir = resolve_hpo_output_dir(backbone_output_dir)
 
-    logger.info(f"Total: Created {total_created} trial_meta.json files")
+        if not hpo_backbone_dir.exists():
+            logger.debug(f"Skipping {backbone_name}: backbone directory not found")
+            continue
+
+        # Resolve storage path to get study folder
+        checkpoint_config = hpo_config.get("checkpoint", {})
+        study_name_template = checkpoint_config.get("study_name") or hpo_config.get("study_name")
+        study_name = None
+        if study_name_template:
+            study_name = study_name_template.replace("{backbone}", backbone_name)
+
+        actual_storage_path = resolve_storage_path(
+            output_dir=backbone_output_dir,
+            checkpoint_config=checkpoint_config,
+            backbone=backbone_name,
+            study_name=study_name,
+        )
+
+        if actual_storage_path and actual_storage_path.exists():
+            study_folder = actual_storage_path.parent
+        else:
+            # Fallback: construct from study name
+            study_folder = backbone_output_dir / study_name if study_name else backbone_output_dir
+            # Try to find existing study folder
+            if not study_folder.exists():
+                # Look for any study folder in backbone dir
+                if backbone_output_dir.exists():
+                    study_folders = [
+                        d
+                        for d in backbone_output_dir.iterdir()
+                        if d.is_dir()
+                        and not d.name.startswith("trial_")
+                        and d.name != ".ipynb_checkpoints"
+                    ]
+                    if study_folders:
+                        study_folder = study_folders[0]
+
+        if study_folder and study_folder.exists():
+            logger.info(f"Processing {backbone_name}: {study_folder.name} (study not in memory, loading from disk)")
+            result = generate_missing_trial_meta(
+                study_folder, backbone_name,
+                hpo_config=hpo_config,
+                data_config=data_config,
+            )
+            total_created += result
+
+    logger.info(f"Total: Created/Updated {total_created} trial_meta.json files")
     return total_created
 

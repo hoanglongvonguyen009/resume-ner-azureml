@@ -290,20 +290,20 @@ def acquire_best_model_checkpoint(
                     hpo_backbone_dir=hpo_output_dir,
                     study_key_hash=study_key_hash,
                     trial_key_hash=trial_key_hash,
-                )
+                        )
 
                 if checkpoint_path:
                     checkpoint_path = Path(checkpoint_path)
-                    if acquisition_config["local"].get("validate", True):
-                        if _validate_checkpoint(checkpoint_path):
-                            print(
-                                f"   [OK] Checkpoint validated: \"{checkpoint_path}\"")
-                            return checkpoint_path
-                    else:
-                        if checkpoint_path.exists():
-                            print(
-                                f"   [OK] Found checkpoint: \"{checkpoint_path}\"")
-                            return checkpoint_path
+                            if acquisition_config["local"].get("validate", True):
+                                if _validate_checkpoint(checkpoint_path):
+                                    print(
+                                        f"   [OK] Checkpoint validated: \"{checkpoint_path}\"")
+                                    return checkpoint_path
+                            else:
+                                if checkpoint_path.exists():
+                                    print(
+                                        f"   [OK] Found checkpoint: \"{checkpoint_path}\"")
+                                    return checkpoint_path
                 else:
                     print(f"   [INFO] Trial not found locally by hash (study_key_hash={study_key_hash[:8]}..., trial_key_hash={trial_key_hash[:8]}...)")
             else:
