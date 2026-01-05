@@ -305,8 +305,29 @@ def _resolve_checkpoint(
     if source_type == "scratch":
         return None
     
-    # Check if checkpoint.load is explicitly set to False
-    if not checkpoint_config.get("load", True):
+    # Auto-derive checkpoint.load from source.type if not explicitly set
+    # Explicit value can override but we warn if it conflicts
+    explicit_load = checkpoint_config.get("load")
+    if explicit_load is None:
+        # Auto-derive: True for best_selected or final_training, False for scratch
+        should_load = source_type in ("best_selected", "final_training")
+        checkpoint_load = should_load
+    else:
+        # Use explicit value, but warn if it conflicts with source.type
+        checkpoint_load = explicit_load
+        should_load = source_type in ("best_selected", "final_training")
+        if checkpoint_load != should_load:
+            import warnings
+            warnings.warn(
+                f"checkpoint.load={checkpoint_load} conflicts with source.type={source_type}. "
+                f"Expected checkpoint.load={should_load} for source.type={source_type}. "
+                f"Using explicit checkpoint.load value, but this may cause unexpected behavior.",
+                UserWarning,
+                stacklevel=3
+            )
+    
+    # Check if checkpoint.load is False (either explicit or auto-derived)
+    if not checkpoint_load:
         return None
     
     # Get checkpoint source

@@ -38,15 +38,20 @@ dataset:
 
 # Checkpoint configuration
 checkpoint:
-  # Whether to load a checkpoint (low-level toggle, set automatically based on source.type)
+  # Whether to load a checkpoint (auto-derived from source.type if not set)
   # - false: When source.type=scratch
   # - true: When source.type=best_selected or final_training
-  load: false
+  # NOTE: If not set, will be auto-derived from source.type. Explicit value can override but may cause warnings if it conflicts.
+  load: true
   
   # Checkpoint source (if load is true)
+  # Behavior depends on source.type:
+  # - When source.type=best_selected: Auto-detect from best_config metadata, or use explicit path here
+  # - When source.type=final_training: Use source.parent instead (this field is ignored)
+  # - When source.type=scratch: Not used
   # Options:
-  # - null: Auto-detect from latest final_training by spec_fp/exec_fp
-  # - "outputs/final_training/local/distilbert/spec_..._exec_.../v1/checkpoint": Explicit path
+  # - null: Auto-detect (from best_config for best_selected, from fingerprints for final_training)
+  # - "outputs/.../checkpoint": Explicit path
   # - {spec_fp: "...", exec_fp: "...", variant: 1}: Load by fingerprints
   source: null
   
@@ -97,12 +102,6 @@ training:
     enabled: null  # null = use from train.yaml
     patience: null
     min_delta: null
-
-# Output configuration
-output:
-  # Whether to skip training if already completed
-  # This is the default behavior for run.mode=reuse_if_exists
-  skip_if_complete: true
 
 # MLflow tracking configuration (optional)
 # NOTE: MLflow names/tags are metadata only and do NOT affect spec_fp or exec_fp

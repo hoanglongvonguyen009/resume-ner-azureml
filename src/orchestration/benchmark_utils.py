@@ -29,6 +29,9 @@ def run_benchmarking(
     benchmark_source: str = "final_training",
     study_key_hash: Optional[str] = None,
     trial_key_hash: Optional[str] = None,
+    hpo_trial_run_id: Optional[str] = None,
+    hpo_refit_run_id: Optional[str] = None,
+    hpo_sweep_run_id: Optional[str] = None,
 ) -> bool:
     """
     Run benchmarking on a model checkpoint.
@@ -50,6 +53,9 @@ def run_benchmarking(
         benchmark_source: Source of benchmark ("hpo_trial" or "final_training").
         study_key_hash: Optional study key hash from HPO trial (for grouping tags).
         trial_key_hash: Optional trial key hash from HPO trial (for grouping tags).
+        hpo_trial_run_id: Optional HPO trial run ID (CV trial run, lineage parent).
+        hpo_refit_run_id: Optional HPO refit run ID (refit run, artifact parent).
+        hpo_sweep_run_id: Optional HPO sweep run ID (HPO parent, optional).
 
     Returns:
         True if successful, False otherwise.
@@ -187,6 +193,9 @@ def run_benchmarking(
                 output_dir=output_path.parent if output_path else None,
                 study_key_hash=study_key_hash,
                 trial_key_hash=trial_key_hash,
+                hpo_trial_run_id=hpo_trial_run_id,
+                hpo_refit_run_id=hpo_refit_run_id,
+                hpo_sweep_run_id=hpo_sweep_run_id,
             ):
                 tracker.log_benchmark_results(
                     batch_sizes=batch_sizes,

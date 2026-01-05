@@ -155,11 +155,45 @@ def load_best_trial_from_disk(
     with open(metrics_file, "r") as f:
         metrics = json.load(f)
 
-    return {
+    # Try to read trial_meta.json from trial root (not subfolders) for run_id
+    trial_run_id = None
+    trial_meta_path = best_trial_dir / "trial_meta.json"
+    if trial_meta_path.exists():
+        try:
+            import re
+            with open(trial_meta_path, "r") as f:
+                trial_meta = json.load(f)
+            if "run_id" in trial_meta:
+                run_id_from_meta = trial_meta["run_id"]
+                # Validate: MLflow run IDs are UUIDs (e.g., "0caed3f7-bf68-4b52-a1bb-bc53b7344ae4")
+                # Skip if it looks like a timestamp (e.g., "20260105_114431")
+                uuid_pattern = re.compile(
+                    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+                    re.IGNORECASE
+                )
+                if uuid_pattern.match(run_id_from_meta):
+                    trial_run_id = run_id_from_meta
+                    logger.debug(
+                        f"Read valid trial_run_id (UUID) from trial_meta.json: {trial_run_id[:12]}..."
+                    )
+                else:
+                    logger.debug(
+                        f"Skipping run_id from trial_meta.json (not a UUID): {run_id_from_meta}"
+                    )
+        except Exception as e:
+            logger.debug(f"Could not read trial_meta.json: {e}")
+
+    result = {
         "backbone": backbone,
         "trial_name": best_trial_name,
         "trial_dir": str(best_trial_dir),
         "accuracy": best_metric,
         "metrics": metrics,
     }
+
+    # Add trial_run_id if found (don't assume sweep_run_id or refit_run_id exist)
+    if trial_run_id:
+        result["trial_run_id"] = trial_run_id
+
+    return result
 
