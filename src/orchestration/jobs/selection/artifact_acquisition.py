@@ -9,6 +9,8 @@ from typing import Dict, Any, Optional, Callable
 import os
 import tarfile
 import mlflow
+import json
+import shutil
 
 
 def _extract_tar_gz(tar_path: Path, extract_to: Optional[Path] = None) -> Path:
@@ -115,14 +117,14 @@ def _build_checkpoint_dir(
 ) -> Path:
     """
     Build systematic checkpoint directory path using centralized paths config.
-    
+
     Uses stable naming based on (study_key_hash, trial_key_hash) when available,
     falling back to run_id for backward compatibility.
-    
+
     Path structure:
       - Preferred: outputs/best_model_selection/{environment}/{backbone}/sel_{study_hash[:8]}_{trial_hash[:8]}/
       - Fallback: outputs/best_model_selection/{environment}/{backbone}/run_{run_id[:8]}/
-    
+
     Args:
         root_dir: Project root directory
         config_dir: Config directory
@@ -131,18 +133,88 @@ def _build_checkpoint_dir(
         artifact_run_id: MLflow run ID (for fallback)
         study_key_hash: Study key hash (preferred for stable naming)
         trial_key_hash: Trial key hash (preferred for stable naming)
-        
+
     Returns:
         Path to checkpoint directory
     """
     from orchestration.paths import resolve_output_path
-    
-    base_dir = resolve_output_path(root_dir, config_dir, "best_model_selection") / environment / backbone
-    
+
+    base_dir = resolve_output_path(
+        root_dir, config_dir, "best_model_selection") / environment / backbone
+
     if study_key_hash and trial_key_hash:
         return base_dir / f"sel_{study_key_hash[:8]}_{trial_key_hash[:8]}"
-    
+
     return base_dir / f"run_{artifact_run_id[:8]}"
+
+
+def _find_checkpoint_in_drive_by_hash(
+    drive_hpo_dir: Path,
+    study_key_hash: str,
+    trial_key_hash: str,
+) -> Optional[Path]:
+    """
+    Find checkpoint in Drive by scanning Drive directory structure directly.
+    This avoids restoring the entire HPO directory structure.
+
+    Args:
+        drive_hpo_dir: Drive path to HPO backbone directory
+        study_key_hash: Target study key hash
+        trial_key_hash: Target trial key hash
+
+    Returns:
+        Path to checkpoint directory in Drive, or None if not found
+    """
+    if not drive_hpo_dir.exists():
+        return None
+
+    # Scan study folders in Drive
+    for study_folder in drive_hpo_dir.iterdir():
+        if not study_folder.is_dir() or study_folder.name.startswith("trial_"):
+            continue
+
+        # Scan trial folders
+        for trial_dir in study_folder.iterdir():
+            if not trial_dir.is_dir() or not trial_dir.name.startswith("trial_"):
+                continue
+
+            # Read trial metadata from Drive
+            trial_meta_path = trial_dir / "trial_meta.json"
+            if not trial_meta_path.exists():
+                continue
+
+            try:
+                with open(trial_meta_path, "r") as f:
+                    meta = json.load(f)
+
+                # Match by hashes
+                if (meta.get("study_key_hash") == study_key_hash and
+                        meta.get("trial_key_hash") == trial_key_hash):
+                    # Found match! Get checkpoint path (prefer refit, else best CV fold)
+                    refit_checkpoint = trial_dir / "refit" / "checkpoint"
+                    if refit_checkpoint.exists():
+                        return refit_checkpoint
+
+                    # Check CV folds
+                    cv_dir = trial_dir / "cv"
+                    if cv_dir.exists():
+                        fold_dirs = [d for d in cv_dir.iterdir()
+                                     if d.is_dir() and d.name.startswith("fold")]
+                        if fold_dirs:
+                            # Return first fold checkpoint (or implement best fold selection)
+                            for fold_dir in sorted(fold_dirs):
+                                fold_checkpoint = fold_dir / "checkpoint"
+                                if fold_checkpoint.exists():
+                                    return fold_checkpoint
+
+                    # Fallback
+                    checkpoint = trial_dir / "checkpoint"
+                    if checkpoint.exists():
+                        return checkpoint
+            except Exception:
+                continue
+
+    return None
 
 
 def _get_azure_ml_info(config_dir: Path, root_dir: Path, tracking_uri: str) -> tuple[str, str]:
@@ -239,6 +311,7 @@ def acquire_best_model_checkpoint(
     selection_config: Dict[str, Any],
     platform: str,
     restore_from_drive: Optional[Callable[[Path, bool], bool]] = None,
+    drive_store: Optional[Any] = None,
     in_colab: bool = False,
 ) -> Path:
     """
@@ -246,7 +319,7 @@ def acquire_best_model_checkpoint(
 
     Priority order (from config):
     1. Local disk (by config + backbone) - PREFERRED to avoid Azure ML issues
-    2. Drive restore (Colab only)
+    2. Drive restore (Colab only) - scans Drive metadata, restores only checkpoint
     3. MLflow download
 
     Args:
@@ -257,6 +330,7 @@ def acquire_best_model_checkpoint(
         selection_config: Best model selection configuration
         platform: Platform name (local, colab, kaggle)
         restore_from_drive: Optional function to restore from Drive backup
+        drive_store: Optional DriveBackupStore instance for direct Drive access
         in_colab: Whether running in Google Colab
 
     Returns:
@@ -271,75 +345,118 @@ def acquire_best_model_checkpoint(
     backbone = best_run_info.get("backbone", "unknown")
     experiment_name = best_run_info.get("experiment_name", "unknown")
 
-    print(f"[ACQUIRE] Acquiring checkpoint for run {run_id[:8]}...")
     priority = acquisition_config["priority"]
+    checkpoint_path = None
 
     # Strategy 1: Local disk selection (using hashes from best_model)
-    if "local" in priority:
+    if "local" in priority and checkpoint_path is None:
         try:
-            from orchestration.jobs.local_selection_v2 import (
-                find_trial_checkpoint_by_hash,
-            )
+            from orchestration.jobs.local_selection_v2 import find_trial_checkpoint_by_hash
 
-            print(f"\n[Strategy 1] Local disk selection...")
-
-            # Use study_key_hash and trial_key_hash to find exact trial
             if study_key_hash and trial_key_hash:
                 hpo_output_dir = root_dir / "outputs" / "hpo" / platform / backbone
-                checkpoint_path = find_trial_checkpoint_by_hash(
+                found_path = find_trial_checkpoint_by_hash(
                     hpo_backbone_dir=hpo_output_dir,
                     study_key_hash=study_key_hash,
                     trial_key_hash=trial_key_hash,
+                )
+
+                if found_path:
+                    found_path = Path(found_path)
+
+                    if acquisition_config["local"].get("validate", True):
+                        if _validate_checkpoint(found_path):
+                            # Copy to best_model_selection directory for consistency
+                            target_path = _build_checkpoint_dir(
+                                root_dir, config_dir, platform, backbone, run_id,
+                                study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
+                            )
+                            if found_path != target_path:
+                                target_path.mkdir(parents=True, exist_ok=True)
+                                if target_path.exists():
+                                    shutil.rmtree(target_path)
+                                shutil.copytree(found_path, target_path)
+                            checkpoint_path = target_path
+                    else:
+                        if found_path.exists():
+                            # Copy to best_model_selection directory for consistency
+                            target_path = _build_checkpoint_dir(
+                                root_dir, config_dir, platform, backbone, run_id,
+                                study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
+                            )
+                            if found_path != target_path:
+                                target_path.mkdir(parents=True, exist_ok=True)
+                                if target_path.exists():
+                                    shutil.rmtree(target_path)
+                                shutil.copytree(found_path, target_path)
+                            checkpoint_path = target_path
+
+        except Exception:
+            pass
+
+    # Strategy 2: Drive restore (Colab only) - optimized to scan Drive metadata and restore only checkpoint
+    if "drive" in priority and restore_from_drive and in_colab and acquisition_config["drive"]["enabled"] and checkpoint_path is None:
+        try:
+            if study_key_hash and trial_key_hash and drive_store:
+                # OPTIMIZATION: Scan Drive directly to find checkpoint path
+                # This avoids restoring the entire HPO directory structure
+                hpo_output_dir = root_dir / "outputs" / "hpo" / platform / backbone
+
+                # Compute Drive path for HPO directory
+                try:
+                    drive_hpo_dir = drive_store.drive_path_for(hpo_output_dir)
+                except ValueError:
+                    drive_hpo_dir = None
+
+                if drive_hpo_dir and drive_hpo_dir.exists():
+                    drive_checkpoint_path = _find_checkpoint_in_drive_by_hash(
+                        drive_hpo_dir, study_key_hash, trial_key_hash
+                    )
+
+                    if drive_checkpoint_path and drive_checkpoint_path.exists():
+                        # Found checkpoint in Drive! Copy to best_model_selection cache dir
+                        local_checkpoint_path = _build_checkpoint_dir(
+                            root_dir, config_dir, platform, backbone, run_id,
+                            study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
                         )
 
-                if checkpoint_path:
-                    checkpoint_path = Path(checkpoint_path)
-                            if acquisition_config["local"].get("validate", True):
-                                if _validate_checkpoint(checkpoint_path):
-                                    print(
-                                        f"   [OK] Checkpoint validated: \"{checkpoint_path}\"")
-                                    return checkpoint_path
-                            else:
-                                if checkpoint_path.exists():
-                                    print(
-                                        f"   [OK] Found checkpoint: \"{checkpoint_path}\"")
-                                    return checkpoint_path
-                else:
-                    print(f"   [INFO] Trial not found locally by hash (study_key_hash={study_key_hash[:8]}..., trial_key_hash={trial_key_hash[:8]}...)")
-            else:
-                print(f"   [INFO] Missing hashes (study_key_hash={study_key_hash is not None}, trial_key_hash={trial_key_hash is not None})")
-        except Exception as e:
-            import traceback
-            print(f"   [WARN] Strategy 1 failed: {type(e).__name__}: {e}")
-            # Don't print full traceback in normal flow, but keep for debugging
-            # traceback.print_exc()
+                        # Direct copy from Drive path to local destination
+                        local_checkpoint_path.mkdir(
+                            parents=True, exist_ok=True)
+                        if local_checkpoint_path.exists():
+                            shutil.rmtree(local_checkpoint_path)
+                        shutil.copytree(drive_checkpoint_path,
+                                        local_checkpoint_path)
 
-    # Strategy 2: Drive restore (Colab only)
-    if "drive" in priority and restore_from_drive and in_colab and acquisition_config["drive"]["enabled"]:
-        try:
-            print(f"\n[Strategy 2] Drive restore...")
-            checkpoint_name = f"checkpoint_{run_id[:8]}"
-            drive_folder = acquisition_config["drive"]["folder_path"]
-            drive_checkpoint_path = Path(
-                "/content/drive/MyDrive") / drive_folder / "checkpoints" / checkpoint_name
+                        # Validate restored checkpoint
+                        if acquisition_config["drive"].get("validate", True):
+                            if _validate_checkpoint(local_checkpoint_path):
+                                checkpoint_path = local_checkpoint_path
+                        else:
+                            if local_checkpoint_path.exists():
+                                checkpoint_path = local_checkpoint_path
 
-            if restore_from_drive(drive_checkpoint_path, is_directory=True):
-                if acquisition_config["drive"].get("validate", True):
-                    if _validate_checkpoint(drive_checkpoint_path):
-                        print(
-                            f"   [OK] Restored and validated checkpoint from Drive: \"{drive_checkpoint_path}\"")
-                        return drive_checkpoint_path
-                else:
-                    print(
-                        f"   [OK] Restored checkpoint from Drive: \"{drive_checkpoint_path}\"")
-                    return drive_checkpoint_path
+            # Fallback: Try best_model_selection directory structure (if checkpoint was manually moved)
+            if checkpoint_path is None:
+                local_checkpoint_path = _build_checkpoint_dir(
+                    root_dir, config_dir, platform, backbone, run_id,
+                    study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
+                )
+
+                if restore_from_drive(local_checkpoint_path, is_directory=True):
+                    if acquisition_config["drive"].get("validate", True):
+                        if _validate_checkpoint(local_checkpoint_path):
+                            checkpoint_path = local_checkpoint_path
+                    else:
+                        if local_checkpoint_path.exists():
+                            checkpoint_path = local_checkpoint_path
+
         except Exception:
             pass
 
     # Strategy 3: MLflow download
-    if "mlflow" in priority and acquisition_config["mlflow"]["enabled"]:
+    if "mlflow" in priority and acquisition_config["mlflow"]["enabled"] and checkpoint_path is None:
         try:
-            print(f"\n[Strategy 3] MLflow download...")
             checkpoint_dir = _build_checkpoint_dir(
                 root_dir, config_dir, platform, backbone, run_id,
                 study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
@@ -381,54 +498,81 @@ def acquire_best_model_checkpoint(
                 dst_path=str(checkpoint_dir)
             )
 
-            checkpoint_path = Path(local_path)
+            downloaded_path = Path(local_path)
 
             # Check for and extract tar.gz files
-            if checkpoint_path.is_file() and checkpoint_path.suffixes == ['.tar', '.gz']:
-                checkpoint_path = _extract_tar_gz(checkpoint_path)
-            elif checkpoint_path.is_dir():
-                tar_files = list(checkpoint_path.glob("*.tar.gz")) + \
-                    list(checkpoint_path.glob("*.tgz"))
+            if downloaded_path.is_file() and downloaded_path.suffixes == ['.tar', '.gz']:
+                downloaded_path = _extract_tar_gz(downloaded_path)
+            elif downloaded_path.is_dir():
+                tar_files = list(downloaded_path.glob("*.tar.gz")) + \
+                    list(downloaded_path.glob("*.tgz"))
                 if tar_files:
-                    checkpoint_path = _extract_tar_gz(
-                        tar_files[0], extract_to=checkpoint_path)
+                    downloaded_path = _extract_tar_gz(
+                        tar_files[0], extract_to=downloaded_path)
 
             # Find checkpoint in downloaded/extracted directory
-            if checkpoint_path.is_dir():
+            if downloaded_path.is_dir():
                 found_checkpoint = _find_checkpoint_in_directory(
-                    checkpoint_path)
+                    downloaded_path)
                 if found_checkpoint:
-                    checkpoint_path = found_checkpoint
+                    downloaded_path = found_checkpoint
                 else:
                     # Validate the directory itself
-                    if not _validate_checkpoint(checkpoint_path):
+                    if not _validate_checkpoint(downloaded_path):
                         raise ValueError(
                             "Downloaded checkpoint failed validation - no valid checkpoint files found")
 
             # Final validation
             if acquisition_config["mlflow"].get("validate", True):
-                if not _validate_checkpoint(checkpoint_path):
+                if not _validate_checkpoint(downloaded_path):
                     raise ValueError("Downloaded checkpoint failed validation")
 
-            print(
-                f"   [OK] Downloaded checkpoint from MLflow: \"{checkpoint_path}\"")
-            return checkpoint_path
+            checkpoint_path = downloaded_path
 
-        except Exception as e:
-            print(f"\n   [WARN] MLflow download failed: {type(e).__name__}")
+        except Exception:
+            pass
 
     # All strategies failed - check for manually placed checkpoint
-    checkpoint_dir = _build_checkpoint_dir(
-        root_dir, config_dir, platform, backbone, run_id,
-        study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
-    )
-    manual_checkpoint_path = checkpoint_dir / "checkpoint"
+    if checkpoint_path is None:
+        checkpoint_dir = _build_checkpoint_dir(
+            root_dir, config_dir, platform, backbone, run_id,
+            study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
+        )
+        manual_checkpoint_path = checkpoint_dir / "checkpoint"
 
-    if manual_checkpoint_path.exists() and any(manual_checkpoint_path.iterdir()):
-        if _validate_checkpoint(manual_checkpoint_path):
-            print(
-                f"[OK] Found manually placed checkpoint: \"{manual_checkpoint_path}\"")
-            return manual_checkpoint_path
+        if manual_checkpoint_path.exists() and any(manual_checkpoint_path.iterdir()):
+            if _validate_checkpoint(manual_checkpoint_path):
+                checkpoint_path = manual_checkpoint_path
+
+    # Backup to Drive if in Colab and checkpoint was successfully acquired
+    if checkpoint_path and in_colab and drive_store and acquisition_config.get("drive", {}).get("enabled", False):
+        try:
+            # Ensure checkpoint is in best_model_selection directory structure
+            target_backup_path = _build_checkpoint_dir(
+                root_dir, config_dir, platform, backbone, run_id,
+                study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
+            )
+
+            # If checkpoint is not already in target location, copy it there
+            if checkpoint_path != target_backup_path:
+                target_backup_path.mkdir(parents=True, exist_ok=True)
+                if target_backup_path.exists():
+                    shutil.rmtree(target_backup_path)
+                shutil.copytree(checkpoint_path, target_backup_path)
+                checkpoint_path = target_backup_path
+
+            # Backup to Drive
+            result = drive_store.backup(checkpoint_path, expect="dir")
+            if not result.ok:
+                # Backup failed, but checkpoint is still available locally
+                pass
+
+        except Exception:
+            # Backup failed, but checkpoint is still available locally
+            pass
+
+    if checkpoint_path:
+        return checkpoint_path
 
     # Generate error message
     tracking_uri = mlflow.get_tracking_uri() or ""
