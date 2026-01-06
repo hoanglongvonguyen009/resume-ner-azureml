@@ -770,405 +770,92 @@ class MLflowSweepTracker(BaseTracker):
             except Exception:
                 pass
 
-            # Check if we're using Azure ML
-            tracking_uri = mlflow.get_tracking_uri()
-            is_azure_ml = tracking_uri and "azureml" in tracking_uri.lower()
-
+            # Use MLflow for artifact upload (works for both Azure ML and non-Azure ML backends)
             artifact_logged = False
+            archive_path = None
+            try:
+                active_run = mlflow.active_run()
+                if not active_run:
+                    raise ValueError(
+                        "No active MLflow run for artifact logging")
 
-            if is_azure_ml:
-                try:
-                    active_run = mlflow.active_run()
-                    if not active_run:
-                        raise ValueError(
-                            "No active MLflow run for artifact logging")
+                # Defensive check: ensure active_run has info.run_id
+                if not hasattr(active_run, 'info') or not hasattr(active_run.info, 'run_id'):
+                    raise ValueError(
+                        "Active MLflow run does not have 'info.run_id' attribute")
 
-                    # Defensive check: ensure active_run has info.run_id
-                    if not hasattr(active_run, 'info') or not hasattr(active_run.info, 'run_id'):
-                        raise ValueError(
-                            "Active MLflow run does not have 'info.run_id' attribute")
+                logger.info("Creating checkpoint archive...")
+                archive_path, manifest = create_checkpoint_archive(
+                    checkpoint_dir, best_trial_number
+                )
 
-                    # Prefer best trial's child run over parent run for artifact upload
-                    run_id_to_use = best_trial_run_id or active_run.info.run_id
+                # Upload archive with retry logic using MLflow
+                logger.info(
+                    f"Uploading checkpoint archive via MLflow ({archive_path.stat().st_size / 1024 / 1024:.1f}MB)...")
 
-                    run_id = run_id_to_use
-
-                    logger.info(
-                        "Uploading best trial checkpoint to Azure ML...")
-                    try:
-                        from azureml.core import Run as AzureMLRun
-                        from azureml.core import Workspace
-                        import os
-
-                        # Get Azure ML workspace - try multiple methods
-                        workspace = None
-                        ws_error1 = None
-
-                        # Method 1: Try from config.json (if available)
-                        try:
-                            workspace = Workspace.from_config()
-                        except Exception as ws_error1:
-
-                            # Method 2: Try from environment variables
-                            subscription_id = os.environ.get(
-                                "AZURE_SUBSCRIPTION_ID")
-                            resource_group = os.environ.get(
-                                "AZURE_RESOURCE_GROUP")
-                            workspace_name = os.environ.get(
-                                "AZURE_WORKSPACE_NAME", "resume-ner-ws")  # Default from codebase
-
-                            if subscription_id and resource_group:
-                                try:
-                                    workspace = Workspace(
-                                        subscription_id=subscription_id,
-                                        resource_group=resource_group,
-                                        workspace_name=workspace_name
-                                    )
-                                except Exception:
-                                    pass
-
-                            # Method 3: Try loading from config.env file (same as mlflow_setup.py)
-                            if not workspace:
-                                try:
-                                    # Path is already imported at module level
-                                    project_root = Path.cwd()
-                                    # Try to find config.env in project root or parent
-                                    config_env_paths = [
-                                        project_root / "config.env",
-                                        project_root.parent / "config.env",
-                                    ]
-
-                                    for config_env_path in config_env_paths:
-                                        if config_env_path.exists():
-                                            # Simple .env parser
-                                            env_vars = {}
-                                            with open(config_env_path, "r", encoding="utf-8") as f:
-                                                for line in f:
-                                                    line = line.strip()
-                                                    if not line or line.startswith("#"):
-                                                        continue
-                                                    if "=" in line:
-                                                        key, value = line.split(
-                                                            "=", 1)
-                                                        key = key.strip()
-                                                        value = value.strip().strip('"').strip("'")
-                                                        env_vars[key] = value
-
-                                            subscription_id = env_vars.get(
-                                                "AZURE_SUBSCRIPTION_ID") or subscription_id
-                                            resource_group = env_vars.get(
-                                                "AZURE_RESOURCE_GROUP") or resource_group
-                                            workspace_name = env_vars.get(
-                                                "AZURE_WORKSPACE_NAME", workspace_name)
-
-                                            if subscription_id and resource_group:
-                                                workspace = Workspace(
-                                                    subscription_id=subscription_id,
-                                                    resource_group=resource_group,
-                                                    workspace_name=workspace_name
-                                                )
-                                                break
-                                except Exception:
-                                    pass
-
-                            # Method 4: Try parsing from MLflow tracking URI
-                            if not workspace:
-                                try:
-                                    tracking_uri = mlflow.get_tracking_uri()
-                                    # Azure ML tracking URI format: azureml://<region>.api.azureml.ms/mlflow/v2.0/subscriptions/<sub_id>/resourceGroups/<rg>/providers/Microsoft.MachineLearningServices/workspaces/<ws_name>
-                                    if "azureml" in tracking_uri.lower() and "/subscriptions/" in tracking_uri:
-                                        import re
-                                        sub_match = re.search(
-                                            r'/subscriptions/([^/]+)', tracking_uri)
-                                        rg_match = re.search(
-                                            r'/resourceGroups/([^/]+)', tracking_uri)
-                                        ws_match = re.search(
-                                            r'/workspaces/([^/]+)', tracking_uri)
-
-                                        if sub_match and rg_match and ws_match:
-                                            workspace = Workspace(
-                                                subscription_id=sub_match.group(
-                                                    1),
-                                                resource_group=rg_match.group(
-                                                    1),
-                                                workspace_name=ws_match.group(
-                                                    1)
-                                            )
-                                except Exception:
-                                    pass
-
-                            if not workspace:
-                                raise RuntimeError(
-                                    f"Could not load Azure ML workspace. Tried: config.json, environment variables, config.env, and tracking URI parsing. "
-                                    f"Last error: {ws_error1}"
-                                )
-
-                        # Get experiment ID and run name from MLflow run
-                        experiment_id = active_run.info.experiment_id
-                        run_name = active_run.info.run_name
-
-                        # Get the Azure ML experiment
-                        try:
-                            experiment = workspace.experiments[experiment_id]
-                        except Exception as exp_err1:
-                            # Try to find experiment by name
-                            try:
-                                experiment_name = mlflow.get_experiment(
-                                    experiment_id).name
-                                experiment = workspace.experiments[experiment_name]
-                            except Exception as exp_err2:
-                                raise ValueError(
-                                    f"Could not find Azure ML experiment for MLflow experiment_id={experiment_id}. "
-                                    f"Errors: by_id={exp_err1}, by_name={exp_err2}"
-                                )
-
-                        # Get the Azure ML run - extract run ID from MLflow artifact URI
-                        # This is the most reliable method for Azure ML
-                        azureml_run = None
-                        try:
-                            mlflow_client = mlflow.tracking.MlflowClient()
-                            mlflow_run_data = mlflow_client.get_run(run_id)
-
-                            # Extract Azure ML run ID from artifact URI
-                            # Format: azureml://.../runs/<run_id>/artifacts
-                            if mlflow_run_data.info.artifact_uri and "azureml://" in mlflow_run_data.info.artifact_uri and "/runs/" in mlflow_run_data.info.artifact_uri:
-                                import re
-                                run_id_match = re.search(
-                                    r'/runs/([^/]+)', mlflow_run_data.info.artifact_uri)
-                                if run_id_match:
-                                    azureml_run_id_from_uri = run_id_match.group(
-                                        1)
-                                    azureml_run = workspace.get_run(
-                                        azureml_run_id_from_uri)
-                        except Exception as uri_err:
-                            logger.debug(
-                                f"Failed to get Azure ML run from artifact URI: {uri_err}")
-
-                        if not azureml_run:
-                            # Fallback: try to get parent run's Azure ML run ID from artifact URI
-                            if parent_run_id_for_artifacts:
-                                try:
-                                    parent_mlflow_run = mlflow.tracking.MlflowClient().get_run(
-                                        parent_run_id_for_artifacts)
-                                    if parent_mlflow_run.info.artifact_uri and "azureml://" in parent_mlflow_run.info.artifact_uri and "/runs/" in parent_mlflow_run.info.artifact_uri:
-                                        import re
-                                        run_id_match = re.search(
-                                            r'/runs/([^/]+)', parent_mlflow_run.info.artifact_uri)
-                                        if run_id_match:
-                                            parent_azureml_run_id = run_id_match.group(
-                                                1)
-                                            azureml_run = workspace.get_run(
-                                                parent_azureml_run_id)
-                                            logger.warning(
-                                                f"Could not find best trial's Azure ML run, "
-                                                f"uploading checkpoint to current parent run instead"
-                                            )
-                                except Exception:
-                                    pass
-
-                            if not azureml_run:
-                                logger.warning(
-                                    f"Could not find Azure ML run for MLflow run_id={run_id}. "
-                                    f"This may happen when resuming from a previous session. "
-                                    f"Best trial checkpoint is available locally at: {checkpoint_dir}"
-                                )
-                                artifact_logged = False
-                                azureml_run = None
-
-                        # Upload artifacts using MLflow (works for both Azure ML and non-Azure ML backends)
-                        # Create archive from checkpoint directory
-                        archive_path = None
-                        try:
-                            logger.info("Creating checkpoint archive...")
-                            archive_path, manifest = create_checkpoint_archive(
-                                checkpoint_dir, best_trial_number
-                            )
-
-                            # Upload archive with retry logic using MLflow
-                            logger.info(
-                                f"Uploading checkpoint archive via MLflow ({archive_path.stat().st_size / 1024 / 1024:.1f}MB)...")
-
-                            def upload_archive():
-                                mlflow.log_artifact(
-                                    str(archive_path),
-                                    artifact_path="best_trial_checkpoint.tar.gz"
-                                )
-
-                            retry_with_backoff(
-                                upload_archive,
-                                max_retries=5,
-                                base_delay=2.0,
-                                operation_name="checkpoint archive upload (MLflow)"
-                            )
-
-                            # Upload manifest.json
-                            try:
-                                manifest_json = json.dumps(
-                                    manifest, indent=2)
-                                with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_manifest:
-                                    tmp_manifest.write(manifest_json)
-                                    tmp_manifest_path = Path(
-                                        tmp_manifest.name)
-
-                                try:
-                                    def upload_manifest():
-                                        mlflow.log_artifact(
-                                            str(tmp_manifest_path),
-                                            artifact_path="best_trial_checkpoint_manifest.json"
-                                        )
-
-                                    retry_with_backoff(
-                                        upload_manifest,
-                                        max_retries=3,
-                                        base_delay=1.0,
-                                        operation_name="manifest upload (MLflow)"
-                                    )
-                                    logger.debug(
-                                        "Uploaded checkpoint manifest.json")
-                                finally:
-                                    tmp_manifest_path.unlink(
-                                        missing_ok=True)
-                            except Exception as manifest_error:
-                                logger.warning(
-                                    f"Could not upload manifest.json: {manifest_error}")
-
-                            artifact_logged = True
-                            logger.info(
-                                f"Uploaded best trial checkpoint archive: {manifest['file_count']} files "
-                                f"({manifest['total_size'] / 1024 / 1024:.1f}MB) for trial {best_trial_number}"
-                            )
-                        except Exception as archive_error:
-                            error_type = type(archive_error).__name__
-                            error_msg = str(archive_error)
-                            logger.warning(
-                                f"Failed to upload checkpoint archive: {error_type}: {error_msg}"
-                            )
-                            artifact_logged = False
-                            raise
-                        finally:
-                            # Clean up temp archive file
-                            if archive_path and archive_path.exists():
-                                try:
-                                    archive_path.unlink()
-                                    logger.debug(
-                                        f"Cleaned up temporary archive: {archive_path}")
-                                except Exception as cleanup_error:
-                                    logger.warning(
-                                        f"Could not clean up archive file: {cleanup_error}")
-                    except ImportError as import_error:
-                        logger.warning(
-                            f"Azure ML SDK (azureml.core) not available: {import_error}")
-                        artifact_logged = False
-                    except Exception as azureml_error:
-                        error_type = type(azureml_error).__name__
-                        error_msg = str(azureml_error)
-                        logger.warning(
-                            f"Failed to upload checkpoint to Azure ML: {error_type}: {error_msg}")
-                        artifact_logged = False
-                except Exception as outer_error:
-                    # Handle errors from the outer try block (e.g., no active run)
-                    logger.warning(
-                        f"Could not upload checkpoint: {outer_error}")
-                    artifact_logged = False
-            else:
-                # For non-Azure ML backends, upload archive using standard MLflow methods
-                archive_path = None
-                try:
-                    logger.info(
-                        "Creating checkpoint archive for non-Azure ML backend...")
-                    archive_path, manifest = create_checkpoint_archive(
-                        checkpoint_dir, best_trial_number
+                def upload_archive():
+                    mlflow.log_artifact(
+                        str(archive_path),
+                        artifact_path="best_trial_checkpoint.tar.gz"
                     )
 
-                    # Upload archive with retry
-                    def upload_archive_mlflow():
-                        mlflow.log_artifact(
-                            str(archive_path),
-                            artifact_path="best_trial_checkpoint.tar.gz"
+                retry_with_backoff(
+                    upload_archive,
+                    max_retries=5,
+                    base_delay=2.0,
+                    operation_name="checkpoint archive upload (MLflow)"
+                )
+
+                # Upload manifest.json
+                try:
+                    manifest_json = json.dumps(manifest, indent=2)
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_manifest:
+                        tmp_manifest.write(manifest_json)
+                        tmp_manifest_path = Path(tmp_manifest.name)
+
+                    try:
+                        def upload_manifest():
+                            mlflow.log_artifact(
+                                str(tmp_manifest_path),
+                                artifact_path="best_trial_checkpoint_manifest.json"
+                            )
+
+                        retry_with_backoff(
+                            upload_manifest,
+                            max_retries=3,
+                            base_delay=1.0,
+                            operation_name="manifest upload (MLflow)"
                         )
+                        logger.debug("Uploaded checkpoint manifest.json")
+                    finally:
+                        tmp_manifest_path.unlink(missing_ok=True)
+                except Exception as manifest_error:
+                    logger.warning(
+                        f"Could not upload manifest.json: {manifest_error}")
 
-                    retry_with_backoff(
-                        upload_archive_mlflow,
-                        max_retries=5,
-                        base_delay=2.0,
-                        operation_name="checkpoint archive upload (MLflow)"
-                    )
-
-                    # Upload manifest
+                artifact_logged = True
+                logger.info(
+                    f"Uploaded best trial checkpoint archive: {manifest['file_count']} files "
+                    f"({manifest['total_size'] / 1024 / 1024:.1f}MB) for trial {best_trial_number}"
+                )
+            except Exception as archive_error:
+                error_type = type(archive_error).__name__
+                error_msg = str(archive_error)
+                logger.warning(
+                    f"Failed to upload checkpoint archive: {error_type}: {error_msg}"
+                )
+                artifact_logged = False
+                raise
+            finally:
+                # Clean up temp archive file
+                if archive_path and archive_path.exists():
                     try:
-                        manifest_json = json.dumps(manifest, indent=2)
-                        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_manifest:
-                            tmp_manifest.write(manifest_json)
-                            tmp_manifest_path = Path(tmp_manifest.name)
-
-                        try:
-                            def upload_manifest_mlflow():
-                                mlflow.log_artifact(
-                                    str(tmp_manifest_path),
-                                    artifact_path="best_trial_checkpoint_manifest.json"
-                                )
-
-                            retry_with_backoff(
-                                upload_manifest_mlflow,
-                                max_retries=3,
-                                base_delay=1.0,
-                                operation_name="manifest upload (MLflow)"
-                            )
-                        finally:
-                            tmp_manifest_path.unlink(missing_ok=True)
-                    except Exception as manifest_error:
+                        archive_path.unlink()
+                        logger.debug(
+                            f"Cleaned up temporary archive: {archive_path}")
+                    except Exception as cleanup_error:
                         logger.warning(
-                            f"Could not upload manifest.json: {manifest_error}")
-
-                    artifact_logged = True
-                    logger.info(
-                        f"Logged best trial checkpoint archive: {manifest['file_count']} files "
-                        f"({manifest['total_size'] / 1024 / 1024:.1f}MB) for trial {best_trial_number}"
-                    )
-                except Exception as e:
-                    # Fallback to client method
-                    try:
-                        client = mlflow.tracking.MlflowClient()
-                        run_id_to_use = parent_run_id_for_artifacts
-                        if not run_id_to_use:
-                            active_run = mlflow.active_run()
-                            if active_run:
-                                run_id_to_use = active_run.info.run_id
-
-                        if run_id_to_use and archive_path:
-                            def upload_archive_client():
-                                client.log_artifact(
-                                    run_id_to_use,
-                                    str(archive_path),
-                                    artifact_path="best_trial_checkpoint.tar.gz"
-                                )
-
-                            retry_with_backoff(
-                                upload_archive_client,
-                                max_retries=5,
-                                base_delay=2.0,
-                                operation_name="checkpoint archive upload (client)"
-                            )
-                            artifact_logged = True
-                            logger.info(
-                                f"Logged best trial checkpoint archive using client: trial {best_trial_number}"
-                            )
-                        else:
-                            raise ValueError("No MLflow run ID available")
-                    except Exception as client_error:
-                        logger.warning(
-                            f"MLflow artifact logging failed: {client_error}")
-                finally:
-                    # Clean up temp archive file
-                    if archive_path and archive_path.exists():
-                        try:
-                            archive_path.unlink()
-                            logger.debug(
-                                f"Cleaned up temporary archive: {archive_path}")
-                        except Exception as cleanup_error:
-                            logger.warning(
-                                f"Could not clean up archive file: {cleanup_error}")
-                        artifact_logged = False
+                            f"Could not clean up archive file: {cleanup_error}")
 
             # Mark study as complete if checkpoint was successfully uploaded
             if artifact_logged:
@@ -1190,16 +877,10 @@ class MLflowSweepTracker(BaseTracker):
 
             # Log fallback message if upload failed
             if not artifact_logged:
-                if is_azure_ml:
-                    logger.info(
-                        f"Best trial checkpoint for trial {best_trial_number} is available locally at: {checkpoint_dir}. "
-                        f"Azure ML artifact upload was not successful, but the checkpoint can be accessed directly."
-                    )
-                else:
-                    logger.info(
-                        f"Checkpoint for best trial {best_trial_number} is available locally at: {checkpoint_dir}. "
-                        f"MLflow artifact logging was not successful, but the checkpoint can be accessed directly."
-                    )
+                logger.info(
+                    f"Checkpoint for best trial {best_trial_number} is available locally at: {checkpoint_dir}. "
+                    f"MLflow artifact logging was not successful, but the checkpoint can be accessed directly."
+                )
         except Exception as e:
             # Don't fail HPO if checkpoint logging fails
             logger.warning(f"Could not log checkpoint to MLflow: {e}")
@@ -1259,10 +940,6 @@ class MLflowSweepTracker(BaseTracker):
 
         client = mlflow.tracking.MlflowClient()
 
-        # Detect backend early to route to correct uploader
-        tracking_uri = mlflow.get_tracking_uri()
-        is_azure_ml = tracking_uri and "azureml" in tracking_uri.lower()
-
         # Set refit tags
         if refit_ok is not None:
             try:
@@ -1294,192 +971,17 @@ class MLflowSweepTracker(BaseTracker):
             )
             return
 
-        # Upload checkpoint - route by backend early to avoid "try → fail → fallback" pattern
+        # Upload checkpoint using MLflow (works for both Azure ML and non-Azure ML backends)
         archive_path = None
         archive_path, manifest = create_checkpoint_archive(
             checkpoint_dir, best_trial_number
         )
 
-        # Route 1: If AzureML backend → use AzureML SDK directly (avoids tracking_uri error)
-        if is_azure_ml:
-            try:
-                from azureml.core import Run as AzureMLRun
-                from azureml.core import Workspace
-                import os
-                import re
-
-                # Get Azure ML workspace - try multiple methods
-                workspace = None
-                ws_error1 = None
-
-                # Method 1: Try from config.json
-                try:
-                    workspace = Workspace.from_config()
-                except Exception as ws_error1:
-                    # Method 2: Try from environment variables
-                    subscription_id = os.environ.get("AZURE_SUBSCRIPTION_ID")
-                    resource_group = os.environ.get("AZURE_RESOURCE_GROUP")
-                    workspace_name = os.environ.get(
-                        "AZURE_WORKSPACE_NAME", "resume-ner-ws")
-
-                    if subscription_id and resource_group:
-                        try:
-                            workspace = Workspace(
-                                subscription_id=subscription_id,
-                                resource_group=resource_group,
-                                workspace_name=workspace_name
-                            )
-                        except Exception:
-                            pass
-
-                    # Method 3: Try loading from config.env file
-                    if not workspace:
-                        try:
-                            project_root = Path.cwd()
-                            config_env_paths = [
-                                project_root / "config.env",
-                                project_root.parent / "config.env",
-                            ]
-
-                            for config_env_path in config_env_paths:
-                                if config_env_path.exists():
-                                    env_vars = {}
-                                    with open(config_env_path, "r", encoding="utf-8") as f:
-                                        for line in f:
-                                            line = line.strip()
-                                            if not line or line.startswith("#"):
-                                                continue
-                                            if "=" in line:
-                                                key, value = line.split("=", 1)
-                                                key = key.strip()
-                                                value = value.strip().strip('"').strip("'")
-                                                env_vars[key] = value
-
-                                    subscription_id = env_vars.get(
-                                        "AZURE_SUBSCRIPTION_ID") or subscription_id
-                                    resource_group = env_vars.get(
-                                        "AZURE_RESOURCE_GROUP") or resource_group
-                                    workspace_name = env_vars.get(
-                                        "AZURE_WORKSPACE_NAME", workspace_name)
-
-                                    if subscription_id and resource_group:
-                                        workspace = Workspace(
-                                            subscription_id=subscription_id,
-                                            resource_group=resource_group,
-                                            workspace_name=workspace_name
-                                        )
-                                        break
-                        except Exception:
-                            pass
-
-                    # Method 4: Try parsing from MLflow tracking URI
-                    if not workspace:
-                        try:
-                            tracking_uri = mlflow.get_tracking_uri()
-                            if "azureml" in tracking_uri.lower() and "/subscriptions/" in tracking_uri:
-                                sub_match = re.search(
-                                    r'/subscriptions/([^/]+)', tracking_uri)
-                                rg_match = re.search(
-                                    r'/resourceGroups/([^/]+)', tracking_uri)
-                                ws_match = re.search(
-                                    r'/workspaces/([^/]+)', tracking_uri)
-
-                                if sub_match and rg_match and ws_match:
-                                    workspace = Workspace(
-                                        subscription_id=sub_match.group(1),
-                                        resource_group=rg_match.group(1),
-                                        workspace_name=ws_match.group(1)
-                                    )
-                        except Exception:
-                            pass
-
-                if not workspace:
-                    raise RuntimeError(
-                        f"Could not load Azure ML workspace. Tried: config.json, environment variables, config.env, and tracking URI parsing. "
-                        f"Last error: {ws_error1}"
-                    )
-
-                # Get Azure ML run
-                run_info = client.get_run(run_id_to_use)
-                azureml_run = None
-
-                # Extract Azure ML run ID from artifact URI if available
-                if run_info.info.artifact_uri and "azureml://" in run_info.info.artifact_uri and "/runs/" in run_info.info.artifact_uri:
-                    run_id_match = re.search(
-                        r'/runs/([^/]+)', run_info.info.artifact_uri)
-                    if run_id_match:
-                        azureml_run_id_from_uri = run_id_match.group(1)
-                        azureml_run = workspace.get_run(
-                            azureml_run_id_from_uri)
-
-                # Fallback: try using MLflow run_id directly
-                if not azureml_run:
-                    try:
-                        azureml_run = workspace.get_run(run_id_to_use)
-                    except Exception:
-                        pass
-
-                if not azureml_run:
-                    raise RuntimeError(
-                        "Could not get Azure ML run from workspace")
-
-                # Upload via MLflow (works for both Azure ML and non-Azure ML backends)
-                logger.info("Uploading checkpoint archive via MLflow...")
-
-                def upload_archive_mlflow():
-                    mlflow.log_artifact(
-                        str(archive_path),
-                        artifact_path="best_trial_checkpoint.tar.gz"
-                    )
-
-                retry_with_backoff(
-                    upload_archive_mlflow,
-                    max_retries=5,
-                    base_delay=2.0,
-                    operation_name="checkpoint archive upload (MLflow)"
-                )
-
-                logger.info(
-                    f"Uploaded checkpoint archive via MLflow: {manifest['file_count']} files "
-                    f"({manifest['total_size'] / 1024 / 1024:.1f}MB) for trial {best_trial_number}"
-                )
-
-                # Mark study as complete after successful checkpoint upload
-                try:
-                    from datetime import datetime
-                    study.set_user_attr("hpo_complete", "true")
-                    study.set_user_attr("checkpoint_uploaded", "true")
-                    study.set_user_attr(
-                        "completion_timestamp", datetime.now().isoformat())
-                    study.set_user_attr("best_trial_number",
-                                        str(best_trial_number))
-                    logger.info(
-                        f"Marked study as complete with checkpoint uploaded (best trial: {best_trial_number})"
-                    )
-                except Exception as attr_error:
-                    logger.warning(
-                        f"Could not mark study as complete: {attr_error}"
-                    )
-
-                # Clean up
-                if archive_path.exists():
-                    archive_path.unlink()
-                return
-
-            except Exception as azureml_error:
-                logger.warning(
-                    f"AzureML SDK upload failed: {azureml_error}. "
-                    f"Falling back to MLflow client..."
-                )
-                # Continue to MLflow client fallback
-
-        # Route 2: Standard MLflow or AzureML fallback → use MLflowClient
         try:
             logger.info("Uploading checkpoint archive to MLflow...")
 
+            # Use MLflowClient with explicit run_id (works when no active run context)
             def upload_archive():
-                # Use MlflowClient with explicit run_id (no active run context)
-                # artifact_path is a directory path - creates best_trial_checkpoint/checkpoint.tar.gz
                 client.log_artifact(
                     run_id_to_use,
                     str(archive_path),
@@ -1490,7 +992,7 @@ class MLflowSweepTracker(BaseTracker):
                 upload_archive,
                 max_retries=5,
                 base_delay=2.0,
-                operation_name="checkpoint archive upload (MLflowClient)"
+                operation_name="checkpoint archive upload (MLflow)"
             )
 
             logger.info(
@@ -1520,15 +1022,7 @@ class MLflowSweepTracker(BaseTracker):
                 archive_path.unlink()
 
         except Exception as e:
-            # MLflow client may fail with tracking_uri error when using AzureML
-            # This is a known issue with MLflow's internal azureml_artifacts_builder
-            if "tracking_uri" in str(e).lower() or "azureml_artifacts_builder" in str(e).lower():
-                logger.error(
-                    f"MLflow client artifact upload failed (known AzureML compatibility issue): {e}. "
-                    f"AzureML SDK should have been used instead. Check backend detection."
-                )
-            else:
-                logger.error(f"Failed to upload checkpoint via MLflow: {e}")
+            logger.error(f"Failed to upload checkpoint via MLflow: {e}")
 
             # Clean up on failure
             if archive_path and archive_path.exists():

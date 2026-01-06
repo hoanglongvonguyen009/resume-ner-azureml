@@ -261,6 +261,11 @@ class TrialExecutor:
             if trial_number is not None:
                 env["MLFLOW_TRIAL_NUMBER"] = str(trial_number)
 
+        # Disable automatic artifact logging during HPO trials
+        # Only the refit checkpoint of the best trial will be logged via log_best_checkpoint
+        # This prevents logging all fold checkpoints of all trials (saves storage and time)
+        env["MLFLOW_SKIP_ARTIFACT_LOGGING"] = "true"
+
         # Set fold index if k-fold CV is enabled
         if fold_idx is not None:
             env["MLFLOW_FOLD_IDX"] = str(fold_idx)

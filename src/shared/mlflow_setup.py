@@ -87,6 +87,23 @@ def setup_mlflow_cross_platform(
         ImportError: If mlflow is not installed (with helpful error message)
         RuntimeError: If Azure ML required but unavailable and fallback disabled
     """
+    import warnings
+
+    # Suppress MLflow Azure ML artifact store "uploading mode" deprecation warning
+    # We're intentionally using mlflow.log_artifact() instead of Azure ML SDK
+    warnings.filterwarnings(
+        "ignore",
+        message=".*uploading mode.*deprecated.*",
+        category=DeprecationWarning,
+        module="mlflow.*"
+    )
+    warnings.filterwarnings(
+        "ignore",
+        message=".*deprecated.*uploading mode.*",
+        category=UserWarning,
+        module="mlflow.*"
+    )
+
     # Check if Azure ML tracking is already configured
     current_tracking_uri = mlflow.get_tracking_uri()
     is_azure_ml_already_set = current_tracking_uri and "azureml" in current_tracking_uri.lower()

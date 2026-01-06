@@ -159,12 +159,15 @@ def run_benchmarking(
             # Create NamingContext for benchmarking
             # For HPO trial benchmarks, trial_id should be the trial identifier
             # For final training benchmarks, trial_id can be None or a variant identifier
+            # Pass study_key_hash and trial_key_hash for proper run naming
             benchmark_context = create_naming_context(
                 process_type="benchmarking",
                 model=backbone.split(
                     "-")[0] if backbone and "-" in backbone else backbone,
                 environment=detect_platform(),
                 trial_id=extracted_trial_id,  # Use extracted trial_id if available
+                study_key_hash=study_key_hash,  # Pass study_key_hash for grouping
+                trial_key_hash=trial_key_hash,  # Pass trial_key_hash for grouping
             )
 
             logger.info(

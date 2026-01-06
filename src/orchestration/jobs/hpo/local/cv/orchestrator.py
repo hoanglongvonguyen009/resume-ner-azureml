@@ -247,17 +247,6 @@ def _create_trial_run(
             else:
                 trial_id = f"trial_{trial_number}"
 
-            # Create NamingContext for HPO trial
-            trial_context = create_naming_context(
-                process_type="hpo",
-                model=backbone_short,
-                environment=detect_platform(),
-                trial_id=trial_id,
-            )
-
-            # Build systematic run name
-            run_name = build_mlflow_run_name(trial_context, config_dir)
-
             # Extract hyperparameters (excluding metadata fields)
             hyperparameters = {
                 k: v for k, v in trial_params.items()
@@ -308,6 +297,25 @@ def _create_trial_run(
                     logger.debug(
                         f"Could not retrieve grouping hashes from parent run: {e}")
 
+            # Create NamingContext for HPO trial WITH study_key_hash and trial_number
+            # This must be done AFTER retrieving study_key_hash so run name includes it
+            # Use explicit trial_number from Optuna (robust, no string parsing)
+            trial_number_int = trial_params.get("trial_number")
+            trial_context = create_naming_context(
+                process_type="hpo",
+                model=backbone_short,
+                environment=detect_platform(),
+                storage_env=detect_platform(),
+                stage="hpo_trial",
+                trial_id=trial_id,
+                trial_number=trial_number_int,  # Explicit Optuna trial number
+                study_key_hash=computed_study_key_hash,
+                trial_key_hash=None,  # Will be computed below
+            )
+
+            # Build systematic run name (now with study_key_hash in context)
+            run_name = build_mlflow_run_name(trial_context, config_dir)
+
             # Compute trial_key_hash if we have study_key_hash and hyperparameters
             if computed_study_key_hash and hyperparameters:
                 try:
@@ -318,6 +326,18 @@ def _create_trial_run(
                     trial_key = build_hpo_trial_key(
                         computed_study_key_hash, hyperparameters)
                     trial_key_hash = build_hpo_trial_key_hash(trial_key)
+                    # Update context with computed trial_key_hash
+                    trial_context = create_naming_context(
+                        process_type="hpo",
+                        model=backbone_short,
+                        environment=detect_platform(),
+                        storage_env=detect_platform(),
+                        stage="hpo_trial",
+                        trial_id=trial_id,
+                        trial_number=trial_number_int,  # Keep explicit trial_number
+                        study_key_hash=computed_study_key_hash,
+                        trial_key_hash=trial_key_hash,
+                    )
                 except Exception as e:
                     logger.warning(
                         f"Could not compute trial_key_hash: {e}", exc_info=True)

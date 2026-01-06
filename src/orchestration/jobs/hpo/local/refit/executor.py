@@ -124,11 +124,16 @@ def run_refit_training(
     )
 
     # Create NamingContext and MLflow run for refit
+    # Include study_key_hash and trial_key_hash for hash-driven naming consistency
     refit_context = create_naming_context(
         process_type="hpo_refit",
         model=backbone.split("-")[0] if "-" in backbone else backbone,
         environment=detect_platform(),
+        storage_env=detect_platform(),
         trial_id=trial_id,
+        trial_number=trial_number,  # Add trial_number for readability
+        study_key_hash=study_key_hash,  # Add study_key_hash for grouping
+        trial_key_hash=trial_key_hash,  # Add trial_key_hash for grouping
     )
 
     # Assert: ensure trial_id is present before creating MLflow run
@@ -176,6 +181,10 @@ def run_refit_training(
     # Set run ID for refit training subprocess
     if refit_run_id:
         env["MLFLOW_RUN_ID"] = refit_run_id
+        # CRITICAL: Also set MLFLOW_PARENT_RUN_ID so training script knows it's refit mode
+        # This prevents training script from auto-ending the run (parent will terminate it)
+        if hpo_parent_run_id:
+            env["MLFLOW_PARENT_RUN_ID"] = hpo_parent_run_id
         logger.info(
             f"[REFIT] Set MLFLOW_RUN_ID to refit run: {refit_run_id[:12]}... "
             f"(training will log directly to refit run, not create child)"
@@ -566,11 +575,16 @@ def run_refit_training(
     )
 
     # Create NamingContext and MLflow run for refit
+    # Include study_key_hash and trial_key_hash for hash-driven naming consistency
     refit_context = create_naming_context(
         process_type="hpo_refit",
         model=backbone.split("-")[0] if "-" in backbone else backbone,
         environment=detect_platform(),
+        storage_env=detect_platform(),
         trial_id=trial_id,
+        trial_number=trial_number,  # Add trial_number for readability
+        study_key_hash=study_key_hash,  # Add study_key_hash for grouping
+        trial_key_hash=trial_key_hash,  # Add trial_key_hash for grouping
     )
 
     # Assert: ensure trial_id is present before creating MLflow run
@@ -618,6 +632,10 @@ def run_refit_training(
     # Set run ID for refit training subprocess
     if refit_run_id:
         env["MLFLOW_RUN_ID"] = refit_run_id
+        # CRITICAL: Also set MLFLOW_PARENT_RUN_ID so training script knows it's refit mode
+        # This prevents training script from auto-ending the run (parent will terminate it)
+        if hpo_parent_run_id:
+            env["MLFLOW_PARENT_RUN_ID"] = hpo_parent_run_id
         logger.info(
             f"[REFIT] Set MLFLOW_RUN_ID to refit run: {refit_run_id[:12]}... "
             f"(training will log directly to refit run, not create child)"

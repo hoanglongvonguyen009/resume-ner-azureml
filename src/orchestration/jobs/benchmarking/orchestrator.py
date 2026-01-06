@@ -302,12 +302,32 @@ def benchmark_best_trials(
         else:
             trial_id = trial_id_raw
 
-        # Build benchmarking output path
+        # Compute grouping tags BEFORE building path (needed for hash-based path)
+        study_key_hash, trial_key_hash, study_family_hash = compute_grouping_tags(
+            trial_info, data_config, hpo_config, benchmark_config
+        )
+
+        # Compute benchmark_config_hash if benchmark_config is available
+        benchmark_config_hash = None
+        if benchmark_config:
+            try:
+                import hashlib
+                import json
+                # Normalize and hash benchmark_config for stable identity
+                normalized_config = json.dumps(benchmark_config, sort_keys=True, separators=(',', ':'))
+                benchmark_config_hash = hashlib.sha256(normalized_config.encode('utf-8')).hexdigest()
+            except Exception as e:
+                logger.debug(f"Could not compute benchmark_config_hash: {e}")
+
+        # Build benchmarking output path with hashes
         benchmarking_context = create_naming_context(
             process_type="benchmarking",
             model=backbone_name,
             trial_id=trial_id,
             environment=environment,
+            study_key_hash=study_key_hash,
+            trial_key_hash=trial_key_hash,
+            benchmark_config_hash=benchmark_config_hash,
         )
         benchmarking_path = build_output_path(root_dir, benchmarking_context)
         # Redirect to Drive on Colab for persistence (similar to checkpoints)
@@ -358,11 +378,6 @@ def benchmark_best_trials(
                 )
                 benchmark_results[backbone] = benchmark_output
                 continue
-
-        # Compute grouping tags
-        study_key_hash, trial_key_hash, study_family_hash = compute_grouping_tags(
-            trial_info, data_config, hpo_config, benchmark_config
-        )
 
         logger.info(f"Benchmarking {backbone} ({trial_info['trial_name']})...")
 

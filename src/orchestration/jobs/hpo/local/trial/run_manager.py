@@ -81,6 +81,9 @@ def create_trial_run_no_cv(
                 trial_id = f"trial_{trial_number}"
 
             # Create NamingContext for HPO trial
+            # Note: study_key_hash is retrieved from parent run above (lines 70-74)
+            # Use explicit trial_number from Optuna (robust, no string parsing)
+            trial_number_int = trial_params.get("trial_number")
             trial_context = create_naming_context(
                 process_type="hpo",
                 model=backbone_short,
@@ -88,8 +91,9 @@ def create_trial_run_no_cv(
                 storage_env=detect_platform(),
                 stage="hpo_trial",
                 trial_id=trial_id,
-                study_key_hash=study_key_hash,
-                trial_key_hash=None,
+                trial_number=trial_number_int,  # Explicit Optuna trial number
+                study_key_hash=study_key_hash,  # Retrieved from parent run tags
+                trial_key_hash=None,  # Not computed for non-CV trials
             )
 
             # Build systematic run name

@@ -42,6 +42,8 @@ class NamingContext:
             force_new / retries).
         trial_id: Legacy trial identifier for HPO/benchmarking
             (e.g., "trial_1_20251229_100000").
+        trial_number: Explicit Optuna trial number (0-indexed integer).
+            Prefer this over parsing trial_id for robustness.
         parent_training_id: Parent training identifier for conversion (matches
             the final_training directory fragment, e.g.,
             "spec_abc_exec_xyz/v1").
@@ -61,6 +63,7 @@ class NamingContext:
     exec_fp: Optional[str] = None
     variant: int = 1
     trial_id: Optional[str] = None
+    trial_number: Optional[int] = None
     parent_training_id: Optional[str] = None
     conv_fp: Optional[str] = None
     study_key_hash: Optional[str] = None
@@ -128,6 +131,7 @@ def create_naming_context(
     study_name: Optional[str] = None,
     variant: int = 1,
     trial_id: Optional[str] = None,
+    trial_number: Optional[int] = None,
     parent_training_id: Optional[str] = None,
     conv_fp: Optional[str] = None,
     study_key_hash: Optional[str] = None,
@@ -145,6 +149,8 @@ def create_naming_context(
         environment: Execution environment (auto-detected if None).
         variant: Variant number for final_training (default 1).
         trial_id: Trial identifier for HPO/benchmarking.
+        trial_number: Explicit Optuna trial number (0-indexed integer).
+            Prefer this over parsing trial_id for robustness.
         parent_training_id: Parent training identifier for conversion.
         conv_fp: Conversion fingerprint (required for conversion).
 
@@ -182,6 +188,7 @@ def create_naming_context(
         exec_fp=exec_fp,
         variant=variant,
         trial_id=trial_id,
+        trial_number=trial_number,
         parent_training_id=parent_training_id,
         conv_fp=conv_fp,
         study_key_hash=study_key_hash,

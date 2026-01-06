@@ -29,6 +29,7 @@ CODE_CONV_FP = "code.conv_fp"
 CODE_STUDY_KEY_HASH = "code.study_key_hash"
 CODE_STUDY_FAMILY_HASH = "code.study_family_hash"
 CODE_TRIAL_KEY_HASH = "code.trial_key_hash"
+CODE_HPO_TRIAL_NUMBER = "code.hpo.trial_number"
 CODE_BENCHMARK_CONFIG_HASH = "code.benchmark_config_hash"
 CODE_OUTPUT_DIR = "code.output_dir"
 CODE_PARENT_RUN_ID = "code.parent_run_id"
@@ -246,6 +247,12 @@ def build_mlflow_tags(
         tags[CODE_STUDY_FAMILY_HASH] = study_family_hash
     if trial_key_hash:
         tags[CODE_TRIAL_KEY_HASH] = trial_key_hash
+
+    # HPO trial number (explicit Optuna trial number for human readability)
+    if context and context.process_type == "hpo":
+        trial_number = getattr(context, "trial_number", None)
+        if trial_number is not None:
+            tags[CODE_HPO_TRIAL_NUMBER] = str(int(trial_number))
 
     # Refit protocol fingerprint
     if refit_protocol_fp:

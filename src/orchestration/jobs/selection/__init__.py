@@ -24,6 +24,14 @@ from .trial_finder import (
     find_best_trials_for_backbones,
     find_study_folder_in_backbone_dir,
 )
+from .study_summary import (
+    extract_cv_statistics,
+    get_trial_hash_info,
+    load_study_from_disk,
+    find_trial_hash_info_for_study,
+    format_study_summary_line,
+    print_study_summaries,
+)
 
 # Alias for backward compatibility
 select_production_configuration = select_best_configuration
@@ -53,5 +61,12 @@ __all__ = [
     "compute_selection_cache_key",
     "load_cached_best_model",
     "save_best_model_cache",
+    # Study summary
+    "extract_cv_statistics",
+    "get_trial_hash_info",
+    "load_study_from_disk",
+    "find_trial_hash_info_for_study",
+    "format_study_summary_line",
+    "print_study_summaries",
 ]
 

@@ -37,7 +37,6 @@ class MLflowConversionTracker(BaseTracker):
         """
         super().__init__(experiment_name)
 
-
     @contextmanager
     def start_conversion_run(
         self,
@@ -170,198 +169,52 @@ class MLflowConversionTracker(BaseTracker):
                     1 if smoke_test_passed else 0,
                 )
 
-            tracking_uri = mlflow.get_tracking_uri()
-            is_azure_ml = tracking_uri and "azureml" in tracking_uri.lower()
+            # Use MLflow for artifact upload (works for both Azure ML and non-Azure ML backends)
+            if onnx_model_path and onnx_model_path.exists():
+                artifact_name = onnx_model_path.name
+                max_retries = 3
+                retry_delay = 2
 
-            if is_azure_ml:
-                try:
-                    active_run = mlflow.active_run()
-                    if not active_run:
-                        raise ValueError(
-                            "No active MLflow run for artifact logging"
-                        )
-
-                    run_id = active_run.info.run_id
-
-                    from azureml.core import Workspace
-                    import os
-                    import time
-                    import re
-
-                    workspace = None
+                for attempt in range(max_retries):
                     try:
-                        workspace = Workspace.from_config()
-                    except Exception:
-                        subscription_id = os.environ.get(
-                            "AZURE_SUBSCRIPTION_ID"
+                        mlflow.log_artifact(
+                            str(onnx_model_path),
+                            artifact_path=artifact_name,
                         )
-                        resource_group = os.environ.get(
-                            "AZURE_RESOURCE_GROUP"
-                        )
-                        workspace_name = os.environ.get(
-                            "AZURE_WORKSPACE_NAME",
-                            "resume-ner-ws",
-                        )
-
-                        if subscription_id and resource_group:
-                            try:
-                                workspace = Workspace(
-                                    subscription_id=subscription_id,
-                                    resource_group=resource_group,
-                                    workspace_name=workspace_name,
-                                )
-                            except Exception:
-                                pass
-
-                    if workspace:
-                        mlflow_client = mlflow.tracking.MlflowClient()
-                        mlflow_run_data = mlflow_client.get_run(run_id)
-
-                        azureml_run = None
-                        if (
-                            mlflow_run_data.info.artifact_uri
-                            and "azureml://" in mlflow_run_data.info.artifact_uri
-                            and "/runs/" in mlflow_run_data.info.artifact_uri
-                        ):
-                            match = re.search(
-                                r"/runs/([^/]+)",
-                                mlflow_run_data.info.artifact_uri,
+                        break
+                    except Exception as upload_err:
+                        if attempt < max_retries - 1:
+                            time.sleep(
+                                retry_delay * (2 ** attempt)
                             )
-                            if match:
-                                azureml_run = workspace.get_run(
-                                    match.group(1)
-                                )
-
-                        if azureml_run:
-                            if onnx_model_path and onnx_model_path.exists():
-                                artifact_name = onnx_model_path.name
-                                file_path = onnx_model_path.resolve()
-
-                                max_retries = 3
-                                retry_delays = [2.0, 5.0, 10.0]
-
-                                for attempt in range(max_retries):
-                                    try:
-                                        azureml_run.upload_file(
-                                            name=artifact_name,
-                                            path_or_stream=str(file_path),
-                                        )
-                                        if attempt > 0:
-                                            logger.info(
-                                                f"Successfully uploaded "
-                                                f"{artifact_name} after "
-                                                f"{attempt + 1} attempts"
-                                            )
-                                        break
-                                    except Exception as upload_err:
-                                        error_msg = str(upload_err).lower()
-
-                                        if (
-                                            "already exists" in error_msg
-                                            or "resource conflict" in error_msg
-                                        ):
-                                            break
-
-                                        if attempt < max_retries - 1:
-                                            delay = retry_delays[attempt]
-                                            logger.warning(
-                                                f"Upload attempt {attempt + 1}/"
-                                                f"{max_retries} failed for "
-                                                f"{artifact_name}: {upload_err}. "
-                                                f"Retrying in {delay}s..."
-                                            )
-                                            time.sleep(delay)
-                                        else:
-                                            logger.warning(
-                                                f"Failed to upload "
-                                                f"{artifact_name} after "
-                                                f"{max_retries} attempts: "
-                                                f"{upload_err}"
-                                            )
-
-                            if (
-                                conversion_log_path
-                                and conversion_log_path.exists()
-                            ):
-                                try:
-                                    azureml_run.upload_file(
-                                        name="conversion_log.txt",
-                                        path_or_stream=str(
-                                            conversion_log_path.resolve()
-                                        ),
-                                    )
-                                except Exception as upload_err:
-                                    error_msg = str(upload_err).lower()
-                                    if (
-                                        "already exists" not in error_msg
-                                        and "resource conflict" not in error_msg
-                                    ):
-                                        logger.warning(
-                                            "Failed to upload "
-                                            f"conversion_log.txt: {upload_err}"
-                                        )
                         else:
                             logger.warning(
-                                "Could not find Azure ML run for conversion "
-                                "artifact upload"
+                                f"Failed to upload {artifact_name} after "
+                                f"{max_retries} attempts: {upload_err}"
                             )
-                    else:
-                        logger.warning(
-                            "Could not get Azure ML workspace for conversion "
-                            "artifact upload"
+
+            if conversion_log_path and conversion_log_path.exists():
+                max_retries = 3
+                retry_delay = 2
+
+                for attempt in range(max_retries):
+                    try:
+                        mlflow.log_artifact(
+                            str(conversion_log_path),
+                            artifact_path="conversion_log.txt",
                         )
-                except Exception as azureml_err:
-                    logger.warning(
-                        "Failed to upload conversion artifacts to Azure ML: "
-                        f"{azureml_err}"
-                    )
-            else:
-                if onnx_model_path and onnx_model_path.exists():
-                    artifact_name = onnx_model_path.name
-                    max_retries = 3
-                    retry_delay = 2
-
-                    for attempt in range(max_retries):
-                        try:
-                            mlflow.log_artifact(
-                                str(onnx_model_path),
-                                artifact_path=artifact_name,
+                        break
+                    except Exception as upload_err:
+                        if attempt < max_retries - 1:
+                            time.sleep(
+                                retry_delay * (2 ** attempt)
                             )
-                            break
-                        except Exception as upload_err:
-                            if attempt < max_retries - 1:
-                                time.sleep(
-                                    retry_delay * (2 ** attempt)
-                                )
-                            else:
-                                logger.warning(
-                                    f"Failed to upload {artifact_name} after "
-                                    f"{max_retries} attempts: {upload_err}"
-                                )
-
-                if conversion_log_path and conversion_log_path.exists():
-                    max_retries = 3
-                    retry_delay = 2
-
-                    for attempt in range(max_retries):
-                        try:
-                            mlflow.log_artifact(
-                                str(conversion_log_path),
-                                artifact_path="conversion_log.txt",
+                        else:
+                            logger.warning(
+                                "Failed to upload conversion_log.txt after "
+                                f"{max_retries} attempts: {upload_err}"
                             )
-                            break
-                        except Exception as upload_err:
-                            if attempt < max_retries - 1:
-                                time.sleep(
-                                    retry_delay * (2 ** attempt)
-                                )
-                            else:
-                                logger.warning(
-                                    "Failed to upload conversion_log.txt after "
-                                    f"{max_retries} attempts: {upload_err}"
-                                )
         except Exception as e:
             logger.warning(
                 f"Could not log conversion results to MLflow: {e}"
             )
-

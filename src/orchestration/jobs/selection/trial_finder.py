@@ -18,6 +18,44 @@ from orchestration.path_resolution import resolve_hpo_output_dir
 logger = get_logger(__name__)
 
 
+def format_trial_identifier(trial_dir: Path, trial_number: Optional[int] = None) -> str:
+    """Format trial identifier using hash-based naming if available, else fallback to directory name.
+    
+    Args:
+        trial_dir: Path to trial directory
+        trial_number: Optional trial number to include in identifier
+        
+    Returns:
+        Formatted identifier string (e.g., "study-350a79aa, trial-9d4153fb, t1" or "trial_1_20260106_173735")
+    """
+    trial_meta_path = trial_dir / "trial_meta.json"
+    if trial_meta_path.exists():
+        try:
+            with open(trial_meta_path, "r") as f:
+                meta = json.load(f)
+            study_key_hash = meta.get("study_key_hash")
+            trial_key_hash = meta.get("trial_key_hash")
+            meta_trial_number = meta.get("trial_number")
+            
+            # Use trial_number from meta if available, else use provided trial_number
+            display_trial_number = meta_trial_number if meta_trial_number is not None else trial_number
+            
+            if study_key_hash and trial_key_hash:
+                if display_trial_number is not None:
+                    return f"study-{study_key_hash[:8]}, trial-{trial_key_hash[:8]}, t{display_trial_number}"
+                else:
+                    return f"study-{study_key_hash[:8]}, trial-{trial_key_hash[:8]}"
+            elif display_trial_number is not None:
+                return f"t{display_trial_number}"
+        except Exception:
+            pass
+    
+    # Fallback to directory name or trial number
+    if trial_number is not None:
+        return f"t{trial_number}"
+    return trial_dir.name
+
+
 def find_study_folder_in_backbone_dir(backbone_dir: Path) -> Optional[Path]:
     """
     Find study folder inside backbone directory.
@@ -173,8 +211,9 @@ def find_best_trial_from_study(
                     # Match by trial_key_hash
                     if meta.get("trial_key_hash") == computed_trial_key_hash:
                         best_trial_dir = trial_dir
+                        trial_identifier = format_trial_identifier(trial_dir, best_trial_number)
                         logger.info(
-                            f"Found trial {trial_dir.name} by trial_key_hash match "
+                            f"Found trial {trial_identifier} by trial_key_hash match "
                             f"({computed_trial_key_hash[:16]}...)"
                         )
                         break
@@ -209,8 +248,9 @@ def find_best_trial_from_study(
 
                     if checkpoint_found:
                         best_trial_dir = trial_dir
+                        trial_identifier = format_trial_identifier(trial_dir, best_trial_number)
                         logger.info(
-                            f"Found trial {trial_dir.name} by trial number {best_trial_number} "
+                            f"Found trial {trial_identifier} by trial number {best_trial_number} "
                             "(with checkpoint)"
                         )
                         break
@@ -365,6 +405,11 @@ def find_best_trials_for_backbones(
                     trial_dir_path = Path(best_trial_from_disk["trial_dir"])
                     study_name = trial_dir_path.parent.name if trial_dir_path.parent else None
 
+                    # Extract trial number from study if available
+                    trial_number = None
+                    if study and study.best_trial:
+                        trial_number = study.best_trial.number
+
                     best_trial_info = {
                         "backbone": backbone_name,
                         "trial_name": best_trial_from_disk["trial_name"],
@@ -380,8 +425,10 @@ def find_best_trials_for_backbones(
                         "metrics": best_trial_from_disk["metrics"],
                         "hyperparameters": best_trial_from_disk["hyperparameters"],
                     }
+                    # Format identifier using hash-based naming if available
+                    trial_identifier = format_trial_identifier(trial_dir_path, trial_number)
                     logger.info(
-                        f"{backbone}: Best trial from HPO run is {best_trial_info['trial_name']} "
+                        f"{backbone}: Best trial from HPO run is {trial_identifier} "
                         f"({objective_metric}={best_trial_info['accuracy']:.4f})"
                     )
 

@@ -259,131 +259,20 @@ class MLflowTrainingTracker(BaseTracker):
             metrics_json_path: Optional path to metrics.json file.
         """
         try:
-            tracking_uri = mlflow.get_tracking_uri()
-            is_azure_ml = tracking_uri and "azureml" in tracking_uri.lower()
+            # Use MLflow for artifact upload (works for both Azure ML and non-Azure ML backends)
+            # Log checkpoint directory
+            if checkpoint_dir.exists():
+                mlflow.log_artifacts(
+                    str(checkpoint_dir),
+                    artifact_path="checkpoint"
+                )
 
-            if is_azure_ml:
-                # Use Azure ML SDK for artifact upload (same approach as HPO checkpoint logging)
-                try:
-                    active_run = mlflow.active_run()
-                    if not active_run:
-                        raise ValueError(
-                            "No active MLflow run for artifact logging")
-
-                    run_id = active_run.info.run_id
-
-                    from azureml.core import Run as AzureMLRun
-                    from azureml.core import Workspace
-                    import os
-
-                    # Get Azure ML workspace (same logic as HPO checkpoint logging)
-                    workspace = None
-                    try:
-                        workspace = Workspace.from_config()
-                    except Exception:
-                        subscription_id = os.environ.get(
-                            "AZURE_SUBSCRIPTION_ID")
-                        resource_group = os.environ.get("AZURE_RESOURCE_GROUP")
-                        workspace_name = os.environ.get(
-                            "AZURE_WORKSPACE_NAME", "resume-ner-ws")
-
-                        if subscription_id and resource_group:
-                            try:
-                                workspace = Workspace(
-                                    subscription_id=subscription_id,
-                                    resource_group=resource_group,
-                                    workspace_name=workspace_name
-                                )
-                            except Exception:
-                                pass
-
-                    if workspace:
-                        # Get Azure ML run ID from MLflow artifact URI
-                        mlflow_client = mlflow.tracking.MlflowClient()
-                        mlflow_run_data = mlflow_client.get_run(run_id)
-
-                        azureml_run = None
-                        if mlflow_run_data.info.artifact_uri and "azureml://" in mlflow_run_data.info.artifact_uri and "/runs/" in mlflow_run_data.info.artifact_uri:
-                            import re
-                            run_id_match = re.search(
-                                r'/runs/([^/]+)', mlflow_run_data.info.artifact_uri)
-                            if run_id_match:
-                                azureml_run_id_from_uri = run_id_match.group(1)
-                                azureml_run = workspace.get_run(
-                                    azureml_run_id_from_uri)
-
-                        if azureml_run:
-                            # Upload checkpoint directory files
-                            if checkpoint_dir.exists():
-                                import os as os_module
-                                files_uploaded = 0
-                                for root, dirs, files in os_module.walk(checkpoint_dir):
-                                    for file in files:
-                                        file_path = Path(root) / file
-                                        file_path = file_path.resolve()
-
-                                        if not file_path.exists():
-                                            continue
-
-                                        # Create artifact path relative to checkpoint_dir
-                                        rel_path = file_path.relative_to(
-                                            checkpoint_dir)
-                                        artifact_path = f"checkpoint/{rel_path}"
-
-                                        try:
-                                            azureml_run.upload_file(
-                                                name=artifact_path,
-                                                path_or_stream=str(file_path)
-                                            )
-                                            files_uploaded += 1
-                                        except Exception as upload_err:
-                                            error_msg = str(upload_err).lower()
-                                            # If artifact already exists, that's okay
-                                            if "already exists" in error_msg or "resource conflict" in error_msg:
-                                                files_uploaded += 1
-                                            else:
-                                                logger.debug(
-                                                    f"Failed to upload {file_path.name}: {upload_err}")
-
-                                if files_uploaded > 0:
-                                    logger.debug(
-                                        f"Uploaded {files_uploaded} checkpoint files to Azure ML run {azureml_run.id}")
-
-                            # Upload metrics.json if provided
-                            if metrics_json_path and metrics_json_path.exists():
-                                file_path = metrics_json_path.resolve()
-                                try:
-                                    azureml_run.upload_file(
-                                        name="metrics.json",
-                                        path_or_stream=str(file_path)
-                                    )
-                                    logger.debug(
-                                        f"Uploaded metrics.json to Azure ML run {azureml_run.id}")
-                                except Exception as upload_err:
-                                    error_msg = str(upload_err).lower()
-                                    if "already exists" not in error_msg and "resource conflict" not in error_msg:
-                                        logger.warning(
-                                            f"Failed to upload metrics.json: {upload_err}")
-                        else:
-                            logger.warning(
-                                "Could not find Azure ML run for training artifact upload")
-                    else:
-                        logger.warning(
-                            "Could not get Azure ML workspace for training artifact upload")
-                except Exception as azureml_err:
-                    logger.warning(
-                        f"Failed to upload training artifacts to Azure ML: {azureml_err}")
-            else:
-                # Use standard MLflow for non-Azure ML backends
-                # Log checkpoint directory
-                if checkpoint_dir.exists():
-                    mlflow.log_artifacts(str(checkpoint_dir),
-                                         artifact_path="checkpoint")
-
-                # Log metrics.json if provided
-                if metrics_json_path and metrics_json_path.exists():
-                    mlflow.log_artifact(str(metrics_json_path),
-                                        artifact_path="metrics.json")
+            # Log metrics.json if provided
+            if metrics_json_path and metrics_json_path.exists():
+                mlflow.log_artifact(
+                    str(metrics_json_path),
+                    artifact_path="metrics.json"
+                )
         except Exception as e:
             logger.warning(f"Could not log training artifacts to MLflow: {e}")
 
