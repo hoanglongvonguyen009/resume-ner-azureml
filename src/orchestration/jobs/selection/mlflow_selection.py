@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 from mlflow.tracking import MlflowClient
 
 from shared.logging_utils import get_logger
+from orchestration.jobs.tracking.naming.tags_registry import TagsRegistry
 
 logger = get_logger(__name__)
 
@@ -14,7 +15,7 @@ logger = get_logger(__name__)
 def find_best_model_from_mlflow(
     benchmark_experiment: Dict[str, str],
     hpo_experiments: Dict[str, Dict[str, str]],
-    tags_config: Dict[str, Any],
+    tags_config: Union[TagsRegistry, Dict[str, Any]],
     selection_config: Dict[str, Any],
     use_python_filtering: bool = True,
 ) -> Optional[Dict[str, Any]]:
@@ -31,7 +32,7 @@ def find_best_model_from_mlflow(
     Args:
         benchmark_experiment: Dict with 'name' and 'id' of benchmark experiment
         hpo_experiments: Dict mapping backbone -> experiment info (name, id)
-        tags_config: Tags configuration
+        tags_config: TagsRegistry or Dict with tags configuration (for backward compatibility)
         selection_config: Selection configuration
         use_python_filtering: If True, fetch all runs and filter in Python (recommended for AzureML)
 
@@ -51,11 +52,18 @@ def find_best_model_from_mlflow(
         logger.error(error_msg)
         return None
 
-    # Tag keys from config
-    study_key_tag = tags_config["grouping"]["study_key_hash"]
-    trial_key_tag = tags_config["grouping"]["trial_key_hash"]
-    stage_tag = tags_config["process"]["stage"]
-    backbone_tag = tags_config["process"]["backbone"]
+    # Tag keys from config (support both TagsRegistry and dict for backward compatibility)
+    if isinstance(tags_config, TagsRegistry):
+        study_key_tag = tags_config.key("grouping", "study_key_hash")
+        trial_key_tag = tags_config.key("grouping", "trial_key_hash")
+        stage_tag = tags_config.key("process", "stage")
+        backbone_tag = tags_config.key("process", "backbone")
+    else:
+        # Backward compatibility: support dict access
+        study_key_tag = tags_config["grouping"]["study_key_hash"]
+        trial_key_tag = tags_config["grouping"]["trial_key_hash"]
+        stage_tag = tags_config["process"]["stage"]
+        backbone_tag = tags_config["process"]["backbone"]
 
     # Selection config
     objective_metric = selection_config["objective"]["metric"]

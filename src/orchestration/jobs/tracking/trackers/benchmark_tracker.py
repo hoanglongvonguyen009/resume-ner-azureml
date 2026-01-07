@@ -154,17 +154,26 @@ class MLflowBenchmarkTracker(BaseTracker):
 
                 # Use pre-computed lineage_parent_run_id and parent_kind from before run creation
 
+                # Get tag keys from registry (config_dir should be available from context)
+                from orchestration.jobs.tracking.naming.tags import get_tag_key
+                config_dir = None  # Could be inferred from context if available
+                lineage_hpo_trial_run_id_tag = get_tag_key("lineage", "hpo_trial_run_id", config_dir, "code.lineage.hpo_trial_run_id")
+                lineage_hpo_refit_run_id_tag = get_tag_key("lineage", "hpo_refit_run_id", config_dir, "code.lineage.hpo_refit_run_id")
+                lineage_hpo_sweep_run_id_tag = get_tag_key("lineage", "hpo_sweep_run_id", config_dir, "code.lineage.hpo_sweep_run_id")
+                lineage_parent_training_run_id_tag = get_tag_key("lineage", "parent_training_run_id", config_dir, "code.lineage.parent_training_run_id")
+                
                 # Set explicit lineage tags using code.lineage.* namespace (only valid UUIDs)
                 if valid_trial_run_id:
-                    tags["code.lineage.hpo_trial_run_id"] = valid_trial_run_id
+                    tags[lineage_hpo_trial_run_id_tag] = valid_trial_run_id
                 if valid_refit_run_id:
-                    tags["code.lineage.hpo_refit_run_id"] = valid_refit_run_id
+                    tags[lineage_hpo_refit_run_id_tag] = valid_refit_run_id
                 if valid_sweep_run_id:
-                    tags["code.lineage.hpo_sweep_run_id"] = valid_sweep_run_id
+                    tags[lineage_hpo_sweep_run_id_tag] = valid_sweep_run_id
 
                 # Canonical parent tags (only if we have a valid parent)
                 if lineage_parent_run_id:
-                    tags["code.lineage.parent_run_id"] = lineage_parent_run_id
+                    tags[lineage_parent_training_run_id_tag] = lineage_parent_run_id
+                    # parent_kind is not in registry, keep as-is for now
                     tags["code.lineage.parent_kind"] = parent_kind
                     logger.info(
                         f"[START_BENCHMARK_RUN] Set lineage tags: parent_run_id={lineage_parent_run_id[:12]}..., "

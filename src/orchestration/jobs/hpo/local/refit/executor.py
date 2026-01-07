@@ -443,8 +443,10 @@ def _log_refit_metrics_to_mlflow(
             client.set_tag(refit_run_id, f"note.{k}", v)
 
         # Set explicit refit tags
-        client.set_tag(refit_run_id, "code.refit", "true")
-        client.set_tag(refit_run_id, "code.refit_has_validation", "false")
+        refit_tag = get_tag_key("training", "refit", config_dir, "code.refit")
+        refit_has_validation_tag = get_tag_key("training", "refit_has_validation", config_dir, "code.refit_has_validation")
+        client.set_tag(refit_run_id, refit_tag, "true")
+        client.set_tag(refit_run_id, refit_has_validation_tag, "false")
 
         # Log hyperparameters
         for param_name, param_value in refit_params.items():
@@ -894,8 +896,10 @@ def _log_refit_metrics_to_mlflow(
             client.set_tag(refit_run_id, f"note.{k}", v)
 
         # Set explicit refit tags
-        client.set_tag(refit_run_id, "code.refit", "true")
-        client.set_tag(refit_run_id, "code.refit_has_validation", "false")
+        refit_tag = get_tag_key("training", "refit", config_dir, "code.refit")
+        refit_has_validation_tag = get_tag_key("training", "refit_has_validation", config_dir, "code.refit_has_validation")
+        client.set_tag(refit_run_id, refit_tag, "true")
+        client.set_tag(refit_run_id, refit_has_validation_tag, "false")
 
         # Log hyperparameters
         for param_name, param_value in refit_params.items():

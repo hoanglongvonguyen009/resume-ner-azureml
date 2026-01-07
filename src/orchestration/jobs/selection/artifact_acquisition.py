@@ -515,12 +515,35 @@ def acquire_best_model_checkpoint(
                 found_checkpoint = _find_checkpoint_in_directory(
                     downloaded_path)
                 if found_checkpoint:
-                    downloaded_path = found_checkpoint
+                    # Resolve and validate the found checkpoint path exists
+                    found_checkpoint = Path(found_checkpoint).resolve()
+                    if found_checkpoint.exists() and found_checkpoint.is_dir():
+                        downloaded_path = found_checkpoint
+                    else:
+                        raise ValueError(
+                            f"Found checkpoint path does not exist: {found_checkpoint}\n"
+                            f"This may indicate an issue with the MLflow artifact structure."
+                        )
                 else:
                     # Validate the directory itself
                     if not _validate_checkpoint(downloaded_path):
                         raise ValueError(
                             "Downloaded checkpoint failed validation - no valid checkpoint files found")
+
+            # Resolve path to absolute
+            downloaded_path = Path(downloaded_path).resolve()
+
+            # Ensure the checkpoint path exists and is valid
+            if not downloaded_path.exists():
+                raise ValueError(
+                    f"Downloaded checkpoint path does not exist: {downloaded_path}\n"
+                    f"This may indicate an issue with the MLflow artifact structure."
+                )
+
+            if not downloaded_path.is_dir():
+                raise ValueError(
+                    f"Downloaded checkpoint path is not a directory: {downloaded_path}"
+                )
 
             # Final validation
             if acquisition_config["mlflow"].get("validate", True):
@@ -529,8 +552,14 @@ def acquire_best_model_checkpoint(
 
             checkpoint_path = downloaded_path
 
-        except Exception:
-            pass
+        except Exception as e:
+            # Log the error instead of silently swallowing it
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(
+                f"Failed to download checkpoint from MLflow: {e}", exc_info=True)
+            # Don't set checkpoint_path - let fallback strategies try
+            checkpoint_path = None
 
     # All strategies failed - check for manually placed checkpoint
     if checkpoint_path is None:
@@ -545,31 +574,40 @@ def acquire_best_model_checkpoint(
                 checkpoint_path = manual_checkpoint_path
 
     # Backup to Drive if in Colab and checkpoint was successfully acquired
+    # Follow the same pattern as final training: backup directly without copying first
     if checkpoint_path and in_colab and drive_store and acquisition_config.get("drive", {}).get("enabled", False):
         try:
-            # Ensure checkpoint is in best_model_selection directory structure
-            target_backup_path = _build_checkpoint_dir(
-                root_dir, config_dir, platform, backbone, run_id,
-                study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
-            )
+            checkpoint_path = Path(checkpoint_path).resolve()
 
-            # If checkpoint is not already in target location, copy it there
-            if checkpoint_path != target_backup_path:
-                target_backup_path.mkdir(parents=True, exist_ok=True)
-                if target_backup_path.exists():
-                    shutil.rmtree(target_backup_path)
-                shutil.copytree(checkpoint_path, target_backup_path)
-                checkpoint_path = target_backup_path
+            # Validate checkpoint exists before attempting backup
+            if not checkpoint_path.exists():
+                print(f"⚠ Checkpoint path does not exist: {checkpoint_path}")
+                print(
+                    f"  Skipping Drive backup - checkpoint may have been moved or deleted")
+            elif not checkpoint_path.is_dir():
+                print(
+                    f"⚠ Checkpoint path is not a directory: {checkpoint_path}")
+                print(f"  Skipping Drive backup")
+            else:
+                # Backup to Drive (same pattern as final training)
+                print(f"\n📦 Backing up best model checkpoint to Google Drive...")
+                result = drive_store.backup(checkpoint_path, expect="dir")
+                if result.ok:
+                    print(f"✓ Successfully backed up checkpoint to Google Drive")
+                    print(f"  Drive path: {result.dst}")
+                else:
+                    print(f"⚠ Drive backup failed: {result.reason}")
+                    if result.error:
+                        print(f"  Error: {result.error}")
+                    print(
+                        f"  Checkpoint is still available locally at: {checkpoint_path}")
 
-            # Backup to Drive
-            result = drive_store.backup(checkpoint_path, expect="dir")
-            if not result.ok:
-                # Backup failed, but checkpoint is still available locally
-                pass
-
-        except Exception:
-            # Backup failed, but checkpoint is still available locally
-            pass
+        except Exception as e:
+            print(f"⚠ Drive backup error: {e}")
+            print(
+                f"  Checkpoint is still available locally at: {checkpoint_path}")
+            import traceback
+            traceback.print_exc()
 
     if checkpoint_path:
         return checkpoint_path

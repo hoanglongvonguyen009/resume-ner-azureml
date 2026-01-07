@@ -9,6 +9,10 @@ from typing import Dict, Optional
 from shared.platform_detection import detect_platform
 from orchestration.naming_centralized import NamingContext
 from orchestration.jobs.tracking.config.loader import get_naming_config
+from orchestration.jobs.tracking.naming.tags_registry import (
+    TagKeyError,
+    load_tags_registry,
+)
 
 # ---------------------------------------------------------------------------
 # Centralized tag keys
@@ -40,6 +44,39 @@ CODE_RUN_KEY_HASH = "code.run_key_hash"
 CODE_RUN_ID_PREFIX = "code.run_id_prefix"
 CODE_LINEAGE_PARENT_TRAINING_RUN_ID = "code.lineage.parent_training_run_id"
 CODE_LINEAGE_HPO_REFIT_RUN_ID = "code.lineage.hpo_refit_run_id"
+
+
+def get_tag_key(
+    section: str,
+    name: str,
+    config_dir: Optional[Path] = None,
+    fallback: Optional[str] = None,
+) -> str:
+    """
+    Get tag key from registry with fallback to constant.
+    
+    Tries to load tag key from registry (config/tags.yaml). If registry is unavailable
+    or key is missing, falls back to the provided fallback value or raises an error.
+    
+    Args:
+        section: Section name (e.g., "grouping", "process", "training")
+        name: Key name within the section
+        config_dir: Optional config directory for loading registry
+        fallback: Optional fallback value if registry fails
+        
+    Returns:
+        Tag key string (e.g., "code.study_key_hash")
+        
+    Raises:
+        TagKeyError: If key is missing and no fallback provided
+    """
+    try:
+        registry = load_tags_registry(config_dir)
+        return registry.key(section, name)
+    except (TagKeyError, Exception):
+        if fallback is not None:
+            return fallback
+        raise
 
 
 def sanitize_tag_value(
@@ -108,159 +145,201 @@ def build_mlflow_tags(
     Returns:
         Dictionary of MLflow tags.
     """
+    # Try to load registry, but don't fail if it's unavailable
+    try:
+        registry = load_tags_registry(config_dir)
+        use_registry = True
+    except Exception:
+        use_registry = False
+
+    def _get_key(section: str, name: str, fallback: str) -> str:
+        """Helper to get tag key from registry or fallback."""
+        if use_registry:
+            try:
+                return registry.key(section, name)
+            except TagKeyError:
+                return fallback
+        return fallback
+
     tags = {}
     sanitize_tags = True
     tag_max_length = 250
+
+    # Get tag keys (from registry or fallback to constants)
+    TAG_STAGE = _get_key("process", "stage", CODE_STAGE)
+    TAG_MODEL = _get_key("process", "model", CODE_MODEL)
+    TAG_ENV = _get_key("process", "env", CODE_ENV)
+    TAG_STORAGE_ENV = _get_key("process", "storage_env", CODE_STORAGE_ENV)
+    TAG_EXECUTION_PLATFORM = _get_key("process", "execution_platform", CODE_EXECUTION_PLATFORM)
+    TAG_CREATED_BY = _get_key("process", "created_by", CODE_CREATED_BY)
+    TAG_PROJECT = _get_key("process", "project", CODE_PROJECT)
+    TAG_RUN_TYPE = _get_key("process", "run_type", "code.run_type")
+    TAG_SPEC_FP = _get_key("paths", "spec_fp", CODE_SPEC_FP)
+    TAG_EXEC_FP = _get_key("paths", "exec_fp", CODE_EXEC_FP)
+    TAG_CONV_FP = _get_key("paths", "conv_fp", CODE_CONV_FP)
+    TAG_OUTPUT_DIR = _get_key("paths", "output_dir", CODE_OUTPUT_DIR)
+    TAG_REFIT_PROTOCOL_FP = _get_key("paths", "refit_protocol_fp", CODE_REFIT_PROTOCOL_FP)
+    TAG_VARIANT = _get_key("legacy", "variant", CODE_VARIANT)
+    TAG_TRIAL_ID = _get_key("legacy", "trial_id", CODE_TRIAL_ID)
+    TAG_PARENT_TRAINING_ID = _get_key("legacy", "parent_training_id", CODE_PARENT_TRAINING_ID)
+    TAG_STUDY_KEY_HASH = _get_key("grouping", "study_key_hash", CODE_STUDY_KEY_HASH)
+    TAG_STUDY_FAMILY_HASH = _get_key("grouping", "study_family_hash", CODE_STUDY_FAMILY_HASH)
+    TAG_TRIAL_KEY_HASH = _get_key("grouping", "trial_key_hash", CODE_TRIAL_KEY_HASH)
+    TAG_PARENT_RUN_ID = _get_key("grouping", "parent_run_id", CODE_PARENT_RUN_ID)
+    TAG_GROUP_ID = _get_key("grouping", "group_id", CODE_GROUP_ID)
+    TAG_GROUPING_SCHEMA_VERSION = _get_key("grouping", "grouping_schema_version", CODE_GROUPING_SCHEMA_VERSION)
+    TAG_RUN_KEY_HASH = _get_key("grouping", "run_key_hash", CODE_RUN_KEY_HASH)
+    TAG_HPO_TRIAL_NUMBER = _get_key("hpo", "trial_number", CODE_HPO_TRIAL_NUMBER)
 
     # Always set minimal tags
     if context:
         if sanitize_tags:
             # For hpo_refit, set code.stage to "hpo_refit" and code.run_type to "refit"
             if context.process_type == "hpo_refit":
-                tags[CODE_STAGE] = sanitize_tag_value(
+                tags[TAG_STAGE] = sanitize_tag_value(
                     "hpo_refit", max_length=tag_max_length, config_dir=config_dir)
-                tags["code.run_type"] = sanitize_tag_value(
+                tags[TAG_RUN_TYPE] = sanitize_tag_value(
                     "refit", max_length=tag_max_length, config_dir=config_dir)
             else:
-                tags[CODE_STAGE] = sanitize_tag_value(
+                tags[TAG_STAGE] = sanitize_tag_value(
                     context.process_type, max_length=tag_max_length, config_dir=config_dir)
-            tags[CODE_MODEL] = sanitize_tag_value(
+            tags[TAG_MODEL] = sanitize_tag_value(
                 context.model, max_length=tag_max_length, config_dir=config_dir)
             # Prefer storage_env; keep legacy env for backward compatibility
             storage_env = getattr(context, "storage_env", context.environment)
-            tags[CODE_STORAGE_ENV] = sanitize_tag_value(
+            tags[TAG_STORAGE_ENV] = sanitize_tag_value(
                 storage_env, max_length=tag_max_length, config_dir=config_dir)
-            tags[CODE_ENV] = sanitize_tag_value(
+            tags[TAG_ENV] = sanitize_tag_value(
                 context.environment, max_length=tag_max_length, config_dir=config_dir)
-            tags[CODE_EXECUTION_PLATFORM] = sanitize_tag_value(
+            tags[TAG_EXECUTION_PLATFORM] = sanitize_tag_value(
                 context.environment, max_length=tag_max_length, config_dir=config_dir)
         else:
             # For hpo_refit, set code.stage to "hpo_refit" and code.run_type to "refit"
             if context.process_type == "hpo_refit":
-                tags["code.stage"] = "hpo_refit"
-                tags["code.run_type"] = "refit"
+                tags[TAG_STAGE] = "hpo_refit"
+                tags[TAG_RUN_TYPE] = "refit"
             else:
-                tags["code.stage"] = context.process_type
-            tags["code.model"] = context.model
-            tags["code.env"] = context.environment
+                tags[TAG_STAGE] = context.process_type
+            tags[TAG_MODEL] = context.model
+            tags[TAG_ENV] = context.environment
     else:
         env = detect_platform()
         if sanitize_tags:
-            tags["code.stage"] = "unknown"
-            tags["code.model"] = "unknown"
-            tags["code.env"] = sanitize_tag_value(
+            tags[TAG_STAGE] = "unknown"
+            tags[TAG_MODEL] = "unknown"
+            tags[TAG_ENV] = sanitize_tag_value(
                 env, max_length=tag_max_length, config_dir=config_dir)
         else:
-            tags["code.stage"] = "unknown"
-            tags["code.model"] = "unknown"
-            tags["code.env"] = env
+            tags[TAG_STAGE] = "unknown"
+            tags[TAG_MODEL] = "unknown"
+            tags[TAG_ENV] = env
 
     # Created by (user or system)
     created_by = os.environ.get("USER", os.environ.get("USERNAME", "system"))
     if sanitize_tags:
-        tags[CODE_CREATED_BY] = sanitize_tag_value(
+        tags[TAG_CREATED_BY] = sanitize_tag_value(
             created_by, max_length=tag_max_length, config_dir=config_dir)
     else:
-        tags[CODE_CREATED_BY] = created_by
+        tags[TAG_CREATED_BY] = created_by
 
     # Project name
     if project_name:
         if sanitize_tags:
-            tags[CODE_PROJECT] = sanitize_tag_value(
+            tags[TAG_PROJECT] = sanitize_tag_value(
                 project_name, max_length=tag_max_length, config_dir=config_dir)
         else:
-            tags[CODE_PROJECT] = project_name
+            tags[TAG_PROJECT] = project_name
     else:
         naming_config = get_naming_config(config_dir)
         default_project = naming_config.get("project_name", "resume-ner")
         if sanitize_tags:
-            tags[CODE_PROJECT] = sanitize_tag_value(
+            tags[TAG_PROJECT] = sanitize_tag_value(
                 default_project, max_length=tag_max_length, config_dir=config_dir)
         else:
-            tags[CODE_PROJECT] = default_project
+            tags[TAG_PROJECT] = default_project
 
     # Optional context fields
     if context:
         if context.spec_fp:
             if sanitize_tags:
-                tags[CODE_SPEC_FP] = sanitize_tag_value(
+                tags[TAG_SPEC_FP] = sanitize_tag_value(
                     context.spec_fp, max_length=tag_max_length, config_dir=config_dir)
             else:
-                tags[CODE_SPEC_FP] = context.spec_fp
+                tags[TAG_SPEC_FP] = context.spec_fp
         if context.exec_fp:
             if sanitize_tags:
-                tags[CODE_EXEC_FP] = sanitize_tag_value(
+                tags[TAG_EXEC_FP] = sanitize_tag_value(
                     context.exec_fp, max_length=tag_max_length, config_dir=config_dir)
             else:
-                tags[CODE_EXEC_FP] = context.exec_fp
+                tags[TAG_EXEC_FP] = context.exec_fp
         if context.variant:
-            tags[CODE_VARIANT] = str(context.variant)
+            tags[TAG_VARIANT] = str(context.variant)
             if context.trial_id:
                 if sanitize_tags:
-                    tags[CODE_TRIAL_ID] = sanitize_tag_value(
+                    tags[TAG_TRIAL_ID] = sanitize_tag_value(
                         context.trial_id, max_length=tag_max_length, config_dir=config_dir)
                 else:
-                    tags[CODE_TRIAL_ID] = context.trial_id
+                    tags[TAG_TRIAL_ID] = context.trial_id
             if context.parent_training_id:
                 if sanitize_tags:
-                    tags[CODE_PARENT_TRAINING_ID] = sanitize_tag_value(
+                    tags[TAG_PARENT_TRAINING_ID] = sanitize_tag_value(
                         context.parent_training_id, max_length=tag_max_length, config_dir=config_dir)
                 else:
-                    tags[CODE_PARENT_TRAINING_ID] = context.parent_training_id
+                    tags[TAG_PARENT_TRAINING_ID] = context.parent_training_id
             if context.conv_fp:
                 if sanitize_tags:
-                    tags[CODE_CONV_FP] = sanitize_tag_value(
+                    tags[TAG_CONV_FP] = sanitize_tag_value(
                         context.conv_fp, max_length=tag_max_length, config_dir=config_dir)
                 else:
-                    tags[CODE_CONV_FP] = context.conv_fp
+                    tags[TAG_CONV_FP] = context.conv_fp
 
     if output_dir:
         if sanitize_tags:
-            tags[CODE_OUTPUT_DIR] = sanitize_tag_value(
+            tags[TAG_OUTPUT_DIR] = sanitize_tag_value(
                 str(output_dir), max_length=tag_max_length, config_dir=config_dir)
         else:
-            tags[CODE_OUTPUT_DIR] = str(output_dir)
+            tags[TAG_OUTPUT_DIR] = str(output_dir)
 
     if parent_run_id:
         if sanitize_tags:
-            tags[CODE_PARENT_RUN_ID] = sanitize_tag_value(
+            tags[TAG_PARENT_RUN_ID] = sanitize_tag_value(
                 parent_run_id, max_length=tag_max_length, config_dir=config_dir)
         else:
-            tags[CODE_PARENT_RUN_ID] = parent_run_id
+            tags[TAG_PARENT_RUN_ID] = parent_run_id
 
     if group_id:
         if sanitize_tags:
-            tags[CODE_GROUP_ID] = sanitize_tag_value(
+            tags[TAG_GROUP_ID] = sanitize_tag_value(
                 group_id, max_length=tag_max_length, config_dir=config_dir)
         else:
-            tags[CODE_GROUP_ID] = group_id
+            tags[TAG_GROUP_ID] = group_id
 
     # Grouping tags (always set schema version if any grouping tag is present)
     # This allows safe interpretation of hash meanings even if only some hashes are present
     has_grouping_tags = study_key_hash or study_family_hash or trial_key_hash
     if has_grouping_tags:
-        tags[CODE_GROUPING_SCHEMA_VERSION] = "1"
+        tags[TAG_GROUPING_SCHEMA_VERSION] = "1"
 
     if study_key_hash:
-        tags[CODE_STUDY_KEY_HASH] = study_key_hash
+        tags[TAG_STUDY_KEY_HASH] = study_key_hash
     if study_family_hash:
-        tags[CODE_STUDY_FAMILY_HASH] = study_family_hash
+        tags[TAG_STUDY_FAMILY_HASH] = study_family_hash
     if trial_key_hash:
-        tags[CODE_TRIAL_KEY_HASH] = trial_key_hash
+        tags[TAG_TRIAL_KEY_HASH] = trial_key_hash
 
     # HPO trial number (explicit Optuna trial number for human readability)
     if context and context.process_type == "hpo":
         trial_number = getattr(context, "trial_number", None)
         if trial_number is not None:
-            tags[CODE_HPO_TRIAL_NUMBER] = str(int(trial_number))
+            tags[TAG_HPO_TRIAL_NUMBER] = str(int(trial_number))
 
     # Refit protocol fingerprint
     if refit_protocol_fp:
-        tags[CODE_REFIT_PROTOCOL_FP] = refit_protocol_fp
+        tags[TAG_REFIT_PROTOCOL_FP] = refit_protocol_fp
 
     # Run key hash (for cleanup and run finding)
     if run_key_hash:
-        tags[CODE_RUN_KEY_HASH] = run_key_hash
+        tags[TAG_RUN_KEY_HASH] = run_key_hash
 
     return tags
 

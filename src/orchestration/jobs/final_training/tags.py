@@ -9,6 +9,7 @@ import mlflow
 from mlflow.tracking import MlflowClient
 
 from orchestration.jobs.tracking.finder.run_finder import find_mlflow_run
+from orchestration.jobs.tracking.naming.tags import get_tag_key
 
 
 def apply_lineage_tags(
@@ -83,26 +84,35 @@ def apply_lineage_tags(
                 print(f"⚠ Could not query MLflow for recent run: {e}")
         
         if run_id:
+            # Get tag keys from registry
+            trained_on_full_data_tag = get_tag_key("training", "trained_on_full_data", config_dir, "code.trained_on_full_data")
+            lineage_source_tag = get_tag_key("lineage", "source", config_dir, "code.lineage.source")
+            lineage_hpo_study_key_hash_tag = get_tag_key("lineage", "hpo_study_key_hash", config_dir, "code.lineage.hpo_study_key_hash")
+            lineage_hpo_trial_key_hash_tag = get_tag_key("lineage", "hpo_trial_key_hash", config_dir, "code.lineage.hpo_trial_key_hash")
+            lineage_hpo_trial_run_id_tag = get_tag_key("lineage", "hpo_trial_run_id", config_dir, "code.lineage.hpo_trial_run_id")
+            lineage_hpo_refit_run_id_tag = get_tag_key("lineage", "hpo_refit_run_id", config_dir, "code.lineage.hpo_refit_run_id")
+            lineage_hpo_sweep_run_id_tag = get_tag_key("lineage", "hpo_sweep_run_id", config_dir, "code.lineage.hpo_sweep_run_id")
+            
             with mlflow.start_run(run_id=run_id):
                 # Set training-specific tags
-                mlflow.set_tag("code.trained_on_full_data", "true")
+                mlflow.set_tag(trained_on_full_data_tag, "true")
                 
                 # Set lineage tags (following benchmark tracker pattern)
                 lineage_tags = {
-                    "code.lineage.source": "hpo_best_selected",
+                    lineage_source_tag: "hpo_best_selected",
                 }
                 
                 # Add HPO lineage tags if available
                 if lineage.get("hpo_study_key_hash"):
-                    lineage_tags["code.lineage.hpo_study_key_hash"] = lineage["hpo_study_key_hash"]
+                    lineage_tags[lineage_hpo_study_key_hash_tag] = lineage["hpo_study_key_hash"]
                 if lineage.get("hpo_trial_key_hash"):
-                    lineage_tags["code.lineage.hpo_trial_key_hash"] = lineage["hpo_trial_key_hash"]
+                    lineage_tags[lineage_hpo_trial_key_hash_tag] = lineage["hpo_trial_key_hash"]
                 if lineage.get("hpo_trial_run_id"):
-                    lineage_tags["code.lineage.hpo_trial_run_id"] = lineage["hpo_trial_run_id"]
+                    lineage_tags[lineage_hpo_trial_run_id_tag] = lineage["hpo_trial_run_id"]
                 if lineage.get("hpo_refit_run_id"):
-                    lineage_tags["code.lineage.hpo_refit_run_id"] = lineage["hpo_refit_run_id"]
+                    lineage_tags[lineage_hpo_refit_run_id_tag] = lineage["hpo_refit_run_id"]
                 if lineage.get("hpo_sweep_run_id"):
-                    lineage_tags["code.lineage.hpo_sweep_run_id"] = lineage["hpo_sweep_run_id"]
+                    lineage_tags[lineage_hpo_sweep_run_id_tag] = lineage["hpo_sweep_run_id"]
                 
                 # Set all lineage tags at once
                 if len(lineage_tags) > 1:  # More than just "source"

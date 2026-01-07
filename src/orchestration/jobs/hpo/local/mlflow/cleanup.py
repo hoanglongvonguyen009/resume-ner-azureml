@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional
 
 import mlflow
 from shared.logging_utils import get_logger
+from orchestration.jobs.tracking.naming.tags import get_tag_key
 
 logger = get_logger(__name__)
 
@@ -369,7 +370,8 @@ def cleanup_interrupted_runs(
                 )
 
                 try:
-                    client.set_tag(run_id_to_mark, "code.interrupted", "true")
+                    interrupted_tag = get_tag_key("training", "interrupted", None, "code.interrupted")
+                    client.set_tag(run_id_to_mark, interrupted_tag, "true")
                     total_tagged_parents += 1
                     logger.info(
                         f"[CLEANUP] Successfully tagged interrupted parent run {run_id_to_mark[:12]}... as interrupted"
@@ -417,8 +419,8 @@ def cleanup_interrupted_runs(
                             f"(name: {child_name}, status: {child_status})"
                         )
                         try:
-                            client.set_tag(
-                                child_run_id, "code.interrupted", "true")
+                            interrupted_tag = get_tag_key("training", "interrupted", None, "code.interrupted")
+                            client.set_tag(child_run_id, interrupted_tag, "true")
                             tagged_children += 1
                             total_tagged_children += 1
                             logger.info(
