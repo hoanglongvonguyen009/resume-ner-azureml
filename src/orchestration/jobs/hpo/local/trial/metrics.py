@@ -112,27 +112,45 @@ def store_metrics_in_trial_attributes(
         # Look for trial-{hash} folders and match by trial_number from trial_meta.json
         trial_output_dir = None
         try:
-            for item in output_base_dir.iterdir():
-                if item.is_dir() and item.name.startswith("trial-"):
-                    trial_meta_path = item / "trial_meta.json"
-                    if trial_meta_path.exists():
-                        import json
-                        with open(trial_meta_path, "r") as f:
-                            meta = json.load(f)
-                        if meta.get("trial_number") == trial_number:
-                            trial_output_dir = item
-                            break
+            if not output_base_dir.exists():
+                logger.warning(
+                    f"Study folder does not exist: {output_base_dir}. "
+                    f"Cannot find trial folder for trial {trial_number}."
+                )
+            else:
+                for item in output_base_dir.iterdir():
+                    if item.is_dir() and item.name.startswith("trial-"):
+                        trial_meta_path = item / "trial_meta.json"
+                        if trial_meta_path.exists():
+                            import json
+                            with open(trial_meta_path, "r") as f:
+                                meta = json.load(f)
+                            # Handle both int and string comparison for trial_number
+                            meta_trial_number = meta.get("trial_number")
+                            if meta_trial_number == trial_number or int(meta_trial_number) == int(trial_number):
+                                trial_output_dir = item
+                                break
         except Exception as e:
-            from shared.logging_utils import get_logger
-            logger = get_logger(__name__)
             logger.debug(f"Could not find v2 trial folder for trial {trial_number}: {e}")
         
-        # Should not happen - v2 trial folder must exist
+        # If trial folder not found, try to find metrics file directly in study folder
+        # This handles cases where trial folders aren't created or trial_meta.json doesn't exist
         if trial_output_dir is None:
-            raise RuntimeError(
-                f"Could not find v2 trial folder for trial {trial_number} in v2 study folder {study_folder_name}. "
-                f"Only v2 paths (trial-{{hash}}) are supported."
-            )
+            # Try to find metrics file directly in study folder (fallback for non-CV trials)
+            metrics_file_fallback = output_base_dir / METRICS_FILENAME
+            if metrics_file_fallback.exists():
+                logger.debug(
+                    f"Trial folder not found for trial {trial_number}, but found metrics file in study folder. "
+                    f"Using fallback location."
+                )
+                trial_output_dir = output_base_dir
+            else:
+                logger.warning(
+                    f"Could not find v2 trial folder for trial {trial_number} in v2 study folder {study_folder_name}. "
+                    f"Skipping metrics storage in trial attributes. "
+                    f"Available folders: {[d.name for d in output_base_dir.iterdir() if d.is_dir()] if output_base_dir.exists() else 'N/A'}"
+                )
+                return  # Return early if no metrics file found either
     else:
         # Should not happen - we only support v2 paths
         raise RuntimeError(
