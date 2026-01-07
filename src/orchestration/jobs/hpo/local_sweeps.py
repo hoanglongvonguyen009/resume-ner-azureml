@@ -314,6 +314,28 @@ def run_local_hpo_sweep(
     # Generate unique run ID
     run_id = generate_run_id()
 
+    # Compute study_key_hash EARLY (before creating study) to enable v2 folder creation
+    # This allows us to create study.db in the v2 folder from the start, avoiding legacy folder creation
+    study_key_hash = None
+    if data_config and hpo_config:
+        try:
+            from orchestration.jobs.tracking.naming.hpo_keys import (
+                build_hpo_study_key,
+                build_hpo_study_key_hash,
+            )
+            study_key = build_hpo_study_key(
+                data_config=data_config,
+                hpo_config=hpo_config,
+                model=backbone,
+                benchmark_config=benchmark_config,
+            )
+            study_key_hash = build_hpo_study_key_hash(study_key)
+            logger.info(f"✓ Computed study_key_hash early: {study_key_hash[:16]}... (full: {study_key_hash[:64]}...)")
+        except Exception as e:
+            logger.warning(f"✗ Could not compute study_key_hash early: {e}")
+            import traceback
+            logger.debug(f"Traceback: {traceback.format_exc()}")
+
     # Create study manager and load/create study
     study_manager = StudyManager(
         backbone=backbone,
@@ -322,8 +344,51 @@ def run_local_hpo_sweep(
         restore_from_drive=restore_from_drive,
     )
 
+    # If we have study_key_hash, create v2 folder and use it for study.db
+    # Otherwise, fall back to legacy folder creation
+    v2_study_folder = None
+    if study_key_hash:
+        try:
+            from orchestration.paths import load_paths_config, apply_env_overrides, resolve_output_path
+            from shared.platform_detection import detect_platform
+            
+            # Derive root_dir by walking up from output_dir until we find "outputs" directory
+            root_dir = None
+            current = output_dir
+            while current.parent != current:  # Stop at filesystem root
+                if current.name == "outputs":
+                    root_dir = current.parent
+                    break
+                current = current.parent
+            
+            if root_dir is None:
+                # Fallback: try to find project root by looking for config directory
+                root_dir = Path.cwd()
+                for candidate in [Path.cwd(), Path.cwd().parent]:
+                    if (candidate / "config").exists():
+                        root_dir = candidate
+                        break
+            
+            config_dir = root_dir / "config"
+            hpo_base = resolve_output_path(root_dir, config_dir, "hpo")
+            paths_config = load_paths_config(config_dir)
+            storage_env = detect_platform()
+            paths_config = apply_env_overrides(paths_config, storage_env)
+            
+            pattern = paths_config.get("patterns", {}).get("hpo_v2", "")
+            if pattern:
+                study8 = study_key_hash[:8]
+                model = backbone.split("-")[0] if "-" in backbone else backbone
+                
+                v2_study_folder = hpo_base / storage_env / model / f"study-{study8}"
+                v2_study_folder.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Created v2 study folder early: {v2_study_folder}")
+        except Exception as e:
+            logger.warning(f"Could not create v2 study folder early, will use legacy: {e}")
+
+    # Create or load study - pass v2_study_folder if available to use for study.db
     study, study_name, storage_path, storage_uri, should_resume = (
-        study_manager.create_or_load_study(output_dir, run_id)
+        study_manager.create_or_load_study(output_dir, run_id, v2_study_folder=v2_study_folder)
     )
 
     # Check if HPO is already complete (early return)
@@ -340,21 +405,40 @@ def run_local_hpo_sweep(
     # Get objective metric name
     objective_metric = study_manager.objective_metric
 
-    # Initial study folder setup (will be updated after context creation if study_key_hash available)
-    # The storage_path should already be in study folder based on config (storage_path: "{study_name}/study.db")
+    # Determine study folder: use v2 if created, otherwise use legacy
     study_folder_legacy = storage_path.parent if storage_path else output_dir / study_name
     
-    # Initialize study_folder and study_output_dir with legacy values (will be updated if v2 succeeds)
-    study_folder = study_folder_legacy
-    study_output_dir = study_folder
+    if v2_study_folder and v2_study_folder.exists():
+        # Use v2 folder (study.db was created there)
+        study_folder = v2_study_folder
+        study_output_dir = study_folder
+        logger.info(f"Using v2 study folder (created early): {study_folder}")
+        
+        # If legacy folder was created (shouldn't happen now, but check for cleanup)
+        if study_folder_legacy.exists() and study_folder_legacy != study_folder:
+            # Check if legacy folder only contains study.db (could be a stale file)
+            legacy_contents = list(study_folder_legacy.iterdir())
+            if len(legacy_contents) == 1 and legacy_contents[0].name == "study.db":
+                logger.debug(f"Legacy folder {study_folder_legacy} contains only study.db, which has been moved to v2 folder. Legacy folder can be cleaned up.")
+            else:
+                logger.warning(f"Legacy folder {study_folder_legacy} exists with additional contents. Not removing to preserve data.")
+    else:
+        # Fall back to legacy folder
+        study_folder = study_folder_legacy
+        study_output_dir = study_folder
+        logger.info(f"Using legacy study folder: {study_folder}")
 
     # Check if checkpointing is enabled (needed for setup_hpo_mlflow_run)
     checkpoint_enabled = checkpoint_config is not None and checkpoint_config.get(
         "enabled", False
     )
 
-    # Create NamingContext for HPO parent run EARLY to get study_key_hash for v2 folder creation
-    # This allows us to create the v2 folder before creating the objective function
+    # Create NamingContext for HPO parent run (study_key_hash already computed earlier)
+    # Pass the computed study_key_hash to avoid recomputation and ensure it's set in the frozen context
+    logger.info(
+        f"[HPO] About to call setup_hpo_mlflow_run with study_key_hash: "
+        f"{study_key_hash[:16] + '...' if study_key_hash else 'None'}"
+    )
     hpo_parent_context, mlflow_run_name = setup_hpo_mlflow_run(
         backbone=backbone,
         study_name=study_name,
@@ -365,11 +449,16 @@ def run_local_hpo_sweep(
         data_config=data_config,
         hpo_config=hpo_config,
         benchmark_config=benchmark_config,
+        study_key_hash=study_key_hash,  # Pass pre-computed hash to avoid recomputation
+    )
+    logger.info(
+        f"[HPO] After setup_hpo_mlflow_run, context.study_key_hash: "
+        f"{getattr(hpo_parent_context, 'study_key_hash', 'MISSING')[:16] + '...' if getattr(hpo_parent_context, 'study_key_hash', None) else 'None'}"
     )
 
-    # Construct study folder using v2 pattern if study_key_hash available, else use legacy
-    # This MUST happen before create_local_hpo_objective so trials use the correct folder
-    if hpo_parent_context and hpo_parent_context.study_key_hash:
+    # Legacy v2 folder construction code (now redundant, but kept for backward compatibility)
+    # This code path should not execute if v2_study_folder was created early
+    if False and hpo_parent_context and hpo_parent_context.study_key_hash:
         logger.debug(f"Attempting v2 study folder construction with study_key_hash={hpo_parent_context.study_key_hash[:16]}...")
         try:
             from orchestration.naming_centralized import build_output_path

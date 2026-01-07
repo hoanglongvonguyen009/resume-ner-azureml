@@ -264,6 +264,8 @@ class MLflowSweepTracker(BaseTracker):
         hpo_config: Optional[Dict[str, Any]] = None,
         child_runs_map: Optional[List] = None,
         upload_checkpoint: bool = True,
+        output_dir: Optional[Path] = None,
+        config_dir: Optional[Path] = None,
     ) -> None:
         """
         Log final metrics and best trial information to parent run.
@@ -276,6 +278,22 @@ class MLflowSweepTracker(BaseTracker):
             f"[LOG_FINAL_METRICS] Starting log_final_metrics for "
             f"parent_run_id={parent_run_id[:12] if parent_run_id else 'None'}..."
         )
+
+        # Infer config_dir and output_dir if not provided
+        if config_dir is None:
+            if output_dir:
+                # Infer config_dir from output_dir by searching for nearest parent
+                # that has a sibling config directory. Fall back to cwd/config.
+                for parent in output_dir.parents:
+                    candidate = parent / "config"
+                    if candidate.exists():
+                        config_dir = candidate
+                        break
+            if config_dir is None:
+                config_dir = Path.cwd() / "config"
+        
+        if output_dir is None:
+            output_dir = hpo_output_dir
 
         try:
             # Count completed trials
@@ -331,7 +349,8 @@ class MLflowSweepTracker(BaseTracker):
                     parent_run_id,
                     run_name,
                     should_resume,
-                    child_runs_map,
+                    cached_child_runs=child_runs_map,
+                    output_dir=output_dir,
                 )
                 logger.info(
                     "[LOG_FINAL_METRICS] Completed best trial ID logging"
@@ -470,6 +489,7 @@ class MLflowSweepTracker(BaseTracker):
         run_name: Optional[str] = None,
         should_resume: bool = False,
         cached_child_runs: Optional[List] = None,
+        output_dir: Optional[Path] = None,
     ) -> None:
         """
         Find and log the best trial's MLflow run ID.

@@ -99,28 +99,34 @@ def validate_naming_policy(policy: Dict[str, Any], policy_path: Optional[Path] =
         return
 
     if not isinstance(run_names, dict):
-        raise ValueError(f"[naming.yaml] 'run_names' must be a mapping{location}")
+        raise ValueError(
+            f"[naming.yaml] 'run_names' must be a mapping{location}")
 
     separators = policy.get("separators")
     if separators is not None and not isinstance(separators, dict):
-        raise ValueError(f"[naming.yaml] 'separators' must be a mapping when present{location}")
+        raise ValueError(
+            f"[naming.yaml] 'separators' must be a mapping when present{location}")
 
     validate_sec = policy.get("validate")
     if validate_sec is not None and not isinstance(validate_sec, dict):
-        raise ValueError(f"[naming.yaml] 'validate' must be a mapping when present{location}")
+        raise ValueError(
+            f"[naming.yaml] 'validate' must be a mapping when present{location}")
 
     # Validate placeholders in run name patterns
     for name, entry in run_names.items():
         if not isinstance(entry, dict):
             if schema_version >= 2:
-                raise ValueError(f"[naming.yaml] run_names.{name} must be a mapping{location}")
-            logger.warning(f"[naming.yaml] run_names.{name} should be a mapping{location}")
+                raise ValueError(
+                    f"[naming.yaml] run_names.{name} must be a mapping{location}")
+            logger.warning(
+                f"[naming.yaml] run_names.{name} should be a mapping{location}")
             continue
         pattern = entry.get("pattern")
         if not pattern:
             continue
         if not isinstance(pattern, str):
-            raise ValueError(f"[naming.yaml] run_names.{name}.pattern must be a string{location}")
+            raise ValueError(
+                f"[naming.yaml] run_names.{name}.pattern must be a string{location}")
         placeholders = extract_placeholders(pattern)
         for token in placeholders:
             if not is_token_known(token):
@@ -305,6 +311,13 @@ def extract_component(
             # Fallback to env var
             import os
             value = os.environ.get("HPO_STUDY_KEY_HASH")
+        if not value:
+            logger.warning(
+                f"[Naming Policy] study_key_hash not found in context or env var for process_type={process_type}. "
+                f"Context has study_key_hash: {hasattr(context, 'study_key_hash')}, "
+                f"value: {getattr(context, 'study_key_hash', None)}, "
+                f"env var: {os.environ.get('HPO_STUDY_KEY_HASH', 'NOT SET')}"
+            )
     elif source == "trial_key_hash":
         value = getattr(context, "trial_key_hash", None)
     elif source == "trial_number":

@@ -84,7 +84,23 @@ class MLflowBenchmarkTracker(BaseTracker):
             # Infer config_dir from output_dir
             config_dir = None
             if output_dir:
-                root_dir_for_config = output_dir.parent.parent if output_dir.parent.name == "outputs" else output_dir.parent.parent.parent
+                # Derive project root correctly by finding "outputs" directory
+                root_dir_for_config = None
+                current = output_dir
+                while current.parent != current:  # Stop at filesystem root
+                    if current.name == "outputs":
+                        root_dir_for_config = current.parent
+                        break
+                    current = current.parent
+                
+                if root_dir_for_config is None:
+                    # Fallback: try to find project root by looking for config directory
+                    root_dir_for_config = Path.cwd()
+                    for candidate in [Path.cwd(), Path.cwd().parent]:
+                        if (candidate / "config").exists():
+                            root_dir_for_config = candidate
+                            break
+                
                 config_dir = root_dir_for_config / "config" if root_dir_for_config else None
 
             # Validate run IDs are UUIDs (not timestamps) BEFORE creating run
@@ -240,12 +256,19 @@ class MLflowBenchmarkTracker(BaseTracker):
                                 root_dir = None
                                 if output_dir:
                                     current = output_dir
-                                    while current.name != "outputs" and current.parent != current:
+                                    while current.parent != current:  # Stop at filesystem root
+                                        if current.name == "outputs":
+                                            root_dir = current.parent
+                                            break
                                         current = current.parent
-                                    root_dir = current.parent if current.name == "outputs" else output_dir.parent.parent.parent
-
+                                
                                 if root_dir is None:
+                                    # Fallback: try to find project root by looking for config directory
                                     root_dir = Path.cwd()
+                                    for candidate in [Path.cwd(), Path.cwd().parent]:
+                                        if (candidate / "config").exists():
+                                            root_dir = candidate
+                                            break
 
                                 logger.info(
                                     f"[Benchmark Commit] Committing version {version} for run {run_id[:12]}..., "
@@ -291,7 +314,24 @@ class MLflowBenchmarkTracker(BaseTracker):
                 # Update local index
                 if run_key_hash:
                     try:
-                        root_dir = output_dir.parent.parent if output_dir else Path.cwd()
+                        # Derive project root correctly by finding "outputs" directory
+                        root_dir = None
+                        if output_dir:
+                            current = output_dir
+                            while current.parent != current:  # Stop at filesystem root
+                                if current.name == "outputs":
+                                    root_dir = current.parent
+                                    break
+                                current = current.parent
+                        
+                        if root_dir is None:
+                            # Fallback: try to find project root by looking for config directory
+                            root_dir = Path.cwd()
+                            for candidate in [Path.cwd(), Path.cwd().parent]:
+                                if (candidate / "config").exists():
+                                    root_dir = candidate
+                                    break
+                        
                         update_mlflow_index(
                             root_dir=root_dir,
                             run_key_hash=run_key_hash,
