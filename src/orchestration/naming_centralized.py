@@ -30,7 +30,7 @@ class NamingContext:
             (e.g., "hpo_sweep", "hpo_trial") used for naming/validation.
         model: Model backbone name (e.g., "distilbert").
         environment: Execution platform identifier
-            (legacy name, e.g., "local", "colab", "kaggle", "azure").
+            (e.g., "local", "colab", "kaggle", "azure").
         storage_env: Logical storage environment used in outputs paths
             (e.g., "local", "colab", "kaggle", "azureml").
             Defaults to the same value as ``environment``.
@@ -42,8 +42,7 @@ class NamingContext:
             training/final_training.
         variant: Variant number for final_training (default 1, increments for
             force_new / retries).
-        trial_id: Legacy trial identifier for HPO/benchmarking
-            (e.g., "trial_1_20251229_100000").
+        trial_id: Trial identifier for HPO/benchmarking (v2 format: "trial-{hash8}").
         trial_number: Explicit Optuna trial number (0-indexed integer).
             Prefer this over parsing trial_id for robustness.
         fold_idx: Optional fold index for cross-validation (0-indexed integer).
@@ -252,41 +251,66 @@ def _build_output_path_fallback(
     """
     Fallback path building logic (hardcoded, used when patterns not available).
 
-    This maintains backward compatibility if paths.yaml patterns are missing.
+    This is used when paths.yaml config is missing or when required hashes are unavailable.
+    For v2 processes (hpo, benchmarking), requires study_key_hash and trial_key_hash.
     """
     base_path = root_dir / base_outputs
 
     if context.process_type == "hpo":
-        if not context.trial_id:
-            raise ValueError("HPO requires trial_id")
-        final_path = base_path / "hpo" / context.environment / \
-            context.model / context.trial_id
+        # For v2 HPO, require hashes
+        if not context.study_key_hash or not context.trial_key_hash:
+            raise ValueError(
+                f"HPO v2 requires study_key_hash and trial_key_hash. "
+                f"Got study_key_hash={'present' if context.study_key_hash else 'missing'}, "
+                f"trial_key_hash={'present' if context.trial_key_hash else 'missing'}"
+            )
+        study8 = context.study_key_hash[:8]
+        trial8 = context.trial_key_hash[:8]
+        final_path = base_path / "hpo" / context.storage_env / \
+            context.model / f"study-{study8}" / f"trial-{trial8}"
 
     elif context.process_type == "hpo_refit":
-        if not context.trial_id:
-            raise ValueError("HPO refit requires trial_id")
-        # Refit is a subdirectory of the trial: trial_<n>_<ts>/refit/
-        # Extract trial base from trial_id (trial_id may include timestamp)
-        final_path = base_path / "hpo" / context.environment / \
-            context.model / context.trial_id / "refit"
+        # For v2 HPO refit, require hashes
+        if not context.study_key_hash or not context.trial_key_hash:
+            raise ValueError(
+                f"HPO refit v2 requires study_key_hash and trial_key_hash. "
+                f"Got study_key_hash={'present' if context.study_key_hash else 'missing'}, "
+                f"trial_key_hash={'present' if context.trial_key_hash else 'missing'}"
+            )
+        study8 = context.study_key_hash[:8]
+        trial8 = context.trial_key_hash[:8]
+        final_path = base_path / "hpo" / context.storage_env / \
+            context.model / f"study-{study8}" / f"trial-{trial8}" / "refit"
 
     elif context.process_type == "benchmarking":
-        if not context.trial_id:
-            raise ValueError("Benchmarking requires trial_id")
-        final_path = base_path / "benchmarking" / \
-            context.environment / context.model / context.trial_id
+        # For v2 benchmarking, require hashes
+        if not context.study_key_hash or not context.trial_key_hash:
+            raise ValueError(
+                f"Benchmarking v2 requires study_key_hash and trial_key_hash. "
+                f"Got study_key_hash={'present' if context.study_key_hash else 'missing'}, "
+                f"trial_key_hash={'present' if context.trial_key_hash else 'missing'}"
+            )
+        study8 = context.study_key_hash[:8]
+        trial8 = context.trial_key_hash[:8]
+        bench8 = (context.benchmark_config_hash or "")[:8] if context.benchmark_config_hash else ""
+        if bench8:
+            final_path = base_path / "benchmarking" / context.storage_env / \
+                context.model / f"study-{study8}" / f"trial-{trial8}" / f"bench-{bench8}"
+        else:
+            final_path = base_path / "benchmarking" / context.storage_env / \
+                context.model / f"study-{study8}" / f"trial-{trial8}"
 
     elif context.process_type == "final_training":
         # Format: spec_<spec_fp>_exec_<exec_fp>/v<variant>
         spec_exec_dir = f"spec_{context.spec_fp}_exec_{context.exec_fp}"
         variant_dir = f"v{context.variant}"
-        final_path = base_path / "final_training" / context.environment / \
+        final_path = base_path / "final_training" / context.storage_env / \
             context.model / spec_exec_dir / variant_dir
 
     elif context.process_type == "conversion":
         # Format: <parent_training_id>/conv_<conv_fp>
         conv_dir = f"conv_{context.conv_fp}"
-        final_path = base_path / "conversion" / context.environment / \
+        final_path = base_path / "conversion" / context.storage_env / \
             context.model / context.parent_training_id / conv_dir
 
     elif context.process_type == "best_configurations":
@@ -318,12 +342,8 @@ def build_output_path(
     Path structures (from paths.yaml patterns):
     - HPO v2:
         outputs/hpo/{storage_env}/{model}/study_{study8}/trial_{trial8}/...
-      (falls back to legacy trial_id-based layout when study/trial hashes
-       are not available)
     - Benchmarking v2:
         outputs/benchmarking/{storage_env}/{model}/study_{study8}/trial_{trial8}/bench_{bench8}/...
-      (falls back to legacy trial_id-based layout when hashes are not
-       available)
     - Final training:
         outputs/final_training/{storage_env}/{model}/spec_{spec_fp}_exec_{exec_fp}/v{variant}/
     - Conversion:
@@ -361,7 +381,7 @@ def build_output_path(
     if base_outputs_path.is_absolute():
         base_path = base_outputs_path
     else:
-        base_path = root_dir / base_outputs
+    base_path = root_dir / base_outputs
 
     # Map process_type to output category
     category_map = {
@@ -394,18 +414,18 @@ def build_output_path(
         return _build_output_path_fallback(root_dir, context, base_outputs)
 
     # Check if v2 pattern requires hashes that are missing
-    # For hpo/hpo_refit/benchmarking v2 patterns, fallback to legacy if hashes unavailable
+    # For hpo/hpo_refit/benchmarking v2 patterns, use fallback if hashes unavailable
     if pattern_key in ("hpo_v2", "benchmarking_v2"):
         requires_study_hash = "{study8}" in pattern
         requires_trial_hash = "{trial8}" in pattern
         if requires_study_hash and not context.study_key_hash:
-            logger.debug(
+            logger.warning(
                 f"Pattern '{pattern_key}' requires study_key_hash but it's missing. Using fallback logic.")
             return _build_output_path_fallback(root_dir, context, base_outputs)
         if requires_trial_hash and not context.trial_key_hash:
-            logger.debug(
+            logger.warning(
                 f"Pattern '{pattern_key}' requires trial_key_hash but it's missing. Using fallback logic.")
-            return _build_output_path_fallback(root_dir, context, base_outputs)
+        return _build_output_path_fallback(root_dir, context, base_outputs)
 
     # Extract values from context
     # NOTE: storage_env defaults to environment in NamingContext.__post_init__
@@ -413,7 +433,7 @@ def build_output_path(
         "environment": context.environment,
         "storage_env": getattr(context, "storage_env", context.environment),
         "model": context.model,
-        # Full fingerprints (still available for legacy or other patterns)
+        # Full fingerprints
         "spec_fp": context.spec_fp or "",
         "exec_fp": context.exec_fp or "",
         "variant": context.variant,
@@ -443,7 +463,7 @@ def build_output_path(
                 value, path_norm_rules)
             if warn_msgs:
                 for msg in warn_msgs:
-                    logger.debug(
+                    logger.warning(
                         f"[build_output_path] Normalized '{key}' for path: {msg}"
                     )
             normalized_values[key] = normalized_value
@@ -453,15 +473,6 @@ def build_output_path(
     resolved_pattern = pattern
     for key, value in values.items():
         resolved_pattern = resolved_pattern.replace(f"{{{key}}}", str(value))
-    
-    # DEBUG: Log resolved pattern for HPO v2 to diagnose path issues
-    if context.process_type in ("hpo", "hpo_refit") and pattern_key == "hpo_v2":
-        logger.debug(
-            f"[build_output_path] Pattern '{pattern}' resolved to '{resolved_pattern}' "
-            f"with study8='{values.get('study8')}', trial8='{values.get('trial8')}', "
-            f"study_key_hash={'present' if context.study_key_hash else 'missing'}, "
-            f"trial_key_hash={'present' if context.trial_key_hash else 'missing'}"
-        )
 
     # Build final path
     if context.process_type == "best_configurations":
@@ -478,13 +489,6 @@ def build_output_path(
         # Filter out empty parts (can occur if a placeholder resolved to empty string)
         pattern_parts = [part for part in pattern_parts if part]
         base_output_path = base_path / output_dir / Path(*pattern_parts)
-        
-        # DEBUG: Log final path for HPO v2
-        if context.process_type in ("hpo", "hpo_refit") and pattern_key == "hpo_v2":
-            logger.debug(
-                f"[build_output_path] Final path components: output_dir={output_dir}, "
-                f"pattern_parts={pattern_parts}, base_output_path={base_output_path}"
-            )
 
         # For hpo_refit, append "refit" subdirectory
         if context.process_type == "hpo_refit":

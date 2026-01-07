@@ -97,7 +97,7 @@ def run_training_trial_with_cv(
             )
             computed_study_key_hash = build_hpo_study_key_hash(study_key)
         except Exception as e:
-            logger.debug(f"Could not compute study_key_hash from configs: {e}")
+            logger.warning(f"Could not compute study_key_hash: {e}")
     
     # Get from parent run if still missing
     if not computed_study_key_hash and hpo_parent_run_id:
@@ -122,7 +122,6 @@ def run_training_trial_with_cv(
             }
             trial_key = build_hpo_trial_key(computed_study_key_hash, hyperparameters)
             computed_trial_key_hash = build_hpo_trial_key_hash(trial_key)
-            logger.debug(f"Computed trial_key_hash: {computed_trial_key_hash[:16]}...")
         except Exception as e:
             logger.warning(f"Could not compute trial_key_hash: {e}", exc_info=True)
             computed_trial_key_hash = None
@@ -134,30 +133,12 @@ def run_training_trial_with_cv(
     
     # CRITICAL: If we're in a v2 study folder, we MUST use v2 trial naming
     # Never create legacy trial folders in v2 study folders
-    if is_v2_study_folder:
-        logger.info(
-            f"[TRIAL_PATH_CONSTRUCTION] In v2 study folder {study_folder_name}. "
-            f"study_key_hash={'YES' if computed_study_key_hash else 'NO'}, "
-            f"trial_key_hash={'YES' if computed_trial_key_hash else 'NO'}"
+    if is_v2_study_folder and not computed_trial_key_hash:
+        logger.error(
+            f"In v2 study folder {study_folder_name} but trial_key_hash is None. "
+            f"study_key_hash={'YES' if computed_study_key_hash else 'NO'}. "
+            f"Will attempt to compute hash."
         )
-        if not computed_trial_key_hash:
-            logger.error(
-                f"[TRIAL_PATH_CONSTRUCTION] CRITICAL: In v2 study folder {study_folder_name} but trial_key_hash is None. "
-                f"This will cause incorrect legacy folder creation. study_key_hash={'YES' if computed_study_key_hash else 'NO'}. "
-                f"Will attempt to compute hash."
-            )
-    
-    logger.info(
-        f"[TRIAL_PATH_CONSTRUCTION] trial_number={trial_number}, "
-        f"output_dir={output_dir}, study_folder={study_folder_name}, is_v2={is_v2_study_folder}, "
-        f"study_key_hash={'YES' if computed_study_key_hash else 'NO'}, "
-        f"trial_key_hash={'YES' if computed_trial_key_hash else 'NO'}"
-    )
-    
-    # ABSOLUTE GUARD: If we're in a v2 study folder, we MUST NOT create legacy folders
-    # This check happens BEFORE any folder creation logic
-    if is_v2_study_folder:
-        logger.info(f"[TRIAL_PATH_CONSTRUCTION] V2 study folder detected. Will enforce v2 trial naming only.")
     
     if computed_study_key_hash and computed_trial_key_hash:
         try:
@@ -204,17 +185,14 @@ def run_training_trial_with_cv(
             # Build trial path using v2 pattern
             trial_base_dir = build_output_path(root_dir, trial_context, config_dir=config_dir)
             trial_base_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"[TRIAL_PATH_CONSTRUCTION] SUCCESS: Using v2 trial folder via build_output_path: {trial_base_dir}")
         except Exception as e:
-            import traceback
             logger.warning(
-                f"[TRIAL_PATH_CONSTRUCTION] build_output_path() failed: {e}. "
-                f"Will attempt fallback. Traceback: {traceback.format_exc()}"
+                f"build_output_path() failed: {e}. Will attempt fallback."
             )
             trial_base_dir = None
     elif is_v2_study_folder:
         logger.warning(
-            f"[TRIAL_PATH_CONSTRUCTION] In v2 study folder but missing hashes: "
+            f"In v2 study folder but missing hashes: "
             f"study_key_hash={'YES' if computed_study_key_hash else 'NO'}, "
             f"trial_key_hash={'YES' if computed_trial_key_hash else 'NO'}"
         )
@@ -232,10 +210,6 @@ def run_training_trial_with_cv(
                 trial8 = computed_trial_key_hash[:8]
                 trial_base_dir = output_dir / f"trial-{trial8}"
                 trial_base_dir.mkdir(parents=True, exist_ok=True)
-                logger.warning(
-                    f"build_output_path() failed but we're in v2 study folder. "
-                    f"Constructed v2 trial folder manually: {trial_base_dir}"
-                )
             else:
                 # We're in a v2 study folder but don't have trial_key_hash
                 # This is an error - we can't create v2 trial name without hash
@@ -260,9 +234,6 @@ def run_training_trial_with_cv(
                         trial8 = computed_trial_key_hash[:8]
                         trial_base_dir = output_dir / f"trial-{trial8}"
                         trial_base_dir.mkdir(parents=True, exist_ok=True)
-                        logger.info(
-                            f"Successfully computed trial_key_hash and created v2 trial folder: {trial_base_dir}"
-                        )
                     else:
                         raise ValueError("Cannot compute trial_key_hash without study_key_hash")
                 except Exception as e:
@@ -281,48 +252,25 @@ def run_training_trial_with_cv(
                         f"study_key_hash={'YES' if computed_study_key_hash else 'NO'}"
                     )
         else:
-            # Legacy study folder, use legacy naming
-            # BUT: Double-check we're not in a v2 study folder (safety check)
-            if is_v2_study_folder:
-                logger.error(
-                    f"[TRIAL_PATH_CONSTRUCTION] CRITICAL ERROR: About to create legacy trial folder in v2 study folder {study_folder_name}! "
-                    f"This should never happen. study_key_hash={'YES' if computed_study_key_hash else 'NO'}, "
-                    f"trial_key_hash={'YES' if computed_trial_key_hash else 'NO'}. "
-                    f"Raising exception to prevent incorrect folder creation."
-                )
-                raise RuntimeError(
-                    f"Cannot create legacy trial folder in v2 study folder {study_folder_name}. "
-                    f"trial_key_hash must be computed. Check hash computation logic."
-                )
-            run_suffix = f"_{run_id}" if run_id else ""
-            trial_base_dir = output_dir / f"trial_{trial_number}{run_suffix}"
-            logger.info(f"Using legacy trial folder: {trial_base_dir}")
+            # Should not happen - we only support v2 paths
+            raise RuntimeError(
+                f"Cannot create trial in non-v2 study folder. Only v2 paths (study-{{hash}}) are supported. "
+                f"Found study folder: {study_folder_name}"
+            )
     
     # CRITICAL CHECK: If we're in a v2 study folder, verify we're using v2 naming
     if is_v2_study_folder:
         if trial_base_dir is None:
-            logger.error(
-                f"[TRIAL_PATH_CONSTRUCTION] CRITICAL: In v2 study folder but trial_base_dir is None! "
-                f"This should never happen. Raising exception."
-            )
             raise RuntimeError(
                 f"In v2 study folder {study_folder_name} but trial_base_dir is None. "
                 f"This indicates a bug in the path construction logic."
             )
         if not trial_base_dir.name.startswith("trial-"):
-            logger.error(
-                f"[TRIAL_PATH_CONSTRUCTION] CRITICAL: In v2 study folder but trial_base_dir uses legacy naming: {trial_base_dir.name}. "
-                f"trial_base_dir={trial_base_dir}, output_dir={output_dir}. "
-                f"This should never happen. Raising exception."
-            )
-            import traceback
-            logger.error(f"Traceback:\n{traceback.format_exc()}")
             raise RuntimeError(
                 f"In v2 study folder {study_folder_name} but trial_base_dir uses legacy naming: {trial_base_dir.name}. "
                 f"This indicates a bug in the path construction logic. "
                 f"trial_base_dir={trial_base_dir}"
             )
-        logger.info(f"[TRIAL_PATH_CONSTRUCTION] Verified v2 trial naming: {trial_base_dir.name}")
     
     # Get study name from output_dir (study folder name)
     study_name = output_dir.name
@@ -346,13 +294,6 @@ def run_training_trial_with_cv(
         
         # FINAL CHECK: Ensure we're not creating a legacy folder in a v2 study folder
         if is_v2_study_folder and not trial_base_dir_abs.name.startswith("trial-"):
-            logger.error(
-                f"[TRIAL_PATH_CONSTRUCTION] CRITICAL: About to create legacy folder in v2 study folder! "
-                f"trial_base_dir_abs={trial_base_dir_abs}, name={trial_base_dir_abs.name}. "
-                f"Raising exception to prevent this."
-            )
-            import traceback
-            logger.error(f"Traceback:\n{traceback.format_exc()}")
             raise RuntimeError(
                 f"About to create legacy folder {trial_base_dir_abs.name} in v2 study folder {study_folder_name}. "
                 f"This should never happen. Check path construction logic."
@@ -361,14 +302,11 @@ def run_training_trial_with_cv(
         trial_base_dir_abs.mkdir(parents=True, exist_ok=True)
         with open(trial_meta_path, "w") as f:
             json.dump(trial_meta, f, indent=2)
-        logger.info(f"[TRIAL_PATH_CONSTRUCTION] Wrote trial metadata to {trial_meta_path}")
         
         # Update trial_base_dir to use absolute path for consistency
         trial_base_dir = trial_base_dir_abs
     except Exception as e:
         logger.warning(f"Could not write trial metadata file: {e}")
-        import traceback
-        logger.debug(traceback.format_exc())
     
     for fold_idx, (train_indices, val_indices) in enumerate(fold_splits):
         # Construct fold-specific output directory using new structure
@@ -609,10 +547,6 @@ def _create_trial_run(
         )
         trial_run_id = trial_run.info.run_id
 
-        logger.info(
-            f"[TRIAL_RUN_CV] Created trial run (CV): {trial_run_id[:12]}... (trial {trial_number}). "
-            f"Run remains RUNNING until all folds complete."
-        )
         return trial_run_id
     except Exception as e:
         logger.warning(f"Could not create trial run: {e}")
@@ -647,14 +581,7 @@ def _log_cv_metrics_to_trial_run(
 
         # End the trial run to mark it as completed
         trial_number = trial_params.get('trial_number', 'unknown')
-        logger.info(
-            f"[TRIAL_RUN_CV] All folds completed. Marking trial run {trial_run_id[:12]}... "
-            f"as FINISHED (trial {trial_number})"
-        )
         client.set_terminated(trial_run_id, status="FINISHED")
-        logger.info(
-            f"[TRIAL_RUN_CV] Successfully marked trial run {trial_run_id[:12]}... as FINISHED"
-        )
     except Exception as e:
         logger.warning(f"Could not log metrics to trial run: {e}")
 

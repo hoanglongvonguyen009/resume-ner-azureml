@@ -96,11 +96,6 @@ class TrialExecutor:
         )
 
         # Run training subprocess
-        logger.info(f"[TRIAL] Running training with args: {args}")
-        logger.info(f"[TRIAL] Root dir: {root_dir}")
-        logger.info(f"[TRIAL] Src dir: {src_dir}")
-        logger.info(f"[TRIAL] Python executable: {sys.executable}")
-        logger.info(f"[TRIAL] Working directory (cwd): {root_dir}")
 
         # Verify the training module can be found
         training_module_path = root_dir / "src" / "training" / "__init__.py"
@@ -109,7 +104,6 @@ class TrialExecutor:
                 f"[TRIAL] Training module not found at {training_module_path}. "
                 f"Root dir: {root_dir}, src_dir: {src_dir}"
             )
-        logger.info(f"[TRIAL] ✓ Training module found at: {training_module_path}")
 
         # Verify PYTHONPATH is set
         pythonpath_value = env.get("PYTHONPATH", "")
@@ -118,7 +112,6 @@ class TrialExecutor:
                 f"[TRIAL] PYTHONPATH not set in environment. "
                 f"Expected: {src_dir}"
             )
-        logger.info(f"[TRIAL] ✓ PYTHONPATH verified: {pythonpath_value}")
 
         result = subprocess.run(
             args,
@@ -164,9 +157,6 @@ class TrialExecutor:
         depth = 0
         while depth < max_depth:
             if (candidate_root / "src").exists() and (candidate_root / "src" / "training").exists():
-                logger.info(
-                    f"[TRIAL] Found project root: {candidate_root} (from config_dir: {config_dir})"
-                )
                 return candidate_root
             candidate_root = candidate_root.parent
             depth += 1

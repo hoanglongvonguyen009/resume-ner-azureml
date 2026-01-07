@@ -206,7 +206,6 @@ def load_tags_registry(config_dir: Optional[Path] = None) -> TagsRegistry:
     if config_path.exists():
         try:
             loaded_data = load_yaml(config_path)
-            logger.info(f"[Tags Registry] Loaded config from {config_path}")
         except Exception as e:
             logger.warning(
                 f"[Tags Registry] Failed to load config from {config_path}: {e}. "

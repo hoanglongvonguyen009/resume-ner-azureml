@@ -40,7 +40,6 @@ def load_mlflow_config(config_dir: Optional[Path] = None) -> Dict[str, Any]:
     
     # Load config
     if not config_path.exists():
-        logger.info(f"[MLflow Config] Config file not found at {config_path}, using defaults")
         _config_cache = {}
         _config_cache_path = config_path
         return _config_cache
@@ -48,8 +47,6 @@ def load_mlflow_config(config_dir: Optional[Path] = None) -> Dict[str, Any]:
     try:
         _config_cache = load_yaml(config_path)
         _config_cache_path = config_path
-        logger.info(f"[MLflow Config] Loaded config from {config_path}")
-        logger.debug(f"[MLflow Config] Config contents: {_config_cache}")
         return _config_cache
     except Exception as e:
         logger.warning(f"[MLflow Config] Failed to load config from {config_path}: {e}", exc_info=True)

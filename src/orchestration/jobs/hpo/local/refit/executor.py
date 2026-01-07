@@ -131,7 +131,6 @@ def run_refit_training(
             # build_output_path() handles hpo_refit by appending /refit to trial path
             refit_output_dir = build_output_path(root_dir, refit_context, config_dir=config_dir)
             refit_output_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Using v2 refit folder: {refit_output_dir}")
         except Exception as e:
             logger.warning(f"Could not construct v2 refit folder, falling back to legacy: {e}")
             refit_output_dir = None
@@ -152,23 +151,11 @@ def run_refit_training(
                 f"Constructed v2 refit folder manually: {refit_output_dir}"
             )
         else:
-            # Legacy study folder, use legacy naming
-            # BUT: Double-check we're not in a v2 study folder (safety check)
-            if is_v2_study_folder:
-                logger.error(
-                    f"[REFIT] CRITICAL ERROR: About to create legacy refit folder in v2 study folder {study_folder_name}! "
-                    f"This should never happen. study_key_hash={'YES' if refit_context.study_key_hash else 'NO'}, "
-                    f"trial_key_hash={'YES' if refit_context.trial_key_hash else 'NO'}. "
-                    f"Raising exception to prevent incorrect folder creation."
-                )
-                raise RuntimeError(
-                    f"Cannot create legacy refit folder in v2 study folder {study_folder_name}. "
-                    f"trial_key_hash must be computed. Check hash computation logic."
-                )
-            trial_base_dir = output_dir / trial_id
-            refit_output_dir = trial_base_dir / "refit"
-            refit_output_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"[REFIT] Using legacy refit folder (NOT in v2 study folder): {refit_output_dir}")
+            # Should not happen - we only support v2 paths
+            raise RuntimeError(
+                f"Cannot create refit in non-v2 study folder. Only v2 paths (study-{{hash}}) are supported. "
+                f"Found study folder: {study_folder_name}"
+            )
 
     # Build command arguments for refit training
     args = _build_refit_command(
@@ -229,10 +216,6 @@ def run_refit_training(
         # This prevents training script from auto-ending the run (parent will terminate it)
         if hpo_parent_run_id:
             env["MLFLOW_PARENT_RUN_ID"] = hpo_parent_run_id
-        logger.info(
-            f"[REFIT] Set MLFLOW_RUN_ID to refit run: {refit_run_id[:12]}... "
-            f"(training will log directly to refit run, not create child)"
-        )
     elif hpo_parent_run_id:
         env["MLFLOW_PARENT_RUN_ID"] = hpo_parent_run_id
         env["MLFLOW_TRIAL_NUMBER"] = "refit"
@@ -245,7 +228,6 @@ def run_refit_training(
     _verify_refit_environment(root_dir, env)
 
     # Run refit training
-    logger.info(f"[REFIT] Running refit training with args: {args}")
     result = subprocess.run(
         args,
         cwd=root_dir,
@@ -372,8 +354,6 @@ def _setup_refit_environment(
     else:
         env["PYTHONPATH"] = src_dir
 
-    logger.info(f"[REFIT] PYTHONPATH set to: {env.get('PYTHONPATH', 'NOT SET')}")
-    logger.info(f"[REFIT] Root dir: {root_dir}, src_dir: {src_dir}")
 
     return env
 
@@ -439,8 +419,6 @@ def _verify_refit_environment(root_dir: Path, env: Dict[str, str]) -> None:
             f"This will prevent the subprocess from finding the training module."
         )
 
-    logger.info(f"[REFIT] ✓ Training module found at: {training_module_path}")
-    logger.info(f"[REFIT] ✓ PYTHONPATH verified: contains src_dir")
 
 
 def _read_refit_metrics(refit_output_dir: Path) -> Dict[str, float]:
@@ -630,7 +608,6 @@ def run_refit_training(
             # build_output_path() handles hpo_refit by appending /refit to trial path
             refit_output_dir = build_output_path(root_dir, refit_context, config_dir=config_dir)
             refit_output_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Using v2 refit folder: {refit_output_dir}")
         except Exception as e:
             logger.warning(f"Could not construct v2 refit folder, falling back to legacy: {e}")
             refit_output_dir = None
@@ -651,23 +628,11 @@ def run_refit_training(
                 f"Constructed v2 refit folder manually: {refit_output_dir}"
             )
         else:
-            # Legacy study folder, use legacy naming
-            # BUT: Double-check we're not in a v2 study folder (safety check)
-            if is_v2_study_folder:
-                logger.error(
-                    f"[REFIT] CRITICAL ERROR: About to create legacy refit folder in v2 study folder {study_folder_name}! "
-                    f"This should never happen. study_key_hash={'YES' if refit_context.study_key_hash else 'NO'}, "
-                    f"trial_key_hash={'YES' if refit_context.trial_key_hash else 'NO'}. "
-                    f"Raising exception to prevent incorrect folder creation."
-                )
-                raise RuntimeError(
-                    f"Cannot create legacy refit folder in v2 study folder {study_folder_name}. "
-                    f"trial_key_hash must be computed. Check hash computation logic."
-                )
-            trial_base_dir = output_dir / trial_id
-            refit_output_dir = trial_base_dir / "refit"
-            refit_output_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"[REFIT] Using legacy refit folder (NOT in v2 study folder): {refit_output_dir}")
+            # Should not happen - we only support v2 paths
+            raise RuntimeError(
+                f"Cannot create refit in non-v2 study folder. Only v2 paths (study-{{hash}}) are supported. "
+                f"Found study folder: {study_folder_name}"
+            )
 
     # Build command arguments for refit training
     args = _build_refit_command(
@@ -728,10 +693,6 @@ def run_refit_training(
         # This prevents training script from auto-ending the run (parent will terminate it)
         if hpo_parent_run_id:
             env["MLFLOW_PARENT_RUN_ID"] = hpo_parent_run_id
-        logger.info(
-            f"[REFIT] Set MLFLOW_RUN_ID to refit run: {refit_run_id[:12]}... "
-            f"(training will log directly to refit run, not create child)"
-        )
     elif hpo_parent_run_id:
         env["MLFLOW_PARENT_RUN_ID"] = hpo_parent_run_id
         env["MLFLOW_TRIAL_NUMBER"] = "refit"
@@ -744,7 +705,6 @@ def run_refit_training(
     _verify_refit_environment(root_dir, env)
 
     # Run refit training
-    logger.info(f"[REFIT] Running refit training with args: {args}")
     result = subprocess.run(
         args,
         cwd=root_dir,
@@ -871,8 +831,6 @@ def _setup_refit_environment(
     else:
         env["PYTHONPATH"] = src_dir
 
-    logger.info(f"[REFIT] PYTHONPATH set to: {env.get('PYTHONPATH', 'NOT SET')}")
-    logger.info(f"[REFIT] Root dir: {root_dir}, src_dir: {src_dir}")
 
     return env
 
@@ -938,8 +896,6 @@ def _verify_refit_environment(root_dir: Path, env: Dict[str, str]) -> None:
             f"This will prevent the subprocess from finding the training module."
         )
 
-    logger.info(f"[REFIT] ✓ Training module found at: {training_module_path}")
-    logger.info(f"[REFIT] ✓ PYTHONPATH verified: contains src_dir")
 
 
 def _read_refit_metrics(refit_output_dir: Path) -> Dict[str, float]:

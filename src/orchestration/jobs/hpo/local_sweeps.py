@@ -291,7 +291,7 @@ def run_local_hpo_sweep(
         mlflow_experiment_name: MLflow experiment name.
         k_folds: Optional number of k-folds for cross-validation.
         fold_splits_file: Optional path to fold splits file.
-        checkpoint_config: Optional checkpoint configuration dict with 'enabled', 
+        checkpoint_config: Optional checkpoint configuration dict with 'enabled',
                           'storage_path', and 'auto_resume' keys.
         restore_from_drive: Optional function to restore checkpoint from Drive if missing.
                           Function should take a Path and return bool (True if restored).
@@ -330,8 +330,6 @@ def run_local_hpo_sweep(
                 benchmark_config=benchmark_config,
             )
             study_key_hash = build_hpo_study_key_hash(study_key)
-            logger.info(
-                f"✓ Computed study_key_hash early: {study_key_hash[:16]}... (full: {study_key_hash[:64]}...)")
         except Exception as e:
             logger.warning(f"✗ Could not compute study_key_hash early: {e}")
             import traceback
@@ -345,8 +343,7 @@ def run_local_hpo_sweep(
         restore_from_drive=restore_from_drive,
     )
 
-    # If we have study_key_hash, create v2 folder and use it for study.db
-    # Otherwise, fall back to legacy folder creation
+    # Create v2 folder and use it for study.db (study_key_hash required)
     v2_study_folder = None
     if study_key_hash:
         try:
@@ -384,8 +381,6 @@ def run_local_hpo_sweep(
                 v2_study_folder = hpo_base / \
                     storage_env / model / f"study-{study8}"
                 v2_study_folder.mkdir(parents=True, exist_ok=True)
-                logger.info(
-                    f"Created v2 study folder early: {v2_study_folder}")
         except Exception as e:
             logger.warning(
                 f"Could not create v2 study folder early, will use legacy: {e}")
@@ -410,30 +405,14 @@ def run_local_hpo_sweep(
     # Get objective metric name
     objective_metric = study_manager.objective_metric
 
-    # Determine study folder: use v2 if created, otherwise use legacy
-    study_folder_legacy = storage_path.parent if storage_path else output_dir / study_name
-
-    if v2_study_folder and v2_study_folder.exists():
-        # Use v2 folder (study.db was created there)
-        study_folder = v2_study_folder
-        study_output_dir = study_folder
-        logger.info(f"Using v2 study folder (created early): {study_folder}")
-
-        # If legacy folder was created (shouldn't happen now, but check for cleanup)
-        if study_folder_legacy.exists() and study_folder_legacy != study_folder:
-            # Check if legacy folder only contains study.db (could be a stale file)
-            legacy_contents = list(study_folder_legacy.iterdir())
-            if len(legacy_contents) == 1 and legacy_contents[0].name == "study.db":
-                logger.debug(
-                    f"Legacy folder {study_folder_legacy} contains only study.db, which has been moved to v2 folder. Legacy folder can be cleaned up.")
-            else:
-                logger.warning(
-                    f"Legacy folder {study_folder_legacy} exists with additional contents. Not removing to preserve data.")
-    else:
-        # Fall back to legacy folder
-        study_folder = study_folder_legacy
-        study_output_dir = study_folder
-        logger.info(f"Using legacy study folder: {study_folder}")
+    # Use v2 folder (study.db was created there)
+    if not v2_study_folder or not v2_study_folder.exists():
+        raise RuntimeError(
+            f"V2 study folder not created. Expected: {v2_study_folder}. "
+            f"Only v2 paths (study-{{hash}}) are supported."
+        )
+    study_folder = v2_study_folder
+    study_output_dir = study_folder
 
     # Check if checkpointing is enabled (needed for setup_hpo_mlflow_run)
     checkpoint_enabled = checkpoint_config is not None and checkpoint_config.get(
@@ -442,10 +421,6 @@ def run_local_hpo_sweep(
 
     # Create NamingContext for HPO parent run (study_key_hash already computed earlier)
     # Pass the computed study_key_hash to avoid recomputation and ensure it's set in the frozen context
-    logger.info(
-        f"[HPO] About to call setup_hpo_mlflow_run with study_key_hash: "
-        f"{study_key_hash[:16] + '...' if study_key_hash else 'None'}"
-    )
     hpo_parent_context, mlflow_run_name = setup_hpo_mlflow_run(
         backbone=backbone,
         study_name=study_name,
@@ -458,59 +433,6 @@ def run_local_hpo_sweep(
         benchmark_config=benchmark_config,
         study_key_hash=study_key_hash,  # Pass pre-computed hash to avoid recomputation
     )
-    logger.info(
-        f"[HPO] After setup_hpo_mlflow_run, context.study_key_hash: "
-        f"{getattr(hpo_parent_context, 'study_key_hash', 'MISSING')[:16] + '...' if getattr(hpo_parent_context, 'study_key_hash', None) else 'None'}"
-    )
-
-    # Legacy v2 folder construction code (now redundant, but kept for backward compatibility)
-    # This code path should not execute if v2_study_folder was created early
-    if False and hpo_parent_context and hpo_parent_context.study_key_hash:
-        logger.debug(
-            f"Attempting v2 study folder construction with study_key_hash={hpo_parent_context.study_key_hash[:16]}...")
-        try:
-            from orchestration.naming_centralized import build_output_path
-            from orchestration.paths import load_paths_config, apply_env_overrides, resolve_output_path
-
-            # Derive root_dir by walking up from output_dir until we find "outputs" directory
-            root_dir = None
-            current = output_dir
-            while current.parent != current:  # Stop at filesystem root
-                if current.name == "outputs":
-                    root_dir = current.parent
-                    break
-                current = current.parent
-
-            if root_dir is None:
-                # Fallback: try to find project root by looking for config directory
-                root_dir = Path.cwd()
-                for candidate in [Path.cwd(), Path.cwd().parent]:
-                    if (candidate / "config").exists():
-                        root_dir = candidate
-                        break
-
-            config_dir = root_dir / "config"
-            hpo_base = resolve_output_path(root_dir, config_dir, "hpo")
-            paths_config = load_paths_config(config_dir)
-            paths_config = apply_env_overrides(
-                paths_config, hpo_parent_context.storage_env or hpo_parent_context.environment)
-
-            pattern = paths_config.get("patterns", {}).get("hpo_v2", "")
-            if pattern:
-                study8 = hpo_parent_context.study_key_hash[:8]
-                storage_env = hpo_parent_context.storage_env or hpo_parent_context.environment
-                model = hpo_parent_context.model
-
-                study_folder = hpo_base / storage_env / \
-                    model / f"study-{study8}"
-                study_folder.mkdir(parents=True, exist_ok=True)
-                logger.info(f"Using v2 study folder: {study_folder}")
-                study_output_dir = study_folder
-        except Exception as e:
-            import traceback
-            logger.warning(
-                f"Could not construct v2 study folder, falling back to legacy: {e}")
-            logger.debug(f"Traceback: {traceback.format_exc()}")
 
     # Write .active_study.json marker for fast lookup in selection code
     try:
@@ -581,8 +503,7 @@ def run_local_hpo_sweep(
     except Exception as e:
         logger.debug(f"Could not cleanup stale reservations: {e}")
 
-    # Update study_output_dir to use the final study_folder (already set above if v2 succeeded)
-    # If v2 failed, study_output_dir is still set to legacy folder
+    # Use v2 study folder
     study_folder = study_output_dir
 
     # IMPORTANT: Do NOT move study.db after the study object has been created.
@@ -598,7 +519,6 @@ def run_local_hpo_sweep(
         )
 
     # Use study folder as base for trials (so trials are created inside study folder)
-    logger.info(f"Using study folder as base for trials: {study_output_dir}")
 
     tracker = MLflowSweepTracker(mlflow_experiment_name)
     tracker.log_tracking_info()

@@ -49,7 +49,7 @@ def resolve_storage_path(
     
     # Ensure parent directory exists (only if create_dirs is True)
     if create_dirs:
-        storage_path.parent.mkdir(parents=True, exist_ok=True)
+    storage_path.parent.mkdir(parents=True, exist_ok=True)
     
     return storage_path
 

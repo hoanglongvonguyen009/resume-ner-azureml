@@ -43,16 +43,9 @@ def setup_hpo_mlflow_run(
         )
         from shared.platform_detection import detect_platform
 
-        logger.info(
-            f"[HPO Parent Run] Received study_key_hash parameter: "
-            f"{study_key_hash[:16] + '...' if study_key_hash else 'None'}"
-        )
 
         # Compute study_key_hash if missing
         if study_key_hash is None and data_config and hpo_config:
-            logger.info(
-                "[HPO Parent Run] study_key_hash is None, attempting to compute from configs..."
-            )
             try:
                 study_key = build_hpo_study_key(
                     data_config=data_config,
@@ -61,47 +54,29 @@ def setup_hpo_mlflow_run(
                     benchmark_config=benchmark_config,
                 )
                 study_key_hash = build_hpo_study_key_hash(study_key)
-                logger.info(
-                    f"[HPO Parent Run] ✓ Computed study_key_hash: {study_key_hash[:16]}..."
-                )
             except Exception as e:
                 logger.warning(
-                    f"[HPO Parent Run] ✗ Could not compute study_key_hash for naming: {e}"
+                    f"Could not compute study_key_hash for naming: {e}"
                 )
-                import traceback
-
-                logger.debug(traceback.format_exc())
-        elif study_key_hash:
-            logger.info(
-                f"[HPO Parent Run] Using provided study_key_hash: {study_key_hash[:16]}..."
-            )
-        else:
+        elif not study_key_hash:
             logger.warning(
-                "[HPO Parent Run] study_key_hash is None and cannot be computed "
+                "study_key_hash is None and cannot be computed "
                 f"(data_config={'present' if data_config else 'missing'}, "
                 f"hpo_config={'present' if hpo_config else 'missing'})"
             )
 
         if study_key_hash:
             os.environ["HPO_STUDY_KEY_HASH"] = study_key_hash
-            logger.debug(
-                f"[HPO Parent Run] Set HPO_STUDY_KEY_HASH env var: {study_key_hash[:16]}..."
-            )
 
         try:
             env = detect_platform()
             storage_env_val = detect_platform()
         except Exception as env_error:
             logger.warning(
-                f"[HPO Parent Run] Error detecting platform: {env_error}, using defaults"
+                f"Error detecting platform: {env_error}, using defaults"
             )
             env = "local"
             storage_env_val = "local"
-
-        logger.info(
-            f"[HPO Parent Run] Calling create_naming_context with study_key_hash: "
-            f"{study_key_hash[:16] + '...' if study_key_hash else 'None'}"
-        )
 
         try:
             hpo_parent_context = create_naming_context(
@@ -114,17 +89,11 @@ def setup_hpo_mlflow_run(
                 trial_id=None,
                 study_key_hash=study_key_hash,
             )
-
-            logger.info(
-                f"[HPO Parent Run] Context created. "
-                f"study_key_hash={getattr(hpo_parent_context, 'study_key_hash', None)}"
-            )
         except Exception as ctx_error:
             logger.error(
-                f"[HPO Parent Run] CRITICAL: Failed to create NamingContext: {ctx_error}"
+                f"CRITICAL: Failed to create NamingContext: {ctx_error}"
             )
             import traceback
-
             logger.error(traceback.format_exc())
             raise
 
@@ -152,19 +121,13 @@ def setup_hpo_mlflow_run(
             output_dir=output_dir,
         )
 
-        logger.info(
-            f"[HPO Parent Run] Generated MLflow run name: {mlflow_run_name}"
-        )
 
         return hpo_parent_context, mlflow_run_name
 
     except Exception as e:
         logger.warning(
-            f"[HPO Parent Run] Exception during context creation: {e}, trying policy fallback"
+            f"Exception during context creation: {e}, trying policy fallback"
         )
-        import traceback
-
-        logger.debug(traceback.format_exc())
         hpo_parent_context = None
 
         try:
@@ -195,10 +158,8 @@ def setup_hpo_mlflow_run(
                         "hpo_sweep", minimal_context, policy, config_dir
                     )
                     return minimal_context, mlflow_run_name
-        except Exception as policy_error:
-            logger.debug(
-                f"Policy fallback also failed: {policy_error}, using legacy naming"
-            )
+        except Exception:
+            pass
 
         mlflow_run_name = create_mlflow_run_name(
             backbone,

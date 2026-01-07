@@ -270,18 +270,15 @@ def benchmark_best_trials(
     benchmark_results = {}
 
     for backbone, trial_info in best_trials.items():
-        logger.info(f"[BENCHMARK_BEST_TRIALS] Processing {backbone}: trial_name={trial_info.get('trial_name')}, trial_dir={trial_info.get('trial_dir')}")
         
         # Use checkpoint_dir from trial_info if available (from load_best_trial_from_disk)
         # This handles new structure: refit/checkpoint/ or cv/foldN/checkpoint/
         if "checkpoint_dir" in trial_info and trial_info["checkpoint_dir"] is not None:
             checkpoint_dir = Path(trial_info["checkpoint_dir"])
-            logger.info(f"[BENCHMARK_BEST_TRIALS] Using checkpoint_dir from trial_info: {checkpoint_dir}")
         else:
             # Try to find checkpoint in trial_dir
             if "trial_dir" in trial_info and trial_info["trial_dir"] is not None:
                 trial_dir = Path(trial_info["trial_dir"])
-                logger.info(f"[BENCHMARK_BEST_TRIALS] Searching for checkpoint in trial_dir: {trial_dir} (exists: {trial_dir.exists()})")
                 
                 if not trial_dir.exists():
                     logger.warning(f"[BENCHMARK_BEST_TRIALS] Trial directory does not exist: {trial_dir}")
@@ -294,8 +291,6 @@ def benchmark_best_trials(
                         f"Tried: refit/checkpoint/, cv/foldN/checkpoint/, checkpoint/"
                     )
                     continue
-                else:
-                    logger.info(f"[BENCHMARK_BEST_TRIALS] Found checkpoint_dir: {checkpoint_dir}")
             else:
                 logger.warning(
                     f"Trial directory not found for {backbone} {trial_info.get('trial_name', 'unknown')}. "
@@ -430,7 +425,7 @@ def benchmark_best_trials(
                                             f"experiment_id={experiment_ids_to_search[0]}"
                                         )
                                 except Exception as e:
-                                    logger.debug(f"[BENCHMARK] Could not find experiment via study_key_hash: {e}")
+                                    logger.debug(f"Could not find HPO experiment via study_key_hash: {e}")
                             
                             # Strategy 2: Fallback to name-based search
                             if experiment_ids_to_search is None:
@@ -450,7 +445,7 @@ def benchmark_best_trials(
                                         f"[BENCHMARK] HPO experiment '{hpo_experiment_name}' not found, searching all experiments"
                                     )
                         except Exception as e:
-                            logger.debug(f"[BENCHMARK] Could not get HPO experiment: {e}")
+                            logger.debug(f"Could not find HPO experiment by name: {e}")
                     
                     # Search for trial run by trial_key_hash (CV trial, not refit)
                     # Try multiple filter strategies to find the trial run

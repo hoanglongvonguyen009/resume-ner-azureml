@@ -94,13 +94,13 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
         mlflow.set_tracking_uri(tracking_uri)
         print(
             f"  [Training] Set MLflow tracking URI: {tracking_uri[:50]}...", file=sys.stderr, flush=True)
-        
+
         # Set Azure ML artifact upload timeout if using Azure ML and not already set
         if "azureml" in tracking_uri.lower():
             if "AZUREML_ARTIFACTS_DEFAULT_TIMEOUT" not in os.environ:
                 os.environ["AZUREML_ARTIFACTS_DEFAULT_TIMEOUT"] = "600"
                 print(
-                    f"  [Training] Set AZUREML_ARTIFACTS_DEFAULT_TIMEOUT=600 for artifact uploads", 
+                    f"  [Training] Set AZUREML_ARTIFACTS_DEFAULT_TIMEOUT=600 for artifact uploads",
                     file=sys.stderr, flush=True)
 
     # Set experiment from environment variable
@@ -167,36 +167,40 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
         trial_display = f"trial {trial_number}"
         if fold_idx is not None:
             trial_display = f"trial {trial_number}, fold {fold_idx}"
-        
+
         # Set environment variables for potential use by mlflow_context fallback
         os.environ["MLFLOW_TRIAL_NUMBER"] = str(trial_number)
         if fold_idx is not None:
             os.environ["MLFLOW_FOLD_IDX"] = str(fold_idx)
-        
+
+        # Initialize variables for fallback use
+        study_key_hash = None
+        model = None
+
         # Try to build systematic name using naming policy
         try:
             from orchestration.naming_centralized import create_naming_context
             from orchestration.jobs.tracking.mlflow_naming import build_mlflow_run_name
             from shared.platform_detection import detect_platform
-            
+
             # Try to get study_key_hash and model from parent run
-            study_key_hash = None
-            model = None
             try:
                 from mlflow.tracking import MlflowClient
                 client = MlflowClient()
                 parent_run = client.get_run(parent_run_id)
-                study_key_hash = parent_run.data.tags.get("code.study_key_hash")
+                study_key_hash = parent_run.data.tags.get(
+                    "code.study_key_hash")
                 model = parent_run.data.tags.get("code.model")
             except Exception:
                 pass
-            
+
             # Infer config_dir from environment or current directory
-            config_dir = Path(os.environ.get("CONFIG_DIR", Path.cwd() / "config"))
-            
+            config_dir = Path(os.environ.get(
+                "CONFIG_DIR", Path.cwd() / "config"))
+
             # Determine process type: hpo_trial_fold if fold_idx, otherwise hpo_trial
             process_type = "hpo_trial_fold" if fold_idx is not None else "hpo_trial"
-            
+
             # Create context if we have minimum required info
             if model or study_key_hash:
                 fold_context = create_naming_context(
@@ -208,24 +212,26 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
                     fold_idx=fold_idx,
                     study_key_hash=study_key_hash,
                 )
-                run_name = build_mlflow_run_name(fold_context, config_dir=config_dir)
+                run_name = build_mlflow_run_name(
+                    fold_context, config_dir=config_dir)
         except Exception as e:
             # If systematic naming fails, will use fallback below
             import logging
             logger = logging.getLogger(__name__)
-            logger.debug(f"Could not build systematic run name: {e}, using fallback")
-        
+            logger.debug(
+                f"Could not build systematic run name: {e}, using fallback")
+
         # Fallback to policy-like deterministic format if systematic naming didn't work
         if not run_name:
             from shared.platform_detection import detect_platform
             env = detect_platform()
             model_name = model or "unknown"
-            
+
             # Try to get study_hash short version
             study_hash_short = "unknown"
             if study_key_hash:
                 study_hash_short = study_key_hash[:8]
-            
+
             # Build policy-like name
             if fold_idx is not None:
                 # Use hpo_trial_fold pattern
@@ -235,7 +241,7 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
                 # Use hpo_trial pattern
                 trial_num_str = f"t{str(trial_number).zfill(2)}"
                 run_name = f"{env}_{model_name}_hpo_trial_study-{study_hash_short}_{trial_num_str}"
-        
+
         print(
             f"  [Training] Creating child run with parent: {parent_run_id[:12]}... ({trial_display})",
             file=sys.stderr,

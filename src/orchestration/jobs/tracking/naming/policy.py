@@ -56,7 +56,6 @@ def load_naming_policy(config_dir: Optional[Path] = None) -> Dict[str, Any]:
         validate_naming_policy(policy, policy_path)
         _policy_cache = policy
         _policy_cache_path = policy_path
-        logger.debug(f"[Naming Policy] Loaded policy from {policy_path}")
         return _policy_cache
     except Exception as e:
         logger.warning(

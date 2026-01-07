@@ -37,8 +37,7 @@ def load_benchmark_speed_score(trial_dir: Path) -> Optional[float]:
             return float(batch_1_data["mean_ms"])
 
         return None
-    except Exception as e:
-        logger.debug(f"Could not read benchmark file {benchmark_file}: {e}")
+    except Exception:
         return None
 
 
@@ -53,7 +52,7 @@ def load_best_trial_from_disk(
     Works by reading metrics.json files from trial directories.
     This allows selection even after notebook restart.
 
-    Supports both v2 paths (study-{study8}/trial-{trial8}) and legacy paths (trial_N).
+    Supports v2 paths (study-{study8}/trial-{trial8}) only.
 
     Args:
         hpo_output_dir: Path to HPO outputs directory (e.g., outputs/hpo).
@@ -67,7 +66,7 @@ def load_best_trial_from_disk(
     if hpo_output_dir.name == backbone:
         backbone_dir = hpo_output_dir
     else:
-        backbone_dir = hpo_output_dir / backbone
+    backbone_dir = hpo_output_dir / backbone
 
     if not backbone_dir.exists():
         return None
@@ -76,31 +75,19 @@ def load_best_trial_from_disk(
     best_trial_dir = None
     best_trial_name = None
 
-    # Collect all trial directories (support both v2 and legacy paths)
+    # Collect all v2 trial directories (study-{study8}/trial-{trial8})
     trial_dirs = []
 
-    # First, check for v2 paths: study-{study8}/trial-{trial8}
     for study_dir in backbone_dir.iterdir():
         if not study_dir.is_dir():
             continue
 
         # Check if this is a v2 study folder (study-{hash})
         if study_dir.name.startswith("study-") and len(study_dir.name) > 7:
-            # Look for trial folders inside study folder
+            # Look for v2 trial folders inside study folder
             for trial_dir in study_dir.iterdir():
                 if trial_dir.is_dir() and trial_dir.name.startswith("trial-") and len(trial_dir.name) > 7:
                     trial_dirs.append(trial_dir)
-        # Also check for legacy study folders (hpo_{backbone}_*)
-        elif study_dir.name.startswith(f"hpo_{backbone}_"):
-            # Legacy study folder - look for trial_N directories inside
-            for trial_dir in study_dir.iterdir():
-                if trial_dir.is_dir() and trial_dir.name.startswith("trial_"):
-                    trial_dirs.append(trial_dir)
-
-    # Also check for legacy direct trial directories (trial_N directly under backbone_dir)
-    for trial_dir in backbone_dir.iterdir():
-        if trial_dir.is_dir() and trial_dir.name.startswith("trial_") and trial_dir not in trial_dirs:
-            trial_dirs.append(trial_dir)
 
     # Find all trial directories
     for trial_dir in trial_dirs:
@@ -203,15 +190,8 @@ def load_best_trial_from_disk(
                 )
                 if uuid_pattern.match(run_id_from_meta):
                     trial_run_id = run_id_from_meta
-                    logger.debug(
-                        f"Read valid trial_run_id (UUID) from trial_meta.json: {trial_run_id[:12]}..."
-                    )
-                else:
-                    logger.debug(
-                        f"Skipping run_id from trial_meta.json (not a UUID): {run_id_from_meta}"
-                    )
-        except Exception as e:
-            logger.debug(f"Could not read trial_meta.json: {e}")
+        except Exception:
+            pass
 
     result = {
         "backbone": backbone,

@@ -87,35 +87,9 @@ def load_study_from_disk(
     if study_name_template:
         study_name = study_name_template.replace("{backbone}", backbone_name)
 
-    # Prefer v2 study folders first (check before calling resolve_storage_path to avoid creating legacy folders)
+    # Find v2 study folder
     from .trial_finder import find_study_folder_in_backbone_dir
     study_folder = find_study_folder_in_backbone_dir(backbone_output_dir)
-    
-    # If no v2 folder found, try to locate legacy folder via resolve_storage_path (read-only)
-    if not study_folder:
-        actual_storage_path = resolve_storage_path(
-            output_dir=backbone_output_dir,
-            checkpoint_config=checkpoint_config,
-            backbone=backbone_name,
-            study_name=study_name,
-            create_dirs=False,  # Read-only: don't create legacy folders
-        )
-        if actual_storage_path and actual_storage_path.exists():
-            study_folder = actual_storage_path.parent
-    
-    if not study_folder:
-        study_folder = backbone_output_dir / \
-            study_name if study_name else backbone_output_dir
-        if not study_folder.exists() and backbone_output_dir.exists():
-            study_folders = [
-                d
-                for d in backbone_output_dir.iterdir()
-                if d.is_dir()
-                and not d.name.startswith("trial_")
-                and d.name != ".ipynb_checkpoints"
-            ]
-            if study_folders:
-                study_folder = study_folders[0]
 
     if not study_folder or not study_folder.exists():
         return None
@@ -164,15 +138,23 @@ def find_trial_hash_info_for_study(
         return None, None, None
 
     for study_folder in backbone_dir.iterdir():
-        if not study_folder.is_dir() or study_folder.name.startswith("trial_"):
+        if not study_folder.is_dir() or not study_folder.name.startswith("study-"):
             continue
         for trial_dir in study_folder.iterdir():
             if (
                 trial_dir.is_dir()
-                and trial_dir.name.startswith("trial_")
-                and str(trial_number) in trial_dir.name
+                and trial_dir.name.startswith("trial-")
             ):
-                return get_trial_hash_info(trial_dir)
+                # Check trial_meta.json for trial_number match
+                trial_meta_path = trial_dir / "trial_meta.json"
+                if trial_meta_path.exists():
+                    try:
+                        with open(trial_meta_path, "r") as f:
+                            meta = json.load(f)
+                        if meta.get("trial_number") == trial_number:
+                            return get_trial_hash_info(trial_dir)
+                    except Exception:
+                        continue
     return None, None, None
 
 

@@ -213,7 +213,6 @@ class StudyManager:
             # if the study already exists in the database (even if file was just created)
             load_if_exists = self.checkpoint_enabled
         else:
-            logger.info(f"[HPO] Starting optimization for {self.backbone}...")
             load_if_exists = False
 
         study = self.optuna.create_study(

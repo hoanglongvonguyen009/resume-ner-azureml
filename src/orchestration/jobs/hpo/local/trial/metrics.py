@@ -127,24 +127,17 @@ def store_metrics_in_trial_attributes(
             logger = get_logger(__name__)
             logger.debug(f"Could not find v2 trial folder for trial {trial_number}: {e}")
         
-        # Fallback to legacy naming if v2 folder not found (shouldn't happen, but be safe)
+        # Should not happen - v2 trial folder must exist
         if trial_output_dir is None:
-            if fold_splits is not None:
-                last_fold_idx = len(fold_splits) - 1
-                trial_output_dir = output_base_dir / f"trial_{trial_number}{run_suffix}_fold{last_fold_idx}"
-            else:
-                trial_output_dir = output_base_dir / f"trial_{trial_number}{run_suffix}"
+            raise RuntimeError(
+                f"Could not find v2 trial folder for trial {trial_number} in v2 study folder {study_folder_name}. "
+                f"Only v2 paths (trial-{{hash}}) are supported."
+            )
     else:
-        # Legacy study folder, use legacy naming
-        if fold_splits is not None:
-            # CV: read from last fold's output (fold indices are 0-based, so last is len(fold_splits)-1)
-            # Fold output directory format: trial_{number}_{run_id}_fold{fold_idx}
-            last_fold_idx = len(fold_splits) - 1
-            trial_output_dir = output_base_dir / f"trial_{trial_number}{run_suffix}_fold{last_fold_idx}"
-        else:
-            # Single training: read from trial output directory
-            # Format: trial_{number}_{run_id}
-            trial_output_dir = output_base_dir / f"trial_{trial_number}{run_suffix}"
+        # Should not happen - we only support v2 paths
+        raise RuntimeError(
+            f"Non-v2 study folder detected: {study_folder_name}. Only v2 paths (study-{{hash}}) are supported."
+        )
 
     metrics_file = trial_output_dir / METRICS_FILENAME
 
