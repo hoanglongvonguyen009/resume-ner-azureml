@@ -99,31 +99,10 @@ def run_refit_training(
         f"trial_number={trial_number}"
     )
 
-    # Create refit output directory: trial_<n>_<ts>/refit/
-    trial_base_dir = output_dir / trial_id
-    refit_output_dir = trial_base_dir / "refit"
-    refit_output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Derive project root from config_dir
+    # Derive project root from config_dir (needed for v2 path construction)
     root_dir = _find_project_root(config_dir)
 
-    # Build command arguments for refit training
-    args = _build_refit_command(
-        dataset_path=dataset_path,
-        config_dir=config_dir,
-        backbone=backbone,
-        refit_params=refit_params,
-        train_config=train_config,
-    )
-
-    # Set environment variables
-    env = _setup_refit_environment(
-        refit_output_dir=refit_output_dir,
-        root_dir=root_dir,
-        mlflow_experiment_name=mlflow_experiment_name,
-    )
-
-    # Create NamingContext and MLflow run for refit
+    # Create NamingContext and MLflow run for refit FIRST (needed for v2 path construction)
     # Include study_key_hash and trial_key_hash for hash-driven naming consistency
     refit_context = create_naming_context(
         process_type="hpo_refit",
@@ -140,6 +119,70 @@ def run_refit_training(
     assert refit_context.trial_id and refit_context.trial_id.strip(), (
         f"Refit context missing trial_id; would become *_unknown. "
         f"Computed trial_id={trial_id!r}, context.trial_id={refit_context.trial_id!r}"
+    )
+
+    # Create refit output directory using v2 pattern if hashes available
+    # IMPORTANT: Do this BEFORE creating legacy directories to prevent legacy folder creation in v2 study folders
+    refit_output_dir = None
+    if refit_context.study_key_hash and refit_context.trial_key_hash:
+        try:
+            from orchestration.naming_centralized import build_output_path
+            # build_output_path() handles hpo_refit by appending /refit to trial path
+            refit_output_dir = build_output_path(root_dir, refit_context, config_dir=config_dir)
+            refit_output_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Using v2 refit folder: {refit_output_dir}")
+        except Exception as e:
+            logger.warning(f"Could not construct v2 refit folder, falling back to legacy: {e}")
+            refit_output_dir = None
+    
+    # Fallback to legacy pattern if v2 construction failed or hashes unavailable
+    if refit_output_dir is None:
+        # Check if we're in a v2 study folder (study-{hash})
+        # If so, we need to find the v2 trial folder first, then append /refit
+        study_folder_name = output_dir.name if output_dir.name.startswith("study-") else None
+        if study_folder_name and refit_context.trial_key_hash:
+            # We're in a v2 study folder, construct v2 trial path manually
+            trial8 = refit_context.trial_key_hash[:8]
+            trial_base_dir = output_dir / f"trial-{trial8}"
+            refit_output_dir = trial_base_dir / "refit"
+            refit_output_dir.mkdir(parents=True, exist_ok=True)
+            logger.warning(
+                f"build_output_path() failed but we're in v2 study folder. "
+                f"Constructed v2 refit folder manually: {refit_output_dir}"
+            )
+        else:
+            # Legacy study folder, use legacy naming
+            # BUT: Double-check we're not in a v2 study folder (safety check)
+            if is_v2_study_folder:
+                logger.error(
+                    f"[REFIT] CRITICAL ERROR: About to create legacy refit folder in v2 study folder {study_folder_name}! "
+                    f"This should never happen. study_key_hash={'YES' if refit_context.study_key_hash else 'NO'}, "
+                    f"trial_key_hash={'YES' if refit_context.trial_key_hash else 'NO'}. "
+                    f"Raising exception to prevent incorrect folder creation."
+                )
+                raise RuntimeError(
+                    f"Cannot create legacy refit folder in v2 study folder {study_folder_name}. "
+                    f"trial_key_hash must be computed. Check hash computation logic."
+                )
+            trial_base_dir = output_dir / trial_id
+            refit_output_dir = trial_base_dir / "refit"
+            refit_output_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"[REFIT] Using legacy refit folder (NOT in v2 study folder): {refit_output_dir}")
+
+    # Build command arguments for refit training
+    args = _build_refit_command(
+        dataset_path=dataset_path,
+        config_dir=config_dir,
+        backbone=backbone,
+        refit_params=refit_params,
+        train_config=train_config,
+    )
+
+    # Set environment variables
+    env = _setup_refit_environment(
+        refit_output_dir=refit_output_dir,
+        root_dir=root_dir,
+        mlflow_experiment_name=mlflow_experiment_name,
     )
 
     # Build MLflow run name and tags
@@ -552,31 +595,10 @@ def run_refit_training(
         f"trial_number={trial_number}"
     )
 
-    # Create refit output directory: trial_<n>_<ts>/refit/
-    trial_base_dir = output_dir / trial_id
-    refit_output_dir = trial_base_dir / "refit"
-    refit_output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Derive project root from config_dir
+    # Derive project root from config_dir (needed for v2 path construction)
     root_dir = _find_project_root(config_dir)
 
-    # Build command arguments for refit training
-    args = _build_refit_command(
-        dataset_path=dataset_path,
-        config_dir=config_dir,
-        backbone=backbone,
-        refit_params=refit_params,
-        train_config=train_config,
-    )
-
-    # Set environment variables
-    env = _setup_refit_environment(
-        refit_output_dir=refit_output_dir,
-        root_dir=root_dir,
-        mlflow_experiment_name=mlflow_experiment_name,
-    )
-
-    # Create NamingContext and MLflow run for refit
+    # Create NamingContext and MLflow run for refit FIRST (needed for v2 path construction)
     # Include study_key_hash and trial_key_hash for hash-driven naming consistency
     refit_context = create_naming_context(
         process_type="hpo_refit",
@@ -593,6 +615,70 @@ def run_refit_training(
     assert refit_context.trial_id and refit_context.trial_id.strip(), (
         f"Refit context missing trial_id; would become *_unknown. "
         f"Computed trial_id={trial_id!r}, context.trial_id={refit_context.trial_id!r}"
+    )
+
+    # Create refit output directory using v2 pattern if hashes available
+    # IMPORTANT: Do this BEFORE creating legacy directories to prevent legacy folder creation in v2 study folders
+    refit_output_dir = None
+    if refit_context.study_key_hash and refit_context.trial_key_hash:
+        try:
+            from orchestration.naming_centralized import build_output_path
+            # build_output_path() handles hpo_refit by appending /refit to trial path
+            refit_output_dir = build_output_path(root_dir, refit_context, config_dir=config_dir)
+            refit_output_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Using v2 refit folder: {refit_output_dir}")
+        except Exception as e:
+            logger.warning(f"Could not construct v2 refit folder, falling back to legacy: {e}")
+            refit_output_dir = None
+    
+    # Fallback to legacy pattern if v2 construction failed or hashes unavailable
+    if refit_output_dir is None:
+        # Check if we're in a v2 study folder (study-{hash})
+        # If so, we need to find the v2 trial folder first, then append /refit
+        study_folder_name = output_dir.name if output_dir.name.startswith("study-") else None
+        if study_folder_name and refit_context.trial_key_hash:
+            # We're in a v2 study folder, construct v2 trial path manually
+            trial8 = refit_context.trial_key_hash[:8]
+            trial_base_dir = output_dir / f"trial-{trial8}"
+            refit_output_dir = trial_base_dir / "refit"
+            refit_output_dir.mkdir(parents=True, exist_ok=True)
+            logger.warning(
+                f"build_output_path() failed but we're in v2 study folder. "
+                f"Constructed v2 refit folder manually: {refit_output_dir}"
+            )
+        else:
+            # Legacy study folder, use legacy naming
+            # BUT: Double-check we're not in a v2 study folder (safety check)
+            if is_v2_study_folder:
+                logger.error(
+                    f"[REFIT] CRITICAL ERROR: About to create legacy refit folder in v2 study folder {study_folder_name}! "
+                    f"This should never happen. study_key_hash={'YES' if refit_context.study_key_hash else 'NO'}, "
+                    f"trial_key_hash={'YES' if refit_context.trial_key_hash else 'NO'}. "
+                    f"Raising exception to prevent incorrect folder creation."
+                )
+                raise RuntimeError(
+                    f"Cannot create legacy refit folder in v2 study folder {study_folder_name}. "
+                    f"trial_key_hash must be computed. Check hash computation logic."
+                )
+            trial_base_dir = output_dir / trial_id
+            refit_output_dir = trial_base_dir / "refit"
+            refit_output_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"[REFIT] Using legacy refit folder (NOT in v2 study folder): {refit_output_dir}")
+
+    # Build command arguments for refit training
+    args = _build_refit_command(
+        dataset_path=dataset_path,
+        config_dir=config_dir,
+        backbone=backbone,
+        refit_params=refit_params,
+        train_config=train_config,
+    )
+
+    # Set environment variables
+    env = _setup_refit_environment(
+        refit_output_dir=refit_output_dir,
+        root_dir=root_dir,
+        mlflow_experiment_name=mlflow_experiment_name,
     )
 
     # Build MLflow run name and tags

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from orchestration.normalize import normalize_for_path
+from orchestration.paths import apply_env_overrides, load_paths_config
 from shared.platform_detection import detect_platform
 
 logger = logging.getLogger(__name__)
@@ -343,8 +345,10 @@ def build_output_path(
 
     # Try to load paths config
     try:
-        from orchestration.paths import load_paths_config
         paths_config = load_paths_config(config_dir)
+        paths_config = apply_env_overrides(
+            paths_config, getattr(context, "storage_env", context.environment)
+        )
     except Exception as e:
         logger.warning(
             f"Failed to load paths.yaml config: {e}. Using fallback logic.")
@@ -352,7 +356,11 @@ def build_output_path(
 
     # Get base outputs from config (or use provided/default)
     base_outputs = paths_config.get("base", {}).get("outputs", base_outputs)
-    base_path = root_dir / base_outputs
+    base_outputs_path = Path(base_outputs)
+    if base_outputs_path.is_absolute():
+        base_path = base_outputs_path
+    else:
+        base_path = root_dir / base_outputs
 
     # Map process_type to output category
     category_map = {
@@ -384,18 +392,37 @@ def build_output_path(
             f"Pattern '{pattern_key}' not found in paths.yaml. Using fallback logic.")
         return _build_output_path_fallback(root_dir, context, base_outputs)
 
+    # Check if v2 pattern requires hashes that are missing
+    # For hpo/hpo_refit/benchmarking v2 patterns, fallback to legacy if hashes unavailable
+    if pattern_key in ("hpo_v2", "benchmarking_v2"):
+        requires_study_hash = "{study8}" in pattern
+        requires_trial_hash = "{trial8}" in pattern
+        if requires_study_hash and not context.study_key_hash:
+            logger.debug(
+                f"Pattern '{pattern_key}' requires study_key_hash but it's missing. Using fallback logic.")
+            return _build_output_path_fallback(root_dir, context, base_outputs)
+        if requires_trial_hash and not context.trial_key_hash:
+            logger.debug(
+                f"Pattern '{pattern_key}' requires trial_key_hash but it's missing. Using fallback logic.")
+            return _build_output_path_fallback(root_dir, context, base_outputs)
+
     # Extract values from context
     # NOTE: storage_env defaults to environment in NamingContext.__post_init__
     values = {
         "environment": context.environment,
         "storage_env": getattr(context, "storage_env", context.environment),
         "model": context.model,
+        # Full fingerprints (still available for legacy or other patterns)
         "spec_fp": context.spec_fp or "",
         "exec_fp": context.exec_fp or "",
         "variant": context.variant,
         "trial_id": context.trial_id or "",
         "parent_training_id": context.parent_training_id or "",
         "conv_fp": context.conv_fp or "",
+        # Short fingerprint helpers for lineage-based patterns
+        "spec8": (context.spec_fp or "")[:8] if context.spec_fp else "",
+        "exec8": (context.exec_fp or "")[:8] if context.exec_fp else "",
+        "conv8": (context.conv_fp or "")[:8] if context.conv_fp else "",
         # Optional short forms for HPO/benchmark v2 layouts
         "study8": (context.study_key_hash or "")[:8] if context.study_key_hash else "",
         "trial8": (context.trial_key_hash or "")[:8] if context.trial_key_hash else "",
@@ -405,6 +432,20 @@ def build_output_path(
         if context.benchmark_config_hash
         else "",
     }
+
+    # Optional path normalization (configurable in paths.yaml under normalize_paths)
+    path_norm_rules = paths_config.get("normalize_paths")
+    if path_norm_rules:
+        normalized_values = {}
+        for key, value in values.items():
+            normalized_value, warn_msgs = normalize_for_path(value, path_norm_rules)
+            if warn_msgs:
+                for msg in warn_msgs:
+                    logger.debug(
+                        f"[build_output_path] Normalized '{key}' for path: {msg}"
+                    )
+            normalized_values[key] = normalized_value
+        values = normalized_values
 
     # Resolve pattern by replacing placeholders
     resolved_pattern = pattern

@@ -100,16 +100,51 @@ def store_metrics_in_trial_attributes(
         fold_splits: Optional fold splits for CV (to determine output directory).
     """
     # Determine trial output directory
+    # Check if we're in a v2 study folder (study-{hash})
+    # If so, we need to find the v2 trial folder, not use legacy naming
+    study_folder_name = output_base_dir.name
+    is_v2_study_folder = study_folder_name.startswith("study-") and len(study_folder_name) > 7
+    
     run_suffix = f"_{run_id}" if run_id else ""
-    if fold_splits is not None:
-        # CV: read from last fold's output (fold indices are 0-based, so last is len(fold_splits)-1)
-        # Fold output directory format: trial_{number}_{run_id}_fold{fold_idx}
-        last_fold_idx = len(fold_splits) - 1
-        trial_output_dir = output_base_dir / f"trial_{trial_number}{run_suffix}_fold{last_fold_idx}"
+    
+    if is_v2_study_folder:
+        # In v2 study folder, we need to find the actual v2 trial folder
+        # Look for trial-{hash} folders and match by trial_number from trial_meta.json
+        trial_output_dir = None
+        try:
+            for item in output_base_dir.iterdir():
+                if item.is_dir() and item.name.startswith("trial-"):
+                    trial_meta_path = item / "trial_meta.json"
+                    if trial_meta_path.exists():
+                        import json
+                        with open(trial_meta_path, "r") as f:
+                            meta = json.load(f)
+                        if meta.get("trial_number") == trial_number:
+                            trial_output_dir = item
+                            break
+        except Exception as e:
+            from shared.logging_utils import get_logger
+            logger = get_logger(__name__)
+            logger.debug(f"Could not find v2 trial folder for trial {trial_number}: {e}")
+        
+        # Fallback to legacy naming if v2 folder not found (shouldn't happen, but be safe)
+        if trial_output_dir is None:
+            if fold_splits is not None:
+                last_fold_idx = len(fold_splits) - 1
+                trial_output_dir = output_base_dir / f"trial_{trial_number}{run_suffix}_fold{last_fold_idx}"
+            else:
+                trial_output_dir = output_base_dir / f"trial_{trial_number}{run_suffix}"
     else:
-        # Single training: read from trial output directory
-        # Format: trial_{number}_{run_id}
-        trial_output_dir = output_base_dir / f"trial_{trial_number}{run_suffix}"
+        # Legacy study folder, use legacy naming
+        if fold_splits is not None:
+            # CV: read from last fold's output (fold indices are 0-based, so last is len(fold_splits)-1)
+            # Fold output directory format: trial_{number}_{run_id}_fold{fold_idx}
+            last_fold_idx = len(fold_splits) - 1
+            trial_output_dir = output_base_dir / f"trial_{trial_number}{run_suffix}_fold{last_fold_idx}"
+        else:
+            # Single training: read from trial output directory
+            # Format: trial_{number}_{run_id}
+            trial_output_dir = output_base_dir / f"trial_{trial_number}{run_suffix}"
 
     metrics_file = trial_output_dir / METRICS_FILENAME
 

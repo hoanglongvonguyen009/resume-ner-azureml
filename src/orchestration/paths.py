@@ -1,9 +1,18 @@
 """Centralized path resolution from config."""
 
+import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
+from orchestration.tokens import (
+    extract_placeholders,
+    is_token_allowed,
+    is_token_known,
+)
+from orchestration.normalize import normalize_for_path
 from shared.yaml_utils import load_yaml
 from shared.json_cache import save_json, load_json
+
+logger = logging.getLogger(__name__)
 
 
 def load_paths_config(config_dir: Path) -> Dict[str, Any]:
@@ -18,10 +27,129 @@ def load_paths_config(config_dir: Path) -> Dict[str, Any]:
     """
     paths_config_path = config_dir / "paths.yaml"
     if paths_config_path.exists():
-        return load_yaml(paths_config_path)
+        config = load_yaml(paths_config_path)
+        try:
+            validate_paths_config(config, paths_config_path)
+        except Exception as e:
+            raise RuntimeError(
+                f"Invalid paths configuration in {paths_config_path}: {e}"
+            ) from e
+        return config
     else:
         # Return defaults if config doesn't exist (backward compatibility)
         return _get_default_paths()
+
+
+def apply_env_overrides(
+    paths_config: Dict[str, Any], storage_env: Optional[str]
+) -> Dict[str, Any]:
+    """
+    Apply shallow env overrides (keyed by storage_env) to a paths config.
+
+    Only whitelisted sections are merged (currently: base, outputs).
+    Does not mutate the original config; returns a merged copy.
+    """
+    if not storage_env:
+        return paths_config
+
+    overrides = paths_config.get("env_overrides", {}).get(storage_env)
+    if not overrides:
+        return paths_config
+
+    merged = dict(paths_config)
+
+    if "base" in overrides and isinstance(overrides["base"], dict):
+        merged_base = dict(paths_config.get("base", {}))
+        merged_base.update(overrides["base"])
+        merged["base"] = merged_base
+
+    if "outputs" in overrides and isinstance(overrides["outputs"], dict):
+        merged_outputs = dict(paths_config.get("outputs", {}))
+        merged_outputs.update(overrides["outputs"])
+        merged["outputs"] = merged_outputs
+
+    return merged
+
+
+def validate_paths_config(config: Dict[str, Any], config_path: Optional[Path] = None) -> None:
+    """
+    Basic schema validation for paths.yaml.
+
+    - v1 (no or schema_version=1): minimal checks.
+    - v2 and above: fail fast on core keys and required patterns.
+    """
+    location = f" ({config_path})" if config_path is not None else ""
+    schema_version_raw = config.get("schema_version", 1)
+
+    try:
+        schema_version = int(schema_version_raw)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"schema_version must be an integer, got {schema_version_raw!r}{location}"
+        )
+
+    if schema_version < 1:
+        logger.warning(
+            f"[paths.yaml] Unsupported schema_version={schema_version}{location}, "
+            f"treating as v1 with minimal validation."
+        )
+        schema_version = 1
+
+    # Core requirement: base.outputs must exist and be non-empty
+    base = config.get("base")
+    if not isinstance(base, dict):
+        raise ValueError(f"[paths.yaml] 'base' section must be a mapping{location}")
+    outputs_base = base.get("outputs")
+    if not outputs_base or not isinstance(outputs_base, str):
+        raise ValueError(
+            f"[paths.yaml] 'base.outputs' must be a non-empty string{location}"
+        )
+
+    # v1: lenient beyond this
+    if schema_version == 1:
+        return
+
+    # v2+: stricter checks for patterns
+    patterns = config.get("patterns")
+    if not isinstance(patterns, dict):
+        raise ValueError(
+            f"[paths.yaml] 'patterns' section must be a mapping for schema_version>=2{location}"
+        )
+
+    required_pattern_keys = [
+        "final_training_v2",
+        "conversion_v2",
+        "best_config_v2",
+        "hpo_v2",
+        "benchmarking_v2",
+    ]
+    missing = [key for key in required_pattern_keys if key not in patterns]
+    if missing:
+        raise ValueError(
+            f"[paths.yaml] Missing required pattern keys for schema_version>=2{location}: "
+            f"{', '.join(missing)}"
+        )
+
+    # Validate placeholders for all string patterns (cache + v2)
+    for pattern_name, pattern_value in patterns.items():
+        if not isinstance(pattern_value, str):
+            continue
+        placeholders = extract_placeholders(pattern_value)
+        for token in placeholders:
+            if not is_token_known(token):
+                if schema_version >= 2:
+                    raise ValueError(
+                        f"[paths.yaml] Unknown placeholder '{{{token}}}' in pattern '{pattern_name}'{location}"
+                    )
+                logger.warning(
+                    f"[paths.yaml] Unknown placeholder '{{{token}}}' in pattern '{pattern_name}'{location}"
+                )
+                continue
+            if not is_token_allowed(token, "path"):
+                raise ValueError(
+                    f"[paths.yaml] Placeholder '{{{token}}}' in pattern '{pattern_name}' "
+                    f"is not allowed for path scope{location}"
+                )
 
 
 def _get_default_paths() -> Dict[str, Any]:
@@ -103,15 +231,17 @@ def resolve_output_path(
     """
     paths_config = load_paths_config(config_dir)
     base_outputs = paths_config["base"]["outputs"]
+    base_outputs_path = Path(base_outputs)
+    base_dir = base_outputs_path if base_outputs_path.is_absolute() else root_dir / base_outputs
 
     if category == "cache" and "subcategory" in kwargs:
         # Special handling for cache subdirectories
         cache_sub = kwargs.pop("subcategory")
         cache_dir = paths_config["cache"][cache_sub]
-        return root_dir / base_outputs / paths_config["outputs"]["cache"] / cache_dir
+        return base_dir / paths_config["outputs"]["cache"] / cache_dir
 
     output_dir = paths_config["outputs"].get(category, category)
-    path = root_dir / base_outputs / output_dir
+    path = base_dir / output_dir
 
     # Apply pattern replacements if provided
     if kwargs:
@@ -149,6 +279,7 @@ def get_cache_file_path(
         Path to cache file.
     """
     paths_config = load_paths_config(config_dir)
+    norm_rules = paths_config.get("normalize_paths")
     cache_dir = resolve_output_path(
         root_dir, config_dir, "cache", subcategory=cache_type)
 
@@ -222,8 +353,12 @@ def get_timestamped_cache_filename(
         pattern = pattern.replace("{cache_type}", cache_type)
 
     # Sanitize values for filename
-    backbone_safe = backbone.replace('-', '_').replace('/', '_')
-    identifier_safe = identifier.replace('-', '_').replace('/', '_')
+    if norm_rules:
+        backbone_safe, _ = normalize_for_path(backbone, norm_rules)
+        identifier_safe, _ = normalize_for_path(identifier, norm_rules)
+    else:
+        backbone_safe = backbone.replace('-', '_').replace('/', '_')
+        identifier_safe = identifier.replace('-', '_').replace('/', '_')
 
     return pattern.format(
         backbone=backbone_safe,
@@ -492,7 +627,11 @@ def get_drive_backup_path(
 
     # Get the base outputs directory
     base_outputs = paths_config["base"]["outputs"]
-    outputs_dir = root_dir / base_outputs
+    base_outputs_path = Path(base_outputs)
+    outputs_dir = (
+        base_outputs_path if base_outputs_path.is_absolute() else root_dir / base_outputs
+    )
+    base_outputs_name = base_outputs_path.name if base_outputs_path.is_absolute() else base_outputs
 
     # Check if the local path is within outputs/
     try:
@@ -507,7 +646,7 @@ def get_drive_backup_path(
         return None
 
     # Build Drive path: mount_point/MyDrive/backup_base/outputs/relative_path
-    drive_path = drive_base / base_outputs / relative_path
+    drive_path = drive_base / base_outputs_name / relative_path
 
     return drive_path
 
@@ -562,3 +701,161 @@ def resolve_output_path_v2(
     from .naming_centralized import build_output_path
 
     return build_output_path(root_dir, context, base_outputs)
+
+
+# ============================================================================
+# V2 Path Parsing and Detection Helpers
+# ============================================================================
+
+import re
+from typing import Dict, Optional
+
+
+def parse_hpo_path_v2(path: Path) -> Optional[Dict[str, str]]:
+    """
+    Parse HPO v2 path to extract study8 and trial8 hashes.
+
+    V2 pattern: {storage_env}/{model}/study-{study8}/trial-{trial8}
+    Example: outputs/hpo/local/distilbert/study-350a79aa/trial-747428f2
+
+    Args:
+        path: Path to parse (can be full path or relative fragment).
+
+    Returns:
+        Dictionary with keys: 'study8', 'trial8', 'storage_env', 'model'
+        Returns None if path doesn't match v2 pattern.
+    """
+    path_str = str(path)
+    
+    # Pattern to match: study-{8_char_hash}/trial-{8_char_hash}
+    # Also capture storage_env and model from preceding components
+    pattern = r'(?:.*/)?(?:outputs/hpo/)?([^/]+)/([^/]+)/study-([a-f0-9]{8})/trial-([a-f0-9]{8})'
+    match = re.search(pattern, path_str)
+    
+    if match:
+        storage_env, model, study8, trial8 = match.groups()
+        return {
+            'storage_env': storage_env,
+            'model': model,
+            'study8': study8,
+            'trial8': trial8,
+        }
+    
+    return None
+
+
+def is_v2_path(path: Path) -> bool:
+    """
+    Detect if path follows v2 pattern (study-{study8}/trial-{trial8}).
+
+    Args:
+        path: Path to check.
+
+    Returns:
+        True if path matches v2 pattern, False otherwise.
+    """
+    path_str = str(path)
+    # Check for v2 pattern: study-{8_char_hash}/trial-{8_char_hash}
+    v2_pattern = r'study-[a-f0-9]{8}/trial-[a-f0-9]{8}'
+    return bool(re.search(v2_pattern, path_str))
+
+
+def find_study_by_hash(
+    root_dir: Path,
+    config_dir: Path,
+    model: str,
+    study_key_hash: str
+) -> Optional[Path]:
+    """
+    Find study folder by study_key_hash using v2 pattern.
+
+    Searches for study folder matching: outputs/hpo/{storage_env}/{model}/study-{study8}/
+    where study8 = study_key_hash[:8]
+
+    Args:
+        root_dir: Project root directory.
+        config_dir: Config directory.
+        model: Model backbone name.
+        study_key_hash: Full study key hash.
+
+    Returns:
+        Path to study folder if found, None otherwise.
+    """
+    if not study_key_hash or len(study_key_hash) < 8:
+        return None
+    
+    study8 = study_key_hash[:8]
+    
+    # Get HPO base directory
+    hpo_base = resolve_output_path(root_dir, config_dir, "hpo")
+    
+    # Search for study-{study8} pattern in all storage_env directories
+    for storage_env_dir in hpo_base.iterdir():
+        if not storage_env_dir.is_dir():
+            continue
+        
+        model_dir = storage_env_dir / model
+        if not model_dir.exists():
+            continue
+        
+        # Look for study-{study8} folder
+        study_folder = model_dir / f"study-{study8}"
+        if study_folder.exists() and study_folder.is_dir():
+            return study_folder
+    
+    return None
+
+
+def find_trial_by_hash(
+    root_dir: Path,
+    config_dir: Path,
+    model: str,
+    study_key_hash: str,
+    trial_key_hash: str
+) -> Optional[Path]:
+    """
+    Find trial folder by study_key_hash and trial_key_hash using v2 pattern.
+
+    Searches for trial folder matching:
+    outputs/hpo/{storage_env}/{model}/study-{study8}/trial-{trial8}/
+    where study8 = study_key_hash[:8], trial8 = trial_key_hash[:8]
+
+    Args:
+        root_dir: Project root directory.
+        config_dir: Config directory.
+        model: Model backbone name.
+        study_key_hash: Full study key hash.
+        trial_key_hash: Full trial key hash.
+
+    Returns:
+        Path to trial folder if found, None otherwise.
+    """
+    if not study_key_hash or len(study_key_hash) < 8:
+        return None
+    if not trial_key_hash or len(trial_key_hash) < 8:
+        return None
+    
+    study8 = study_key_hash[:8]
+    trial8 = trial_key_hash[:8]
+    
+    # Get HPO base directory
+    hpo_base = resolve_output_path(root_dir, config_dir, "hpo")
+    
+    # Search for trial-{trial8} pattern in study-{study8} folders
+    for storage_env_dir in hpo_base.iterdir():
+        if not storage_env_dir.is_dir():
+            continue
+        
+        model_dir = storage_env_dir / model
+        if not model_dir.exists():
+            continue
+        
+        study_folder = model_dir / f"study-{study8}"
+        if not study_folder.exists():
+            continue
+        
+        trial_folder = study_folder / f"trial-{trial8}"
+        if trial_folder.exists() and trial_folder.is_dir():
+            return trial_folder
+    
+    return None

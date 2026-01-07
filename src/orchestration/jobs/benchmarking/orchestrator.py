@@ -270,14 +270,22 @@ def benchmark_best_trials(
     benchmark_results = {}
 
     for backbone, trial_info in best_trials.items():
+        logger.info(f"[BENCHMARK_BEST_TRIALS] Processing {backbone}: trial_name={trial_info.get('trial_name')}, trial_dir={trial_info.get('trial_dir')}")
+        
         # Use checkpoint_dir from trial_info if available (from load_best_trial_from_disk)
         # This handles new structure: refit/checkpoint/ or cv/foldN/checkpoint/
         if "checkpoint_dir" in trial_info and trial_info["checkpoint_dir"] is not None:
             checkpoint_dir = Path(trial_info["checkpoint_dir"])
+            logger.info(f"[BENCHMARK_BEST_TRIALS] Using checkpoint_dir from trial_info: {checkpoint_dir}")
         else:
             # Try to find checkpoint in trial_dir
             if "trial_dir" in trial_info and trial_info["trial_dir"] is not None:
                 trial_dir = Path(trial_info["trial_dir"])
+                logger.info(f"[BENCHMARK_BEST_TRIALS] Searching for checkpoint in trial_dir: {trial_dir} (exists: {trial_dir.exists()})")
+                
+                if not trial_dir.exists():
+                    logger.warning(f"[BENCHMARK_BEST_TRIALS] Trial directory does not exist: {trial_dir}")
+                
                 checkpoint_dir = find_checkpoint_in_trial_dir(trial_dir)
                 if checkpoint_dir is None:
                     logger.warning(
@@ -286,6 +294,8 @@ def benchmark_best_trials(
                         f"Tried: refit/checkpoint/, cv/foldN/checkpoint/, checkpoint/"
                     )
                     continue
+                else:
+                    logger.info(f"[BENCHMARK_BEST_TRIALS] Found checkpoint_dir: {checkpoint_dir}")
             else:
                 logger.warning(
                     f"Trial directory not found for {backbone} {trial_info.get('trial_name', 'unknown')}. "

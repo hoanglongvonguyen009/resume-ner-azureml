@@ -202,3 +202,4 @@ def test_tags_registry_invalid_key_type():
     with pytest.raises(TagKeyError, match="Tag key 'grouping.study_key_hash' is not a string"):
         registry.key("grouping", "study_key_hash")
 
+

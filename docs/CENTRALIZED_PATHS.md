@@ -9,6 +9,9 @@ The centralized path configuration system provides:
 - **Dual file strategy** for cache files (timestamped history + latest pointer)
 - **Flexible path resolution** with pattern support
 - **Backward compatibility** with existing hardcoded paths
+- **Schema-versioned config with validation** (paths.yaml `schema_version`)
+- **Shallow env overrides** keyed by `storage_env` (e.g., colab/azureml)
+- **Optional path normalization** rules for filesystem safety
 
 ## Configuration File
 
@@ -39,6 +42,15 @@ cache_strategies:
     latest: { enabled: true }
     index: { enabled: true }
 ```
+
+### Schema v2 highlights
+
+- `schema_version: 2` at the top of `paths.yaml`; loader fails fast on invalid core keys/patterns.
+- `env_overrides` keyed by `storage_env` (e.g., `colab`, `azureml`) shallow-merge `base`/`outputs` so you can point outputs to mounted volumes.
+- Absolute vs relative `base.outputs`:
+  - If absolute (e.g., `/mnt/outputs`), it is used directly.
+  - If relative (e.g., `outputs`), it is resolved under `root_dir`.
+- `normalize_paths` section lets you define replace rules and length limits for filesystem safety; applied during path construction and cache filenames when present.
 
 ## Path Resolution API
 

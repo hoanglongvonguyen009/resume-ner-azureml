@@ -303,12 +303,13 @@ for threshold in thresholds:
 from pathlib import Path
 from shared.json_cache import save_json
 from orchestration.jobs.local_selection import select_best_configuration_across_studies
+from orchestration.paths import resolve_output_path
 
 BEST_CONFIG_CACHE_FILE = ROOT_DIR / "notebooks" / "best_configuration_cache.json"
-HPO_OUTPUT_DIR = ROOT_DIR / "outputs" / "hpo"
+HPO_OUTPUT_DIR = resolve_output_path(ROOT_DIR, CONFIG_DIR, "hpo")
 
 # Try in-memory first, fall back to disk
-if 'hpo_studies' in locals() and hpo_studies:
+if "hpo_studies" in locals() and hpo_studies:
     best_configuration = select_best_configuration_across_studies(
         studies=hpo_studies,
         hpo_config=hpo_config,
@@ -327,12 +328,20 @@ else:
 save_json(BEST_CONFIG_CACHE_FILE, best_configuration)
 
 # Display results
-print(f"Best configuration selected:")
-print(f"  Backbone: {best_configuration.get('backbone')}")
-print(f"  Trial: {best_configuration.get('trial_name')}")
-print(f"  Best {hpo_config['objective']['metric']}: "
-      f"{best_configuration.get('selection_criteria', {}).get('best_value'):.4f}")
-print(f"  Reason: {best_configuration.get('selection_criteria', {}).get('reason', 'N/A')}")
+print("Best configuration selected:")
+print("  Backbone: {}".format(best_configuration.get("backbone")))
+print("  Trial: {}".format(best_configuration.get("trial_name")))
+print(
+    "  Best {}: {:.4f}".format(
+        hpo_config["objective"]["metric"],
+        best_configuration.get("selection_criteria", {}).get("best_value"),
+    )
+)
+print(
+    "  Reason: {}".format(
+        best_configuration.get("selection_criteria", {}).get("reason", "N/A")
+    )
+)
 ```
 
 ## Best Practices

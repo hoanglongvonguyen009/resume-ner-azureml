@@ -1,6 +1,8 @@
 # ============================================================================
 # Paths Configuration
 # ============================================================================
+schema_version: 2
+
 # Centralized directory structure for the entire ML pipeline.
 # 
 # This file defines all directory paths and file naming patterns used across
@@ -36,6 +38,20 @@ base:
   src: "src"              # Source code directory
   tests: "tests"          # Test files directory
   mlruns: "mlruns"        # Local MLflow runs (file store, optional)
+
+# ----------------------------------------------------------------------------
+# Environment-specific overrides (shallow, keyed by storage_env)
+# ----------------------------------------------------------------------------
+env_overrides:
+  colab:
+    base:
+      outputs: "/content/drive/MyDrive/resume-ner-azureml/outputs"
+  azureml:
+    base:
+      outputs: "/mnt/outputs"
+  kaggle:
+    base:
+      outputs: "/kaggle/working/outputs"
 
 # ----------------------------------------------------------------------------
 # Output Subdirectories
@@ -156,14 +172,12 @@ files:
 #
 # Placeholders for v2 patterns (fingerprint-based):
 #   - {storage_env}: Logical storage environment for outputs
-#                   (e.g., "local", "colab", "kaggle", "azureml")
+#                    (e.g., "local", "colab", "kaggle", "azureml")
 #   - {model}: Model backbone name (e.g., "distilbert", "distilroberta")
-#   - {spec_fp}: Specification fingerprint (platform-independent experiment identity)
-#   - {exec_fp}: Execution fingerprint (toolchain/runtime identity)
+#   - {spec8}: Short specification fingerprint (spec_fp[:8])
+#   - {exec8}: Short execution fingerprint (exec_fp[:8])
 #   - {variant}: Variant number for final_training (e.g., 1, 2, 3)
-#   - {trial_id}: Legacy trial identifier for HPO/benchmarking
-#   - {parent_training_id}: Parent training identifier for conversion (e.g., "spec_abc_exec_xyz/v1")
-#   - {conv_fp}: Conversion fingerprint for conversion variants
+#   - {conv8}: Short conversion fingerprint (conv_fp[:8])
 #   - {study8}: Short study hash (study_key_hash[:8]) for HPO/benchmarking
 #   - {trial8}: Short trial hash (trial_key_hash[:8]) for HPO/benchmarking
 #   - {bench8}: Optional short benchmark-config hash for benchmarking
@@ -175,10 +189,10 @@ files:
 #   - {timestamp}: Timestamp string (e.g., "20251228_001000")
 #
 # Examples (v2 patterns):
-#   final_training_v2: "{storage_env}/{model}/spec_{spec_fp}_exec_{exec_fp}/v{variant}"
-#   With storage_env="local", model="distilbert", spec_fp="abc123", exec_fp="xyz789", variant=1
-#   Result: "local/distilbert/spec_abc123_exec_xyz789/v1"
-#   Full path: outputs/final_training/local/distilbert/spec_abc123_exec_xyz789/v1/
+#   final_training_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}"
+#   With storage_env="local", model="distilbert", spec8="abc12345", exec8="xyz789ab", variant=1
+#   Result: "local/distilbert/spec-abc12345_exec-xyz789ab/v1"
+#   Full path: outputs/final_training/local/distilbert/spec-abc12345_exec-xyz789ab/v1/
 #
 patterns:
   # Cache file patterns (still used by cache system)
@@ -202,33 +216,32 @@ patterns:
   # to generate fingerprint-based, storage-env-aware output paths.
   # Pattern placeholders are replaced at runtime with values from NamingContext.
   #
-  # Final training with fingerprints
+  # Final training with fingerprints (short hashes)
   # Example resolved fragment:
-  #   "local/distilbert/spec_abc123_exec_xyz789/v1"
-  final_training_v2: "{storage_env}/{model}/spec_{spec_fp}_exec_{exec_fp}/v{variant}"
+  #   "local/distilbert/spec-abc12345_exec-xyz789ab/v1"
+  final_training_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}"
   
-  # Conversion with parent reference
-  # parent_training_id should match final_training_v2 fragment, e.g.:
-  #   "spec_abc123_exec_xyz789/v1"
-  conversion_v2: "{storage_env}/{model}/{parent_training_id}/conv_{conv_fp}"
+  # Conversion with structured lineage (no parent_training_id)
+  # Uses the same spec/exec/variant lineage as final_training plus a conv hash.
+  conversion_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}/conv-{conv8}"
   
-  # Best config with spec_fp (cache layout)
-  best_config_v2: "{model}/spec_{spec_fp}"
+  # Best config with short spec hash (cache layout)
+  best_config_v2: "{model}/spec-{spec8}"
   
-  # HPO v2 with study/trial hashes
+  # HPO v2 with study/trial short hashes
   # Stable structure:
-  #   outputs/hpo/{storage_env}/{model}/study_{study8}/trial_{trial8}/...
+  #   outputs/hpo/{storage_env}/{model}/study-{study8}/trial-{trial8}/...
   # where study8 = study_key_hash[:8], trial8 = trial_key_hash[:8]
   # NOTE: When study/trial hashes are not available, code falls back to the
   # legacy trial_id-based layout for backward compatibility.
-  hpo_v2: "{storage_env}/{model}/study_{study8}/trial_{trial8}"
+  hpo_v2: "{storage_env}/{model}/study-{study8}/trial-{trial8}"
   
   # Benchmarking v2 with study/trial + optional benchmark-config hash
   # Stable structure:
-  #   outputs/benchmarking/{storage_env}/{model}/study_{study8}/trial_{trial8}/bench_{bench8}/...
+  #   outputs/benchmarking/{storage_env}/{model}/study-{study8}/trial-{trial8}/bench-{bench8}/...
   # where bench8 is derived from benchmark_config_hash (if used).
   # When hashes are not available, code falls back to the legacy layout.
-  benchmarking_v2: "{storage_env}/{model}/study_{study8}/trial_{trial8}/bench_{bench8}"
+  benchmarking_v2: "{storage_env}/{model}/study-{study8}/trial-{trial8}/bench-{bench8}"
 
 # ----------------------------------------------------------------------------
 # Cache File Strategies
@@ -396,56 +409,22 @@ drive:
   auto_restore_on_startup: false
 
 # ----------------------------------------------------------------------------
-# Variant Configuration
+# Path normalization policy (for filesystem safety)
 # ----------------------------------------------------------------------------
-# Configuration for variant system (v1, v2, etc.) to support force_new and retries.
-#
-# Variants allow multiple runs with the same spec_fp + exec_fp without overwriting.
-# This is essential for:
-#   - force_new scenarios (explicitly create new run)
-#   - Retries after interruptions
-#   - Testing different seeds with same config
-#
-variants:
-  final_training:
-    enabled: true
-    default: 1
-    auto_increment: true  # Automatically increment for force_new
-
-# ----------------------------------------------------------------------------
-# Index Configuration
-# ----------------------------------------------------------------------------
-# Configuration for index files that enable fast lookup by spec_fp, env, model.
-#
-# Index files are stored in outputs/cache/ and provide:
-#   - Fast lookup: Find all runs with matching spec_fp
-#   - Cross-platform comparison: Group by spec_fp across environments
-#   - Model organization: Find all runs for a specific model
-#
-indexes:
-  final_training:
-    enabled: true
-    filename: "final_training_index.json"
-    max_entries: 100  # Maximum entries in main entries list
-    max_per_spec_fp: 20  # Maximum entries per spec_fp
-    max_per_env: 50  # Maximum entries per environment
-    max_per_model: 50  # Maximum entries per model
-  
-  conversion:
-    enabled: true
-    filename: "conversion_index.json"
-    max_entries: 100
-    max_per_spec_fp: 20
-    max_per_env: 50
-    max_per_model: 50
-  
-  hpo:
-    enabled: false  # HPO uses trial-based organization, index optional
-    filename: "hpo_index.json"
-    max_entries: 200
-  
-  benchmarking:
-    enabled: false  # Benchmarking uses trial-based organization, index optional
-    filename: "benchmarking_index.json"
-    max_entries: 200
+normalize_paths:
+  replace:
+    "/": "_"
+    "\\": "_"
+    "-": "_"
+    " ": "_"
+    ":": "_"
+    "*": "_"
+    "?": "_"
+    "\"": "_"
+    "<": "_"
+    ">": "_"
+    "|": "_"
+  lowercase: false
+  max_component_length: 255
+  max_path_length: 260
 

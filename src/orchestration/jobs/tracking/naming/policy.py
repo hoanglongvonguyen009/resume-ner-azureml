@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from orchestration.naming_centralized import NamingContext
+from orchestration.tokens import (
+    extract_placeholders,
+    is_token_allowed,
+    is_token_known,
+)
 from shared.yaml_utils import load_yaml
 
 logger = logging.getLogger(__name__)
@@ -47,7 +52,9 @@ def load_naming_policy(config_dir: Optional[Path] = None) -> Dict[str, Any]:
         return _policy_cache
 
     try:
-        _policy_cache = load_yaml(policy_path)
+        policy = load_yaml(policy_path)
+        validate_naming_policy(policy, policy_path)
+        _policy_cache = policy
         _policy_cache_path = policy_path
         logger.debug(f"[Naming Policy] Loaded policy from {policy_path}")
         return _policy_cache
@@ -57,6 +64,79 @@ def load_naming_policy(config_dir: Optional[Path] = None) -> Dict[str, Any]:
         _policy_cache = {}
         _policy_cache_path = policy_path
         return _policy_cache
+
+
+def validate_naming_policy(policy: Dict[str, Any], policy_path: Optional[Path] = None) -> None:
+    """
+    Basic schema validation for naming.yaml.
+
+    - v1 (schema_version missing or 1): minimal checks, mostly warnings.
+    - v2 and above: can be tightened later; for now we ensure core sections exist.
+    """
+    location = f" ({policy_path})" if policy_path is not None else ""
+    schema_version_raw = policy.get("schema_version", 1)
+
+    try:
+        schema_version = int(schema_version_raw)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"[naming.yaml] schema_version must be an integer, got {schema_version_raw!r}{location}"
+        )
+
+    if schema_version < 1:
+        logger.warning(
+            f"[naming.yaml] Unsupported schema_version={schema_version}{location}, "
+            f"treating as v1 with minimal validation."
+        )
+        schema_version = 1
+
+    run_names = policy.get("run_names")
+    if run_names is None:
+        msg = f"[naming.yaml] Missing required 'run_names' section{location}"
+        if schema_version >= 2:
+            raise ValueError(msg)
+        logger.warning(msg)
+        return
+
+    if not isinstance(run_names, dict):
+        raise ValueError(f"[naming.yaml] 'run_names' must be a mapping{location}")
+
+    separators = policy.get("separators")
+    if separators is not None and not isinstance(separators, dict):
+        raise ValueError(f"[naming.yaml] 'separators' must be a mapping when present{location}")
+
+    validate_sec = policy.get("validate")
+    if validate_sec is not None and not isinstance(validate_sec, dict):
+        raise ValueError(f"[naming.yaml] 'validate' must be a mapping when present{location}")
+
+    # Validate placeholders in run name patterns
+    for name, entry in run_names.items():
+        if not isinstance(entry, dict):
+            if schema_version >= 2:
+                raise ValueError(f"[naming.yaml] run_names.{name} must be a mapping{location}")
+            logger.warning(f"[naming.yaml] run_names.{name} should be a mapping{location}")
+            continue
+        pattern = entry.get("pattern")
+        if not pattern:
+            continue
+        if not isinstance(pattern, str):
+            raise ValueError(f"[naming.yaml] run_names.{name}.pattern must be a string{location}")
+        placeholders = extract_placeholders(pattern)
+        for token in placeholders:
+            if not is_token_known(token):
+                if schema_version >= 2:
+                    raise ValueError(
+                        f"[naming.yaml] Unknown placeholder '{{{token}}}' in run_names.{name}{location}"
+                    )
+                logger.warning(
+                    f"[naming.yaml] Unknown placeholder '{{{token}}}' in run_names.{name}{location}"
+                )
+                continue
+            if not is_token_allowed(token, "name"):
+                raise ValueError(
+                    f"[naming.yaml] Placeholder '{{{token}}}' in run_names.{name} "
+                    f"is not allowed for name scope{location}"
+                )
 
 
 def parse_parent_training_id(parent_id: str) -> Dict[str, str]:

@@ -340,27 +340,78 @@ def run_local_hpo_sweep(
     # Get objective metric name
     objective_metric = study_manager.objective_metric
 
-    # Reorganize structure: use study folder as base for trials
-    # Structure: output_dir/study_name/study.db and output_dir/study_name/trial_X/...
+    # Initial study folder setup (will be updated after context creation if study_key_hash available)
     # The storage_path should already be in study folder based on config (storage_path: "{study_name}/study.db")
-    study_folder = storage_path.parent if storage_path else output_dir / study_name
-    study_folder.mkdir(parents=True, exist_ok=True)
+    study_folder_legacy = storage_path.parent if storage_path else output_dir / study_name
     
-    # Ensure study.db is in study folder (in case it was created elsewhere)
-    if storage_path and storage_path.parent != study_folder:
-        new_storage_path = study_folder / "study.db"
-        if storage_path.exists() and not new_storage_path.exists():
-            import shutil
-            shutil.move(str(storage_path), str(new_storage_path))
-            logger.info(f"Moved study.db to study folder: {new_storage_path}")
-        # Update storage_path to point to new location
-        storage_path = new_storage_path
-        storage_uri = get_storage_uri(storage_path)
-    
-    # Use study folder as base for trials (so trials are created inside study folder)
+    # Initialize study_folder and study_output_dir with legacy values (will be updated if v2 succeeds)
+    study_folder = study_folder_legacy
     study_output_dir = study_folder
-    logger.info(f"Using study folder as base for trials: {study_output_dir}")
-    
+
+    # Check if checkpointing is enabled (needed for setup_hpo_mlflow_run)
+    checkpoint_enabled = checkpoint_config is not None and checkpoint_config.get(
+        "enabled", False
+    )
+
+    # Create NamingContext for HPO parent run EARLY to get study_key_hash for v2 folder creation
+    # This allows us to create the v2 folder before creating the objective function
+    hpo_parent_context, mlflow_run_name = setup_hpo_mlflow_run(
+        backbone=backbone,
+        study_name=study_name,
+        output_dir=output_dir,
+        run_id=run_id,
+        should_resume=should_resume,
+        checkpoint_enabled=checkpoint_enabled,
+        data_config=data_config,
+        hpo_config=hpo_config,
+        benchmark_config=benchmark_config,
+    )
+
+    # Construct study folder using v2 pattern if study_key_hash available, else use legacy
+    # This MUST happen before create_local_hpo_objective so trials use the correct folder
+    if hpo_parent_context and hpo_parent_context.study_key_hash:
+        logger.debug(f"Attempting v2 study folder construction with study_key_hash={hpo_parent_context.study_key_hash[:16]}...")
+        try:
+            from orchestration.naming_centralized import build_output_path
+            from orchestration.paths import load_paths_config, apply_env_overrides, resolve_output_path
+            
+            # Derive root_dir by walking up from output_dir until we find "outputs" directory
+            root_dir = None
+            current = output_dir
+            while current.parent != current:  # Stop at filesystem root
+                if current.name == "outputs":
+                    root_dir = current.parent
+                    break
+                current = current.parent
+            
+            if root_dir is None:
+                # Fallback: try to find project root by looking for config directory
+                root_dir = Path.cwd()
+                for candidate in [Path.cwd(), Path.cwd().parent]:
+                    if (candidate / "config").exists():
+                        root_dir = candidate
+                        break
+            
+            config_dir = root_dir / "config"
+            hpo_base = resolve_output_path(root_dir, config_dir, "hpo")
+            paths_config = load_paths_config(config_dir)
+            paths_config = apply_env_overrides(paths_config, hpo_parent_context.storage_env or hpo_parent_context.environment)
+            
+            pattern = paths_config.get("patterns", {}).get("hpo_v2", "")
+            if pattern:
+                study8 = hpo_parent_context.study_key_hash[:8]
+                storage_env = hpo_parent_context.storage_env or hpo_parent_context.environment
+                model = hpo_parent_context.model
+                
+                study_folder = hpo_base / storage_env / model / f"study-{study8}"
+                study_folder.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Using v2 study folder: {study_folder}")
+                study_output_dir = study_folder
+        except Exception as e:
+            import traceback
+            logger.warning(f"Could not construct v2 study folder, falling back to legacy: {e}")
+            logger.debug(f"Traceback: {traceback.format_exc()}")
+
     # Write .active_study.json marker for fast lookup in selection code
     try:
         from orchestration.jobs.local_selection_v2 import write_active_study_marker
@@ -374,11 +425,6 @@ def run_local_hpo_sweep(
         logger.debug(f"Wrote .active_study.json marker to {backbone_dir / '.active_study.json'}")
     except Exception as e:
         logger.debug(f"Could not write .active_study.json marker: {e}")
-
-    # Check if checkpointing is enabled (for later use)
-    checkpoint_enabled = checkpoint_config is not None and checkpoint_config.get(
-        "enabled", False
-    )
 
     # Run ID was already generated above for study naming
     # Print it here for user visibility
@@ -433,19 +479,25 @@ def run_local_hpo_sweep(
                 f"Cleaned up {cleaned_count} stale run name reservations")
     except Exception as e:
         logger.debug(f"Could not cleanup stale reservations: {e}")
-
-    # Create NamingContext for HPO parent run
-    hpo_parent_context, mlflow_run_name = setup_hpo_mlflow_run(
-        backbone=backbone,
-        study_name=study_name,
-        output_dir=output_dir,
-        run_id=run_id,
-        should_resume=should_resume,
-        checkpoint_enabled=checkpoint_enabled,
-        data_config=data_config,
-        hpo_config=hpo_config,
-        benchmark_config=benchmark_config,
-    )
+    
+    # Update study_output_dir to use the final study_folder (already set above if v2 succeeded)
+    # If v2 failed, study_output_dir is still set to legacy folder
+    study_folder = study_output_dir
+    
+    # IMPORTANT: Do NOT move study.db after the study object has been created.
+    # The Optuna study object maintains a connection to the database at the original location.
+    # Moving the file breaks this connection and causes "no such table: studies" errors.
+    # Instead, ensure the database stays where it was created (storage_path location).
+    # The v2 folder structure is used for trial outputs, but the database can remain
+    # in the legacy location for backward compatibility and to avoid breaking the study connection.
+    if storage_path and storage_path.parent != study_folder:
+        logger.debug(
+            f"Database at {storage_path} is in different location than study folder {study_folder}. "
+            f"Keeping database in original location to maintain Optuna study connection."
+        )
+    
+    # Use study folder as base for trials (so trials are created inside study folder)
+    logger.info(f"Using study folder as base for trials: {study_output_dir}")
 
     tracker = MLflowSweepTracker(mlflow_experiment_name)
     tracker.log_tracking_info()

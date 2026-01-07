@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from shared.logging_utils import get_logger
+from orchestration.paths import parse_hpo_path_v2, is_v2_path
 
 logger = get_logger(__name__)
 
@@ -52,6 +53,8 @@ def load_best_trial_from_disk(
     Works by reading metrics.json files from trial directories.
     This allows selection even after notebook restart.
 
+    Supports both v2 paths (study-{study8}/trial-{trial8}) and legacy paths (trial_N).
+
     Args:
         hpo_output_dir: Path to HPO outputs directory (e.g., outputs/hpo).
         backbone: Model backbone name.
@@ -60,7 +63,11 @@ def load_best_trial_from_disk(
     Returns:
         Dictionary with best trial info, or None if no trials found.
     """
-    backbone_dir = hpo_output_dir / backbone
+    # Handle case where hpo_output_dir already includes backbone (e.g., outputs/hpo/local/distilbert)
+    if hpo_output_dir.name == backbone:
+        backbone_dir = hpo_output_dir
+    else:
+        backbone_dir = hpo_output_dir / backbone
 
     if not backbone_dir.exists():
         return None
@@ -69,10 +76,34 @@ def load_best_trial_from_disk(
     best_trial_dir = None
     best_trial_name = None
 
-    # Find all trial directories
-    for trial_dir in backbone_dir.iterdir():
-        if not trial_dir.is_dir() or not trial_dir.name.startswith("trial_"):
+    # Collect all trial directories (support both v2 and legacy paths)
+    trial_dirs = []
+    
+    # First, check for v2 paths: study-{study8}/trial-{trial8}
+    for study_dir in backbone_dir.iterdir():
+        if not study_dir.is_dir():
             continue
+        
+        # Check if this is a v2 study folder (study-{hash})
+        if study_dir.name.startswith("study-") and len(study_dir.name) > 7:
+            # Look for trial folders inside study folder
+            for trial_dir in study_dir.iterdir():
+                if trial_dir.is_dir() and trial_dir.name.startswith("trial-") and len(trial_dir.name) > 7:
+                    trial_dirs.append(trial_dir)
+        # Also check for legacy study folders (hpo_{backbone}_*)
+        elif study_dir.name.startswith(f"hpo_{backbone}_"):
+            # Legacy study folder - look for trial_N directories inside
+            for trial_dir in study_dir.iterdir():
+                if trial_dir.is_dir() and trial_dir.name.startswith("trial_"):
+                    trial_dirs.append(trial_dir)
+    
+    # Also check for legacy direct trial directories (trial_N directly under backbone_dir)
+    for trial_dir in backbone_dir.iterdir():
+        if trial_dir.is_dir() and trial_dir.name.startswith("trial_") and trial_dir not in trial_dirs:
+            trial_dirs.append(trial_dir)
+
+    # Find all trial directories
+    for trial_dir in trial_dirs:
 
         # Check for metrics.json
         metrics_file = trial_dir / "metrics.json"
@@ -106,9 +137,8 @@ def load_best_trial_from_disk(
         # Group by trial base (e.g., trial_0_20251223_123456_fold0, trial_0_20251223_123456_fold1 -> trial_0_20251223_123456)
         # Handles both old format (trial_N_foldX) and new format (trial_N_RUNID_foldX)
         trial_groups = {}
-        for trial_dir in backbone_dir.iterdir():
-            if not trial_dir.is_dir() or not trial_dir.name.startswith("trial_"):
-                continue
+        # Use the same trial_dirs collection we built earlier
+        for trial_dir in trial_dirs:
 
             metrics_file = trial_dir / "metrics.json"
             if not metrics_file.exists():

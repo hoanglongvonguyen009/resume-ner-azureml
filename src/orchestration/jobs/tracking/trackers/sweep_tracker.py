@@ -80,11 +80,17 @@ class MLflowSweepTracker(BaseTracker):
                 experiment_id = parent_run.info.experiment_id
                 tracking_uri = mlflow.get_tracking_uri()
 
-                # Infer config_dir from output_dir
+                # Infer config_dir from output_dir by searching for nearest parent
+                # that has a sibling config directory. Fall back to cwd/config.
                 config_dir = None
                 if output_dir:
-                    root_dir_for_config = output_dir.parent.parent if output_dir.parent.name == "outputs" else output_dir.parent.parent.parent
-                    config_dir = root_dir_for_config / "config" if root_dir_for_config else None
+                    for parent in output_dir.parents:
+                        candidate = parent / "config"
+                        if candidate.exists():
+                            config_dir = candidate
+                            break
+                if config_dir is None:
+                    config_dir = Path.cwd() / "config"
 
                 # Compute grouping tags if configs available
                 study_key_hash = None
@@ -198,11 +204,17 @@ class MLflowSweepTracker(BaseTracker):
         goal = hpo_config.get("objective", {}).get("goal", "maximize")
         max_trials = hpo_config["sampling"]["max_trials"]
 
-        # Infer config_dir from context if available
+        # Infer config_dir from output_dir by searching for nearest parent
+        # that has a sibling config directory. Fall back to cwd/config.
         config_dir = None
         if output_dir:
-            root_dir_for_config = output_dir.parent.parent if output_dir.parent.name == "outputs" else output_dir.parent.parent.parent
-            config_dir = root_dir_for_config / "config" if root_dir_for_config else None
+            for parent in output_dir.parents:
+                candidate = parent / "config"
+                if candidate.exists():
+                    config_dir = candidate
+                    break
+        if config_dir is None:
+            config_dir = Path.cwd() / "config"
 
         # Mark parent run as sweep job for Azure ML UI
         azureml_run_type = get_tag_key("azureml", "run_type", config_dir, "azureml.runType")

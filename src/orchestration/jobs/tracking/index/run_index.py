@@ -29,8 +29,12 @@ def get_mlflow_index_path(root_dir: Path, config_dir: Optional[Path] = None) -> 
     if config_dir is None:
         config_dir = root_dir / "config"
 
-    # Use same cache structure as index_manager
-    cache_dir = root_dir / "outputs" / "cache"
+    # Derive project root from config_dir when available to avoid nesting
+    # indexes under stage-specific roots (e.g. outputs/hpo or notebooks).
+    project_root = config_dir.parent if config_dir is not None else root_dir
+
+    # Use same cache structure as index_manager under the project root
+    cache_dir = project_root / "outputs" / "cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
 
     # Read file_name from config

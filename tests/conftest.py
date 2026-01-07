@@ -16,6 +16,8 @@ if str(ROOT_DIR) not in sys.path:
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
+from orchestration.paths import resolve_output_path
+
 # Global variable to store the log file path and TeeOutput instance
 _pytest_log_file = None
 _pytest_tee = None
@@ -31,8 +33,9 @@ def pytest_configure(config):
     if log_file:
         log_path = Path(log_file).resolve()
     else:
-        # Create timestamped log file in outputs/pytest_logs directory
-        log_dir = ROOT_DIR / "outputs" / "pytest_logs"
+        # Create timestamped log file in outputs/pytest_logs directory (centralized)
+        config_dir = ROOT_DIR / "config"
+        log_dir = resolve_output_path(ROOT_DIR, config_dir, "pytest_logs")
         log_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_path = log_dir / f"pytest_{timestamp}.log"

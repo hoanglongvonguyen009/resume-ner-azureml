@@ -77,9 +77,19 @@ def build_mlflow_run_name(
     """
     # Infer root_dir from output_dir if not provided
     if root_dir is None and output_dir is not None:
-        root_dir = output_dir.parent.parent if output_dir else None
+        # Walk up from output_dir until we find "outputs" directory
+        current = output_dir
+        while current.parent != current:  # Stop at filesystem root
+            if current.name == "outputs":
+                root_dir = current.parent
+                break
+            current = current.parent
 
-    # Fallback to current directory if still None
+    # Fallback: try to derive from config_dir if available
+    if root_dir is None and config_dir is not None:
+        root_dir = config_dir.parent
+
+    # Last resort: fallback to current directory
     if root_dir is None:
         root_dir = Path.cwd()
 
