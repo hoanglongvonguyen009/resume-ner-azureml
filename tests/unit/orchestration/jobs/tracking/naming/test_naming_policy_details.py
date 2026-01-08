@@ -345,7 +345,7 @@ class TestValidationRules:
 schema_version: 1
 validate:
   max_length: 256
-  forbidden_chars: ["/", "\\", ":", "*", "?", "\"", "<", ">", "|"]
+  forbidden_chars: ["/", "\\\\", ":", "*", "?", '"', "<", ">", "|"]
   warn_length: 150
 """)
         
@@ -366,7 +366,7 @@ validate:
 schema_version: 1
 validate:
   max_length: 256
-  forbidden_chars: ["/", "\\", ":", "*", "?", "\"", "<", ">", "|"]
+  forbidden_chars: ["/", "\\\\", ":", "*", "?", '"', "<", ">", "|"]
   warn_length: 150
 """)
         
@@ -383,7 +383,7 @@ validate:
 schema_version: 1
 validate:
   max_length: 256
-  forbidden_chars: ["/", "\\", ":", "*", "?", "\"", "<", ">", "|"]
+  forbidden_chars: ["/", "\\\\", ":", "*", "?", '"', "<", ">", "|"]
   warn_length: 150
 """)
         

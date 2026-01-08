@@ -170,6 +170,7 @@ def _get_default_paths() -> Dict[str, Any]:
         "cache": {
             "best_configurations": "best_configurations",
             "final_training": "final_training",
+            "best_model_selection": "best_model_selection",
         },
         "files": {
             "metrics": "metrics.json",
@@ -789,6 +790,10 @@ def find_study_by_hash(
     # Get HPO base directory
     hpo_base = resolve_output_path(root_dir, config_dir, "hpo")
 
+    # Check if directory exists before iterating
+    if not hpo_base.exists() or not hpo_base.is_dir():
+        return None
+
     # Search for study-{study8} pattern in all storage_env directories
     for storage_env_dir in hpo_base.iterdir():
         if not storage_env_dir.is_dir():
@@ -840,6 +845,10 @@ def find_trial_by_hash(
 
     # Get HPO base directory
     hpo_base = resolve_output_path(root_dir, config_dir, "hpo")
+
+    # Check if directory exists before iterating
+    if not hpo_base.exists() or not hpo_base.is_dir():
+        return None
 
     # Search for trial-{trial8} pattern in study-{study8} folders
     for storage_env_dir in hpo_base.iterdir():

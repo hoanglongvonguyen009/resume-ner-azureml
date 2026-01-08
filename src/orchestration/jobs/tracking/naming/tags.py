@@ -73,9 +73,15 @@ def get_tag_key(
     try:
         registry = load_tags_registry(config_dir)
         return registry.key(section, name)
-    except (TagKeyError, Exception):
+    except TagKeyError:
         if fallback is not None:
             return fallback
+        raise
+    except Exception:
+        # For other exceptions (e.g., file not found), use fallback if available
+        if fallback is not None:
+            return fallback
+        # Re-raise the original exception
         raise
 
 
@@ -190,6 +196,7 @@ def build_mlflow_tags(
     TAG_GROUPING_SCHEMA_VERSION = _get_key("grouping", "grouping_schema_version", CODE_GROUPING_SCHEMA_VERSION)
     TAG_RUN_KEY_HASH = _get_key("grouping", "run_key_hash", CODE_RUN_KEY_HASH)
     TAG_HPO_TRIAL_NUMBER = _get_key("hpo", "trial_number", CODE_HPO_TRIAL_NUMBER)
+    TAG_BENCHMARK_CONFIG_HASH = _get_key("legacy", "benchmark_config_hash", CODE_BENCHMARK_CONFIG_HASH)
 
     # Always set minimal tags
     if context:
@@ -340,6 +347,14 @@ def build_mlflow_tags(
     # Run key hash (for cleanup and run finding)
     if run_key_hash:
         tags[TAG_RUN_KEY_HASH] = run_key_hash
+
+    # Benchmark config hash (for benchmarking processes)
+    if context and hasattr(context, "benchmark_config_hash") and context.benchmark_config_hash:
+        if sanitize_tags:
+            tags[TAG_BENCHMARK_CONFIG_HASH] = sanitize_tag_value(
+                context.benchmark_config_hash, max_length=tag_max_length, config_dir=config_dir)
+        else:
+            tags[TAG_BENCHMARK_CONFIG_HASH] = context.benchmark_config_hash
 
     return tags
 

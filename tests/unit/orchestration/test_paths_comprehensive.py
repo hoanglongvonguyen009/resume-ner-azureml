@@ -21,9 +21,8 @@ from orchestration.paths import (
     is_v2_path,
     find_study_by_hash,
     find_trial_by_hash,
-    build_output_path,
 )
-from orchestration.naming_centralized import NamingContext
+from orchestration.naming_centralized import NamingContext, build_output_path
 
 
 @pytest.fixture
@@ -115,7 +114,7 @@ outputs:
   hpo: "hpo"
 """)
 
-        with pytest.raises(ValueError, match="base.outputs"):
+        with pytest.raises(RuntimeError, match="base.outputs"):
             load_paths_config(config_dir)
 
     def test_load_paths_config_invalid_schema_version(self, config_dir):
@@ -127,7 +126,7 @@ base:
   outputs: "outputs"
 """)
 
-        with pytest.raises(ValueError, match="schema_version must be an integer"):
+        with pytest.raises(RuntimeError, match="schema_version must be an integer"):
             load_paths_config(config_dir)
 
     def test_load_paths_config_missing_required_patterns_v2(self, config_dir):
@@ -142,7 +141,7 @@ patterns:
   # Missing other required patterns
 """)
 
-        with pytest.raises(ValueError, match="Missing required pattern keys"):
+        with pytest.raises(RuntimeError, match="Missing required pattern keys"):
             load_paths_config(config_dir)
 
     def test_load_paths_config_unknown_placeholder(self, config_dir):
@@ -164,7 +163,7 @@ patterns:
 """)
 
         # Should warn or raise for unknown placeholder in v2+
-        with pytest.raises(ValueError, match="Unknown placeholder"):
+        with pytest.raises(RuntimeError, match="Unknown placeholder"):
             load_paths_config(config_dir)
 
 
@@ -523,7 +522,7 @@ class TestBuildOutputPathV2:
             model="distilbert",
             environment="local",
             storage_env="local",
-            parent_training_id="spec-abc12345_exec-xyz789ab/v1",
+            parent_training_id="spec-abc12345_exec-def789ab/v1",
             conv_fp="conv1234567890123"
         )
 
@@ -656,6 +655,10 @@ class TestCacheStrategyOperations:
         paths_yaml.write_text("""
 base:
   outputs: "outputs"
+outputs:
+  cache: "cache"
+cache:
+  best_configurations: "best_configurations"
 cache_strategies:
   best_configurations:
     strategy: "dual"

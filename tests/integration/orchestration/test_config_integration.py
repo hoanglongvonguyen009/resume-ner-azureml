@@ -230,7 +230,8 @@ class TestConfigurationConsistency:
             environment="local",
             storage_env="local",
             study_key_hash="350a79aa1234567890abcdef",
-            trial_key_hash="747428f2abcdef1234567890"
+            trial_key_hash="747428f2abcdef1234567890",
+            trial_id="trial_01"  # Set trial_id to ensure it's detected as hpo_trial
         )
         
         # Path should use v2 pattern from paths.yaml

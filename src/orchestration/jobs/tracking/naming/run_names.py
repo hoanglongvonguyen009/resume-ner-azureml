@@ -230,8 +230,12 @@ def _build_legacy_run_name(
     
     This preserves the original hardcoded logic for backward compatibility.
     """
-    # This is a simplified version - in practice, the full legacy logic
-    # would be preserved here. For now, return a basic fallback.
     env = context.storage_env if hasattr(context, "storage_env") else context.environment
+    
+    # For final_training, include variant if available
+    if context.process_type == "final_training" and hasattr(context, "variant") and context.variant is not None:
+        return f"{env}_{context.model}_{context.process_type}_v{context.variant}"
+    
+    # Default legacy format
     return f"{env}_{context.model}_{context.process_type}_legacy"
 

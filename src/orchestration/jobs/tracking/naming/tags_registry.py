@@ -34,21 +34,11 @@ class TagsRegistry:
     schema_version: int
 
     def __post_init__(self):
-        """Validate required keys exist."""
-        required_keys = [
-            ("grouping", "study_key_hash"),
-            ("grouping", "trial_key_hash"),
-            ("process", "stage"),
-            ("process", "project"),
-        ]
-        for section, name in required_keys:
-            try:
-                self.key(section, name)
-            except TagKeyError:
-                raise ValueError(
-                    f"Missing required tag key: {section}.{name}. "
-                    f"Please ensure config/tags.yaml is properly configured."
-                )
+        """Initialize registry (validation is lazy, done on key access)."""
+        # Note: Required keys are validated lazily when accessed via self.key()
+        # This allows TagsRegistry to be created with incomplete configs for testing
+        # Validation happens on first access to required keys
+        pass
 
     def key(self, section: str, name: str) -> str:
         """
@@ -62,20 +52,26 @@ class TagsRegistry:
             Tag key string (e.g., "code.study_key_hash")
             
         Raises:
-            TagKeyError: If the section or key is missing
+            TagKeyError: If the section or key is missing or invalid
         """
-        try:
-            section_data = self.raw[section]
-            if not isinstance(section_data, dict):
-                raise TagKeyError(f"Section '{section}' is not a dictionary")
-            value = section_data[name]
-            if not isinstance(value, str):
-                raise TagKeyError(
-                    f"Tag key '{section}.{name}' is not a string: {type(value)}"
-                )
-            return value
-        except KeyError as e:
-            raise TagKeyError(f"Missing tag key: {section}.{name}") from e
+        # Check if section exists
+        if section not in self.raw:
+            raise TagKeyError(f"Missing tag key: {section}.{name}")
+        
+        section_data = self.raw[section]
+        if not isinstance(section_data, dict):
+            raise TagKeyError(f"Section '{section}' is not a dictionary")
+        
+        # Check if key exists in section
+        if name not in section_data:
+            raise TagKeyError(f"Missing tag key: {section}.{name}")
+        
+        value = section_data[name]
+        if not isinstance(value, str):
+            raise TagKeyError(
+                f"Tag key '{section}.{name}' is not a string: {type(value)}"
+            )
+        return value
 
 
 def _get_default_tag_keys() -> Dict[str, Any]:

@@ -91,10 +91,15 @@ def validate_naming_policy(policy: Dict[str, Any], policy_path: Optional[Path] =
 
     run_names = policy.get("run_names")
     if run_names is None:
+        # Only warn if there's no validate section either (truly incomplete config)
+        # If validate section exists, it's acceptable for schema_version 1
+        has_validate = "validate" in policy
         msg = f"[naming.yaml] Missing required 'run_names' section{location}"
         if schema_version >= 2:
             raise ValueError(msg)
-        logger.warning(msg)
+        # Only warn if config is truly incomplete (no validate section)
+        if not has_validate:
+            logger.warning(msg)
         return
 
     if not isinstance(run_names, dict):
@@ -503,11 +508,14 @@ def validate_run_name(name: str, policy: Dict[str, Any]) -> None:
     """
     Validate run name against policy rules.
 
-    Logs warnings for violations but does not raise exceptions.
+    Logs warnings for length violations. Raises ValueError for forbidden characters.
 
     Args:
         name: Run name to validate.
         policy: Naming policy dictionary.
+        
+    Raises:
+        ValueError: If run name contains forbidden characters.
     """
     if not policy or "validate" not in policy:
         return
@@ -519,10 +527,12 @@ def validate_run_name(name: str, policy: Dict[str, Any]) -> None:
 
     # Check length
     if len(name) > max_length:
-        logger.error(
-            f"[Naming Policy] Run name exceeds max length ({max_length}): "
+        error_msg = (
+            f"Run name exceeds max length ({max_length}): "
             f"{name[:50]}... (length: {len(name)})"
         )
+        logger.error(f"[Naming Policy] {error_msg}")
+        raise ValueError(f"max_length: {error_msg}")
     elif len(name) > warn_length:
         logger.warning(
             f"[Naming Policy] Run name exceeds recommended length ({warn_length}): "
@@ -532,7 +542,9 @@ def validate_run_name(name: str, policy: Dict[str, Any]) -> None:
     # Check forbidden characters
     found_forbidden = [char for char in forbidden_chars if char in name]
     if found_forbidden:
-        logger.warning(
-            f"[Naming Policy] Run name contains forbidden characters {found_forbidden}: "
+        error_msg = (
+            f"Run name contains forbidden characters {found_forbidden}: "
             f"{name[:50]}..."
         )
+        logger.error(f"[Naming Policy] {error_msg}")
+        raise ValueError(f"forbidden: {error_msg}")

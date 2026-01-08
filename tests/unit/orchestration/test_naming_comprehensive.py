@@ -540,7 +540,7 @@ version:
             model="distilbert",
             environment="local",
             storage_env="local",
-            parent_training_id="spec-abc12345_exec-xyz789ab/v1",
+            parent_training_id="spec-abc12345_exec-def789ab/v1",
             conv_fp="conv1234567890123"
         )
         
@@ -614,7 +614,7 @@ run_names:
 schema_version: 1
 validate:
   max_length: 256
-  forbidden_chars: ["/", "\\", ":", "*", "?", "\"", "<", ">", "|"]
+  forbidden_chars: ["/", "\\\\", ":", "*", "?", '"', "<", ">", "|"]
   warn_length: 150
 """)
         

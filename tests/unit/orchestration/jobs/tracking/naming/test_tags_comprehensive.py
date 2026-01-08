@@ -407,7 +407,7 @@ class TestTagBuilding:
             model="distilbert",
             environment="local",
             storage_env="local",
-            parent_training_id="spec-abc12345_exec-xyz789ab/v1",
+            parent_training_id="spec-abc12345_exec-def789ab/v1",
             conv_fp="conv1234567890123"
         )
         
@@ -418,7 +418,7 @@ class TestTagBuilding:
         )
         
         assert tags["code.stage"] == "conversion"
-        assert tags["code.parent_training_id"] == "spec-abc12345_exec-xyz789ab/v1"
+        assert tags["code.parent_training_id"] == "spec-abc12345_exec-def789ab/v1"
         assert tags["code.conv_fp"] == "conv1234567890123"
         assert tags["code.parent_run_id"] == "parent_run_123"
     
@@ -521,9 +521,9 @@ process:
     
     def test_get_tag_key_raises_when_missing_and_no_fallback(self, config_dir):
         """Test raises TagKeyError when key missing and no fallback."""
-        # Don't create tags.yaml
+        # Don't create tags.yaml - use a key that doesn't exist in defaults
         with pytest.raises(TagKeyError):
-            get_tag_key("grouping", "study_key_hash", config_dir=config_dir, fallback=None)
+            get_tag_key("grouping", "nonexistent_key", config_dir=config_dir, fallback=None)
     
     def test_get_tag_key_handles_registry_loading_failures(self, config_dir):
         """Test handles registry loading failures gracefully."""
