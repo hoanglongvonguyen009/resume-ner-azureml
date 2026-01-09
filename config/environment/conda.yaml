@@ -27,7 +27,7 @@ dependencies:
     - tqdm>=4.65.0
     - seqeval>=1.2.2
     - sentencepiece>=0.1.99  # Required for DeBERTa slow tokenizer (use_fast=False)
-    - mlflow  # For experiment tracking
+    - mlflow==3.5.0  # For experiment tracking (compatible with azureml-mlflow 1.61.0)
     - azureml-mlflow  # Azure ML MLflow integration
     - onnxruntime  # For Phase 2 inference (ONNX model serving)
     - onnx>=1.16.0  # Required for ONNX export/validation + onnxruntime quantization tooling

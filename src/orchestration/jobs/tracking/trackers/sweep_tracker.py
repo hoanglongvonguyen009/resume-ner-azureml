@@ -13,6 +13,54 @@ import os
 import re
 
 import mlflow
+# Import azureml.mlflow to ensure Azure ML artifact repository is properly registered
+# This is required for Azure ML artifact uploads to work correctly
+try:
+    import azureml.mlflow  # noqa: F401
+    
+    # Monkey-patch azureml_artifacts_builder to handle tracking_uri parameter gracefully
+    # This fixes a compatibility issue between MLflow 3.5.0 and azureml-mlflow 1.61.0
+    # MLflow passes tracking_uri, but some versions of azureml-mlflow don't accept it
+    import mlflow.store.artifact.artifact_repository_registry as arr
+    original_builder = arr._artifact_repository_registry._registry.get('azureml')
+    if original_builder:
+        import functools
+        import inspect
+        
+        # Get the original function's signature to see what it actually accepts
+        sig = inspect.signature(original_builder)
+        param_names = list(sig.parameters.keys())
+        
+        @functools.wraps(original_builder)
+        def patched_azureml_builder(artifact_uri=None, tracking_uri=None, registry_uri=None):
+            """Patched builder that handles tracking_uri parameter gracefully."""
+            # Try calling with all parameters first
+            try:
+                return original_builder(
+                    artifact_uri=artifact_uri,
+                    tracking_uri=tracking_uri,
+                    registry_uri=registry_uri
+                )
+            except TypeError as e:
+                # If tracking_uri is not accepted, try without it
+                if 'tracking_uri' in str(e) and 'unexpected keyword argument' in str(e):
+                    # Call without tracking_uri (some versions don't accept it despite signature)
+                    try:
+                        return original_builder(
+                            artifact_uri=artifact_uri,
+                            registry_uri=registry_uri
+                        )
+                    except TypeError:
+                        # Last resort: call with just artifact_uri
+                        return original_builder(artifact_uri=artifact_uri)
+                # Re-raise if it's a different error
+                raise
+        
+        # Register the patched builder
+        arr._artifact_repository_registry.register('azureml', patched_azureml_builder)
+except ImportError:
+    pass  # Not using Azure ML, or azureml-mlflow not installed
+
 from shared.logging_utils import get_logger
 
 from orchestration.jobs.tracking.mlflow_types import RunHandle
@@ -1047,61 +1095,35 @@ class MLflowSweepTracker(BaseTracker):
             checkpoint_dir, best_trial_number
         )
 
-        # Detect Azure ML - it requires mlflow.log_artifact() with active run context
-        # Do this before try block so it's available in except block
-        tracking_uri = mlflow.get_tracking_uri()
-        is_azure_ml = tracking_uri and "azureml" in tracking_uri.lower()
-
+        # Check if parent run is active - if so, use mlflow.log_artifact() which works
+        # If parent is not active, use client.log_artifact() with explicit run_id
+        active_run = mlflow.active_run()
+        use_active_run = active_run and active_run.info.run_id == parent_run_id
+        
         try:
             logger.info("Uploading checkpoint archive to MLflow...")
             
-            active_run = mlflow.active_run()
-            active_run_id = active_run.info.run_id if active_run else None
-            
-            def upload_archive():
-                # Azure ML has a known limitation: cannot upload artifacts to child runs when
-                # parent run is active due to artifact repository builder incompatibility.
-                # The builder doesn't accept 'tracking_uri' parameter that MLflow tries to pass.
-                # Workaround: Upload to parent run instead (checkpoint is still preserved)
-                if is_azure_ml:
-                    if active_run_id == run_id_to_use:
-                        # Target run is already active, use it directly
-                        mlflow.log_artifact(
-                            str(archive_path),
-                            artifact_path="best_trial_checkpoint"
-                        )
-                    elif active_run_id and active_run_id == parent_run_id and refit_run_id and run_id_to_use == refit_run_id:
-                        # Azure ML workaround: Parent is active, trying to upload to child run
-                        # Upload to parent run instead - checkpoint is still preserved and associated with HPO study
-                        logger.info(
-                            f"Azure ML workaround: Uploading checkpoint to parent run {parent_run_id} "
-                            f"instead of child run {refit_run_id} due to Azure ML limitation. "
-                            f"Checkpoint is still preserved and associated with the HPO study."
-                        )
-                        mlflow.log_artifact(
-                            str(archive_path),
-                            artifact_path="best_trial_checkpoint"
-                        )
-                    else:
-                        # Azure ML limitation: Cannot upload to child run when parent is active
-                        # This is a known issue with Azure ML's MLflow integration
-                        # Skip upload and let error handler log the warning
-                        raise RuntimeError("Azure ML limitation: Cannot upload to child run when parent is active")
-                else:
-                    # Non-Azure ML: can use either approach
-                    if active_run_id == run_id_to_use:
-                        # Target run is already active, use it directly
-                        mlflow.log_artifact(
-                            str(archive_path),
-                            artifact_path="best_trial_checkpoint"
-                        )
-                    else:
-                        # Use MlflowClient with explicit run_id (works for non-Azure ML)
-                        client.log_artifact(
-                            run_id_to_use,
-                            str(archive_path),
-                            artifact_path="best_trial_checkpoint"
-                        )
+            if use_active_run and run_id_to_use == refit_run_id:
+                # Parent run is active, but we want to upload to child run
+                # Azure ML has a bug where client.log_artifact() to child run fails
+                # Upload to active parent run instead (checkpoint is still associated via study/trial tags)
+                logger.info(
+                    f"Uploading to active parent run {parent_run_id[:12]} "
+                    f"(Azure ML workaround: cannot upload directly to child run {refit_run_id[:12]})"
+                )
+                def upload_archive():
+                    mlflow.log_artifact(
+                        str(archive_path),
+                        artifact_path="best_trial_checkpoint"
+                    )
+            else:
+                # Use MLflowClient with explicit run_id (matches old working code)
+                def upload_archive():
+                    client.log_artifact(
+                        run_id_to_use,
+                        str(archive_path),
+                        artifact_path="best_trial_checkpoint"
+                    )
 
             retry_with_backoff(
                 upload_archive,
@@ -1137,39 +1159,11 @@ class MLflowSweepTracker(BaseTracker):
                 archive_path.unlink()
 
         except Exception as e:
-            error_str = str(e)
-            error_type = type(e).__name__
-            
-            # Check if it's the Azure ML limitation (expected) or artifact repository issue
-            is_azure_ml_limitation = (
-                error_type == "RuntimeError" and "Azure ML limitation" in error_str
-            )
-            is_azure_ml_error = (
-                "tracking_uri" in error_str or 
-                "azureml_artifacts_builder" in error_str or 
-                (error_type == "TypeError" and "unexpected keyword argument" in error_str and "tracking_uri" in error_str)
-            )
-            
-            if is_azure_ml_limitation or (is_azure_ml_error and is_azure_ml):
-                # Azure ML has known limitations with artifact uploads to child runs
-                # This is expected behavior - checkpoint is still available locally
-                logger.warning(
-                    f"⚠ Azure ML limitation: Cannot upload checkpoint to MLflow. "
-                    f"Checkpoint is available locally at: {checkpoint_dir} "
-                    f"and can be accessed directly. "
-                    f"This is a known limitation of Azure ML's MLflow integration when uploading "
-                    f"to child runs while parent run is active."
-                )
-                # Don't raise - checkpoint is still available locally, process can continue
-                # Clean up archive file
-                if archive_path and archive_path.exists():
-                    archive_path.unlink()
-            else:
-                logger.error(f"Failed to upload checkpoint via MLflow: {e}")
-                # Clean up on failure
-                if archive_path and archive_path.exists():
-                    archive_path.unlink()
-                raise
+            logger.error(f"Failed to upload checkpoint via MLflow: {e}")
+            # Clean up on failure
+            if archive_path and archive_path.exists():
+                archive_path.unlink()
+            raise
 
     def log_tracking_info(self) -> None:
         """Log MLflow tracking URI information for user visibility."""

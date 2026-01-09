@@ -2,24 +2,31 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 
-def get_stage_config(experiment_cfg: dict, stage: str) -> Dict[str, Any]:
+def get_stage_config(experiment_cfg: Union[dict, Any], stage: str) -> Dict[str, Any]:
     """
     Return the configuration block for a given stage, if present.
 
     This is a thin, read-only helper around experiment config stages.
-    Uses dict interface instead of ExperimentConfig to avoid dependency on orchestration.config_loader.
+    Supports both dict interface and ExperimentConfig objects.
 
     Args:
-        experiment_cfg: Experiment configuration dictionary with 'stages' key.
+        experiment_cfg: Experiment configuration dictionary with 'stages' key,
+            or ExperimentConfig object with a 'stages' attribute.
         stage: Stage name to retrieve.
 
     Returns:
         Stage configuration dictionary, or empty dict if not found.
     """
-    stages = experiment_cfg.get("stages", {})
+    # Handle ExperimentConfig objects (has 'stages' attribute)
+    if hasattr(experiment_cfg, "stages"):
+        stages = experiment_cfg.stages
+    # Handle dict interface
+    else:
+        stages = experiment_cfg.get("stages", {})
+    
     return stages.get(stage, {}) or {}
 
 
