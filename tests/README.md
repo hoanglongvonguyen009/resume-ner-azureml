@@ -50,250 +50,197 @@ pip install pytest pytest-cov pytest-mock
 
 ## Test Structure
 
-- **`tests/e2e/`**: End-to-end workflow tests (standalone scripts, not pytest-based)
-  - **`test_e2e_workflow.py`**: Full training pipeline validation (config → HPO → training)
-  - **`test_hpo_with_tiny_datasets.py`**: HPO pipeline validation with tiny datasets
-  - **Note**: These are standalone Python scripts, not pytest tests. Run them directly with `python`.
-- **`tests/unit/`**: Unit tests with mocked dependencies (pytest-based)
-  - **`api/`**: API unit tests
-  - **`training/`**: Training unit tests
+Tests are organized by **feature/workflow** rather than by test type, following the production code structure:
+
+- **`tests/fixtures/`**: Shared test fixtures and helpers (NEW)
+  - **`datasets.py`**: Dataset fixtures (`tiny_dataset`, `create_dataset_structure`)
+  - **`mlflow.py`**: MLflow mocking fixtures (`mock_mlflow_tracking`, `mock_mlflow_client`, `mock_mlflow_run`)
+  - **`configs.py`**: Config fixtures (HPO, selection, acquisition, conversion)
+  - **`validators.py`**: Validation helpers (`validate_path_structure`, `validate_run_name`, `validate_tags`)
+
+- **`tests/workflows/`**: End-to-end workflow tests (pytest-based)
+  - **`test_notebook_01_e2e.py`**: Tests notebook 01 (HPO + Benchmarking workflow)
+  - **`test_notebook_02_e2e.py`**: Tests notebook 02 (Best config selection → final training → conversion)
+  - **`test_full_workflow_e2e.py`**: Tests complete workflow (01 → 02 end-to-end)
+
+- **`tests/hpo/`**: Hyperparameter optimization tests
+  - **`unit/`**: Fast, isolated HPO tests (search space, trial selection, checkpoint resume)
+  - **`integration/`**: HPO with real components (sweep execution, refit training, early termination, path structure)
+  - **`e2e/`**: Full HPO workflow (`test_hpo_workflow.py`)
+
+- **`tests/benchmarking/`**: Benchmarking tests
+  - **`unit/`**: Config option tests
+  - **`integration/`**: Benchmark workflow, orchestrator, utils, edge cases
+
+- **`tests/selection/`**: Best model selection tests
+  - **`unit/`**: Config options, cache tests
+  - **`integration/`**: MLflow selection, artifact acquisition, workflow, edge cases
+
+- **`tests/final_training/`**: Final training tests
+  - **`unit/`**: Config tests
+  - **`integration/`**: Component tests, logging intervals
+
+- **`tests/conversion/`**: Model conversion tests
+  - **`unit/`**: Config and options tests
+  - **`integration/`**: Config integration tests
+
+- **`tests/tracking/`**: MLflow tracking tests
+  - **`unit/`**: Naming policy, tags registry, MLflow config
+  - **`integration/`**: Tracking config enabled, naming integration
+
+- **`tests/config/`**: Configuration loading tests
+  - **`unit/`**: Config loader, experiment/data/model configs, paths/naming/mlflow YAML tests, fingerprints
+  - **`integration/`**: Config integration tests
+
+- **`tests/training/`**: Training unit tests (kept existing structure)
     - **`test_trainer.py`**: Training loop and data loader tests
     - **`test_checkpoint_loader.py`**: Checkpoint path resolution and validation tests
     - **`test_data_combiner.py`**: Dataset combination strategy tests
-- **`tests/integration/`**: Integration tests requiring actual models/files (pytest-based)
-  - **`api/`**: API integration tests
-- **`src/testing/`**: Test helper utilities (not test scripts)
-  - **`orchestrators/`**: Test orchestration logic
-  - **`services/`**: Test service modules (HPO execution, k-fold validation, edge case detection)
-  - **`setup/`**: Environment setup and configuration loading
-  - **`validators/`**: Dataset validation utilities
-  - **`aggregators/`**: Result aggregation utilities
-  - **`comparators/`**: Result comparison utilities
-  - **`fixtures/`**: Test fixtures and configuration loaders
+  - **`test_cv_utils.py`**: Cross-validation utilities
+
+- **`tests/api/`**: API tests (kept existing structure)
+  - **`unit/`**: API unit tests
+  - **`integration/`**: API integration tests
+
+- **`tests/shared/`**: Shared utility tests
+  - **`unit/`**: MLflow setup, drive backup tests
+
+- **`tests/docs/`**: Coverage analysis and limitations documentation (NEW)
+  - Coverage analysis documents for all YAML configs
+  - Implementation status and limitations
+
+- **`tests/test_data/`**: Test data fixtures (kept existing)
 
 ## Running Tests
 
-### End-to-End Workflow Tests
+### Workflow E2E Tests
 
-These tests validate the complete training pipeline from config loading to final training.
+These tests validate complete notebook workflows end-to-end:
 
-#### End-to-End Workflow Test
+#### Notebook 01 E2E Test
 
-Validates the complete training pipeline using tiny datasets (mimics the Colab notebook workflow):
+Tests the complete workflow from `01_orchestrate_training_colab.ipynb`:
 
 ```bash
-# Run full workflow (HPO + final training)
-python tests/e2e/test_e2e_workflow.py
+# Core workflow with mocked training (default, CI-compatible)
+pytest tests/workflows/test_notebook_01_e2e.py -v
 
-# Skip final training (HPO only)
-python tests/e2e/test_e2e_workflow.py --skip-training
+# Full workflow
+E2E_TEST_SCOPE=full pytest tests/workflows/test_notebook_01_e2e.py -v
 
-# Custom output directory
-python tests/e2e/test_e2e_workflow.py --output-dir outputs/my_test
+# Real training execution (slower)
+E2E_USE_REAL_TRAINING=true pytest tests/workflows/test_notebook_01_e2e.py -v
 ```
 
 **What it tests:**
 
-- Config loading and validation
+- Environment detection
+- Config loading
 - Dataset verification
 - MLflow setup
-- HPO sweep execution
-- Best configuration selection
-- Final training (optional)
-- Output validation
+- HPO sweep execution (mocked)
+- Benchmarking execution (mocked)
+- Path, naming, and tag validation
 
-**Prerequisites:**
+#### Notebook 02 E2E Test
 
-- Tiny dataset must exist at `dataset_tiny/seed0/` (create with `notebooks/00_make_tiny_dataset.ipynb`)
-- Experiment config must use `data/resume_tiny.yaml`
-
-#### HPO Pipeline Tests with Tiny Datasets
-
-Validates HPO pipeline with various tiny dataset configurations:
+Tests the complete workflow from `02_best_config_selection.ipynb`:
 
 ```bash
-# Run all test suites with default config
-python tests/e2e/test_hpo_with_tiny_datasets.py
-
-# Test specific seeds
-python tests/e2e/test_hpo_with_tiny_datasets.py --seeds 0 1 2
-
-# Test specific backbones
-python tests/e2e/test_hpo_with_tiny_datasets.py --backbones distilbert
-
-# Skip specific test suites
-python tests/e2e/test_hpo_with_tiny_datasets.py --skip-deterministic
-python tests/e2e/test_hpo_with_tiny_datasets.py --skip-random-seeds
-python tests/e2e/test_hpo_with_tiny_datasets.py --skip-kfold
-python tests/e2e/test_hpo_with_tiny_datasets.py --skip-edge-cases
-
-# Combine multiple skip options
-python tests/e2e/test_hpo_with_tiny_datasets.py --skip-kfold --skip-edge-cases
-
-# Custom output directory
-python tests/e2e/test_hpo_with_tiny_datasets.py --output-dir outputs/my_hpo_tests
-
-# Specify custom log file
-python tests/e2e/test_hpo_with_tiny_datasets.py --log-file outputs/my_hpo_tests/test.log
+# Default: CI-compatible mode (mocked training)
+pytest tests/workflows/test_notebook_02_e2e.py -v
 ```
 
 **What it tests:**
 
-- HPO completion with tiny datasets
-- K-fold cross-validation with small datasets
-- Edge cases (k > n_samples, batch size issues)
-- Random seed variants
-- Multiple backbone support
+- Best model selection
+- Artifact acquisition
+- Final training (mocked)
+- Model conversion (mocked)
+- Path, naming, and tag validation
 
-**Prerequisites:**
+#### Full Workflow E2E Test
 
-- Tiny datasets must exist at `dataset_tiny/seed{N}/` for each seed
-- Configuration loaded from `config/test/hpo_pipeline.yaml`
-
-**Logging:**
-
-- Log files are automatically created in the output directory with timestamp: `test_hpo_YYYYMMDD_HHMMSS.log`
-- Use `--log-file` to specify a custom log file path
-- All output (both console and log) includes timestamps and log levels
-
-### Unit Tests
+Tests the complete workflow from notebook 01 through notebook 02:
 
 ```bash
-# Run all unit tests
-pytest tests/unit/ -v
+# Default: CI-compatible mode (mocked training)
+pytest tests/workflows/test_full_workflow_e2e.py -v
 
-# Run specific test files
-pytest tests/unit/api/test_inference_performance.py -v
-pytest tests/unit/api/test_inference_fixes.py -v
+# Real training execution (slower)
+E2E_USE_REAL_TRAINING=true pytest tests/workflows/test_full_workflow_e2e.py -v
+```
 
-# Run training unit tests (including continued training)
-pytest tests/unit/training/ -v
+**What it tests:**
 
-# Run specific continued training tests
-pytest tests/unit/training/test_checkpoint_loader.py -v
-pytest tests/unit/training/test_data_combiner.py -v
+- Complete pipeline: HPO → Benchmarking → Selection → Final Training → Conversion
+- Path, naming, and tag validation throughout
+- Lineage tracking validation
+
+### Feature-Specific Tests
+
+Tests are organized by feature. Run tests for a specific feature:
+
+```bash
+# HPO tests
+pytest tests/hpo/ -v
+
+# Benchmarking tests
+pytest tests/benchmarking/ -v
+
+# Selection tests
+pytest tests/selection/ -v
+
+# Final training tests
+pytest tests/final_training/ -v
+
+# Conversion tests
+pytest tests/conversion/ -v
+
+# Tracking tests
+pytest tests/tracking/ -v
+
+# Config tests
+pytest tests/config/ -v
+```
+
+### Training Tests
+
+```bash
+# Run all training tests
+pytest tests/training/ -v
+
+# Run specific tests
+pytest tests/training/test_checkpoint_loader.py -v
+pytest tests/training/test_data_combiner.py -v
+pytest tests/training/test_trainer.py -v
+```
+
+### API Tests
+
+```bash
+# Run all API tests
+pytest tests/api/ -v
 
 # Run with coverage
-pytest tests/unit/ --cov=src --cov-report=html
+pytest tests/ --cov=src --cov-report=html
 ```
 
-#### Training Unit Tests
+### Shared Fixtures
 
-**Checkpoint Loader Tests** (`test_checkpoint_loader.py`):
-- Validates checkpoint directory structure and required files
-- Tests checkpoint path resolution from environment variables, config files, and cache files
-- Tests pattern resolution (`{backbone}`, `{run_id}`)
-- Tests priority order (env var > config > cache)
-- Edge cases: missing files, invalid paths, non-existent checkpoints
+All tests can use shared fixtures from `tests/fixtures/`:
 
-**Data Combiner Tests** (`test_data_combiner.py`):
-- Tests all three data combination strategies (`new_only`, `combined`, `append`)
-- Validates dataset merging and shuffling
-- Tests validation split creation
-- Edge cases: missing validation sets, empty datasets, invalid strategies
-- Error handling for missing dataset paths
-
-### Integration Tests
-
-#### API Integration Tests
-
-```bash
-# Run API integration tests
-pytest tests/integration/api/ -v
-
-# Test inference performance with actual model
-pytest tests/integration/api/test_inference_performance.py \
-    --onnx-model outputs/final_training/distilroberta/distilroberta_model.onnx \
-    --checkpoint outputs/final_training/distilroberta/checkpoint \
-    -v
-
-# Test ONNX inference speed
-pytest tests/integration/api/test_onnx_inference.py \
-    --onnx-model <path> --checkpoint <path> -v
-
-# Test tokenization speed
-pytest tests/integration/api/test_tokenization_speed.py --checkpoint <path> -v
+```python
+from fixtures import (
+    tiny_dataset,
+    mock_mlflow_tracking,
+    validate_path_structure,
+    validate_run_name,
+    validate_tags,
+)
 ```
 
-**Note**: On Windows, use quotes for paths:
-
-```bash
-pytest tests/integration/api/test_inference_performance.py --onnx-model "outputs/final_training/distilroberta/distilroberta_model.onnx" --checkpoint "outputs/final_training/distilroberta/checkpoint" -v
-```
-
-#### FastAPI Local Server Tests
-
-These tests start a real FastAPI server process and test all endpoints with actual model files. This is different from `test_api.py` which uses mocked `TestClient`.
-
-**Prerequisites:**
-
-- Trained model files in `outputs/final_training/distilroberta/`:
-  - `distilroberta_model.onnx`
-  - `checkpoint/` directory
-- Test data files in `tests/test_data/` (see `tests/test_data/README.md`)
-- Required Python packages:
-
-  ```bash
-  pip install python-multipart httpx pyyaml
-  ```
-
-**Running Tests:**
-
-```bash
-# Run all local server tests
-pytest tests/integration/api/test_api_local_server.py -v
-
-# Run specific test class
-pytest tests/integration/api/test_api_local_server.py::TestServerLifecycle -v
-
-# Run with custom model paths
-pytest tests/integration/api/test_api_local_server.py \
-    --onnx-model outputs/final_training/distilroberta/distilroberta_model.onnx \
-    --checkpoint outputs/final_training/distilroberta/checkpoint \
-    -v
-```
-
-**Test Categories:**
-
-- **Server Lifecycle**: Startup, shutdown, failure handling
-- **Health & Info Endpoints**: `/health`, `/info`
-- **Single Text Prediction** (`/predict`):
-  - Valid inputs: Normal text, various entity types, special characters
-  - Edge cases: Empty string, very long text, unicode characters, whitespace-only text
-  - Error cases: Missing text field, invalid JSON, non-string text value
-- **Batch Text Prediction** (`/predict/batch`):
-  - Valid inputs: Small, medium, large batches
-  - Edge cases: Empty batch, mixed valid/invalid texts, batch with empty text
-  - Error cases: Batch exceeding MAX_BATCH_SIZE, missing texts field, non-list value
-- **File Upload** (`/predict/file`):
-  - Valid inputs: PDF files, PNG images, larger PDF files
-  - Edge cases: Small PDF files
-  - Error cases: Invalid file type, missing file in request
-- **Batch File Upload** (`/predict/file/batch`):
-  - Valid inputs: Small and medium file batches, mixed file types
-  - Edge cases: Empty batch
-  - Error cases: Batch exceeding MAX_BATCH_SIZE
-- **Debug Endpoint**: `/predict/debug` with detailed token-level information
-- **Error Handling**: Invalid inputs, missing fields, malformed requests
-- **Performance**: Latency validation against thresholds (P50, P95, max)
-- **Stability**: Consistency across repeated runs, performance degradation detection
-
-**Configuration:**
-
-Test configuration is in `config/test/api_local_server.yaml`:
-
-- Server settings (host, port, timeouts)
-- Performance thresholds (latency, throughput)
-- Request timeouts
-
-**Test Data:**
-
-Test data fixtures are defined in `tests/test_data/fixtures.py` and documented in `tests/test_data/README.md`. If test files are missing, generate them:
-
-```bash
-cd tests/test_data
-python generate_test_files.py
-```
+See `tests/fixtures/` for available fixtures and helpers.
 
 ## Configuration
 
