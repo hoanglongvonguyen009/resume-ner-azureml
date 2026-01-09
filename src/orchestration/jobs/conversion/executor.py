@@ -239,25 +239,53 @@ def execute_conversion(
     
     # Execute conversion (stream output instead of capture_output=True)
     print("🔄 Running model conversion...")
+    print(f"Command: {' '.join(conversion_args)}")
     process = subprocess.Popen(
         conversion_args,
         cwd=root_dir,
         env=conversion_env,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stderr=subprocess.PIPE,  # Capture stderr separately for better error reporting
         text=True,
         bufsize=1,  # Line buffered
     )
     
-    # Stream output in real-time
-    try:
-        for line in process.stdout:
-            print(line, end='', flush=True)
-    except Exception as e:
-        print(f"⚠ Error streaming output: {e}")
+    # Stream output in real-time and capture for error reporting
+    stdout_lines = []
+    stderr_lines = []
+    import sys as sys_module
+    import threading
+    
+    def read_stdout():
+        """Read stdout in a separate thread."""
+        try:
+            for line in process.stdout:
+                print(line, end='', flush=True)
+                stdout_lines.append(line.rstrip())
+        except Exception as e:
+            print(f"⚠ Error reading stdout: {e}")
+    
+    def read_stderr():
+        """Read stderr in a separate thread."""
+        try:
+            for line in process.stderr:
+                print(line, end='', file=sys_module.stderr, flush=True)
+                stderr_lines.append(line.rstrip())
+        except Exception as e:
+            print(f"⚠ Error reading stderr: {e}")
+    
+    # Start threads to read stdout and stderr concurrently
+    stdout_thread = threading.Thread(target=read_stdout, daemon=True)
+    stderr_thread = threading.Thread(target=read_stderr, daemon=True)
+    stdout_thread.start()
+    stderr_thread.start()
     
     # Wait for process to complete
     returncode = process.wait()
+    
+    # Wait for threads to finish reading
+    stdout_thread.join(timeout=1.0)
+    stderr_thread.join(timeout=1.0)
     
     # Handle subprocess failure - ensure run is marked as FAILED
     if returncode != 0:
@@ -266,9 +294,21 @@ def execute_conversion(
                 client.set_terminated(run_id, status="FAILED")
             except Exception as e:
                 print(f"⚠ Could not mark run as FAILED: {e}")
-        raise RuntimeError(
-            f"Model conversion failed with return code {returncode}"
-        )
+        
+        # Build detailed error message
+        error_msg = f"Model conversion failed with return code {returncode}"
+        if stderr_lines:
+            error_msg += f"\n\nStderr output (last 30 lines):\n" + "\n".join(stderr_lines[-30:])
+        if stdout_lines:
+            # Check if there are any error-like messages in stdout
+            error_lines = [line for line in stdout_lines if any(keyword in line.lower() for keyword in ['error', 'exception', 'traceback', 'failed', 'fatal'])]
+            if error_lines:
+                error_msg += f"\n\nError messages from stdout (last 20 lines):\n" + "\n".join(error_lines[-20:])
+            else:
+                # If no obvious error lines, show last few lines of stdout
+                error_msg += f"\n\nLast stdout output (last 10 lines):\n" + "\n".join(stdout_lines[-10:])
+        
+        raise RuntimeError(error_msg)
     else:
         # Subprocess should have ended the run, but verify it's terminated
         if run_id:
