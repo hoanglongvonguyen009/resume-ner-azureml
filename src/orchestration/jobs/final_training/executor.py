@@ -22,7 +22,8 @@ from orchestration.jobs.tracking.mlflow_naming import (
     build_mlflow_run_key_hash,
 )
 from orchestration.jobs.tracking.mlflow_index import update_mlflow_index
-from orchestration.naming_centralized import build_output_path, create_naming_context
+from naming import create_naming_context
+from paths import build_output_path
 from shared.platform_detection import detect_platform
 from shared.yaml_utils import load_yaml
 
@@ -179,7 +180,7 @@ def execute_final_training(
         # Second check: search for any complete variant with same spec_fp + exec_fp
         # This handles cases where _resolve_variant didn't find the complete variant
         try:
-            from orchestration.paths import resolve_output_path
+            from paths import resolve_output_path
             base_output_dir = resolve_output_path(
                 root_dir, config_dir, "final_training")
             final_training_base = base_output_dir / environment / backbone_name

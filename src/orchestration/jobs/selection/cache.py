@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from mlflow.tracking import MlflowClient
 
-from orchestration.paths import get_cache_file_path, save_cache_with_dual_strategy
+from paths import get_cache_file_path, save_cache_with_dual_strategy
 from shared.json_cache import load_json
 
 from shared.logging_utils import get_logger

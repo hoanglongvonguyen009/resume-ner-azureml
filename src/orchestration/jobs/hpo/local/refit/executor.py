@@ -15,7 +15,7 @@ from typing import Any, Dict, Optional, Tuple
 import mlflow
 from shared.logging_utils import get_logger
 from orchestration.constants import METRICS_FILENAME
-from orchestration.naming_centralized import create_naming_context
+from naming import create_naming_context
 from orchestration.jobs.tracking.mlflow_naming import (
     build_mlflow_run_name,
     build_mlflow_tags,
@@ -127,7 +127,7 @@ def run_refit_training(
     refit_output_dir = None
     if refit_context.study_key_hash and refit_context.trial_key_hash:
         try:
-            from orchestration.naming_centralized import build_output_path
+            from paths import build_output_path
             # build_output_path() handles hpo_refit by appending /refit to trial path
             refit_output_dir = build_output_path(root_dir, refit_context, config_dir=config_dir)
             refit_output_dir.mkdir(parents=True, exist_ok=True)
@@ -142,7 +142,9 @@ def run_refit_training(
         study_folder_name = output_dir.name if output_dir.name.startswith("study-") else None
         if study_folder_name and refit_context.trial_key_hash:
             # We're in a v2 study folder, construct v2 trial path manually
-            trial8 = refit_context.trial_key_hash[:8]
+            from naming.context_tokens import build_token_values
+            tokens = build_token_values(refit_context)
+            trial8 = tokens["trial8"]
             trial_base_dir = output_dir / f"trial-{trial8}"
             refit_output_dir = trial_base_dir / "refit"
             refit_output_dir.mkdir(parents=True, exist_ok=True)
@@ -496,7 +498,7 @@ from typing import Any, Dict, Optional, Tuple
 import mlflow
 from shared.logging_utils import get_logger
 from orchestration.constants import METRICS_FILENAME
-from orchestration.naming_centralized import create_naming_context
+from naming import create_naming_context
 from orchestration.jobs.tracking.mlflow_naming import (
     build_mlflow_run_name,
     build_mlflow_tags,
@@ -608,7 +610,7 @@ def run_refit_training(
     refit_output_dir = None
     if refit_context.study_key_hash and refit_context.trial_key_hash:
         try:
-            from orchestration.naming_centralized import build_output_path
+            from paths import build_output_path
             # build_output_path() handles hpo_refit by appending /refit to trial path
             refit_output_dir = build_output_path(root_dir, refit_context, config_dir=config_dir)
             refit_output_dir.mkdir(parents=True, exist_ok=True)
@@ -623,7 +625,9 @@ def run_refit_training(
         study_folder_name = output_dir.name if output_dir.name.startswith("study-") else None
         if study_folder_name and refit_context.trial_key_hash:
             # We're in a v2 study folder, construct v2 trial path manually
-            trial8 = refit_context.trial_key_hash[:8]
+            from naming.context_tokens import build_token_values
+            tokens = build_token_values(refit_context)
+            trial8 = tokens["trial8"]
             trial_base_dir = output_dir / f"trial-{trial8}"
             refit_output_dir = trial_base_dir / "refit"
             refit_output_dir.mkdir(parents=True, exist_ok=True)

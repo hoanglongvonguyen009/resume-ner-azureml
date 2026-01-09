@@ -395,7 +395,7 @@ def create_colab_store(
         return None
 
     # Get backup base from config
-    from orchestration.paths import get_drive_backup_base
+    from paths import get_drive_backup_base
 
     backup_base = get_drive_backup_base(config_dir)
 

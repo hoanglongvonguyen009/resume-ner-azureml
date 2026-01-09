@@ -13,7 +13,8 @@ from orchestration.path_resolution import (
     resolve_output_path_for_colab,
     validate_path_before_mkdir,
 )
-from orchestration.naming_centralized import create_naming_context, build_output_path
+from naming import create_naming_context
+from paths import build_output_path
 
 logger = get_logger(__name__)
 

@@ -259,7 +259,17 @@ def create_local_hpo_objective(
                     trial_key = build_hpo_trial_key(
                         study_key_hash, hyperparameters)
                     trial_key_hash = build_hpo_trial_key_hash(trial_key)
-                    trial8 = trial_key_hash[:8]
+                    # Use token expansion for consistency
+                    from naming.context_tokens import build_token_values
+                    from naming.context import NamingContext
+                    temp_context = NamingContext(
+                        process_type="hpo",
+                        model=backbone.split("-")[0] if "-" in backbone else backbone,
+                        environment=detect_platform(),
+                        trial_key_hash=trial_key_hash
+                    )
+                    tokens = build_token_values(temp_context)
+                    trial8 = tokens["trial8"]
 
                     # Create trial-{hash} folder in study folder
                     trial_output_dir = output_base_dir / f"trial-{trial8}"
@@ -447,7 +457,7 @@ def run_local_hpo_sweep(
     v2_study_folder = None
     if study_key_hash:
         try:
-            from orchestration.paths import load_paths_config, apply_env_overrides, resolve_output_path
+            from paths import load_paths_config, apply_env_overrides, resolve_output_path
             from shared.platform_detection import detect_platform
 
             # Derive root_dir by walking up from output_dir until we find "outputs" directory
@@ -475,7 +485,17 @@ def run_local_hpo_sweep(
 
             pattern = paths_config.get("patterns", {}).get("hpo_v2", "")
             if pattern:
-                study8 = study_key_hash[:8]
+                # Use token expansion for consistency
+                from naming.context_tokens import build_token_values
+                from naming.context import NamingContext
+                temp_context = NamingContext(
+                    process_type="hpo",
+                    model=backbone.split("-")[0] if "-" in backbone else backbone,
+                    environment=detect_platform(),
+                    study_key_hash=study_key_hash
+                )
+                tokens = build_token_values(temp_context)
+                study8 = tokens["study8"]
                 model = backbone.split("-")[0] if "-" in backbone else backbone
 
                 v2_study_folder = hpo_base / \

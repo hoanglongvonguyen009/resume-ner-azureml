@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from shared.logging_utils import get_logger
-from orchestration.paths import parse_hpo_path_v2, is_v2_path
+from paths import parse_hpo_path_v2, is_v2_path
 
 logger = get_logger(__name__)
 

@@ -50,7 +50,7 @@ def create_trial_run_no_cv(
         # Build systematic run name using NamingContext
         run_name = None
         try:
-            from orchestration.naming_centralized import create_naming_context
+            from naming import create_naming_context
             from orchestration.jobs.tracking.mlflow_naming import (
                 build_mlflow_run_name,
                 build_mlflow_tags,

@@ -8,7 +8,7 @@ from typing import Optional
 import mlflow
 from mlflow.tracking import MlflowClient
 
-from orchestration.naming_centralized import NamingContext
+from naming.context import NamingContext
 from orchestration.jobs.tracking.mlflow_types import RunLookupReport
 from orchestration.jobs.tracking.mlflow_naming import build_mlflow_run_key, build_mlflow_run_key_hash
 from orchestration.jobs.tracking.mlflow_index import find_in_mlflow_index

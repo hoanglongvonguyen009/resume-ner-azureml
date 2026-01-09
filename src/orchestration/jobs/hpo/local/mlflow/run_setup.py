@@ -32,7 +32,7 @@ def setup_hpo_mlflow_run(
     Set up MLflow run name and context for HPO parent run.
     """
     try:
-        from orchestration.naming_centralized import create_naming_context
+        from naming import create_naming_context
         from orchestration.jobs.tracking.mlflow_naming import (
             build_mlflow_run_name,
             build_mlflow_tags,
@@ -135,7 +135,7 @@ def setup_hpo_mlflow_run(
                 load_naming_policy,
                 format_run_name,
             )
-            from orchestration.naming_centralized import create_naming_context
+            from naming import create_naming_context
             from shared.platform_detection import detect_platform
 
             config_dir = Path.cwd() / "config"

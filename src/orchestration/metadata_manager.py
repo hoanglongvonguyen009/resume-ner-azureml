@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
 
-from orchestration.paths import resolve_output_path
+from paths import resolve_output_path
 from shared.json_cache import load_json, save_json
 from shared.platform_detection import detect_platform
 

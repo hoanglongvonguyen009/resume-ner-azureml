@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 
-from orchestration.naming_centralized import NamingContext
+from naming.context import NamingContext
 
 
 def build_mlflow_run_key(context: NamingContext) -> str:

@@ -11,7 +11,8 @@ from shared.yaml_utils import load_yaml
 from shared.platform_detection import detect_platform
 from training.checkpoint_loader import validate_checkpoint
 from orchestration.config_loader import load_all_configs, ExperimentConfig
-from orchestration.naming_centralized import build_output_path, create_naming_context
+from naming import create_naming_context
+from paths import build_output_path
 
 
 def load_final_training_config(
@@ -387,7 +388,7 @@ def _resolve_checkpoint(
         backbone = best_config.get("backbone", "unknown")
         backbone_name = backbone.split("-")[0] if "-" in backbone else backbone
 
-        from orchestration.naming_centralized import create_naming_context
+        from naming import create_naming_context
 
         parent_context = create_naming_context(
             process_type="final_training",
@@ -528,7 +529,7 @@ def _resolve_checkpoint_from_fingerprints(
 
     # Priority 2: Metadata lookup (scan cache directory)
     try:
-        from orchestration.paths import resolve_output_path
+        from paths import resolve_output_path
         from shared.json_cache import load_json
 
         cache_dir = resolve_output_path(
@@ -552,7 +553,7 @@ def _resolve_checkpoint_from_fingerprints(
 
     # Priority 3: Cache lookup (latest training cache)
     try:
-        from orchestration.paths import resolve_output_path
+        from paths import resolve_output_path
         from shared.json_cache import load_json
 
         cache_dir = resolve_output_path(
@@ -662,7 +663,8 @@ def _find_existing_variant(
 
     # Fallback: scan output directories
     try:
-        from orchestration.naming_centralized import build_output_path, create_naming_context
+        from naming import create_naming_context
+        from paths import build_output_path
 
         variants = []
         for variant_num in range(1, 100):  # Reasonable limit
@@ -703,10 +705,8 @@ def _is_variant_complete(
     backbone_name = backbone.split("-")[0] if "-" in backbone else backbone
 
     try:
-        from orchestration.naming_centralized import (
-            build_output_path,
-            create_naming_context,
-        )
+        from naming import create_naming_context
+        from paths import build_output_path
 
         context = create_naming_context(
             process_type="final_training",

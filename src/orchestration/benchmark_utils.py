@@ -128,7 +128,7 @@ def run_benchmarking(
                 backbone = checkpoint_dir.name
 
             # Build run name using systematic naming with auto-increment
-            from orchestration.naming_centralized import create_naming_context
+            from naming import create_naming_context
             from orchestration.jobs.tracking.mlflow_naming import build_mlflow_run_name
             from shared.platform_detection import detect_platform
             from pathlib import Path

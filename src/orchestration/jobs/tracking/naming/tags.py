@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from shared.platform_detection import detect_platform
-from orchestration.naming_centralized import NamingContext
+from naming.context import NamingContext
 from orchestration.jobs.tracking.config.loader import get_naming_config
 from orchestration.jobs.tracking.naming.tags_registry import (
     TagKeyError,

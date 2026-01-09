@@ -373,7 +373,7 @@ def find_best_trial_from_study(
             # Try v2 path lookup using find_trial_by_hash
             if study_key_hash:
                 try:
-                    from orchestration.paths import find_trial_by_hash
+                    from paths import find_trial_by_hash
                     from shared.platform_detection import detect_platform
                     # Find project root and config_dir from hpo_backbone_dir
                     # hpo_backbone_dir is typically: outputs/hpo/{storage_env}/{model}

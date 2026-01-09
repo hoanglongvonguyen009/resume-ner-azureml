@@ -7,9 +7,9 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from orchestration.naming_centralized import NamingContext
-from orchestration.tokens import (
-    extract_placeholders,
+from naming.context import NamingContext
+from core.placeholders import extract_placeholders
+from core.tokens import (
     is_token_allowed,
     is_token_known,
 )

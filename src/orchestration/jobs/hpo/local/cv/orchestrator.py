@@ -142,8 +142,8 @@ def run_training_trial_with_cv(
     
     if computed_study_key_hash and computed_trial_key_hash:
         try:
-            from orchestration.naming_centralized import build_output_path, create_naming_context
-            from orchestration.paths import resolve_output_path
+            from naming import create_naming_context
+            from paths import build_output_path, resolve_output_path
             from shared.platform_detection import detect_platform
             
             # Derive root_dir and config_dir from output_dir
@@ -170,7 +170,19 @@ def run_training_trial_with_cv(
             
             # Create NamingContext for trial
             # For v2 paths, set trial_id to trial-{hash8} format so build_output_path can use it
-            trial_id_v2 = f"trial-{computed_trial_key_hash[:8]}" if computed_trial_key_hash else None
+            from naming.context_tokens import build_token_values
+            from naming.context import NamingContext
+            if computed_trial_key_hash:
+                temp_context = NamingContext(
+                    process_type="hpo",
+                    model=backbone.split("-")[0] if "-" in backbone else backbone,
+                    environment=detect_platform(),
+                    trial_key_hash=computed_trial_key_hash
+                )
+                tokens = build_token_values(temp_context)
+                trial_id_v2 = f"trial-{tokens['trial8']}"
+            else:
+                trial_id_v2 = None
             trial_context = create_naming_context(
                 process_type="hpo",
                 model=backbone.split("-")[0] if "-" in backbone else backbone,
@@ -207,7 +219,16 @@ def run_training_trial_with_cv(
         if is_v2_study_folder:
             if computed_trial_key_hash:
                 # We have the hash, construct v2 trial name manually
-                trial8 = computed_trial_key_hash[:8]
+                from naming.context_tokens import build_token_values
+                from naming.context import NamingContext
+                temp_context = NamingContext(
+                    process_type="hpo",
+                    model=backbone.split("-")[0] if "-" in backbone else backbone,
+                    environment=detect_platform(),
+                    trial_key_hash=computed_trial_key_hash
+                )
+                tokens = build_token_values(temp_context)
+                trial8 = tokens["trial8"]
                 trial_base_dir = output_dir / f"trial-{trial8}"
                 trial_base_dir.mkdir(parents=True, exist_ok=True)
             else:
@@ -231,7 +252,16 @@ def run_training_trial_with_cv(
                         }
                         trial_key = build_hpo_trial_key(computed_study_key_hash, hyperparameters)
                         computed_trial_key_hash = build_hpo_trial_key_hash(trial_key)
-                        trial8 = computed_trial_key_hash[:8]
+                        from naming.context_tokens import build_token_values
+                        from naming.context import NamingContext
+                        temp_context = NamingContext(
+                            process_type="hpo",
+                            model=backbone.split("-")[0] if "-" in backbone else backbone,
+                            environment=detect_platform(),
+                            trial_key_hash=computed_trial_key_hash
+                        )
+                        tokens = build_token_values(temp_context)
+                        trial8 = tokens["trial8"]
                         trial_base_dir = output_dir / f"trial-{trial8}"
                         trial_base_dir.mkdir(parents=True, exist_ok=True)
                     else:
@@ -384,7 +414,7 @@ def _create_trial_run(
         # Build systematic run name using NamingContext
         run_name = None
         try:
-            from orchestration.naming_centralized import create_naming_context
+            from naming import create_naming_context
             from orchestration.jobs.tracking.mlflow_naming import build_mlflow_run_name
             from shared.platform_detection import detect_platform
 

@@ -2,8 +2,8 @@
 
 from typing import Any, Dict, List
 
-from orchestration.tokens import (
-    extract_placeholders,
+from core.placeholders import extract_placeholders
+from core.tokens import (
     is_token_allowed,
     is_token_known,
 )
