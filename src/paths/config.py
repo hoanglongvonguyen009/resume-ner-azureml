@@ -151,20 +151,15 @@ def validate_paths_config(config: Dict[str, Any], config_path: Optional[Path] = 
             f"[paths.yaml] 'patterns' section must be a mapping for schema_version>=2{location}"
         )
 
-    # Import PROCESS_PATTERN_KEYS from resolve.py (will be created there)
-    # For now, use the required keys directly
-    try:
-        from paths.resolve import PROCESS_PATTERN_KEYS
-        required_pattern_keys = list(PROCESS_PATTERN_KEYS.values())
-    except ImportError:
-        # Fallback if resolve.py doesn't exist yet
-        required_pattern_keys = [
-            "final_training_v2",
-            "conversion_v2",
-            "best_config_v2",
-            "hpo_v2",
-            "benchmarking_v2",
-        ]
+    # Required pattern keys for schema v2 (matches PROCESS_PATTERN_KEYS in resolve.py)
+    # Note: We define this here to avoid circular import with resolve.py
+    required_pattern_keys = [
+        "final_training_v2",
+        "conversion_v2",
+        "best_config_v2",
+        "hpo_v2",
+        "benchmarking_v2",
+    ]
     
     missing = [key for key in required_pattern_keys if key not in patterns]
     if missing:
