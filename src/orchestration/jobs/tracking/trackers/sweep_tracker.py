@@ -1071,23 +1071,37 @@ class MLflowSweepTracker(BaseTracker):
                             artifact_path="best_trial_checkpoint"
                         )
                     else:
-                        # Need to activate target run temporarily for Azure ML
-                        # Use mlflow.start_run() with run_id to activate existing run
-                        # This creates a nested run context if parent is active (which is fine)
+                        # For Azure ML with active parent run, we have two options:
+                        # 1. Upload to parent (simpler, but artifact goes to parent)
+                        # 2. Use artifact repository directly (complex, but uploads to child)
+                        # 
+                        # Since Azure ML has limitations, we'll try to use the artifact repository
+                        # directly by getting it from the run info, bypassing the problematic builder
                         try:
-                            with mlflow.start_run(run_id=run_id_to_use):
-                                mlflow.log_artifact(
-                                    str(archive_path),
-                                    artifact_path="best_trial_checkpoint"
-                                )
-                        except Exception as nested_run_error:
-                            # If starting nested run fails (e.g., run_id not found or not a child),
-                            # fall back to uploading to active parent run
+                            # Get run info to construct artifact URI
+                            run_info = client.get_run(run_id_to_use)
+                            artifact_uri = run_info.info.artifact_uri
+                            
+                            # Import artifact repository utilities
+                            from mlflow.store.artifact.artifact_repository_registry import get_artifact_repository
+                            
+                            # Get artifact repository without tracking_uri (Azure ML doesn't need it)
+                            # The artifact_uri already contains all necessary information
+                            artifact_repo = get_artifact_repository(artifact_uri)
+                            
+                            # Upload directly using the repository
+                            artifact_repo.log_artifact(
+                                str(archive_path),
+                                "best_trial_checkpoint"
+                            )
+                        except Exception as direct_upload_error:
+                            # If direct upload fails, fall back to parent run upload
+                            # This is acceptable for Azure ML given its limitations
                             if active_run_id:
                                 logger.warning(
-                                    f"Could not activate child run {run_id_to_use} for upload. "
+                                    f"Could not upload directly to child run {run_id_to_use} for Azure ML. "
                                     f"Falling back to active parent run {active_run_id}. "
-                                    f"Error: {nested_run_error}"
+                                    f"Error: {direct_upload_error}"
                                 )
                                 mlflow.log_artifact(
                                     str(archive_path),
