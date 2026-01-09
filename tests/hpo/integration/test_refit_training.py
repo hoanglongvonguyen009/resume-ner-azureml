@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch, MagicMock
 
 import optuna
 
-from orchestration.jobs.hpo.local.refit.executor import run_refit_training
+from hpo.execution.local.refit import run_refit_training
 
 
 class TestRefitTrainingSetup:

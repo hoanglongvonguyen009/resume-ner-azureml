@@ -6,8 +6,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
 from orchestration.config_loader import load_experiment_config, load_all_configs
-from orchestration.jobs.hpo.local.mlflow.run_setup import setup_hpo_mlflow_run
-from orchestration.jobs.hpo.hpo_helpers import create_study_name
+from hpo.tracking.setup import setup_hpo_mlflow_run
+from hpo.utils.helpers import create_study_name
 
 
 class TestHPOSweepSetup:
@@ -264,7 +264,7 @@ run_names:
 
     def test_checkpoint_file_created(self, tmp_path):
         """Test that checkpoint file is created at {study_name}/study.db."""
-        from orchestration.jobs.hpo.local.checkpoint.manager import (
+        from hpo.checkpoint.storage import (
             resolve_storage_path,
         )
         

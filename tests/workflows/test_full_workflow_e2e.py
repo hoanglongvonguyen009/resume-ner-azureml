@@ -209,7 +209,7 @@ def test_full_workflow_e2e(
         return mock_result
     
     with patch('orchestration.jobs.hpo.local.trial.execution.subprocess.run', side_effect=subprocess_side_effect):
-        from orchestration.jobs.hpo.local_sweeps import run_local_hpo_sweep
+        from hpo import run_local_hpo_sweep
         
         environment = detect_platform()
         output_dir = ROOT_DIR / "outputs" / "hpo" / environment / "distilbert"

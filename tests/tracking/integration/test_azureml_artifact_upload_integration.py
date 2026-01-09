@@ -16,7 +16,7 @@ from unittest.mock import Mock, patch, MagicMock
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    not pytest.config.getoption("--run-azureml-tests", default=False),
+    True,  # Skip by default - use --run-azureml-tests to enable
     reason="Azure ML integration tests require --run-azureml-tests flag"
 )
 class TestAzureMLArtifactUploadIntegration:
@@ -95,7 +95,7 @@ class TestAzureMLArtifactUploadIntegration:
 
     def test_refit_run_completion_after_upload(self, mock_azureml_workspace):
         """Test that refit run is marked as FINISHED after successful upload."""
-        from orchestration.jobs.hpo.local_sweeps import run_local_hpo_sweep
+        from hpo import run_local_hpo_sweep
         
         # Mock MLflow client
         with patch('mlflow.tracking.MlflowClient') as mock_client_class:

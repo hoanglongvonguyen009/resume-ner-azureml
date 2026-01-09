@@ -13,60 +13,24 @@ import os
 import re
 
 import mlflow
-# Import azureml.mlflow to ensure Azure ML artifact repository is properly registered
-# This is required for Azure ML artifact uploads to work correctly
+# Import tracking.mlflow to ensure Azure ML compatibility patch is applied
+# Use try/except to handle cases where path isn't set up during pytest collection
 try:
-    import azureml.mlflow  # noqa: F401
-    
-    # Monkey-patch azureml_artifacts_builder to handle tracking_uri parameter gracefully
-    # This fixes a compatibility issue between MLflow 3.5.0 and azureml-mlflow 1.61.0
-    # MLflow passes tracking_uri, but some versions of azureml-mlflow don't accept it
-    import mlflow.store.artifact.artifact_repository_registry as arr
-    original_builder = arr._artifact_repository_registry._registry.get('azureml')
-    if original_builder:
-        import functools
-        import inspect
-        
-        # Get the original function's signature to see what it actually accepts
-        sig = inspect.signature(original_builder)
-        param_names = list(sig.parameters.keys())
-        
-        @functools.wraps(original_builder)
-        def patched_azureml_builder(artifact_uri=None, tracking_uri=None, registry_uri=None):
-            """Patched builder that handles tracking_uri parameter gracefully."""
-            # Try calling with all parameters first
-            try:
-                return original_builder(
-                    artifact_uri=artifact_uri,
-                    tracking_uri=tracking_uri,
-                    registry_uri=registry_uri
-                )
-            except TypeError as e:
-                # If tracking_uri is not accepted, try without it
-                if 'tracking_uri' in str(e) and 'unexpected keyword argument' in str(e):
-                    # Call without tracking_uri (some versions don't accept it despite signature)
-                    try:
-                        return original_builder(
-                            artifact_uri=artifact_uri,
-                            registry_uri=registry_uri
-                        )
-                    except TypeError:
-                        # Last resort: call with just artifact_uri
-                        return original_builder(artifact_uri=artifact_uri)
-                # Re-raise if it's a different error
-                raise
-        
-        # Register the patched builder
-        arr._artifact_repository_registry.register('azureml', patched_azureml_builder)
+from tracking.mlflow import (  # noqa: F401
+    get_mlflow_run_url,
+    upload_checkpoint_archive,
+    log_artifact_safe,
+)
 except ImportError:
-    pass  # Not using Azure ML, or azureml-mlflow not installed
+    # During pytest collection, path might not be set up yet
+    # These will be imported lazily when actually needed
+    pass
 
 from shared.logging_utils import get_logger
 
 from orchestration.jobs.tracking.mlflow_types import RunHandle
 from orchestration.jobs.tracking.mlflow_naming import build_mlflow_tags, build_mlflow_run_key, build_mlflow_run_key_hash
 from orchestration.jobs.tracking.mlflow_index import update_mlflow_index
-from orchestration.jobs.tracking.utils.mlflow_utils import get_mlflow_run_url, retry_with_backoff
 from orchestration.jobs.tracking.artifacts.manager import create_checkpoint_archive
 from orchestration.jobs.tracking.trackers.base_tracker import BaseTracker
 # Tag key imports moved to local scope where needed
@@ -907,51 +871,16 @@ class MLflowSweepTracker(BaseTracker):
                     checkpoint_dir, best_trial_number
                 )
 
-                # Upload archive with retry logic using MLflow
-                logger.info(
-                    f"Uploading checkpoint archive via MLflow ({archive_path.stat().st_size / 1024 / 1024:.1f}MB)...")
-
-                def upload_archive():
-                    mlflow.log_artifact(
-                        str(archive_path),
-                        artifact_path="best_trial_checkpoint.tar.gz"
-                    )
-
-                retry_with_backoff(
-                    upload_archive,
+                # Upload archive with retry logic using safe utility
+                artifact_logged = upload_checkpoint_archive(
+                    archive_path=archive_path,
+                    manifest=manifest,
+                    artifact_path="best_trial_checkpoint.tar.gz",
+                    run_id=None,  # Use active run
                     max_retries=5,
                     base_delay=2.0,
-                    operation_name="checkpoint archive upload (MLflow)"
+                    cleanup_on_failure=False,  # We'll clean up in finally block
                 )
-
-                # Upload manifest.json
-                try:
-                    manifest_json = json.dumps(manifest, indent=2)
-                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_manifest:
-                        tmp_manifest.write(manifest_json)
-                        tmp_manifest_path = Path(tmp_manifest.name)
-
-                    try:
-                        def upload_manifest():
-                            mlflow.log_artifact(
-                                str(tmp_manifest_path),
-                                artifact_path="best_trial_checkpoint_manifest.json"
-                            )
-
-                        retry_with_backoff(
-                            upload_manifest,
-                            max_retries=3,
-                            base_delay=1.0,
-                            operation_name="manifest upload (MLflow)"
-                        )
-                        logger.debug("Uploaded checkpoint manifest.json")
-                    finally:
-                        tmp_manifest_path.unlink(missing_ok=True)
-                except Exception as manifest_error:
-                    logger.warning(
-                        f"Could not upload manifest.json: {manifest_error}")
-
-                artifact_logged = True
                 logger.info(
                     f"Uploaded best trial checkpoint archive: {manifest['file_count']} files "
                     f"({manifest['total_size'] / 1024 / 1024:.1f}MB) for trial {best_trial_number}"
@@ -1097,9 +1026,8 @@ class MLflowSweepTracker(BaseTracker):
 
         try:
             logger.info("Uploading checkpoint archive to MLflow...")
-            
+
             # Always upload to the target run (refit_run_id if available, otherwise parent_run_id)
-            # The monkey-patch handles the tracking_uri issue, so client.log_artifact() should work
             # Uploading to refit run ensures it can be marked as FINISHED after artifact upload
             if refit_run_id:
                 logger.info(
@@ -1111,20 +1039,15 @@ class MLflowSweepTracker(BaseTracker):
                     f"Uploading checkpoint to parent run {parent_run_id[:12]}"
                 )
             
-            # Use MLflowClient with explicit run_id to upload to the target run
-            # The monkey-patch will handle any tracking_uri compatibility issues
-            def upload_archive():
-                client.log_artifact(
-                    run_id_to_use,
-                    str(archive_path),
-                    artifact_path="best_trial_checkpoint"
-                )
-
-            retry_with_backoff(
-                upload_archive,
+            # Use safe upload utility with explicit run_id
+            upload_checkpoint_archive(
+                archive_path=archive_path,
+                manifest=manifest,
+                artifact_path="best_trial_checkpoint",
+                run_id=run_id_to_use,
                 max_retries=5,
                 base_delay=2.0,
-                operation_name="checkpoint archive upload (MLflow)"
+                cleanup_on_failure=False,  # We'll clean up in finally block
             )
 
             logger.info(

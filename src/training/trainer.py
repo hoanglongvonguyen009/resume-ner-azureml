@@ -539,9 +539,11 @@ def train_model(
                     checkpoint_dir = output_dir / "checkpoint"
                     if checkpoint_dir.exists():
                         print(f"  [Training] Logging checkpoint artifacts from: {checkpoint_dir}", file=sys.stderr, flush=True)
-                        mlflow.log_artifacts(
-                            str(checkpoint_dir),
-                            artifact_path="checkpoint"
+                        from tracking.mlflow import log_artifacts_safe, log_artifact_safe
+                        log_artifacts_safe(
+                            local_dir=checkpoint_dir,
+                            artifact_path="checkpoint",
+                            run_id=None,  # Use active run
                         )
                         print(f"  [Training] ✓ Logged checkpoint artifacts to MLflow", file=sys.stderr, flush=True)
                     else:
@@ -550,9 +552,11 @@ def train_model(
                     # Log metrics.json if it exists
                     metrics_json_path = output_dir / "metrics.json"
                     if metrics_json_path.exists():
-                        mlflow.log_artifact(
-                            str(metrics_json_path),
-                            artifact_path="metrics.json"
+                        from tracking.mlflow import log_artifact_safe
+                        log_artifact_safe(
+                            local_path=metrics_json_path,
+                            artifact_path="metrics.json",
+                            run_id=None,  # Use active run
                         )
                         print(f"  [Training] ✓ Logged metrics.json to MLflow", file=sys.stderr, flush=True)
                 else:

@@ -8,8 +8,8 @@ from unittest.mock import Mock, patch, MagicMock
 
 import optuna
 
-from orchestration.jobs.hpo.local.study.manager import StudyManager
-from orchestration.jobs.hpo.local.checkpoint.manager import resolve_storage_path, get_storage_uri
+from hpo.core.study import StudyManager
+from hpo.checkpoint.storage import resolve_storage_path, get_storage_uri
 
 
 class TestCheckpointCreation:

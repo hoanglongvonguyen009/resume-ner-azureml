@@ -18,7 +18,13 @@ from shared.logging_utils import get_logger
 from orchestration.jobs.tracking.mlflow_types import RunHandle
 from orchestration.jobs.tracking.mlflow_naming import build_mlflow_tags, build_mlflow_run_key, build_mlflow_run_key_hash
 from orchestration.jobs.tracking.mlflow_index import update_mlflow_index
-from orchestration.jobs.tracking.utils.mlflow_utils import get_mlflow_run_url, retry_with_backoff
+from orchestration.jobs.tracking.utils.mlflow_utils import retry_with_backoff
+# Lazy import to avoid pytest collection issues
+try:
+from tracking.mlflow import get_mlflow_run_url
+except ImportError:
+    # During pytest collection, path might not be set up yet
+    get_mlflow_run_url = None
 from orchestration.jobs.tracking.artifacts.manager import create_checkpoint_archive
 from orchestration.jobs.tracking.trackers.base_tracker import BaseTracker
 
@@ -442,11 +448,13 @@ class MLflowBenchmarkTracker(BaseTracker):
                     current = current.parent
             
             from orchestration.jobs.tracking.config.loader import get_tracking_config
+            from tracking.mlflow import log_artifact_safe
             tracking_config = get_tracking_config(config_dir=config_dir, stage="benchmark")
             if tracking_config.get("log_artifacts", True) and benchmark_json_path.exists():
-                mlflow.log_artifact(
-                    str(benchmark_json_path),
-                    artifact_path="benchmark.json"
+                log_artifact_safe(
+                    local_path=benchmark_json_path,
+                    artifact_path="benchmark.json",
+                    run_id=None,  # Use active run
                 )
             elif not tracking_config.get("log_artifacts", True):
                 logger.debug("[Benchmark Tracker] Artifact logging disabled (tracking.benchmark.log_artifacts=false)")

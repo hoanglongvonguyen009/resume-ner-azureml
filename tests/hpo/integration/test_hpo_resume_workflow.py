@@ -6,8 +6,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 import optuna
 
-from orchestration.jobs.hpo.local_sweeps import run_local_hpo_sweep
-from orchestration.jobs.hpo.local.study.manager import StudyManager
+from hpo import run_local_hpo_sweep
+from hpo.core.study import StudyManager
 from orchestration.constants import METRICS_FILENAME
 
 

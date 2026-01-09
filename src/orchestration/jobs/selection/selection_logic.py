@@ -9,7 +9,7 @@ from shared.logging_utils import get_logger
 
 from .disk_loader import load_benchmark_speed_score, load_best_trial_from_disk
 from ..errors import SelectionError
-from ..hpo.study_extractor import extract_best_config_from_study
+from hpo import extract_best_config_from_study
 
 logger = get_logger(__name__)
 

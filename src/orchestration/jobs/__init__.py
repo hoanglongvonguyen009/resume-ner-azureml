@@ -39,10 +39,9 @@ except ImportError:
     register_online_endpoints = None
 
 # Local-only utilities (always available)
-from .hpo.local_sweeps import (
-    run_local_hpo_sweep,
-    translate_search_space_to_optuna,
-)
+# Import from new hpo module (lazy import to avoid circular dependency)
+# These will be imported on first use via the backward compatibility facade
+# For direct access, use: from hpo import run_local_hpo_sweep
 from .local_selection import (
     select_best_configuration_across_studies,
     extract_best_config_from_study,
@@ -64,8 +63,8 @@ __all__ = [
     "create_conversion_job",
     "validate_conversion_job",
     # Local helpers (always available)
-    "run_local_hpo_sweep",
-    "translate_search_space_to_optuna",
+    # Note: run_local_hpo_sweep and translate_search_space_to_optuna are now in 'hpo' module
+    # Use: from hpo import run_local_hpo_sweep
     "select_best_configuration_across_studies",
     "extract_best_config_from_study",
     "load_best_trial_from_disk",

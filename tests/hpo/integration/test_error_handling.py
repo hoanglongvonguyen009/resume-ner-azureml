@@ -5,14 +5,17 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from orchestration.jobs.hpo.local.trial.execution import run_training_trial, TrialExecutor
-from orchestration.jobs.hpo.local.trial.metrics import read_trial_metrics
-from orchestration.jobs.hpo.local.cv.orchestrator import run_training_trial_with_cv
-from orchestration.jobs.hpo.local.refit.executor import run_refit_training
-from orchestration.jobs.hpo.local.study.manager import StudyManager
-from orchestration.jobs.hpo.study_extractor import extract_best_config_from_study
+from hpo import (
+    TrialExecutor,
+    extract_best_config_from_study,
+    SearchSpaceTranslator,
+)
+from hpo.execution.local.trial import run_training_trial
+from hpo.execution.local.cv import run_training_trial_with_cv
+from hpo.execution.local.refit import run_refit_training
+from hpo.trial.metrics import read_trial_metrics
+from hpo.core.study import StudyManager
 from orchestration.jobs.selection.selection_logic import SelectionLogic
-from orchestration.jobs.hpo.search_space import SearchSpaceTranslator
 from orchestration.constants import METRICS_FILENAME
 import optuna
 
@@ -443,13 +446,13 @@ class TestMLflowErrors:
         
         # The code should handle this gracefully (either log warning or raise)
         # This depends on implementation - check if it raises or logs
-        from orchestration.jobs.hpo.local.trial.run_manager import create_trial_run_no_cv
+        from hpo.tracking.runs import create_trial_run_no_cv
         
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         
         # Should either raise or return None/empty
-        from orchestration.jobs.hpo.local.trial.run_manager import create_trial_run_no_cv
+        from hpo.tracking.runs import create_trial_run_no_cv
         with pytest.raises(Exception, match="MLflow connection failed|unexpected keyword"):
             create_trial_run_no_cv(
                 trial_params={"backbone": "distilbert", "trial_number": 0},

@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import optuna
 
-from orchestration.jobs.hpo.study_extractor import extract_best_config_from_study
+from hpo import extract_best_config_from_study
 from orchestration.jobs.selection.selection_logic import SelectionLogic
 
 

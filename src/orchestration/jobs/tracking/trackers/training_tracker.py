@@ -18,7 +18,13 @@ from shared.logging_utils import get_logger
 from orchestration.jobs.tracking.mlflow_types import RunHandle
 from orchestration.jobs.tracking.mlflow_naming import build_mlflow_tags, build_mlflow_run_key, build_mlflow_run_key_hash
 from orchestration.jobs.tracking.mlflow_index import update_mlflow_index
-from orchestration.jobs.tracking.utils.mlflow_utils import get_mlflow_run_url, retry_with_backoff
+from orchestration.jobs.tracking.utils.mlflow_utils import retry_with_backoff
+# Lazy import to avoid pytest collection issues
+try:
+from tracking.mlflow import get_mlflow_run_url
+except ImportError:
+    # During pytest collection, path might not be set up yet
+    get_mlflow_run_url = None
 from orchestration.jobs.tracking.artifacts.manager import create_checkpoint_archive
 from orchestration.jobs.tracking.trackers.base_tracker import BaseTracker
 
@@ -284,20 +290,23 @@ class MLflowTrainingTracker(BaseTracker):
             tracking_config = get_tracking_config(config_dir=config_dir, stage="training")
             
             # Use MLflow for artifact upload (works for both Azure ML and non-Azure ML backends)
+            from tracking.mlflow import log_artifacts_safe, log_artifact_safe
             # Log checkpoint directory if enabled
             if tracking_config.get("log_checkpoint", True) and checkpoint_dir.exists():
-                mlflow.log_artifacts(
-                    str(checkpoint_dir),
-                    artifact_path="checkpoint"
+                log_artifacts_safe(
+                    local_dir=checkpoint_dir,
+                    artifact_path="checkpoint",
+                    run_id=None,  # Use active run
                 )
             elif not tracking_config.get("log_checkpoint", True):
                 logger.debug("[Training Tracker] Checkpoint logging disabled (tracking.training.log_checkpoint=false)")
 
             # Log metrics.json if provided and enabled
             if tracking_config.get("log_metrics_json", True) and metrics_json_path and metrics_json_path.exists():
-                mlflow.log_artifact(
-                    str(metrics_json_path),
-                    artifact_path="metrics.json"
+                log_artifact_safe(
+                    local_path=metrics_json_path,
+                    artifact_path="metrics.json",
+                    run_id=None,  # Use active run
                 )
             elif not tracking_config.get("log_metrics_json", True):
                 logger.debug("[Training Tracker] Metrics JSON logging disabled (tracking.training.log_metrics_json=false)")

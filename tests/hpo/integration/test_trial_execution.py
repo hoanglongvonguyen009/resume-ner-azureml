@@ -5,8 +5,8 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from orchestration.jobs.hpo.local.trial.execution import TrialExecutor
-from orchestration.jobs.hpo.local.cv.orchestrator import run_training_trial_with_cv
+from hpo import TrialExecutor
+from hpo.execution.local.cv import run_training_trial_with_cv
 
 
 class TestTrialExecutionNoCV:

@@ -18,7 +18,13 @@ from shared.logging_utils import get_logger
 from orchestration.jobs.tracking.mlflow_types import RunHandle
 from orchestration.jobs.tracking.mlflow_naming import build_mlflow_tags, build_mlflow_run_key, build_mlflow_run_key_hash
 from orchestration.jobs.tracking.mlflow_index import update_mlflow_index
-from orchestration.jobs.tracking.utils.mlflow_utils import get_mlflow_run_url, retry_with_backoff
+from orchestration.jobs.tracking.utils.mlflow_utils import retry_with_backoff
+# Lazy import to avoid pytest collection issues
+try:
+from tracking.mlflow import get_mlflow_run_url
+except ImportError:
+    # During pytest collection, path might not be set up yet
+    get_mlflow_run_url = None
 from orchestration.jobs.tracking.artifacts.manager import create_checkpoint_archive
 from orchestration.jobs.tracking.trackers.base_tracker import BaseTracker
 
@@ -209,22 +215,13 @@ class MLflowConversionTracker(BaseTracker):
                 max_retries = 3
                 retry_delay = 2
 
-                for attempt in range(max_retries):
-                    try:
-                        mlflow.log_artifact(
-                            str(onnx_model_path),
+                from tracking.mlflow import log_artifact_safe
+                log_artifact_safe(
+                    local_path=onnx_model_path,
                             artifact_path=artifact_name,
-                        )
-                        break
-                    except Exception as upload_err:
-                        if attempt < max_retries - 1:
-                            time.sleep(
-                                retry_delay * (2 ** attempt)
-                            )
-                        else:
-                            logger.warning(
-                                f"Failed to upload {artifact_name} after "
-                                f"{max_retries} attempts: {upload_err}"
+                    run_id=None,  # Use active run
+                    max_retries=max_retries,
+                    base_delay=retry_delay,
                             )
             elif not tracking_config.get("log_onnx_model", True):
                 logger.debug("[Conversion Tracker] ONNX model logging disabled (tracking.conversion.log_onnx_model=false)")
@@ -234,22 +231,13 @@ class MLflowConversionTracker(BaseTracker):
                 max_retries = 3
                 retry_delay = 2
 
-                for attempt in range(max_retries):
-                    try:
-                        mlflow.log_artifact(
-                            str(conversion_log_path),
+                from tracking.mlflow import log_artifact_safe
+                log_artifact_safe(
+                    local_path=conversion_log_path,
                             artifact_path="conversion_log.txt",
-                        )
-                        break
-                    except Exception as upload_err:
-                        if attempt < max_retries - 1:
-                            time.sleep(
-                                retry_delay * (2 ** attempt)
-                            )
-                        else:
-                            logger.warning(
-                                "Failed to upload conversion_log.txt after "
-                                f"{max_retries} attempts: {upload_err}"
+                    run_id=None,  # Use active run
+                    max_retries=max_retries,
+                    base_delay=retry_delay,
                             )
             elif not tracking_config.get("log_conversion_log", True):
                 logger.debug("[Conversion Tracker] Conversion log logging disabled (tracking.conversion.log_conversion_log=false)")

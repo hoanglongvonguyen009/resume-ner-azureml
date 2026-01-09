@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 import optuna
 from optuna.pruners import MedianPruner
 
-from orchestration.jobs.hpo.local.optuna.integration import create_optuna_pruner
+from hpo.core.optuna_integration import create_optuna_pruner
 
 
 class TestPrunerCreation:
@@ -235,7 +235,7 @@ class TestPruningBehavior:
 
     def test_pruner_with_study_manager(self, tmp_path):
         """Test that StudyManager creates pruner correctly."""
-        from orchestration.jobs.hpo.local.study.manager import StudyManager
+        from hpo.core.study import StudyManager
         
         output_dir = tmp_path / "outputs" / "hpo"
         hpo_config = {
@@ -331,7 +331,7 @@ class TestPruningIntegration:
 
     def test_pruning_with_checkpoint_resume(self, tmp_path):
         """Test that pruning works correctly after checkpoint resume."""
-        from orchestration.jobs.hpo.local.study.manager import StudyManager
+        from hpo.core.study import StudyManager
         
         output_dir = tmp_path / "outputs" / "hpo"
         hpo_config = {

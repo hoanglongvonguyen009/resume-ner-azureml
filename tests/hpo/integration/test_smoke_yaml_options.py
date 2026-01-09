@@ -8,9 +8,9 @@ from unittest.mock import Mock, patch, MagicMock
 
 import optuna
 
-from orchestration.jobs.hpo.local.checkpoint.cleanup import CheckpointCleanupManager
-from orchestration.jobs.hpo.local.mlflow.cleanup import should_skip_cleanup
-from orchestration.jobs.hpo.local.study.manager import StudyManager
+from hpo.checkpoint.cleanup import CheckpointCleanupManager
+from hpo.tracking.cleanup import should_skip_cleanup
+from hpo.core.study import StudyManager
 
 
 class TestTimeoutMinutes:

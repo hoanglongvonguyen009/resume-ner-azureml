@@ -69,7 +69,7 @@ from orchestration.config_loader import (
     compute_config_hashes,
     create_config_metadata,
 )
-from orchestration.jobs.hpo.local_sweeps import run_local_hpo_sweep
+from hpo import run_local_hpo_sweep
 from orchestration.jobs.benchmarking import benchmark_best_trials
 from orchestration.jobs.selection.trial_finder import find_best_trials_for_backbones
 from shared.platform_detection import detect_platform

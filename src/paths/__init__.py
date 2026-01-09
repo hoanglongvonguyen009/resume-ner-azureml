@@ -27,6 +27,7 @@ from paths.resolve import (
     build_output_path,
     resolve_output_path,
 )
+from paths.utils import find_project_root
 from paths.validation import (
     validate_output_path,
     validate_path_before_mkdir,
@@ -58,5 +59,7 @@ __all__ = [
     "is_v2_path",
     "find_study_by_hash",
     "find_trial_by_hash",
+    # Utils
+    "find_project_root",
 ]
 

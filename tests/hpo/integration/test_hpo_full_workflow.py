@@ -6,8 +6,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 import optuna
 
-from orchestration.jobs.hpo.local_sweeps import run_local_hpo_sweep
-from orchestration.jobs.hpo.study_extractor import extract_best_config_from_study
+from hpo import run_local_hpo_sweep, extract_best_config_from_study
 from orchestration.jobs.selection.selection_logic import SelectionLogic
 from orchestration.constants import METRICS_FILENAME
 

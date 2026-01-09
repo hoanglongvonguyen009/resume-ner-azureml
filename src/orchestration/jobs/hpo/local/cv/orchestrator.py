@@ -615,7 +615,8 @@ def _log_cv_metrics_to_trial_run(
 
         # End the trial run to mark it as completed
         trial_number = trial_params.get('trial_number', 'unknown')
-        client.set_terminated(trial_run_id, status="FINISHED")
+        from tracking.mlflow import terminate_run_safe
+        terminate_run_safe(trial_run_id, status="FINISHED", check_status=True)
     except Exception as e:
         logger.warning(f"Could not log metrics to trial run: {e}")
 

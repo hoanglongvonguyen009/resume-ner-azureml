@@ -180,7 +180,8 @@ def finalize_trial_run_no_cv(trial_run_id: str, trial_number: int) -> None:
             f"{trial_run_id[:12]}... as FINISHED (trial {trial_number})"
         )
         client = mlflow.tracking.MlflowClient()
-        client.set_terminated(trial_run_id, status="FINISHED")
+        from tracking.mlflow import terminate_run_safe
+        terminate_run_safe(trial_run_id, status="FINISHED", check_status=True)
         logger.info(
             f"[TRIAL_RUN_NO_CV] Successfully marked trial run "
             f"{trial_run_id[:12]}... as FINISHED"

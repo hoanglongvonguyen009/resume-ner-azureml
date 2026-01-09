@@ -1,41 +1,60 @@
 """Hyperparameter Optimization (HPO) utilities.
 
-This module provides HPO functionality for both local (Optuna) and Azure ML execution.
+DEPRECATED: This module is maintained for backward compatibility only.
+Please import from `hpo` module directly instead.
+
+Example:
+    # Old (deprecated):
+    from orchestration.jobs.hpo import run_local_hpo_sweep
+    
+    # New (preferred):
+    from hpo import run_local_hpo_sweep
 """
 
 from __future__ import annotations
 
-# Import hpo_helpers first to avoid circular dependency
-from .hpo_helpers import (
+import warnings
+
+# Re-export all public functions from hpo/ module
+from hpo import (
+    # Checkpoint management
+    get_storage_uri,
+    resolve_storage_path,
+    # HPO helpers
     create_mlflow_run_name,
     create_study_name,
     generate_run_id,
     setup_checkpoint_storage,
-)
-# Import checkpoint.manager after hpo_helpers to break circular dependency
-from .local.checkpoint.manager import get_storage_uri, resolve_storage_path
-from .local_sweeps import run_local_hpo_sweep, translate_search_space_to_optuna
-from .search_space import (
+    # Local sweeps
+    run_local_hpo_sweep,
+    translate_search_space_to_optuna,
+    # Search space
     SearchSpaceTranslator,
     create_search_space,
-    translate_search_space_to_optuna as translate_search_space,
+    # Study extraction
+    extract_best_config_from_study,
+    # Azure ML sweeps
+    create_dry_run_sweep_job_for_backbone,
+    create_hpo_sweep_job_for_backbone,
+    validate_sweep_job,
+    # Trial execution
+    TrialExecutor,
 )
-from .study_extractor import extract_best_config_from_study
 
-# Azure ML-dependent imports (optional)
-try:
-    from .azureml.sweeps import (
-        create_dry_run_sweep_job_for_backbone,
-        create_hpo_sweep_job_for_backbone,
-        validate_sweep_job,
-    )
-except ImportError:
-    # Azure ML SDK not available; skip Azure-specific helpers.
-    create_dry_run_sweep_job_for_backbone = None
-    create_hpo_sweep_job_for_backbone = None
-    validate_sweep_job = None
+# Re-export backup function (still in old location, not moved per plan)
+from orchestration.jobs.hpo.local.backup import backup_hpo_study_to_drive
 
-from .local.trial.execution import TrialExecutor
+# Re-export trial meta function
+from hpo.trial.meta import generate_missing_trial_meta_for_all_studies
+
+# Issue deprecation warning on import
+warnings.warn(
+    "Importing from 'orchestration.jobs.hpo' is deprecated. "
+    "Please use 'hpo' module directly instead. "
+    "Example: 'from hpo import run_local_hpo_sweep'",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = [
     # Checkpoint management
@@ -61,4 +80,8 @@ __all__ = [
     "validate_sweep_job",
     # Trial execution
     "TrialExecutor",
+    # Backup utilities
+    "backup_hpo_study_to_drive",
+    # Trial meta
+    "generate_missing_trial_meta_for_all_studies",
 ]

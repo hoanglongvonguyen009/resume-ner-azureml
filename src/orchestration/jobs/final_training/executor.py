@@ -454,10 +454,8 @@ def execute_final_training(
     # Handle subprocess failure - ensure run is marked as FAILED
     if result.returncode != 0:
         if run_id:
-            try:
-                client.set_terminated(run_id, status="FAILED")
-            except Exception as e:
-                print(f"⚠ Could not mark run as FAILED: {e}")
+            from tracking.mlflow import terminate_run_safe
+            terminate_run_safe(run_id, status="FAILED", check_status=True)
         raise RuntimeError(
             f"Final training failed with return code {result.returncode}\n"
             f"STDOUT: {result.stdout}\n"
@@ -503,13 +501,8 @@ def execute_final_training(
                 print(filtered_stderr, file=sys.stderr)
         # Subprocess should have ended the run, but verify it's terminated
         if run_id:
-            try:
-                run_info = client.get_run(run_id)
-                if run_info.info.status == "RUNNING":
-                    # Subprocess didn't end the run, mark it as finished
-                    client.set_terminated(run_id, status="FINISHED")
-            except Exception as e:
-                print(f"⚠ Could not verify run status: {e}")
+            from tracking.mlflow import ensure_run_terminated
+            ensure_run_terminated(run_id, expected_status="FINISHED")
 
     # Find final checkpoint directory
     final_checkpoint_dir = final_output_dir / "checkpoint"

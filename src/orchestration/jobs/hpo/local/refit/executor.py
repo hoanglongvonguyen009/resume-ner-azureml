@@ -23,7 +23,12 @@ from orchestration.jobs.tracking.mlflow_naming import (
     build_mlflow_run_key_hash,
 )
 # Tag key imports moved to local scope where needed
-from orchestration.jobs.tracking.utils.mlflow_utils import get_mlflow_run_url
+# Lazy import to avoid pytest collection issues
+try:
+from tracking.mlflow import get_mlflow_run_url
+except ImportError:
+    # During pytest collection, path might not be set up yet
+    get_mlflow_run_url = None
 from shared.platform_detection import detect_platform
 
 logger = get_logger(__name__)
@@ -506,7 +511,12 @@ from orchestration.jobs.tracking.mlflow_naming import (
     build_mlflow_run_key_hash,
 )
 # Tag key imports moved to local scope where needed
-from orchestration.jobs.tracking.utils.mlflow_utils import get_mlflow_run_url
+# Lazy import to avoid pytest collection issues
+try:
+from tracking.mlflow import get_mlflow_run_url
+except ImportError:
+    # During pytest collection, path might not be set up yet
+    get_mlflow_run_url = None
 from shared.platform_detection import detect_platform
 
 logger = get_logger(__name__)

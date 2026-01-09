@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import Mock, MagicMock
 
-from orchestration.jobs.hpo.search_space import (
+from hpo import (
     translate_search_space_to_optuna,
     SearchSpaceTranslator,
 )
