@@ -1050,20 +1050,62 @@ class MLflowSweepTracker(BaseTracker):
         try:
             logger.info("Uploading checkpoint archive to MLflow...")
 
-            # Use mlflow.log_artifact() within active run context to avoid Azure ML artifact repository issue
-            # MLflowClient().log_artifact() with explicit run_id causes issues with Azure ML backend
-            # because it tries to pass tracking_uri to azureml_artifacts_builder() which doesn't accept it
+            # Determine if target run is a child run (refit run) or parent run
+            active_run = mlflow.active_run()
+            active_run_id = active_run.info.run_id if active_run else None
+            
+            # Check if we're trying to upload to a child run (refit) when parent is active
+            is_child_run = refit_run_id is not None and refit_run_id == run_id_to_use
+            is_parent_active = active_run_id == parent_run_id if (parent_run_id and active_run_id) else False
+            is_target_active = active_run_id == run_id_to_use if (run_id_to_use and active_run_id) else False
+
             def upload_archive():
                 # Check if target run is already active
-                active_run = mlflow.active_run()
-                if active_run and active_run.info.run_id == run_id_to_use:
+                if is_target_active:
                     # Run is already active, just log artifact directly
                     mlflow.log_artifact(
                         str(archive_path),
                         artifact_path="best_trial_checkpoint"
                     )
+                elif is_child_run and is_parent_active:
+                    # Target is a child run and parent is active - can't start child run
+                    # Use MlflowClient directly (may have Azure ML issues, but it's the only option)
+                    # For Azure ML, we'll catch the error and use a workaround
+                    try:
+                        client.log_artifact(
+                            run_id_to_use,
+                            str(archive_path),
+                            artifact_path="best_trial_checkpoint"
+                        )
+                    except (TypeError, Exception) as e:
+                        error_str = str(e)
+                        if "tracking_uri" in error_str or "azureml_artifacts_builder" in error_str:
+                            # Azure ML artifact repository issue - try workaround: use nested run
+                            logger.warning(
+                                f"Azure ML artifact upload issue detected. "
+                                f"Attempting workaround for child run {run_id_to_use[:12]}..."
+                            )
+                            try:
+                                # Try using nested run context
+                                with mlflow.start_run(run_id=run_id_to_use, nested=True):
+                                    mlflow.log_artifact(
+                                        str(archive_path),
+                                        artifact_path="best_trial_checkpoint"
+                                    )
+                            except Exception as nested_error:
+                                # If nested run also fails, log warning and skip
+                                logger.warning(
+                                    f"Could not upload checkpoint to child run {run_id_to_use[:12]}... "
+                                    f"due to Azure ML limitations. "
+                                    f"Checkpoint is available locally at: {checkpoint_dir}. "
+                                    f"Error: {nested_error}"
+                                )
+                                # Don't raise - checkpoint is still available locally
+                                return
+                        else:
+                            raise
                 else:
-                    # Run is not active, start it temporarily
+                    # Run is not active and not a child run, start it temporarily
                     with mlflow.start_run(run_id=run_id_to_use):
                         mlflow.log_artifact(
                             str(archive_path),
