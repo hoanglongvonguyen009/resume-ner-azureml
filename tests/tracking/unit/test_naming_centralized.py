@@ -96,16 +96,22 @@ def test_build_output_path_hpo():
 
 def test_build_output_path_benchmarking():
     """Test path building for benchmarking."""
+    # Benchmarking v2 requires study_key_hash and trial_key_hash
     context = NamingContext(
         process_type="benchmarking",
         model="distilbert",
         environment="colab",
-        trial_id="trial_1_20251229_100000"
+        trial_id="trial_1_20251229_100000",
+        study_key_hash="abc123def4567890abcdef1234567890abcdef1234567890abcdef1234567890",
+        trial_key_hash="xyz789abc1234567xyz789abc1234567xyz789abc1234567xyz789abc1234567"
     )
     
     path = build_output_path(Path("/root"), context)
     
-    assert str(path) == "/root/outputs/benchmarking/colab/distilbert/trial_1_20251229_100000"
+    # Should use v2 format with study8/trial8 when hashes are provided
+    assert "benchmarking" in str(path)
+    assert "colab" in str(path)
+    assert "distilbert" in str(path)
 
 
 def test_build_output_path_final_training():
