@@ -6,7 +6,12 @@ import time
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-import optuna
+# Lazy import optuna to allow tests to be skipped if not available
+try:
+    import optuna
+except ImportError:
+    optuna = None
+    pytest.skip("optuna not available", allow_module_level=True)
 
 from hpo.checkpoint.cleanup import CheckpointCleanupManager
 from hpo.tracking.cleanup import should_skip_cleanup

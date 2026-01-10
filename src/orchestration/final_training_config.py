@@ -12,9 +12,9 @@ __all__ = [
 ]
 
 # Issue deprecation warning
-        warnings.warn(
+warnings.warn(
     "Importing 'final_training_config' from 'orchestration' is deprecated. "
     "Please import from 'config.training' instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
+    DeprecationWarning,
+    stacklevel=2
+)

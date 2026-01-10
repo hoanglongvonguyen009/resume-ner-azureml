@@ -2,9 +2,17 @@
 
 import json
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, TYPE_CHECKING
 from unittest.mock import Mock
-import optuna
+
+# Lazy import optuna to allow tests to be skipped if not available
+try:
+    import optuna
+except ImportError:
+    optuna = None
+
+if TYPE_CHECKING:
+    import optuna as optuna_type
 
 
 def create_mock_trial(trial_number: int, params: Dict[str, Any], metric_value: float) -> Mock:
@@ -19,6 +27,17 @@ def create_mock_trial(trial_number: int, params: Dict[str, Any], metric_value: f
     Returns:
         Mock trial with attributes.
     """
+    if optuna is None:
+        # Return a basic mock if optuna is not available
+        mock_trial = Mock()
+        mock_trial.number = trial_number
+        mock_trial.params = params
+        mock_trial.value = metric_value
+        mock_trial.state = Mock()  # Mock state object
+        mock_trial.user_attrs = {}
+        mock_trial.system_attrs = {}
+        return mock_trial
+    
     mock_trial = Mock(spec=optuna.trial.FrozenTrial)
     mock_trial.number = trial_number
     mock_trial.params = params
@@ -122,8 +141,8 @@ def assert_mlflow_tags(run: Mock, expected_tags: Dict[str, str]) -> None:
 
 
 def assert_study_trials_preserved(
-    study1: optuna.Study,
-    study2: optuna.Study,
+    study1: "optuna_type.Study",
+    study2: "optuna_type.Study",
     tolerance: float = 1e-6,
 ) -> None:
     """

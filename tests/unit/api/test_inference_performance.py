@@ -142,8 +142,8 @@ class TestInferencePerformance:
     @patch("src.api.inference.engine.prepare_onnx_inputs")
     @patch("src.api.inference.engine.get_offset_mapping")
     @patch("src.api.inference.engine.AutoTokenizer")
-    @patch("src.api.inference.engine.AutoConfig")
-    @patch("src.api.inference.engine.ort.InferenceSession")
+    @patch("transformers.AutoConfig")
+    @patch("onnxruntime.InferenceSession")
     def test_tokenization_does_not_hang(
         self,
         mock_session,
@@ -211,8 +211,8 @@ class TestInferencePerformance:
     @patch("src.api.inference.engine.prepare_onnx_inputs")
     @patch("src.api.inference.engine.get_offset_mapping")
     @patch("src.api.inference.engine.AutoTokenizer")
-    @patch("src.api.inference.engine.AutoConfig")
-    @patch("src.api.inference.engine.ort.InferenceSession")
+    @patch("transformers.AutoConfig")
+    @patch("onnxruntime.InferenceSession")
     def test_entity_extraction_with_offset_mapping(
         self,
         mock_session,
@@ -332,8 +332,8 @@ class TestInferencePerformance:
     @patch("src.api.inference.engine.prepare_onnx_inputs")
     @patch("src.api.inference.engine.get_offset_mapping")
     @patch("src.api.inference.engine.AutoTokenizer")
-    @patch("src.api.inference.engine.AutoConfig")
-    @patch("src.api.inference.engine.ort.InferenceSession")
+    @patch("transformers.AutoConfig")
+    @patch("onnxruntime.InferenceSession")
     def test_empty_text_handling(
         self,
         mock_session,
@@ -389,8 +389,8 @@ class TestInferencePerformance:
     @patch("src.api.inference.engine.prepare_onnx_inputs")
     @patch("src.api.inference.engine.get_offset_mapping")
     @patch("src.api.inference.engine.AutoTokenizer")
-    @patch("src.api.inference.engine.AutoConfig")
-    @patch("src.api.inference.engine.ort.InferenceSession")
+    @patch("transformers.AutoConfig")
+    @patch("onnxruntime.InferenceSession")
     def test_special_characters_handling(
         self,
         mock_session,
@@ -483,8 +483,8 @@ class TestInferencePerformance:
     @patch("src.api.inference.engine.prepare_onnx_inputs")
     @patch("src.api.inference.engine.get_offset_mapping")
     @patch("src.api.inference.engine.AutoTokenizer")
-    @patch("src.api.inference.engine.AutoConfig")
-    @patch("src.api.inference.engine.ort.InferenceSession")
+    @patch("transformers.AutoConfig")
+    @patch("onnxruntime.InferenceSession")
     def test_tokenization_consistency(
         self,
         mock_session,

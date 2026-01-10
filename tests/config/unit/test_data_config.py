@@ -1,7 +1,17 @@
 """Unit tests for data configuration files.
 
 Tests coverage for all data configuration options in config/data/*.yaml files.
+
+Note: Some tests import from training.data which requires PyTorch.
+These tests should be run in the resume-ner-training environment.
 """
+
+import pytest
+
+# Mark tests that import training.data (which requires torch)
+# The build_label_list function itself doesn't require torch, but importing
+# training.data triggers torch imports at module level
+pytestmark = pytest.mark.torch
 
 import pytest
 from pathlib import Path

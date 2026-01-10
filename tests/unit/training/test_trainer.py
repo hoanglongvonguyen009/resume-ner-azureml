@@ -1,9 +1,19 @@
-"""Tests for training loop and model training functionality."""
+"""Tests for training loop and model training functionality.
+
+These tests require PyTorch and should be run in the resume-ner-training environment.
+"""
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch, Mock
 import pytest
-import torch
+
+pytestmark = pytest.mark.torch
+
+# Import torch only when test is actually run (not during collection in wrong env)
+try:
+    import torch
+except ImportError:
+    torch = None
 
 
 class TestPrepareDataLoaders:
@@ -479,7 +489,7 @@ class TestTrainModel:
     @patch("training.trainer.build_label_list")
     @patch("training.trainer.evaluate_model")
     def test_train_model_basic(self, mock_evaluate, mock_build_labels, mock_create_model,
-                               mock_prepare_loaders, mock_create_optimizer, mock_run_loop, mock_save):
+                               mock_prepare_loaders, mock_create_optimizer, mock_run_loop, mock_save, tmp_path):
         """Test basic model training."""
         from training.trainer import train_model
         
@@ -492,7 +502,8 @@ class TestTrainModel:
             "train": [{"text": "test", "annotations": []}],
             "validation": [{"text": "val", "annotations": []}],
         }
-        output_dir = Path("/output")
+        output_dir = tmp_path / "output"
+        output_dir.mkdir(parents=True)
         
         mock_build_labels.return_value = ["O", "PERSON", "ORG"]
         mock_model = MagicMock()
@@ -525,7 +536,7 @@ class TestTrainModel:
     @patch("training.trainer.build_label_list")
     @patch("training.trainer.load_fold_splits")
     def test_train_model_with_fold_splits(self, mock_load_splits, mock_build_labels, mock_create_model,
-                                         mock_prepare_loaders, mock_create_optimizer, mock_run_loop, mock_save):
+                                         mock_prepare_loaders, mock_create_optimizer, mock_run_loop, mock_save, tmp_path):
         """Test model training with fold splits."""
         from training.trainer import train_model
         
@@ -542,7 +553,8 @@ class TestTrainModel:
         dataset = {
             "train": [{"text": "test", "annotations": []}],
         }
-        output_dir = Path("/output")
+        output_dir = tmp_path / "output"
+        output_dir.mkdir(parents=True)
         
         mock_build_labels.return_value = ["O", "PERSON"]
         mock_model = MagicMock()
@@ -573,7 +585,7 @@ class TestTrainModel:
     @patch("training.trainer.create_model_and_tokenizer")
     @patch("training.trainer.build_label_list")
     def test_train_model_use_all_data(self, mock_build_labels, mock_create_model,
-                                     mock_prepare_loaders, mock_create_optimizer, mock_run_loop, mock_save):
+                                     mock_prepare_loaders, mock_create_optimizer, mock_run_loop, mock_save, tmp_path):
         """Test model training with use_all_data=True."""
         from training.trainer import train_model
         
@@ -589,7 +601,8 @@ class TestTrainModel:
         dataset = {
             "train": [{"text": "test", "annotations": []}],
         }
-        output_dir = Path("/output")
+        output_dir = tmp_path / "output"
+        output_dir.mkdir(parents=True)
         
         mock_build_labels.return_value = ["O", "PERSON"]
         mock_model = MagicMock()
@@ -611,7 +624,7 @@ class TestTrainModel:
         assert "No validation set" in metrics["note"]
 
     @patch("training.trainer.load_fold_splits")
-    def test_train_model_invalid_fold_idx(self, mock_load_splits):
+    def test_train_model_invalid_fold_idx(self, mock_load_splits, tmp_path):
         """Test model training with invalid fold index."""
         from training.trainer import train_model
         
@@ -625,7 +638,8 @@ class TestTrainModel:
             },
         }
         dataset = {"train": []}
-        output_dir = Path("/output")
+        output_dir = tmp_path / "output"
+        output_dir.mkdir(parents=True)
         
         mock_load_splits.return_value = ([(0, 1), (2, 3)], {})
         

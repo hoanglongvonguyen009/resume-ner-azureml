@@ -3,14 +3,28 @@
 This module provides benchmarking orchestration and utilities.
 """
 
+# Lazy imports to avoid requiring torch at module level
+# Only import CLI functions when actually needed (they require torch)
+from .formatting import compare_models, format_results_table
 from .orchestrator import benchmark_best_trials, compute_grouping_tags
 from .utils import run_benchmarking
 
 __all__ = [
     "benchmark_best_trials",
+    "benchmark_model",
+    "compare_models",
     "compute_grouping_tags",
+    "format_results_table",
     "run_benchmarking",
 ]
+
+
+def __getattr__(name: str):
+    """Lazy import for CLI functions that require torch."""
+    if name == "benchmark_model":
+        from .cli import benchmark_model
+        return benchmark_model
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 

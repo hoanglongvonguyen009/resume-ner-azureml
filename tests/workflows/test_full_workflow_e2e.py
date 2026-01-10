@@ -326,7 +326,7 @@ def test_full_workflow_e2e(
         mock_result.stderr = ""
         return mock_result
     
-    with patch('orchestration.benchmark_utils.subprocess.run', side_effect=benchmark_subprocess_side_effect):
+    with patch('benchmarking.utils.subprocess.run', side_effect=benchmark_subprocess_side_effect):
         from benchmarking import benchmark_best_trials
         
         best_trials = {

@@ -185,8 +185,14 @@ def test_best_config_selection_e2e(tmp_path, monkeypatch):
     )
 
     # Patch final training executor to return our fake final checkpoint
+    # Note: The actual import is from training_exec, so we patch that
     monkeypatch.setattr(
-        "orchestration.jobs.final_training.execute_final_training",
+        "training_exec.execute_final_training",
+        lambda **kwargs: fake_final_checkpoint_dir,
+    )
+    # Also patch at the executor level in case it's imported directly
+    monkeypatch.setattr(
+        "training_exec.executor.execute_final_training",
         lambda **kwargs: fake_final_checkpoint_dir,
     )
 
@@ -241,6 +247,26 @@ def test_best_config_selection_e2e(tmp_path, monkeypatch):
     assert lineage["hpo_study_key_hash"] == fake_best_model["study_key_hash"]
     assert lineage["hpo_trial_key_hash"] == fake_best_model["trial_key_hash"]
 
+    # Mock training subprocess execution
+    from unittest.mock import Mock
+    def fake_execute_training_subprocess(*args, **kwargs):
+        result = Mock()
+        result.returncode = 0
+        result.stdout = ""
+        result.stderr = ""
+        return result
+    monkeypatch.setattr("training.execution.subprocess_runner.execute_training_subprocess", fake_execute_training_subprocess)
+    
+    # Mock MLflow client
+    mock_client = Mock()
+    mock_experiment = Mock()
+    mock_experiment.experiment_id = "exp-123"
+    mock_client.get_experiment_by_name.return_value = mock_experiment
+    mock_run = Mock()
+    mock_run.info.run_id = "run-123"
+    mock_client.create_run.return_value = mock_run
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
+    
     # Final training
     from training_exec import execute_final_training
 

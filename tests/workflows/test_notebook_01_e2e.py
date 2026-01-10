@@ -378,7 +378,7 @@ class TestNotebookE2E_Core:
         assert mlflow.get_tracking_uri() == tracking_uri
     
     @patch('orchestration.jobs.hpo.local.trial.execution.subprocess.run')
-    @patch('orchestration.jobs.hpo.local_sweeps.mlflow')
+    @patch('hpo.execution.local.sweep.mlflow')
     def test_hpo_sweep_execution_mocked(
         self,
         mock_mlflow,
@@ -568,7 +568,7 @@ class TestNotebookE2E_Core:
             import warnings
             warnings.warn(f"Could not validate HPO MLflow tags: {e}")
     
-    @patch('orchestration.benchmark_utils.subprocess.run')
+    @patch('benchmarking.utils.subprocess.run')
     def test_benchmarking_execution_mocked(
         self,
         mock_subprocess,

@@ -6,7 +6,12 @@ import sqlite3
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-import optuna
+# Lazy import optuna to allow tests to be skipped if not available
+try:
+    import optuna
+except ImportError:
+    optuna = None
+    pytest.skip("optuna not available", allow_module_level=True)
 
 from hpo.core.study import StudyManager
 from hpo.checkpoint.storage import resolve_storage_path, get_storage_uri

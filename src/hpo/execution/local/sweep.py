@@ -57,7 +57,7 @@ from hpo.utils.helpers import (
 
 # Import from extracted modules
 from hpo.core.optuna_integration import import_optuna as _import_optuna, create_optuna_pruner
-import optuna
+# optuna imported lazily when needed (in run_local_hpo_sweep function)
 from hpo.execution.local.trial import run_training_trial
 from hpo.execution.local.cv import run_training_trial_with_cv
 from hpo.execution.local.refit import run_refit_training
@@ -437,6 +437,8 @@ def run_local_hpo_sweep(
     Returns:
         Optuna study object with completed trials.
     """
+    # Lazy import optuna to avoid requiring it at module level
+    import optuna
     # Store original project config_dir (never overwrite with outputs/hpo/config)
     project_config_dir = config_dir
 

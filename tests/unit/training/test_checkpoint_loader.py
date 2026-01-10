@@ -1,10 +1,15 @@
-"""Unit tests for checkpoint loader module."""
+"""Unit tests for checkpoint loader module.
+
+These tests require PyTorch and should be run in the resume-ner-training environment.
+"""
 
 import os
 import json
 import tempfile
 from pathlib import Path
 import pytest
+
+pytestmark = pytest.mark.torch
 
 from training.checkpoint_loader import resolve_training_checkpoint_path, validate_checkpoint
 

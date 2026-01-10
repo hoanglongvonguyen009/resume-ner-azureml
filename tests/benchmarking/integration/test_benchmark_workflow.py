@@ -13,11 +13,11 @@ from benchmarking.utils import run_benchmarking
 class TestBenchmarkWorkflow:
     """Test end-to-end benchmarking workflow with config loading."""
 
-    @patch("orchestration.jobs.benchmarking.orchestrator.run_benchmarking")
-    @patch("orchestration.jobs.benchmarking.orchestrator.create_naming_context")
-    @patch("orchestration.jobs.benchmarking.orchestrator.build_output_path")
-    @patch("orchestration.jobs.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("orchestration.jobs.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("benchmarking.orchestrator.run_benchmarking")
+    @patch("benchmarking.orchestrator.create_naming_context")
+    @patch("benchmarking.orchestrator.build_output_path")
+    @patch("benchmarking.orchestrator.resolve_output_path_for_colab")
+    @patch("benchmarking.orchestrator.validate_path_before_mkdir")
     def test_workflow_loads_config_and_uses_all_options(
         self,
         mock_validate_path,
@@ -86,6 +86,17 @@ benchmark_config: benchmark.yaml
         root_dir = tmp_path / "outputs"
         root_dir.mkdir()
         output_dir = root_dir / "benchmarking" / "test"
+        
+        # Ensure checkpoint exists
+        checkpoint_dir = Path(mock_best_trials["distilbert"]["checkpoint_dir"])
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        (checkpoint_dir / "config.json").write_text('{"model_type": "distilbert"}')
+        
+        # Create benchmark script
+        benchmark_script = root_dir / "src" / "benchmarking" / "cli.py"
+        benchmark_script.parent.mkdir(parents=True, exist_ok=True)
+        benchmark_script.write_text("# mock script")
+        
         mock_validate_path.side_effect = lambda p, **kwargs: p
         mock_resolve_colab.side_effect = lambda p: p
         mock_build_path.return_value = output_dir
@@ -118,7 +129,7 @@ benchmark_config: benchmark.yaml
         assert call_args.kwargs["device"] == device
         assert call_args.kwargs["output_path"].name == filename
 
-    @patch("orchestration.benchmark_utils.subprocess.run")
+    @patch("benchmarking.utils.subprocess.run")
     def test_workflow_custom_config_values(
         self,
         mock_subprocess,
@@ -164,8 +175,8 @@ output:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "benchmarks" / "benchmark_inference.py"
-        benchmark_script.parent.mkdir(parents=True)
+        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
+        benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         
         # Run benchmarking with custom config
@@ -215,11 +226,11 @@ output:
         output_idx = call_args.index("--output")
         assert Path(call_args[output_idx + 1]).name == filename
 
-    @patch("orchestration.jobs.benchmarking.orchestrator.run_benchmarking")
-    @patch("orchestration.jobs.benchmarking.orchestrator.create_naming_context")
-    @patch("orchestration.jobs.benchmarking.orchestrator.build_output_path")
-    @patch("orchestration.jobs.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("orchestration.jobs.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("benchmarking.orchestrator.run_benchmarking")
+    @patch("benchmarking.orchestrator.create_naming_context")
+    @patch("benchmarking.orchestrator.build_output_path")
+    @patch("benchmarking.orchestrator.resolve_output_path_for_colab")
+    @patch("benchmarking.orchestrator.validate_path_before_mkdir")
     def test_workflow_defaults_when_config_missing(
         self,
         mock_validate_path,
@@ -265,6 +276,17 @@ env_config: env.yaml
         root_dir = tmp_path / "outputs"
         root_dir.mkdir()
         output_dir = root_dir / "benchmarking" / "test"
+        
+        # Ensure checkpoint exists
+        checkpoint_dir = Path(mock_best_trials["distilbert"]["checkpoint_dir"])
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        (checkpoint_dir / "config.json").write_text('{"model_type": "distilbert"}')
+        
+        # Create benchmark script
+        benchmark_script = root_dir / "src" / "benchmarking" / "cli.py"
+        benchmark_script.parent.mkdir(parents=True, exist_ok=True)
+        benchmark_script.write_text("# mock script")
+        
         mock_validate_path.side_effect = lambda p, **kwargs: p
         mock_resolve_colab.side_effect = lambda p: p
         mock_build_path.return_value = output_dir

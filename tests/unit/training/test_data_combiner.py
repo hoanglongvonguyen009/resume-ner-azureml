@@ -139,8 +139,8 @@ class TestCombineDatasets:
             )
     
     def test_old_dataset_not_found(self, tmp_path, new_dataset):
-        """Test raises FileNotFoundError when old dataset doesn't exist."""
-        with pytest.raises(FileNotFoundError):
+        """Test raises ValueError when old dataset doesn't exist."""
+        with pytest.raises(ValueError, match="Old dataset path required"):
             combine_datasets(
                 old_dataset_path=tmp_path / "nonexistent",
                 new_dataset_path=new_dataset,

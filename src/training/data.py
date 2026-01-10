@@ -3,12 +3,13 @@
 import json
 import re
 from pathlib import Path
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, TYPE_CHECKING
 
 from sklearn.model_selection import train_test_split
 
-from torch.utils.data import Dataset
-import torch
+if TYPE_CHECKING:
+    from torch.utils.data import Dataset
+    import torch
 
 
 def load_dataset(data_path: str) -> Dict[str, Any]:
@@ -276,8 +277,19 @@ def encode_annotations_to_labels(
     return labels
 
 
-class ResumeNERDataset(Dataset):
-    """Dataset for Resume NER token classification."""
+# Import Dataset lazily - only when ResumeNERDataset is actually instantiated
+# This allows build_label_list to be imported without requiring torch
+def _get_dataset_class():
+    """Lazy import of Dataset class."""
+    from torch.utils.data import Dataset
+    return Dataset
+
+class ResumeNERDataset:
+    """Dataset for Resume NER token classification.
+    
+    This class behaves like torch.utils.data.Dataset but inherits dynamically
+    to avoid requiring torch at module import time.
+    """
 
     def __init__(
         self,
@@ -436,5 +448,6 @@ class ResumeNERDataset(Dataset):
             labels = [self.label2id.get("O", 0)] * seq_len
 
         encoded = {k: v.squeeze(0) for k, v in encoded.items()}
+        import torch
         encoded["labels"] = torch.tensor(labels, dtype=torch.long)
         return encoded

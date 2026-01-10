@@ -4,11 +4,13 @@ import time
 import logging
 import gc
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Optional, Tuple, Set, TYPE_CHECKING
 
 import numpy as np
-import onnxruntime as ort
-from transformers import AutoTokenizer, AutoConfig
+
+if TYPE_CHECKING:
+    import onnxruntime as ort
+    from transformers import AutoTokenizer, AutoConfig
 
 from ..config import APIConfig
 from ..exceptions import InferenceError, ModelNotLoadedError
@@ -41,8 +43,8 @@ class ONNXModelLoader:
         self.checkpoint_dir = Path(checkpoint_dir)
         self.providers = providers or APIConfig.ONNX_PROVIDERS
 
-        self.session: Optional[ort.InferenceSession] = None
-        self.tokenizer: Optional[AutoTokenizer] = None
+        self.session: Optional["ort.InferenceSession"] = None
+        self.tokenizer: Optional["AutoTokenizer"] = None
         self.id2label: Dict[int, str] = {}
         self.label2id: Dict[str, int] = {}
         self.max_length: int = APIConfig.MAX_SEQUENCE_LENGTH
@@ -51,6 +53,9 @@ class ONNXModelLoader:
 
     def load(self) -> None:
         """Load ONNX model, tokenizer, and label mappings."""
+        import onnxruntime as ort
+        from transformers import AutoTokenizer, AutoConfig
+        
         if not self.onnx_path.exists():
             raise FileNotFoundError(f"ONNX model not found: {self.onnx_path}")
         if not self.checkpoint_dir.exists():
@@ -114,8 +119,8 @@ class InferenceRunner:
 
     def __init__(
         self,
-        session: ort.InferenceSession,
-        tokenizer: AutoTokenizer,
+        session: "ort.InferenceSession",
+        tokenizer: "AutoTokenizer",
         max_length: int,
     ):
         """

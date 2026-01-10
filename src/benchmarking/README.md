@@ -18,7 +18,7 @@ Results are saved as `benchmark.json` files that can be automatically used by mo
 Benchmark a specific model checkpoint:
 
 ```bash
-python benchmarks/benchmark_inference.py \
+python -m src.benchmarking.cli \
   --checkpoint outputs/hpo/distilbert/trial_0/checkpoint \
   --test-data dataset/test.json \
   --batch-sizes 1 8 16 \
@@ -111,7 +111,7 @@ The model selection logic will:
 #    (e.g., distilbert/trial_0, deberta/trial_1)
 
 # 2. Benchmark DistilBERT best trial
-python benchmarks/benchmark_inference.py \
+python -m src.benchmarking.cli \
   --checkpoint outputs/hpo/distilbert/trial_0/checkpoint \
   --test-data dataset/test.json \
   --batch-sizes 1 8 16 \
@@ -119,7 +119,7 @@ python benchmarks/benchmark_inference.py \
   --output outputs/hpo/distilbert/trial_0/benchmark.json
 
 # 3. Benchmark DeBERTa best trial
-python benchmarks/benchmark_inference.py \
+python -m src.benchmarking.cli \
   --checkpoint outputs/hpo/deberta/trial_1/checkpoint \
   --test-data dataset/test.json \
   --batch-sizes 1 8 16 \
@@ -139,7 +139,7 @@ from orchestration.jobs.local_selection import select_best_configuration_across_
 Use the utility functions to compare multiple models:
 
 ```python
-from benchmarks.benchmark_utils import compare_models
+from src.benchmarking import compare_models
 from pathlib import Path
 
 benchmark_files = [
@@ -152,6 +152,30 @@ comparison = compare_models(
     model_names=["DistilBERT", "DeBERTa"]
 )
 print(comparison)
+```
+
+## Programmatic Usage
+
+You can also use the benchmarking functions programmatically:
+
+```python
+from pathlib import Path
+from src.benchmarking import benchmark_model, load_test_texts
+
+# Load test data
+test_texts = load_test_texts(Path("dataset/test.json"))
+
+# Run benchmark
+results = benchmark_model(
+    checkpoint_dir=Path("outputs/hpo/distilbert/trial_0/checkpoint"),
+    test_texts=test_texts,
+    batch_sizes=[1, 8, 16],
+    num_iterations=100,
+    warmup_iterations=10,
+)
+
+# Use results
+print(f"Batch 1 mean latency: {results['batch_1']['mean_ms']} ms")
 ```
 
 ## Best Practices
@@ -169,29 +193,16 @@ print(comparison)
 - The `batch_1` mean latency is typically used as the speed score in model selection
 - Benchmark files are saved alongside `metrics.json` in trial directories
 
+## Module Structure
 
+The benchmarking module is organized with Single Responsibility Principle:
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+- `cli.py`: CLI entry point and argument parsing
+- `model_loader.py`: Model and tokenizer loading
+- `data_loader.py`: Test data loading utilities
+- `execution.py`: Inference execution and latency measurement
+- `statistics.py`: Statistics calculation from measurements
+- `formatting.py`: Result formatting and comparison utilities
+- `orchestrator.py`: High-level orchestration for HPO trials
+- `utils.py`: Subprocess wrapper and MLflow logging
 

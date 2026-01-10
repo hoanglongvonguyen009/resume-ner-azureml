@@ -46,7 +46,13 @@ def _setup_base_patches(monkeypatch, tmp_path, outputs_root):
     monkeypatch.setattr(executor, "load_all_configs", lambda experiment_config: {})
 
     def fake_create_context(**kwargs):
-        return SimpleNamespace(**kwargs)
+        # Ensure required attributes are present
+        ctx = SimpleNamespace(**kwargs)
+        if not hasattr(ctx, 'storage_env'):
+            ctx.storage_env = kwargs.get('environment', 'local')
+        if not hasattr(ctx, 'environment'):
+            ctx.environment = kwargs.get('environment', 'local')
+        return ctx
 
     def fake_build_output_path(root_dir_arg, ctx):
         variant = ctx.variant if hasattr(ctx, 'variant') else ctx.get('variant', 1)
@@ -111,7 +117,7 @@ def test_logging_eval_interval_loaded_from_config(tmp_path, monkeypatch):
 
     subprocess_calls = []
 
-    def fake_subprocess_run(*args, **kwargs):
+    def fake_execute_training_subprocess(*args, **kwargs):
         subprocess_calls.append(args)
         result = Mock()
         result.returncode = 0
@@ -119,14 +125,16 @@ def test_logging_eval_interval_loaded_from_config(tmp_path, monkeypatch):
         result.stderr = ""
         return result
 
-    monkeypatch.setattr(executor, "subprocess", SimpleNamespace(run=fake_subprocess_run))
+    # Patch the actual subprocess execution function - patch it in the executor module where it's imported
+    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
 
     mock_client = Mock()
     mock_experiment = Mock()
     mock_experiment.experiment_id = "exp-123"
     mock_client.get_experiment_by_name.return_value = mock_experiment
-    monkeypatch.setattr(executor, "MlflowClient", lambda: mock_client)
-    monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
+    # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
+    monkeypatch.setattr("mlflow.get_tracking_uri", lambda: "file:///tmp/mlflow")
     import orchestration.metadata_manager as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 
@@ -203,7 +211,7 @@ def test_logging_save_interval_loaded_from_config(tmp_path, monkeypatch):
 
     subprocess_calls = []
 
-    def fake_subprocess_run(*args, **kwargs):
+    def fake_execute_training_subprocess(*args, **kwargs):
         subprocess_calls.append(args)
         result = Mock()
         result.returncode = 0
@@ -211,14 +219,16 @@ def test_logging_save_interval_loaded_from_config(tmp_path, monkeypatch):
         result.stderr = ""
         return result
 
-    monkeypatch.setattr(executor, "subprocess", SimpleNamespace(run=fake_subprocess_run))
+    # Patch the actual subprocess execution function - patch it in the executor module where it's imported
+    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
 
     mock_client = Mock()
     mock_experiment = Mock()
     mock_experiment.experiment_id = "exp-123"
     mock_client.get_experiment_by_name.return_value = mock_experiment
-    monkeypatch.setattr(executor, "MlflowClient", lambda: mock_client)
-    monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
+    # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
+    monkeypatch.setattr("mlflow.get_tracking_uri", lambda: "file:///tmp/mlflow")
     import orchestration.metadata_manager as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 
@@ -297,7 +307,7 @@ def test_logging_intervals_both_loaded_from_config(tmp_path, monkeypatch):
 
     subprocess_calls = []
 
-    def fake_subprocess_run(*args, **kwargs):
+    def fake_execute_training_subprocess(*args, **kwargs):
         subprocess_calls.append(args)
         result = Mock()
         result.returncode = 0
@@ -305,14 +315,16 @@ def test_logging_intervals_both_loaded_from_config(tmp_path, monkeypatch):
         result.stderr = ""
         return result
 
-    monkeypatch.setattr(executor, "subprocess", SimpleNamespace(run=fake_subprocess_run))
+    # Patch the actual subprocess execution function - patch it in the executor module where it's imported
+    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
 
     mock_client = Mock()
     mock_experiment = Mock()
     mock_experiment.experiment_id = "exp-123"
     mock_client.get_experiment_by_name.return_value = mock_experiment
-    monkeypatch.setattr(executor, "MlflowClient", lambda: mock_client)
-    monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
+    # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
+    monkeypatch.setattr("mlflow.get_tracking_uri", lambda: "file:///tmp/mlflow")
     import orchestration.metadata_manager as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 

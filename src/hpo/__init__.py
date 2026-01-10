@@ -24,9 +24,8 @@ from hpo.utils.helpers import (
 # Checkpoint management
 from hpo.checkpoint.storage import get_storage_uri, resolve_storage_path
 
-# Execution
-from hpo.execution.local.sweep import run_local_hpo_sweep
-from hpo.execution.local.trial import TrialExecutor
+# Execution - lazy imports to avoid requiring optuna at module level
+# These will be imported on-demand
 
 # Azure ML-dependent imports (optional)
 try:
@@ -65,4 +64,15 @@ __all__ = [
     # Trial execution
     "TrialExecutor",
 ]
+
+
+def __getattr__(name: str):
+    """Lazy import for functions that require optuna."""
+    if name == "run_local_hpo_sweep":
+        from hpo.execution.local.sweep import run_local_hpo_sweep
+        return run_local_hpo_sweep
+    elif name == "TrialExecutor":
+        from hpo.execution.local.trial import TrialExecutor
+        return TrialExecutor
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

@@ -69,8 +69,8 @@ def run_benchmarking(
         warmup_iterations: Number of warmup iterations.
         max_length: Maximum sequence length.
         device: Device to use (None = auto-detect).
-        benchmark_script_path: Path to benchmark script. If None, will try to find
-            it at benchmarks/benchmark_inference.py relative to project_root.
+        benchmark_script_path: Path to benchmark script. If None, will use
+            src/benchmarking/cli.py relative to project_root.
         project_root: Project root directory. Required if benchmark_script_path is None.
         tracker: Optional MLflowBenchmarkTracker instance for logging results.
         backbone: Optional model backbone name for tracking.
@@ -90,8 +90,8 @@ def run_benchmarking(
         if project_root is None:
             raise ValueError(
                 "Either benchmark_script_path or project_root must be provided")
-        # Benchmarks live at <project_root>/benchmarks, not under src/
-        benchmark_script = project_root / "benchmarks" / "benchmark_inference.py"
+        # Benchmark CLI is now at src/benchmarking/cli.py
+        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
     else:
         benchmark_script = benchmark_script_path
 
@@ -163,23 +163,13 @@ def run_benchmarking(
             # Extract trial_id from checkpoint path if benchmarking an HPO trial
             extracted_trial_id = None
             if benchmark_source == "hpo_trial" and checkpoint_dir:
-                # Try to extract trial_id from checkpoint path (e.g., outputs/hpo/local/distilbert/trial_1_20251231_161745/checkpoints)
+                # Extract trial_id from checkpoint path (e.g., outputs/hpo/local/distilbert/trial_1_20251231_161745/checkpoints)
                 checkpoint_parent = checkpoint_dir.parent
                 if checkpoint_parent.name.startswith("trial_"):
                     extracted_trial_id = checkpoint_parent.name
                     logger.info(
                         f"[Benchmark Run Name] Extracted trial_id from checkpoint path: {extracted_trial_id}"
                     )
-                elif "trial" in str(checkpoint_dir):
-                    # Fallback: try to extract from path
-                    parts = str(checkpoint_dir).split("trial")
-                    if len(parts) > 1:
-                        trial_part = "trial" + \
-                            parts[1].split("/")[0].split("\\")[0]
-                        extracted_trial_id = trial_part
-                        logger.info(
-                            f"[Benchmark Run Name] Extracted trial_id from path (fallback): {extracted_trial_id}"
-                        )
 
             # Create NamingContext for benchmarking
             # For HPO trial benchmarks, trial_id should be the trial identifier

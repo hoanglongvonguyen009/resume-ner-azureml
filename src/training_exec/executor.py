@@ -31,6 +31,7 @@ lifecycle:
 """
 
 """Final training execution module."""
+import subprocess
 from pathlib import Path
 from typing import Any, Dict
 
@@ -45,8 +46,27 @@ from training.execution import (
 )
 
 from config.loader import ExperimentConfig, load_all_configs
-from azureml.data_assets import resolve_dataset_path
+# azureml.data_assets imported lazily when needed
 from config.training import load_final_training_config
+
+# Try to import resolve_dataset_path, fallback to local implementation if Azure ML not available
+try:
+    from azureml.data_assets import resolve_dataset_path
+except ImportError:
+    # Fallback implementation if Azure ML is not available
+    def resolve_dataset_path(data_config: Dict[str, Any]) -> Path:
+        """Resolve dataset path from data config (fallback implementation)."""
+        local_path = data_config.get("local_path", "../dataset")
+        if not isinstance(local_path, str):
+            raise ValueError(
+                f"data_config['local_path'] must be a string, got {type(local_path).__name__}"
+            )
+        dataset_path = Path(local_path)
+        # Check if seed-based dataset structure
+        seed = data_config.get("seed")
+        if seed is not None and "dataset_tiny" in str(dataset_path):
+            dataset_path = dataset_path / f"seed{seed}"
+        return dataset_path
 from fingerprints.compute import compute_exec_fp, compute_spec_fp
 from tracking.mlflow.naming import (
     build_mlflow_run_name,

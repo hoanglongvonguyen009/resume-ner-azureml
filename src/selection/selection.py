@@ -27,11 +27,13 @@ lifecycle:
 """
 
 """Best configuration selection from HPO sweep jobs using MLflow."""
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 import mlflow
-from azure.ai.ml import MLClient
-from azure.ai.ml.entities import Job
+
+if TYPE_CHECKING:
+    from azure.ai.ml import MLClient
+    from azure.ai.ml.entities import Job
 
 # azureml-mlflow registers the 'azureml' URI scheme
 try:
@@ -39,8 +41,10 @@ try:
 except ImportError:
     pass
 
-def _configure_mlflow(ml_client: MLClient) -> None:
+def _configure_mlflow(ml_client: "MLClient") -> None:
     """Configure MLflow to use Azure ML workspace tracking URI."""
+    # Import Azure SDK locally to avoid requiring it at module load time
+    from azure.ai.ml import MLClient
     from shared.mlflow_setup import setup_mlflow_cross_platform
     # Use setup_mlflow_cross_platform for consistency
     # We use a placeholder experiment name since setup_mlflow_cross_platform requires it
@@ -74,17 +78,21 @@ def _get_params_from_mlflow(run_id: str) -> Dict[str, Any]:
         return {}
 
 def get_best_trial_from_sweep(
-    ml_client: MLClient,
-    sweep_job: Job,
+    ml_client: "MLClient",
+    sweep_job: "Job",
     objective_metric: str,
     goal: str,
-) -> tuple[Optional[Job], Optional[float]]:
+) -> tuple[Optional["Job"], Optional[float]]:
     """
     Get the best trial from a sweep job based on the objective metric.
 
     Returns:
         Tuple of (best_trial_job, best_metric_value) or (None, None) if not found.
     """
+    # Import Azure SDK locally to avoid requiring it at module load time
+    from azure.ai.ml import MLClient
+    from azure.ai.ml.entities import Job
+    
     _configure_mlflow(ml_client)
     trials = list(ml_client.jobs.list(parent_job_name=sweep_job.name))
 
@@ -113,11 +121,15 @@ def get_best_trial_from_sweep(
     return best_trial, best_value
 
 def extract_trial_configuration(
-    ml_client: MLClient,
-    trial: Job,
+    ml_client: "MLClient",
+    trial: "Job",
     dataset_version: str,
 ) -> Dict[str, Any]:
     """Extract configuration from a trial run using MLflow."""
+    # Import Azure SDK locally to avoid requiring it at module load time
+    from azure.ai.ml import MLClient
+    from azure.ai.ml.entities import Job
+    
     _configure_mlflow(ml_client)
 
     return {
@@ -130,8 +142,8 @@ def extract_trial_configuration(
     }
 
 def select_best_configuration(
-    ml_client: MLClient,
-    hpo_completed_jobs: Dict[str, Job],
+    ml_client: "MLClient",
+    hpo_completed_jobs: Dict[str, "Job"],
     hpo_config: Dict[str, Any],
     dataset_version: str,
 ) -> Dict[str, Any]:
@@ -143,6 +155,10 @@ def select_best_configuration(
     Raises:
         ValueError: If no valid trials found.
     """
+    # Import Azure SDK locally to avoid requiring it at module load time
+    from azure.ai.ml import MLClient
+    from azure.ai.ml.entities import Job
+    
     objective_metric = hpo_config["objective"]["metric"]
     goal = hpo_config["objective"]["goal"]
 

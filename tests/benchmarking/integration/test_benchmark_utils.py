@@ -33,7 +33,7 @@ class TestBenchmarkUtilsConfigUsage:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "benchmarks" / "benchmark_inference.py"
+        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True)
         benchmark_script.write_text("# mock script")
         
@@ -89,7 +89,7 @@ class TestBenchmarkUtilsConfigUsage:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "benchmarks" / "benchmark_inference.py"
+        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True)
         benchmark_script.write_text("# mock script")
         
@@ -136,7 +136,7 @@ class TestBenchmarkUtilsConfigUsage:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "benchmarks" / "benchmark_inference.py"
+        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True)
         benchmark_script.write_text("# mock script")
         
@@ -183,7 +183,7 @@ class TestBenchmarkUtilsConfigUsage:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "benchmarks" / "benchmark_inference.py"
+        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True)
         benchmark_script.write_text("# mock script")
         
@@ -230,7 +230,7 @@ class TestBenchmarkUtilsConfigUsage:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "benchmarks" / "benchmark_inference.py"
+        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True)
         benchmark_script.write_text("# mock script")
         
@@ -275,7 +275,7 @@ class TestBenchmarkUtilsConfigUsage:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "benchmarks" / "benchmark_inference.py"
+        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True)
         benchmark_script.write_text("# mock script")
         
@@ -320,7 +320,7 @@ class TestBenchmarkUtilsConfigUsage:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "benchmarks" / "benchmark_inference.py"
+        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True)
         benchmark_script.write_text("# mock script")
         
@@ -372,7 +372,7 @@ class TestBenchmarkUtilsConfigUsage:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "benchmarks" / "benchmark_inference.py"
+        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True)
         benchmark_script.write_text("# mock script")
         

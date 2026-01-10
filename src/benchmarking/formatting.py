@@ -1,32 +1,33 @@
-"""Utility functions for benchmarking."""
+"""
+@meta
+name: benchmarking_formatting
+type: utility
+domain: benchmarking
+responsibility:
+  - Format benchmark results as human-readable tables
+  - Compare multiple model benchmarks side-by-side
+inputs:
+  - Benchmark results dictionary
+  - List of benchmark JSON files (for comparison)
+outputs:
+  - Formatted table strings
+tags:
+  - utility
+  - benchmarking
+  - formatting
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Result formatting and comparison utilities for benchmarking."""
 
 import json
 from pathlib import Path
 from typing import Dict, List, Optional
-
-
-def load_test_texts(file_path: Path) -> List[str]:
-    """
-    Load test texts from a JSON file.
-
-    Args:
-        file_path: Path to JSON file containing test data.
-
-    Returns:
-        List of test text strings.
-    """
-    with open(file_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    
-    if isinstance(data, list):
-        if len(data) > 0 and isinstance(data[0], dict):
-            # List of dicts with 'text' field
-            return [item.get("text", "") for item in data if item.get("text")]
-        else:
-            # List of strings
-            return [str(item) for item in data if item]
-    else:
-        raise ValueError("Test data must be a list of texts or list of dicts with 'text' field")
 
 
 def format_results_table(results: Dict) -> str:
@@ -75,6 +76,9 @@ def compare_models(
 
     Returns:
         Formatted comparison table string.
+
+    Raises:
+        ValueError: If number of model names doesn't match number of files.
     """
     if model_names is None:
         model_names = [f.name.replace("_benchmark.json", "") for f in benchmark_files]
@@ -133,30 +137,4 @@ def compare_models(
         lines.append(row)
     
     return "\n".join(lines)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

@@ -108,7 +108,7 @@ class TestAzureMLArtifactUploadIntegration:
             mock_client.get_run.return_value = mock_run
             
             # Mock tracker
-            with patch('orchestration.jobs.hpo.local_sweeps.MLflowSweepTracker') as mock_tracker_class:
+            with patch('hpo.tracking.sweep_tracker.MLflowSweepTracker') as mock_tracker_class:
                 mock_tracker = MagicMock()
                 mock_tracker_class.return_value = mock_tracker
                 mock_tracker.log_best_checkpoint.return_value = None  # Success

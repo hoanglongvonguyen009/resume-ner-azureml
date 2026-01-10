@@ -28,7 +28,7 @@ class TestONNXInferenceEngine:
 
     @patch("src.api.inference.engine.AutoTokenizer")
     @patch("src.api.inference.engine.AutoConfig")
-    @patch("src.api.inference.engine.ort.InferenceSession")
+    @patch("onnxruntime.InferenceSession")
     def test_load_model_success(
         self,
         mock_session,
@@ -71,9 +71,9 @@ class TestONNXInferenceEngine:
 
     @patch("src.api.inference.engine.prepare_onnx_inputs")
     @patch("src.api.inference.engine.get_offset_mapping")
-    @patch("src.api.inference.engine.AutoTokenizer")
-    @patch("src.api.inference.engine.AutoConfig")
-    @patch("src.api.inference.engine.ort.InferenceSession")
+    @patch("transformers.AutoTokenizer")
+    @patch("transformers.AutoConfig")
+    @patch("onnxruntime.InferenceSession")
     def test_predict_tokens(
         self,
         mock_session,

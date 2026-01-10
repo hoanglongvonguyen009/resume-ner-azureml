@@ -56,9 +56,9 @@ class TestInferenceFixes:
         
         with patch("src.api.inference.engine.prepare_onnx_inputs") as mock_prepare, \
              patch("src.api.inference.engine.get_offset_mapping") as mock_get_offset, \
-             patch("src.api.inference.engine.ort.InferenceSession") as mock_session, \
-             patch("src.api.inference.engine.AutoTokenizer") as mock_tokenizer_class, \
-             patch("src.api.inference.engine.AutoConfig") as mock_config:
+             patch("onnxruntime.InferenceSession") as mock_session, \
+             patch("transformers.AutoTokenizer") as mock_tokenizer_class, \
+             patch("transformers.AutoConfig") as mock_config:
             
             # Setup prepare_onnx_inputs and get_offset_mapping mocks
             mock_prepare.return_value = {
@@ -140,9 +140,9 @@ class TestInferenceFixes:
         
         with patch("src.api.inference.engine.prepare_onnx_inputs") as mock_prepare, \
              patch("src.api.inference.engine.get_offset_mapping") as mock_get_offset, \
-             patch("src.api.inference.engine.ort.InferenceSession") as mock_session, \
-             patch("src.api.inference.engine.AutoTokenizer") as mock_tokenizer_class, \
-             patch("src.api.inference.engine.AutoConfig") as mock_config:
+             patch("onnxruntime.InferenceSession") as mock_session, \
+             patch("transformers.AutoTokenizer") as mock_tokenizer_class, \
+             patch("transformers.AutoConfig") as mock_config:
             
             # Setup prepare_onnx_inputs and get_offset_mapping mocks
             expected_offsets = [(0, 0), (0, 4), (5, 8), (0, 0)]  # CLS, John, Doe, SEP
@@ -219,9 +219,9 @@ class TestInferenceFixes:
         
         with patch("src.api.inference.engine.prepare_onnx_inputs") as mock_prepare, \
              patch("src.api.inference.engine.get_offset_mapping") as mock_get_offset, \
-             patch("src.api.inference.engine.ort.InferenceSession") as mock_session, \
-             patch("src.api.inference.engine.AutoTokenizer") as mock_tokenizer_class, \
-             patch("src.api.inference.engine.AutoConfig") as mock_config:
+             patch("onnxruntime.InferenceSession") as mock_session, \
+             patch("transformers.AutoTokenizer") as mock_tokenizer_class, \
+             patch("transformers.AutoConfig") as mock_config:
             
             # Create realistic offset mapping
             # "John Doe works at Google" -> tokens: [CLS, John, Doe, works, at, Google, SEP]
@@ -325,9 +325,9 @@ class TestInferenceFixes:
         
         with patch("src.api.inference.engine.prepare_onnx_inputs") as mock_prepare, \
              patch("src.api.inference.engine.get_offset_mapping") as mock_get_offset, \
-             patch("src.api.inference.engine.ort.InferenceSession") as mock_session, \
-             patch("src.api.inference.engine.AutoTokenizer") as mock_tokenizer_class, \
-             patch("src.api.inference.engine.AutoConfig") as mock_config:
+             patch("onnxruntime.InferenceSession") as mock_session, \
+             patch("transformers.AutoTokenizer") as mock_tokenizer_class, \
+             patch("transformers.AutoConfig") as mock_config:
             
             # Setup prepare_onnx_inputs and get_offset_mapping mocks
             mock_prepare.return_value = {

@@ -4,7 +4,12 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock
 
-import optuna
+# Lazy import optuna to allow tests to be skipped if not available
+try:
+    import optuna
+except ImportError:
+    optuna = None
+    pytest.skip("optuna not available", allow_module_level=True)
 
 from hpo import extract_best_config_from_study
 from selection.selection_logic import SelectionLogic

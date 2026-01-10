@@ -5,7 +5,13 @@ from typing import Dict, Any, List, Optional
 from unittest.mock import Mock
 import json
 import pytest
-import optuna
+
+# Lazy import optuna to allow tests to be skipped if not available
+try:
+    import optuna
+except ImportError:
+    optuna = None
+    pytest.skip("optuna not available", allow_module_level=True)
 
 from constants import METRICS_FILENAME
 

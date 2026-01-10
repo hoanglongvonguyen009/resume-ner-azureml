@@ -46,7 +46,13 @@ def mock_checkpoint_dir(tmp_path):
 def _patch_context_builders(monkeypatch, tmp_path):
     """Patch naming context builders to use tmp_path."""
     def fake_create_context(**kwargs):
-        return SimpleNamespace(**kwargs)
+        # Ensure required attributes are present
+        ctx = SimpleNamespace(**kwargs)
+        if not hasattr(ctx, 'storage_env'):
+            ctx.storage_env = kwargs.get('environment', 'local')
+        if not hasattr(ctx, 'environment'):
+            ctx.environment = kwargs.get('environment', 'local')
+        return ctx
     
     def fake_build_output_path(root_dir_arg, ctx):
         # Build path based on context
@@ -61,9 +67,11 @@ def _patch_context_builders(monkeypatch, tmp_path):
             return tmp_path / "outputs" / "final_training" / f"spec-{spec8}_exec-{exec8}" / f"v{variant}"
         return tmp_path / "outputs" / "final_training" / f"v{variant}"
     
-    monkeypatch.setattr("orchestration.final_training_config.create_naming_context", fake_create_context)
-    monkeypatch.setattr("orchestration.final_training_config.build_output_path", fake_build_output_path)
-    monkeypatch.setattr("orchestration.final_training_config.detect_platform", lambda: "local")
+    monkeypatch.setattr("naming.create_naming_context", fake_create_context)
+    monkeypatch.setattr("paths.build_output_path", fake_build_output_path)
+    monkeypatch.setattr("paths.resolve.build_output_path", fake_build_output_path)
+    monkeypatch.setattr("config.training.build_output_path", fake_build_output_path)
+    monkeypatch.setattr("shared.platform_detection.detect_platform", lambda: "local")
 
 
 class TestSourceParentDictFormat:
@@ -357,7 +365,7 @@ class TestVariantNumber:
         variant_config = {"number": 5}
         run_mode = "force_new"  # Should ignore explicit variant and increment
         
-        with patch("orchestration.final_training_config._compute_next_variant", return_value=6):
+        with patch("config.training._compute_next_variant", return_value=6):
             result = _resolve_variant(
                 root_dir=tmp_path,
                 config_dir=tmp_config_dir,
@@ -377,7 +385,7 @@ class TestVariantNumber:
         variant_config = {"number": None}
         run_mode = "reuse_if_exists"
         
-        with patch("orchestration.final_training_config._compute_next_variant", return_value=2):
+        with patch("config.training._compute_next_variant", return_value=2):
             result = _resolve_variant(
                 root_dir=tmp_path,
                 config_dir=tmp_config_dir,
@@ -424,6 +432,10 @@ training:
         
         # Mock load_yaml to return our config
         def fake_load_yaml(path):
+            # Handle None values
+            if path is None:
+                return {}
+            # Convert string to Path if needed
             path_obj = Path(path) if isinstance(path, str) else path
             if path_obj.name == "final_training.yaml":
                 return load_yaml(final_training_yaml)
@@ -431,16 +443,20 @@ training:
                 return load_yaml(path_obj)  # Load actual train.yaml file
             return {}
         
-        monkeypatch.setattr("orchestration.final_training_config.load_yaml", fake_load_yaml)
+        monkeypatch.setattr("shared.yaml_utils.load_yaml", fake_load_yaml)
         
         # Mock other dependencies
-        monkeypatch.setattr("orchestration.final_training_config.detect_platform", lambda: "local")
-        monkeypatch.setattr("orchestration.final_training_config._compute_fingerprints", lambda *args, **kwargs: ("spec123", "exec456"))
-        monkeypatch.setattr("orchestration.final_training_config._resolve_variant", lambda *args, **kwargs: 1)
-        monkeypatch.setattr("orchestration.final_training_config._resolve_checkpoint", lambda *args, **kwargs: None)
-        monkeypatch.setattr("orchestration.final_training_config._resolve_seed", lambda *args, **kwargs: 42)
-        monkeypatch.setattr("orchestration.final_training_config._resolve_dataset_config", lambda *args, **kwargs: {})
-        monkeypatch.setattr("orchestration.final_training_config.load_all_configs", lambda *args, **kwargs: {})
+        monkeypatch.setattr("shared.platform_detection.detect_platform", lambda: "local")
+        monkeypatch.setattr("config.training._compute_fingerprints", lambda *args, **kwargs: ("spec123", "exec456"))
+        monkeypatch.setattr("config.training._resolve_variant", lambda *args, **kwargs: 1)
+        monkeypatch.setattr("config.training._resolve_checkpoint", lambda *args, **kwargs: None)
+        monkeypatch.setattr("config.training._resolve_seed", lambda *args, **kwargs: 42)
+        monkeypatch.setattr("config.training._resolve_dataset_config", lambda *args, **kwargs: {})
+        # Mock load_all_configs to return empty dict to avoid loading data_config
+        # Patch it where it's imported in config.training
+        def fake_load_all_configs(experiment_config):
+            return {}
+        monkeypatch.setattr("config.training.load_all_configs", fake_load_all_configs)
         
         from types import SimpleNamespace
         # Create a train.yaml file for the test
@@ -452,7 +468,8 @@ training:
     patience: 3
     min_delta: 0.001
 """)
-        experiment_config = SimpleNamespace(data_config=None, train_config=str(train_yaml))
+        # train_config should be a Path object, not a string
+        experiment_config = SimpleNamespace(data_config=None, train_config=train_yaml)
         
         result = load_final_training_config(
             root_dir=tmp_path,
@@ -505,14 +522,18 @@ training:
                 return load_yaml(path_obj)  # Load actual train.yaml file
             return {}
         
-        monkeypatch.setattr("orchestration.final_training_config.load_yaml", fake_load_yaml)
-        monkeypatch.setattr("orchestration.final_training_config.detect_platform", lambda: "local")
-        monkeypatch.setattr("orchestration.final_training_config._compute_fingerprints", lambda *args, **kwargs: ("spec123", "exec456"))
-        monkeypatch.setattr("orchestration.final_training_config._resolve_variant", lambda *args, **kwargs: 1)
-        monkeypatch.setattr("orchestration.final_training_config._resolve_checkpoint", lambda *args, **kwargs: None)
-        monkeypatch.setattr("orchestration.final_training_config._resolve_seed", lambda *args, **kwargs: 42)
-        monkeypatch.setattr("orchestration.final_training_config._resolve_dataset_config", lambda *args, **kwargs: {})
-        monkeypatch.setattr("orchestration.final_training_config.load_all_configs", lambda *args, **kwargs: {})
+        monkeypatch.setattr("shared.yaml_utils.load_yaml", fake_load_yaml)
+        monkeypatch.setattr("shared.platform_detection.detect_platform", lambda: "local")
+        monkeypatch.setattr("config.training._compute_fingerprints", lambda *args, **kwargs: ("spec123", "exec456"))
+        monkeypatch.setattr("config.training._resolve_variant", lambda *args, **kwargs: 1)
+        monkeypatch.setattr("config.training._resolve_checkpoint", lambda *args, **kwargs: None)
+        monkeypatch.setattr("config.training._resolve_seed", lambda *args, **kwargs: 42)
+        monkeypatch.setattr("config.training._resolve_dataset_config", lambda *args, **kwargs: {})
+        # Mock load_all_configs to return empty dict to avoid loading data_config
+        # Patch it where it's imported in config.training
+        def fake_load_all_configs(experiment_config):
+            return {}
+        monkeypatch.setattr("config.training.load_all_configs", fake_load_all_configs)
         
         from types import SimpleNamespace
         # Create a train.yaml file for the test
@@ -524,7 +545,8 @@ training:
     patience: 3
     min_delta: 0.001
 """)
-        experiment_config = SimpleNamespace(data_config=None, train_config=str(train_yaml))
+        # train_config should be a Path object, not a string
+        experiment_config = SimpleNamespace(data_config=None, train_config=train_yaml)
         
         result = load_final_training_config(
             root_dir=tmp_path,

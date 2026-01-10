@@ -73,24 +73,17 @@ def find_checkpoint_in_trial_dir(trial_dir: Path) -> Optional[Path]:
         logger.warning(f"Trial directory does not exist: {trial_dir}")
         return None
 
-    # Log what's actually in the directory for debugging
-    try:
-        contents = [item.name for item in trial_dir.iterdir()]
-        logger.warning(f"Trial directory {trial_dir} contains: {contents}")
-    except Exception as e:
-        logger.warning(f"Could not list trial directory contents: {e}")
-
     # 1. Check for refit checkpoint
     refit_checkpoint = trial_dir / "refit" / CHECKPOINT_DIRNAME
-    logger.warning(
+    logger.debug(
         f"Checking refit checkpoint at: {refit_checkpoint} (exists: {refit_checkpoint.exists()})")
     if refit_checkpoint.exists():
-        logger.warning(f"Found refit checkpoint: {refit_checkpoint}")
+        logger.info(f"Found refit checkpoint: {refit_checkpoint}")
         return refit_checkpoint
 
     # 2. Check for CV fold checkpoints
     cv_dir = trial_dir / "cv"
-    logger.warning(
+    logger.debug(
         f"Checking CV directory at: {cv_dir} (exists: {cv_dir.exists()})")
     if cv_dir.exists():
         # Find all fold directories - handle both "fold0" and "fold_0" patterns
@@ -103,7 +96,7 @@ def find_checkpoint_in_trial_dir(trial_dir: Path) -> Optional[Path]:
                     fold_dirs.append(item)
 
         if fold_dirs:
-            logger.warning(
+            logger.debug(
                 f"Found {len(fold_dirs)} fold directories in {cv_dir}: {[d.name for d in fold_dirs]}")
             # Try to find the best fold by looking for metrics.json
             best_fold = None
@@ -133,35 +126,25 @@ def find_checkpoint_in_trial_dir(trial_dir: Path) -> Optional[Path]:
                             f"Error reading metrics from {metrics_file}: {e}")
                         continue
 
-            # Use best fold if found, otherwise use first fold
+            # Use best fold if found
             if best_fold:
                 checkpoint = best_fold / CHECKPOINT_DIRNAME
-                logger.warning(
+                logger.debug(
                     f"Checking best fold {best_fold.name}: checkpoint at {checkpoint} (exists: {checkpoint.exists()})")
                 if checkpoint.exists():
-                    logger.warning(
-                        f"Found checkpoint in best fold: {checkpoint}")
-                    return checkpoint
-
-            # Fallback: try all folds in order
-            for fold_dir in fold_dirs:
-                checkpoint = fold_dir / CHECKPOINT_DIRNAME
-                logger.warning(
-                    f"Checking fold {fold_dir.name}: checkpoint at {checkpoint} (exists: {checkpoint.exists()})")
-                if checkpoint.exists():
-                    logger.warning(f"Found checkpoint in fold: {checkpoint}")
+                    logger.info(f"Found checkpoint in best fold: {checkpoint}")
                     return checkpoint
         else:
-            logger.warning(f"No fold directories found in {cv_dir}")
+            logger.debug(f"No fold directories found in {cv_dir}")
     else:
-        logger.warning(f"CV directory does not exist: {cv_dir}")
+        logger.debug(f"CV directory does not exist: {cv_dir}")
 
-    # 3. Fallback: check root checkpoint
+    # 3. Check root checkpoint
     root_checkpoint = trial_dir / CHECKPOINT_DIRNAME
-    logger.warning(
+    logger.debug(
         f"Checking root checkpoint at: {root_checkpoint} (exists: {root_checkpoint.exists()})")
     if root_checkpoint.exists():
-        logger.warning(f"Found root checkpoint: {root_checkpoint}")
+        logger.info(f"Found root checkpoint: {root_checkpoint}")
         return root_checkpoint
 
     return None
@@ -443,113 +426,50 @@ def benchmark_best_trials(
                     import mlflow
                     client = mlflow.tracking.MlflowClient()
                     
-                    # Try to get experiment ID from benchmark tracker if available
+                    # Get experiment ID from benchmark tracker if available
                     experiment_ids_to_search = None
                     if benchmark_tracker and hasattr(benchmark_tracker, 'experiment_name'):
-                        try:
-                            # Strategy 1: Try to find HPO experiment by study_key_hash (most reliable)
-                            if study_key_hash:
-                                try:
-                                    # Search for any run with this study_key_hash to find the experiment
-                                    temp_runs = client.search_runs(
-                                        filter_string=f"tags.code.study_key_hash = '{study_key_hash}'",
-                                        max_results=1
-                                    )
-                                    if temp_runs:
-                                        experiment_ids_to_search = [temp_runs[0].info.experiment_id]
-                                        logger.info(
-                                            f"[BENCHMARK] Found HPO experiment via study_key_hash: "
-                                            f"experiment_id={experiment_ids_to_search[0]}"
-                                        )
-                                except Exception as e:
-                                    logger.debug(f"Could not find HPO experiment via study_key_hash: {e}")
-                            
-                            # Strategy 2: Fallback to name-based search
-                            if experiment_ids_to_search is None:
-                                # Search in HPO experiment (parent of benchmark experiment)
-                                # Benchmark experiment name is usually "{name}-benchmark"
-                                # HPO experiment name is usually "{name}"
-                                hpo_experiment_name = benchmark_tracker.experiment_name.replace("-benchmark", "")
-                                hpo_experiment = mlflow.get_experiment_by_name(hpo_experiment_name)
-                                if hpo_experiment:
-                                    experiment_ids_to_search = [hpo_experiment.experiment_id]
-                                    logger.info(
-                                        f"[BENCHMARK] Found HPO experiment by name: {hpo_experiment_name} "
-                                        f"(experiment_id={hpo_experiment.experiment_id})"
-                                    )
-                                else:
-                                    logger.debug(
-                                        f"[BENCHMARK] HPO experiment '{hpo_experiment_name}' not found, searching all experiments"
-                                    )
-                        except Exception as e:
-                            logger.debug(f"Could not find HPO experiment by name: {e}")
-                    
-                    # Search for trial run by trial_key_hash (CV trial, not refit)
-                    # Try multiple filter strategies to find the trial run
-                    filter_strings = [
-                        f"tags.code.trial_key_hash = '{trial_key_hash}' AND tags.code.stage = 'hpo'",
-                        f"tags.code.trial_key_hash = '{trial_key_hash}'",
-                    ]
-                    runs = None
-                    for filter_str in filter_strings:
-                        try:
-                            # MLflow requires experiment_ids as positional arg - use [] to search all experiments
-                            runs = client.search_runs(
-                                experiment_ids=experiment_ids_to_search if experiment_ids_to_search is not None else [],
-                                filter_string=filter_str,
-                                max_results=5  # Get more results to filter manually
-                            )
-                            
-                            if runs:
-                                # Filter out refit runs manually (keep only hpo stage, exclude hpo_refit)
-                                runs = [r for r in runs if r.data.tags.get("code.stage") == "hpo"]
-                                if runs:
-                                    break
-                        except Exception as e:
-                            logger.debug(f"Filter '{filter_str}' failed: {e}")
-                            continue
-                    
-                    if runs:
-                        trial_run = runs[0]
-                        hpo_trial_run_id = trial_run.info.run_id
-                        logger.info(
-                            f"[BENCHMARK] Found trial run ID from MLflow: {hpo_trial_run_id[:12]}... "
-                            f"(via trial_key_hash={trial_key_hash[:16]}...)"
-                        )
-                    else:
-                        # Try fallback: search by trial_id if available
-                        # Extract trial_id from trial_name (e.g., "trial_0_20260105_122905" -> "trial_0_20260105_122905")
-                        trial_id = trial_info.get("trial_id") or trial_info.get("trial_name")
-                        if trial_id:
+                        # Find HPO experiment by study_key_hash (most reliable)
+                        if study_key_hash:
                             try:
-                                logger.info(
-                                    f"[BENCHMARK] Trying fallback search by trial_id={trial_id}..."
-                                )
-                                fallback_runs = client.search_runs(
-                                    experiment_ids=experiment_ids_to_search if experiment_ids_to_search is not None else [],
-                                    filter_string=f"tags.code.trial_id = '{trial_id}' AND tags.code.stage = 'hpo'",
+                                temp_runs = client.search_runs(
+                                    filter_string=f"tags.code.study_key_hash = '{study_key_hash}'",
                                     max_results=1
                                 )
-                                if fallback_runs:
-                                    trial_run = fallback_runs[0]
-                                    hpo_trial_run_id = trial_run.info.run_id
+                                if temp_runs:
+                                    experiment_ids_to_search = [temp_runs[0].info.experiment_id]
                                     logger.info(
-                                        f"[BENCHMARK] Found trial run ID via trial_id fallback: {hpo_trial_run_id[:12]}..."
-                                    )
-                                else:
-                                    logger.warning(
-                                        f"[BENCHMARK] Could not find trial run in MLflow for trial_key_hash={trial_key_hash[:16]}... "
-                                        f"or trial_id={trial_id} (searched {len(experiment_ids_to_search) if experiment_ids_to_search else 'all'} experiments)"
+                                        f"[BENCHMARK] Found HPO experiment via study_key_hash: "
+                                        f"experiment_id={experiment_ids_to_search[0]}"
                                     )
                             except Exception as e:
-                                logger.warning(
-                                    f"[BENCHMARK] Fallback search by trial_id failed: {e}"
-                                )
+                                logger.debug(f"Could not find HPO experiment via study_key_hash: {e}")
+                    
+                    # Search for trial run by trial_key_hash (CV trial, not refit)
+                    runs = client.search_runs(
+                        experiment_ids=experiment_ids_to_search if experiment_ids_to_search is not None else [],
+                        filter_string=f"tags.code.trial_key_hash = '{trial_key_hash}' AND tags.code.stage = 'hpo'",
+                        max_results=5
+                    )
+                    
+                    if runs:
+                        # Filter out refit runs manually (keep only hpo stage, exclude hpo_refit)
+                        runs = [r for r in runs if r.data.tags.get("code.stage") == "hpo"]
+                        if runs:
+                            trial_run = runs[0]
+                            hpo_trial_run_id = trial_run.info.run_id
+                            logger.info(
+                                f"[BENCHMARK] Found trial run ID from MLflow: {hpo_trial_run_id[:12]}... "
+                                f"(via trial_key_hash={trial_key_hash[:16]}...)"
+                            )
                         else:
                             logger.warning(
-                                f"[BENCHMARK] Could not find trial run in MLflow for trial_key_hash={trial_key_hash[:16]}... "
-                                f"(searched {len(experiment_ids_to_search) if experiment_ids_to_search else 'all'} experiments, no trial_id for fallback)"
+                                f"[BENCHMARK] Could not find trial run in MLflow for trial_key_hash={trial_key_hash[:16]}..."
                             )
+                    else:
+                        logger.warning(
+                            f"[BENCHMARK] Could not find trial run in MLflow for trial_key_hash={trial_key_hash[:16]}..."
+                        )
                 except Exception as e:
                     logger.warning(f"Could not query MLflow for trial run ID: {e}", exc_info=True)
 
@@ -559,19 +479,20 @@ def benchmark_best_trials(
                     import mlflow
                     client = mlflow.tracking.MlflowClient()
                     
-                    # Try to get experiment ID from benchmark tracker if available
+                    # Get experiment ID from benchmark tracker if available
                     experiment_ids_to_search = None
-                    if benchmark_tracker and hasattr(benchmark_tracker, 'experiment_name'):
+                    if benchmark_tracker and hasattr(benchmark_tracker, 'experiment_name') and study_key_hash:
                         try:
-                            hpo_experiment_name = benchmark_tracker.experiment_name.replace("-benchmark", "")
-                            hpo_experiment = mlflow.get_experiment_by_name(hpo_experiment_name)
-                            if hpo_experiment:
-                                experiment_ids_to_search = [hpo_experiment.experiment_id]
+                            temp_runs = client.search_runs(
+                                filter_string=f"tags.code.study_key_hash = '{study_key_hash}'",
+                                max_results=1
+                            )
+                            if temp_runs:
+                                experiment_ids_to_search = [temp_runs[0].info.experiment_id]
                         except Exception:
                             pass
                     
-                    # Try to find refit run (same trial_key_hash with refit tag)
-                    # MLflow requires experiment_ids as positional arg - use [] to search all experiments
+                    # Find refit run (same trial_key_hash with refit tag)
                     refit_runs = client.search_runs(
                         experiment_ids=experiment_ids_to_search if experiment_ids_to_search is not None else [],
                         filter_string=f"tags.code.trial_key_hash = '{trial_key_hash}' AND tags.code.stage = 'hpo_refit'",

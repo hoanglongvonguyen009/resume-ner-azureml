@@ -323,7 +323,7 @@ class TestBenchmarkConfigEdgeCases:
         assert result == {}
         assert not mock_run_benchmarking.called
 
-    @patch("orchestration.benchmark_utils.subprocess.run")
+    @patch("benchmarking.utils.subprocess.run")
     def test_run_benchmarking_handles_missing_benchmark_script(
         self,
         mock_subprocess,
@@ -352,7 +352,7 @@ class TestBenchmarkConfigEdgeCases:
         assert success is False
         assert not mock_subprocess.called
 
-    @patch("orchestration.benchmark_utils.subprocess.run")
+    @patch("benchmarking.utils.subprocess.run")
     def test_run_benchmarking_handles_subprocess_failure(
         self,
         mock_subprocess,
@@ -365,8 +365,8 @@ class TestBenchmarkConfigEdgeCases:
         project_root = tmp_path
         
         # Create mock benchmark script
-        benchmark_script = project_root / "benchmarks" / "benchmark_inference.py"
-        benchmark_script.parent.mkdir(parents=True)
+        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
+        benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         
         # Mock subprocess failure

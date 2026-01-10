@@ -10,7 +10,11 @@ from shared.logging_utils import get_logger
 logger = get_logger(__name__)
 
 # Suppress Optuna's verbose output to reduce log clutter
-logging.getLogger("optuna").setLevel(logging.WARNING)
+# Only set if optuna is available
+try:
+    logging.getLogger("optuna").setLevel(logging.WARNING)
+except Exception:
+    pass  # optuna not available, skip logging configuration
 
 
 def import_optuna():

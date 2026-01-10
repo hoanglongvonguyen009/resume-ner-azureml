@@ -4,8 +4,14 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import optuna
-from optuna.pruners import MedianPruner
+# Lazy import optuna to allow tests to be skipped if not available
+try:
+    import optuna
+    from optuna.pruners import MedianPruner
+except ImportError:
+    optuna = None
+    MedianPruner = None
+    pytest.skip("optuna not available", allow_module_level=True)
 
 from hpo.core.optuna_integration import create_optuna_pruner
 

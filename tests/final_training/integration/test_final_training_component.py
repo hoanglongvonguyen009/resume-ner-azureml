@@ -46,7 +46,13 @@ def _setup_base_patches(monkeypatch, tmp_path, outputs_root):
 
     def fake_create_context(**kwargs):
         # Return a SimpleNamespace so it behaves like a context object
-        return SimpleNamespace(**kwargs)
+        ctx = SimpleNamespace(**kwargs)
+        # Ensure required attributes are present
+        if not hasattr(ctx, 'storage_env'):
+            ctx.storage_env = kwargs.get('environment', 'local')
+        if not hasattr(ctx, 'environment'):
+            ctx.environment = kwargs.get('environment', 'local')
+        return ctx
 
     def fake_build_output_path(root_dir_arg, ctx):
         # Use variant to distinguish different runs
@@ -95,12 +101,13 @@ def test_execute_final_training_reuse_if_exists_skips_training(tmp_path, monkeyp
         calls["called"] = True
         raise AssertionError("execute_training_subprocess should not be called in reuse_if_exists path")
 
-    monkeypatch.setattr("training.execution.subprocess_runner.execute_training_subprocess", fake_execute_training_subprocess)
+    # Patch where it's imported in executor module
+    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
 
     # Mock MLflow to avoid real calls
     mock_client = Mock()
-    monkeypatch.setattr(executor, "MlflowClient", lambda: mock_client)
-    monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: None))
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
+    monkeypatch.setattr("mlflow.get_tracking_uri", lambda: None)
 
     # Execute
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
@@ -161,14 +168,16 @@ def test_execute_final_training_force_new_runs_training(tmp_path, monkeypatch):
         result.stderr = ""
         return result
 
-    monkeypatch.setattr("training.execution.subprocess_runner.execute_training_subprocess", fake_execute_training_subprocess)
+    # Patch where it's imported in executor module
+    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
 
     # Mock MLflow
     mock_client = Mock()
     mock_experiment = Mock()
     mock_experiment.experiment_id = "exp-123"
     mock_client.get_experiment_by_name.return_value = mock_experiment
-    monkeypatch.setattr(executor, "MlflowClient", lambda: mock_client)
+    # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
     # Patch the metadata manager module since save_metadata_with_fingerprints is imported inside the function
     import orchestration.metadata_manager as mm
@@ -237,13 +246,15 @@ def test_execute_final_training_resume_if_incomplete_continues(tmp_path, monkeyp
         result.stderr = ""
         return result
 
-    monkeypatch.setattr("training.execution.subprocess_runner.execute_training_subprocess", fake_execute_training_subprocess)
+    # Patch where it's imported in executor module
+    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
 
     mock_client = Mock()
     mock_experiment = Mock()
     mock_experiment.experiment_id = "exp-123"
     mock_client.get_experiment_by_name.return_value = mock_experiment
-    monkeypatch.setattr(executor, "MlflowClient", lambda: mock_client)
+    # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
     # Patch the metadata manager module since save_metadata_with_fingerprints is imported inside the function
     import orchestration.metadata_manager as mm
@@ -292,7 +303,8 @@ def test_execute_final_training_missing_dataset_raises_error(tmp_path, monkeypat
     mock_experiment = Mock()
     mock_experiment.experiment_id = "exp-123"
     mock_client.get_experiment_by_name.return_value = mock_experiment
-    monkeypatch.setattr(executor, "MlflowClient", lambda: mock_client)
+    # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: None))
 
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
@@ -344,13 +356,15 @@ def test_execute_final_training_local_path_override(tmp_path, monkeypatch):
         result.stderr = ""
         return result
 
-    monkeypatch.setattr("training.execution.subprocess_runner.execute_training_subprocess", fake_execute_training_subprocess)
+    # Patch where it's imported in executor module
+    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
 
     mock_client = Mock()
     mock_experiment = Mock()
     mock_experiment.experiment_id = "exp-123"
     mock_client.get_experiment_by_name.return_value = mock_experiment
-    monkeypatch.setattr(executor, "MlflowClient", lambda: mock_client)
+    # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
     # Patch the metadata manager module since save_metadata_with_fingerprints is imported inside the function
     import orchestration.metadata_manager as mm
@@ -408,7 +422,8 @@ def test_execute_final_training_training_failure_marks_run_failed(tmp_path, monk
         result.stderr = "Traceback..."
         return result
 
-    monkeypatch.setattr("training.execution.subprocess_runner.execute_training_subprocess", fake_execute_training_subprocess)
+    # Patch where it's imported in executor module
+    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
 
     mock_client = Mock()
     mock_experiment = Mock()
@@ -417,7 +432,8 @@ def test_execute_final_training_training_failure_marks_run_failed(tmp_path, monk
     mock_run = Mock()
     mock_run.info.run_id = "run-123"
     mock_client.create_run.return_value = mock_run
-    monkeypatch.setattr(executor, "MlflowClient", lambda: mock_client)
+    # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
     # Patch the metadata manager module since save_metadata_with_fingerprints is imported inside the function
     import orchestration.metadata_manager as mm
@@ -477,12 +493,14 @@ def test_execute_final_training_mlflow_disabled_skips_tracking(tmp_path, monkeyp
         result.stderr = ""
         return result
 
-    monkeypatch.setattr("training.execution.subprocess_runner.execute_training_subprocess", fake_execute_training_subprocess)
+    # Patch where it's imported in executor module
+    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
 
     # Mock MLflow to return None (disabled)
     mock_client = Mock()
     mock_client.get_experiment_by_name.side_effect = Exception("MLflow disabled")
-    monkeypatch.setattr(executor, "MlflowClient", lambda: mock_client)
+    # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: None))
     # Patch the metadata manager module since save_metadata_with_fingerprints is imported inside the function
     import orchestration.metadata_manager as mm
@@ -566,13 +584,15 @@ def test_execute_final_training_source_scratch_no_checkpoint(tmp_path, monkeypat
         result.stderr = ""
         return result
 
-    monkeypatch.setattr("training.execution.subprocess_runner.execute_training_subprocess", fake_execute_training_subprocess)
+    # Patch where it's imported in executor module
+    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
 
     mock_client = Mock()
     mock_experiment = Mock()
     mock_experiment.experiment_id = "exp-123"
     mock_client.get_experiment_by_name.return_value = mock_experiment
-    monkeypatch.setattr(executor, "MlflowClient", lambda: mock_client)
+    # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
     import orchestration.metadata_manager as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
@@ -663,13 +683,15 @@ def test_execute_final_training_source_final_training_with_checkpoint(tmp_path, 
         result.stderr = ""
         return result
 
-    monkeypatch.setattr("training.execution.subprocess_runner.execute_training_subprocess", fake_execute_training_subprocess)
+    # Patch where it's imported in executor module
+    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
 
     mock_client = Mock()
     mock_experiment = Mock()
     mock_experiment.experiment_id = "exp-123"
     mock_client.get_experiment_by_name.return_value = mock_experiment
-    monkeypatch.setattr(executor, "MlflowClient", lambda: mock_client)
+    # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
     import orchestration.metadata_manager as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
@@ -761,13 +783,15 @@ def test_execute_final_training_hyperparameter_precedence(tmp_path, monkeypatch)
         result.stderr = ""
         return result
 
-    monkeypatch.setattr("training.execution.subprocess_runner.execute_training_subprocess", fake_execute_training_subprocess)
+    # Patch where it's imported in executor module
+    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
 
     mock_client = Mock()
     mock_experiment = Mock()
     mock_experiment.experiment_id = "exp-123"
     mock_client.get_experiment_by_name.return_value = mock_experiment
-    monkeypatch.setattr(executor, "MlflowClient", lambda: mock_client)
+    # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
     import orchestration.metadata_manager as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
@@ -894,13 +918,15 @@ def test_execute_final_training_mlflow_overrides(tmp_path, monkeypatch):
         result.stderr = ""
         return result
 
-    monkeypatch.setattr("training.execution.subprocess_runner.execute_training_subprocess", fake_execute_training_subprocess)
+    # Patch where it's imported in executor module
+    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
 
     mock_client = Mock()
     mock_experiment = Mock()
     mock_experiment.experiment_id = "exp-123"
     mock_client.get_experiment_by_name.return_value = mock_experiment
-    monkeypatch.setattr(executor, "MlflowClient", lambda: mock_client)
+    # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
+    monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
     import orchestration.metadata_manager as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)

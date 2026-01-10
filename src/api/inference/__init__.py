@@ -137,15 +137,13 @@ except Exception as e:
     # If import fails, set to None (will not be exported)
     ONNXInferenceEngine = None
 
-# Also expose ort, AutoTokenizer, and AutoConfig from engine for test compatibility
+# Also expose ort, AutoTokenizer, and AutoConfig for test compatibility
 # This allows tests to patch src.api.inference.ort.InferenceSession, etc.
+# Use lazy imports to avoid requiring onnxruntime at module load time
 try:
-    from .engine import ort
+    import onnxruntime as ort
 except ImportError:
-    try:
-        import onnxruntime as ort
-    except ImportError:
-        ort = None
+    ort = None
 
 # Expose transformers classes for test compatibility
 try:

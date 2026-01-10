@@ -3,9 +3,12 @@
 This file is automatically discovered by pytest and applies to all tests.
 """
 
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
+
+import pytest
 
 # Add project root and src to Python path for all tests
 ROOT_DIR = Path(__file__).parent.parent
@@ -26,6 +29,19 @@ _pytest_tee = None
 def pytest_configure(config):
     """Configure pytest hooks."""
     global _pytest_log_file
+
+    # Check environment for torch-requiring tests
+    import os
+    conda_env = os.environ.get("CONDA_DEFAULT_ENV", "")
+    
+    # Warn if torch tests are being run without the correct environment
+    if config.option.markexpr and ("torch" in config.option.markexpr or "requires_torch" in config.option.markexpr):
+        if conda_env != "resume-ner-training":
+            print(f"\n{'='*60}")
+            print(f"WARNING: Torch-requiring tests detected but current environment is '{conda_env}'")
+            print(f"Expected environment: 'resume-ner-training'")
+            print(f"Activate with: conda activate resume-ner-training")
+            print(f"{'='*60}\n")
 
     # Create timestamped log file for this test run
     log_file = config.getoption("--log-file", default=None)
@@ -53,8 +69,20 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    """Log collection information."""
+    """Modify test items during collection."""
     global _pytest_tee, _pytest_log_file
+    
+    # Check environment for torch-requiring tests
+    conda_env = os.environ.get("CONDA_DEFAULT_ENV", "")
+    skip_torch = pytest.mark.skip(reason="Requires resume-ner-training environment. Run: conda activate resume-ner-training")
+    
+    for item in items:
+        # Check if test requires torch
+        torch_markers = [mark for mark in item.iter_markers() if mark.name in ("torch", "requires_torch")]
+        
+        if torch_markers and conda_env != "resume-ner-training":
+            # Skip test if it requires torch but we're not in the right environment
+            item.add_marker(skip_torch)
 
     if _pytest_tee and _pytest_log_file:
         try:

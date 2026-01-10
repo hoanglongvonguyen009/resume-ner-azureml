@@ -5,8 +5,14 @@ import time
 import numpy as np
 from pathlib import Path
 
-import onnxruntime as ort
-from transformers import AutoTokenizer
+# Lazy import onnxruntime to allow tests to be skipped if not available
+try:
+    import onnxruntime as ort
+    from transformers import AutoTokenizer
+except ImportError:
+    ort = None
+    AutoTokenizer = None
+    pytest.skip("onnxruntime or transformers not available", allow_module_level=True)
 
 
 @pytest.mark.integration
