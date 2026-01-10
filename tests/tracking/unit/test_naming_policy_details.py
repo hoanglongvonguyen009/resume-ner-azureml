@@ -4,7 +4,7 @@ import yaml
 from pathlib import Path
 import pytest
 
-from orchestration.jobs.tracking.naming.policy import (
+from naming.mlflow.policy import (
     load_naming_policy,
     format_run_name,
     validate_run_name,

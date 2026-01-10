@@ -59,7 +59,7 @@ def create_trial_run_no_cv(
         run_name = None
         try:
             from naming import create_naming_context
-            from orchestration.jobs.tracking.mlflow_naming import (
+            from tracking.mlflow.naming import (
                 build_mlflow_run_name,
                 build_mlflow_tags,
             )
@@ -132,7 +132,7 @@ def create_trial_run_no_cv(
             run_name = f"trial_{trial_number}"
             # Fallback to minimal tags - still try to get project name from config
             try:
-                from orchestration.jobs.tracking.mlflow_config_loader import (
+                from tracking.mlflow.config_loader import (
                     get_naming_config,
                 )
 

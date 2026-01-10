@@ -186,7 +186,7 @@ def build_mlflow_run_name(
                 env or "",
             )
 
-            from orchestration.jobs.tracking.mlflow_index import reserve_run_name_version  # TODO: Move to naming/mlflow/ in future
+            from tracking.mlflow.index import reserve_run_name_version
 
             temp_run_id = f"pending_{datetime.now().isoformat()}"
             version = reserve_run_name_version(

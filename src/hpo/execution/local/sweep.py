@@ -17,7 +17,7 @@ import numpy as np
 
 from hpo.checkpoint.storage import resolve_storage_path, get_storage_uri
 from hpo.core.search_space import translate_search_space_to_optuna
-from orchestration.jobs.tracking.trackers.sweep_tracker import MLflowSweepTracker
+from tracking.mlflow.trackers.sweep_tracker import MLflowSweepTracker
 from hpo.utils.helpers import (
     generate_run_id,
     setup_checkpoint_storage,
@@ -247,7 +247,7 @@ def create_local_hpo_objective(
             trial_key_hash = None
             if study_key_hash:
                 try:
-                    from orchestration.jobs.tracking.mlflow_naming import (
+                    from tracking.mlflow.naming import (
                         build_hpo_trial_key,
                         build_hpo_trial_key_hash,
                     )
@@ -429,7 +429,7 @@ def run_local_hpo_sweep(
     study_key_hash = None
     if data_config and hpo_config:
         try:
-            from orchestration.jobs.tracking.naming.hpo_keys import (
+            from naming.mlflow.hpo_keys import (
                 build_hpo_study_key,
                 build_hpo_study_key_hash,
             )
@@ -556,7 +556,7 @@ def run_local_hpo_sweep(
 
     # Write .active_study.json marker for fast lookup in selection code
     try:
-        from orchestration.jobs.local_selection_v2 import write_active_study_marker
+        from selection.local_selection_v2 import write_active_study_marker
         backbone_dir = study_folder.parent
         write_active_study_marker(
             backbone_dir=backbone_dir,
@@ -614,7 +614,7 @@ def run_local_hpo_sweep(
 
     # Cleanup stale reservations from crashed processes
     try:
-        from orchestration.jobs.tracking.mlflow_index import cleanup_stale_reservations
+        from tracking.mlflow.index import cleanup_stale_reservations
         root_dir = output_dir.parent.parent if output_dir else Path.cwd()
         config_dir = output_dir.parent.parent / "config" if output_dir else None
         cleaned_count = cleanup_stale_reservations(
@@ -715,7 +715,7 @@ def run_local_hpo_sweep(
 
             # Update .active_study.json marker with study_key_hash from MLflow run
             try:
-                from orchestration.jobs.local_selection_v2 import write_active_study_marker
+                from selection.local_selection_v2 import write_active_study_marker
                 import mlflow
                 client = mlflow.tracking.MlflowClient()
                 parent_run = client.get_run(parent_run_id)
@@ -828,7 +828,7 @@ def run_local_hpo_sweep(
                     # Primary: compute grouping hashes from configs (ensures canonicalization matches)
                     if data_config and hpo_config:
                         try:
-                            from orchestration.jobs.tracking.mlflow_naming import (
+                            from tracking.mlflow.naming import (
                                 build_hpo_study_key,
                                 build_hpo_study_family_key,
                                 build_hpo_study_key_hash,
@@ -880,7 +880,7 @@ def run_local_hpo_sweep(
                     # Compute trial_key_hash from best trial hyperparameters and study_key_hash
                     if refit_study_key_hash and study.best_trial:
                         try:
-                            from orchestration.jobs.tracking.mlflow_naming import (
+                            from tracking.mlflow.naming import (
                                 build_hpo_trial_key,
                                 build_hpo_trial_key_hash,
                             )
@@ -902,7 +902,7 @@ def run_local_hpo_sweep(
                                 f"Could not compute trial_key_hash for refit: {e}", exc_info=True)
 
                     # Compute refit protocol fingerprint
-                    from orchestration.jobs.tracking.mlflow_naming import compute_refit_protocol_fp
+                    from tracking.mlflow.naming import compute_refit_protocol_fp
                     refit_protocol_fp = compute_refit_protocol_fp(
                         data_config=data_config if data_config else {},
                         train_config=train_config,

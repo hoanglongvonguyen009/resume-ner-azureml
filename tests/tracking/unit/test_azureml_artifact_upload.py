@@ -180,7 +180,7 @@ class TestRefitRunFinishedStatus:
         """Test that refit run is marked as FINISHED after successful artifact upload."""
         from tracking.mlflow import terminate_run_with_tags
         
-            refit_run_id = "refit-run-id-456"
+        refit_run_id = "refit-run-id-456"
         tags = {"code.refit_artifacts_uploaded": "true"}
         
         # Test using new utility
@@ -189,14 +189,14 @@ class TestRefitRunFinishedStatus:
             status="FINISHED",
             tags=tags
         )
-            
-            # Verify that set_terminated was called with FINISHED status
-            mock_mlflow_client.set_terminated.assert_called_once_with(
-                refit_run_id, status="FINISHED"
-            )
-            mock_mlflow_client.set_tag.assert_called_with(
-                refit_run_id, "code.refit_artifacts_uploaded", "true"
-            )
+        
+        # Verify that set_terminated was called with FINISHED status
+        mock_mlflow_client.set_terminated.assert_called_once_with(
+            refit_run_id, status="FINISHED"
+        )
+        mock_mlflow_client.set_tag.assert_called_with(
+            refit_run_id, "code.refit_artifacts_uploaded", "true"
+        )
 
     def test_refit_run_marked_failed_after_upload_failure(self, mock_mlflow_client):
         """Test that refit run is marked as FAILED after artifact upload failure."""
@@ -270,10 +270,10 @@ class TestAzureMLCompatibility:
         
         # Azure ML may not be registered if azureml.mlflow is not installed
         if 'azureml' in registry:
-        builder = registry.get('azureml')
+            builder = registry.get('azureml')
             if builder is not None:
-        # Verify it's callable
-        assert callable(builder), "Azure ML builder should be callable"
+                # Verify it's callable
+                assert callable(builder), "Azure ML builder should be callable"
                 # Verify it's patched if available
                 if hasattr(builder, '__wrapped__'):
                     assert True, "Azure ML builder is patched"

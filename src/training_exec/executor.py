@@ -15,13 +15,13 @@ from config.loader import ExperimentConfig, load_all_configs
 from azureml.data_assets import resolve_dataset_path
 from config.training import load_final_training_config
 from fingerprints.compute import compute_exec_fp, compute_spec_fp
-from orchestration.jobs.tracking.mlflow_naming import (
+from tracking.mlflow.naming import (
     build_mlflow_run_name,
     build_mlflow_tags,
     build_mlflow_run_key,
     build_mlflow_run_key_hash,
 )
-from orchestration.jobs.tracking.mlflow_index import update_mlflow_index
+from tracking.mlflow.index import update_mlflow_index
 from naming import create_naming_context
 from paths import build_output_path
 from shared.platform_detection import detect_platform
@@ -356,7 +356,7 @@ def execute_final_training(
         config_dir=config_dir,
     )
     # Get tag keys from registry (using centralized helpers)
-    from orchestration.jobs.tracking.naming.tag_keys import (
+    from naming.mlflow.tag_keys import (
         get_lineage_hpo_refit_run_id,
         get_lineage_hpo_study_key_hash,
         get_lineage_hpo_sweep_run_id,

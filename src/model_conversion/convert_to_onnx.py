@@ -14,29 +14,43 @@ from typing import Any, Optional
 
 # Import azureml.mlflow early to register the 'azureml' URI scheme before MLflow initializes
 # This must happen before mlflow is imported to ensure the scheme is registered
+# Use shared.mlflow_setup helper to handle namespace collision with local src/azureml module
 tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
 if tracking_uri and "azureml" in tracking_uri.lower():
-    try:
-        import azureml.mlflow  # noqa: F401
-    except ImportError:
-        # If azureml.mlflow is not available, fallback to local tracking
-        print(
-            "  [Conversion] WARNING: azureml.mlflow not available, but Azure ML URI detected. "
-            "Falling back to local tracking. Install azureml-mlflow to use Azure ML tracking.",
-            file=sys.stderr, flush=True)
-        # Override with local tracking URI
+    # Use the helper function that handles namespace collision properly
+    from shared.mlflow_setup import _try_import_azureml_mlflow
+    azureml_mlflow_available = _try_import_azureml_mlflow()
+    
+    if not azureml_mlflow_available:
+        # If azureml.mlflow is truly not available, we MUST fallback to local tracking
+        # MLflow cannot handle azureml:// URIs without azureml.mlflow being imported
+        # Even if MLFLOW_RUN_ID is set, we can't use it without Azure ML support
+        mlflow_run_id = os.environ.get("MLFLOW_RUN_ID") or os.environ.get("MLFLOW_USE_RUN_ID")
+        if mlflow_run_id:
+            print(
+                "  [Conversion] WARNING: azureml.mlflow not available, but Azure ML run ID detected. "
+                f"Cannot use Azure ML run {mlflow_run_id[:12]}... without azureml.mlflow. "
+                "Falling back to local tracking and creating a new local run.",
+                file=sys.stderr, flush=True)
+        else:
+            print(
+                "  [Conversion] INFO: azureml.mlflow not available, but Azure ML URI detected. "
+                "Falling back to local tracking. (This is normal if azureml-mlflow is not installed)",
+                file=sys.stderr, flush=True)
+        # Override with local tracking URI (required - MLflow can't handle azureml:// without azureml.mlflow)
         from shared.mlflow_setup import _get_local_tracking_uri
         tracking_uri = _get_local_tracking_uri()
         os.environ["MLFLOW_TRACKING_URI"] = tracking_uri
-        # CRITICAL: Clear MLFLOW_RUN_ID and MLFLOW_USE_RUN_ID if falling back to local
-        # This prevents trying to use an Azure ML run ID with a local SQLite store
+        # CRITICAL: Clear MLFLOW_RUN_ID and MLFLOW_USE_RUN_ID - we can't use Azure ML run IDs without azureml.mlflow
         if "MLFLOW_RUN_ID" in os.environ:
             del os.environ["MLFLOW_RUN_ID"]
             print("  [Conversion] Cleared MLFLOW_RUN_ID for local fallback.", file=sys.stderr, flush=True)
         if "MLFLOW_USE_RUN_ID" in os.environ:
             del os.environ["MLFLOW_USE_RUN_ID"]
-            print("  [Conversion] Cleared MLFLOW_USE_RUN_ID for local fallback.", file=sys.stderr, flush=True)
         print("  [Conversion] A new local run will be created.", file=sys.stderr, flush=True)
+    else:
+        # azureml.mlflow is available - ensure it's imported to register the URI scheme
+        import azureml.mlflow  # noqa: F401
 
 import mlflow
 # Import tracking.mlflow to ensure Azure ML compatibility patch is applied

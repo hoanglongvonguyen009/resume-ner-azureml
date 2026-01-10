@@ -3,7 +3,7 @@
 import pytest
 import json
 
-from orchestration.jobs.tracking.naming.hpo_keys import (
+from naming.mlflow.hpo_keys import (
     build_hpo_study_key,
     build_hpo_study_key_hash,
     build_hpo_trial_key,

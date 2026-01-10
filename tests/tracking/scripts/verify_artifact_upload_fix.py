@@ -20,7 +20,7 @@ def check_monkey_patch():
     print("Checking monkey-patch...")
     
     try:
-        from orchestration.jobs.tracking.trackers.sweep_tracker import MLflowSweepTracker
+        from tracking.mlflow.trackers.sweep_tracker import MLflowSweepTracker
         
         import mlflow.store.artifact.artifact_repository_registry as arr
         builder = arr._artifact_repository_registry._registry.get('azureml')
@@ -47,7 +47,7 @@ def check_upload_to_refit_run():
     print("\nChecking upload to refit run logic...")
     
     try:
-        from orchestration.jobs.tracking.trackers.sweep_tracker import MLflowSweepTracker
+        from tracking.mlflow.trackers.sweep_tracker import MLflowSweepTracker
         
         # Read the source code to check
         sweep_tracker_file = Path(__file__).parent.parent.parent.parent / "src" / "orchestration" / "jobs" / "tracking" / "trackers" / "sweep_tracker.py"

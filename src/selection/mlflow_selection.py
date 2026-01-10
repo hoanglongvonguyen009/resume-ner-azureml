@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 from mlflow.tracking import MlflowClient
 
 from shared.logging_utils import get_logger
-from orchestration.jobs.tracking.naming.tags_registry import TagsRegistry
+from naming.mlflow.tags_registry import TagsRegistry
 
 logger = get_logger(__name__)
 
@@ -53,17 +53,32 @@ def find_best_model_from_mlflow(
         return None
 
     # Tag keys from config (support both TagsRegistry and dict for backward compatibility)
-    if isinstance(tags_config, TagsRegistry):
+    # Check if it's a TagsRegistry by checking for the key() method (more robust than isinstance)
+    # This handles cases where isinstance might fail due to import/class definition issues
+    if hasattr(tags_config, 'key') and callable(getattr(tags_config, 'key', None)):
+        # It's a TagsRegistry object (or compatible object with key() method)
         study_key_tag = tags_config.key("grouping", "study_key_hash")
         trial_key_tag = tags_config.key("grouping", "trial_key_hash")
         stage_tag = tags_config.key("process", "stage")
         backbone_tag = tags_config.key("process", "backbone")
-    else:
+    elif isinstance(tags_config, dict):
         # Backward compatibility: support dict access
         study_key_tag = tags_config["grouping"]["study_key_hash"]
         trial_key_tag = tags_config["grouping"]["trial_key_hash"]
         stage_tag = tags_config["process"]["stage"]
         backbone_tag = tags_config["process"]["backbone"]
+    else:
+        # Fallback: try isinstance check
+        if isinstance(tags_config, TagsRegistry):
+            study_key_tag = tags_config.key("grouping", "study_key_hash")
+            trial_key_tag = tags_config.key("grouping", "trial_key_hash")
+            stage_tag = tags_config.key("process", "stage")
+            backbone_tag = tags_config.key("process", "backbone")
+        else:
+            raise TypeError(
+                f"tags_config must be TagsRegistry or dict, got {type(tags_config)}. "
+                f"Object: {tags_config}"
+            )
 
     # Selection config
     objective_metric = selection_config["objective"]["metric"]

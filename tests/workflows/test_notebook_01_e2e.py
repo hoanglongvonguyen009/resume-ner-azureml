@@ -700,7 +700,7 @@ class TestNotebookE2E_Core:
         benchmark_warmup = benchmark_settings.get("warmup_iterations", 10)
         benchmark_max_length = benchmark_settings.get("max_length", 512)
         
-        from orchestration.jobs.tracking.mlflow_tracker import MLflowBenchmarkTracker
+        from tracking.mlflow.trackers.benchmark_tracker import MLflowBenchmarkTracker
         benchmark_tracker = MLflowBenchmarkTracker("test-benchmark-experiment")
         
         benchmark_results = benchmark_best_trials(

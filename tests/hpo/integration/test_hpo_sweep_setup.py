@@ -116,7 +116,7 @@ run_names:
         benchmark_config = {"benchmarking": {"enabled": True}}
         
         # Compute study_key_hash
-        from orchestration.jobs.tracking.naming.hpo_keys import (
+        from naming.mlflow.hpo_keys import (
             build_hpo_study_key,
             build_hpo_study_key_hash,
         )
@@ -237,7 +237,7 @@ run_names:
         data_config = {"name": "test", "version": "1.0"}
         hpo_config = {"search_space": {}, "objective": {"metric": "macro-f1"}}
         
-        from orchestration.jobs.tracking.naming.hpo_keys import (
+        from naming.mlflow.hpo_keys import (
             build_hpo_study_key,
             build_hpo_study_key_hash,
         )
@@ -300,7 +300,7 @@ run_names:
 
     def test_study_key_hash_and_family_hash_computed(self, tmp_path):
         """Test that study_key_hash and study_family_hash are computed and can be tagged."""
-        from orchestration.jobs.tracking.naming.hpo_keys import (
+        from naming.mlflow.hpo_keys import (
             build_hpo_study_key,
             build_hpo_study_key_hash,
             build_hpo_study_family_key,

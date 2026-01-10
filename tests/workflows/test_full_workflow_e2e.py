@@ -64,7 +64,7 @@ from config.loader import (
     load_all_configs,
 )
 from training_exec import extract_lineage_from_best_model
-from orchestration.jobs.tracking.naming.tags_registry import load_tags_registry
+from naming.mlflow.tags_registry import load_tags_registry
 from shared.platform_detection import detect_platform
 from shared.yaml_utils import load_yaml
 
@@ -355,7 +355,7 @@ def test_full_workflow_e2e(
         benchmark_warmup = benchmark_settings.get("warmup_iterations", 10)
         benchmark_max_length = benchmark_settings.get("max_length", 512)
         
-        from orchestration.jobs.tracking.mlflow_tracker import MLflowBenchmarkTracker
+        from tracking.mlflow.trackers.benchmark_tracker import MLflowBenchmarkTracker
         benchmark_tracker = MLflowBenchmarkTracker(f"{EXPERIMENT_NAME}-benchmark")
         
         benchmark_results = benchmark_best_trials(

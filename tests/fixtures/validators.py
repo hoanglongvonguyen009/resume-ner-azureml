@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import Tuple
 
-from orchestration.jobs.tracking.naming.tags_registry import load_tags_registry
+from naming.mlflow.tags_registry import load_tags_registry
 from shared.yaml_utils import load_yaml
 
 
@@ -168,5 +168,8 @@ def validate_tags(tags: dict, process_type: str, config_dir: Path) -> Tuple[bool
     except Exception as e:
         # If validation fails, return True with error message
         return True, [f"Validation error: {e}"]
+
+
+
 
 

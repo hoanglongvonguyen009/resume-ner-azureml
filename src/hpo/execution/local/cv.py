@@ -88,7 +88,7 @@ def run_training_trial_with_cv(
     # Try to compute study_key_hash if not provided
     if not computed_study_key_hash and data_config and hpo_config:
         try:
-            from orchestration.jobs.tracking.mlflow_naming import (
+            from tracking.mlflow.naming import (
                 build_hpo_study_key,
                 build_hpo_study_key_hash,
             )
@@ -111,7 +111,7 @@ def run_training_trial_with_cv(
     # Compute trial_key_hash if we have study_key_hash
     if computed_study_key_hash:
         try:
-            from orchestration.jobs.tracking.mlflow_naming import (
+            from tracking.mlflow.naming import (
                 build_hpo_trial_key,
                 build_hpo_trial_key_hash,
             )
@@ -241,7 +241,7 @@ def run_training_trial_with_cv(
                     f"Attempting to compute trial_key_hash from trial_params..."
                 )
                 try:
-                    from orchestration.jobs.tracking.mlflow_naming import (
+                    from tracking.mlflow.naming import (
                         build_hpo_trial_key,
                         build_hpo_trial_key_hash,
                     )
@@ -415,7 +415,7 @@ def _create_trial_run(
         run_name = None
         try:
             from naming import create_naming_context
-            from orchestration.jobs.tracking.mlflow_naming import build_mlflow_run_name
+            from tracking.mlflow.naming import build_mlflow_run_name
             from shared.platform_detection import detect_platform
 
             # Extract backbone short name
@@ -445,7 +445,7 @@ def _create_trial_run(
             # If grouping hashes not provided, try to compute from configs
             if (not computed_study_key_hash or not computed_study_family_hash) and data_config and hpo_config:
                 try:
-                    from orchestration.jobs.tracking.mlflow_naming import (
+                    from tracking.mlflow.naming import (
                         build_hpo_study_key,
                         build_hpo_study_family_key,
                         build_hpo_study_key_hash,
@@ -502,7 +502,7 @@ def _create_trial_run(
             # Compute trial_key_hash if we have study_key_hash and hyperparameters
             if computed_study_key_hash and hyperparameters:
                 try:
-                    from orchestration.jobs.tracking.mlflow_naming import (
+                    from tracking.mlflow.naming import (
                         build_hpo_trial_key,
                         build_hpo_trial_key_hash,
                     )
@@ -526,7 +526,7 @@ def _create_trial_run(
                         f"Could not compute trial_key_hash: {e}", exc_info=True)
 
             # Build tags including project identity tags and grouping tags
-            from orchestration.jobs.tracking.mlflow_naming import (
+            from tracking.mlflow.naming import (
                 build_mlflow_tags,
                 build_mlflow_run_key,
                 build_mlflow_run_key_hash,
@@ -555,7 +555,7 @@ def _create_trial_run(
                 f"Could not build systematic run name and tags: {e}, using fallback")
             run_name = f"trial_{trial_number}"
             try:
-                from orchestration.jobs.tracking.mlflow_config_loader import get_naming_config
+                from tracking.mlflow.config_loader import get_naming_config
                 naming_config = get_naming_config(config_dir)
                 project_name = naming_config.get("project_name", "resume-ner")
             except Exception:

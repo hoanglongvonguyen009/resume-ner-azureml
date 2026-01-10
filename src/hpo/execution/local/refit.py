@@ -16,7 +16,7 @@ import mlflow
 from shared.logging_utils import get_logger
 from constants import METRICS_FILENAME
 from naming import create_naming_context
-from orchestration.jobs.tracking.mlflow_naming import (
+from tracking.mlflow.naming import (
     build_mlflow_run_name,
     build_mlflow_tags,
     build_mlflow_run_key,
@@ -475,7 +475,7 @@ def _log_refit_metrics_to_mlflow(
             client.set_tag(refit_run_id, f"note.{k}", v)
 
         # Set explicit refit tags
-        from orchestration.jobs.tracking.naming.tag_keys import (
+        from naming.mlflow.tag_keys import (
             get_refit,
             get_refit_has_validation,
         )
@@ -503,7 +503,7 @@ import mlflow
 from shared.logging_utils import get_logger
 from constants import METRICS_FILENAME
 from naming import create_naming_context
-from orchestration.jobs.tracking.mlflow_naming import (
+from tracking.mlflow.naming import (
     build_mlflow_run_name,
     build_mlflow_tags,
     build_mlflow_run_key,
@@ -962,7 +962,7 @@ def _log_refit_metrics_to_mlflow(
             client.set_tag(refit_run_id, f"note.{k}", v)
 
         # Set explicit refit tags
-        from orchestration.jobs.tracking.naming.tag_keys import (
+        from naming.mlflow.tag_keys import (
             get_refit,
             get_refit_has_validation,
         )

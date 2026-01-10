@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional, Tuple
 from shared.logging_utils import get_logger
 
 from hpo.utils.paths import resolve_hpo_output_dir
-from orchestration.jobs.hpo.local.checkpoint.manager import resolve_storage_path
+from hpo.checkpoint.storage import resolve_storage_path
 
 logger = get_logger(__name__)
 
@@ -99,7 +99,7 @@ def load_study_from_disk(
         return None
 
     try:
-        from orchestration.jobs.hpo.local.optuna.integration import import_optuna
+        from hpo.core.optuna_integration import import_optuna
 
         optuna, _, _, _ = import_optuna()
     except ImportError:

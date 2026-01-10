@@ -141,7 +141,7 @@ def cleanup_interrupted_runs(
         current_env = detect_platform()
 
         # Get run_key_hash from context for tag-based search
-        from orchestration.jobs.tracking.mlflow_naming import (
+        from tracking.mlflow.naming import (
             build_mlflow_run_key_hash,
             build_mlflow_run_key,
         )
@@ -150,7 +150,7 @@ def cleanup_interrupted_runs(
         run_key_hash = build_mlflow_run_key_hash(run_key) if run_key else None
 
         # Load naming config for project name comparison
-        from orchestration.jobs.tracking.mlflow_config_loader import get_naming_config
+        from tracking.mlflow.config_loader import get_naming_config
 
         config_dir = output_dir.parent.parent / "config" if output_dir else None
         naming_config = get_naming_config(config_dir)
@@ -407,7 +407,7 @@ def cleanup_interrupted_runs(
                 )
 
                 try:
-                    from orchestration.jobs.tracking.naming.tag_keys import get_interrupted
+                    from naming.mlflow.tag_keys import get_interrupted
                     interrupted_tag = get_interrupted(None)
                     client.set_tag(run_id_to_mark, interrupted_tag, "true")
                     total_tagged_parents += 1
@@ -457,7 +457,7 @@ def cleanup_interrupted_runs(
                             f"(name: {child_name}, status: {child_status})"
                         )
                         try:
-                            from orchestration.jobs.tracking.naming.tag_keys import get_interrupted
+                            from naming.mlflow.tag_keys import get_interrupted
                             interrupted_tag = get_interrupted(None)
                             client.set_tag(child_run_id, interrupted_tag, "true")
                             tagged_children += 1
@@ -510,7 +510,7 @@ def cleanup_interrupted_runs(
                     f"(name: {child_name}, parent_id: {parent_id[:12] if parent_id else 'None'}...)"
                 )
                 try:
-                    from orchestration.jobs.tracking.naming.tag_keys import get_interrupted
+                    from naming.mlflow.tag_keys import get_interrupted
                     interrupted_tag = get_interrupted(None)
                     client.set_tag(child_run_id, interrupted_tag, "true")
                     total_tagged_orphaned += 1

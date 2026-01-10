@@ -33,11 +33,11 @@ def setup_hpo_mlflow_run(
     """
     try:
         from naming import create_naming_context
-        from orchestration.jobs.tracking.mlflow_naming import (
+        from tracking.mlflow.naming import (
             build_mlflow_run_name,
             build_mlflow_tags,
         )
-        from orchestration.jobs.tracking.naming.hpo_keys import (
+        from naming.mlflow.hpo_keys import (
             build_hpo_study_key,
             build_hpo_study_key_hash,
         )
@@ -131,7 +131,7 @@ def setup_hpo_mlflow_run(
         hpo_parent_context = None
 
         try:
-            from orchestration.jobs.tracking.naming.policy import (
+            from naming.mlflow.policy import (
                 load_naming_policy,
                 format_run_name,
             )
@@ -188,16 +188,16 @@ def commit_run_name_version(
 
     try:
         import re
-        from orchestration.jobs.tracking.mlflow_naming import (
+        from tracking.mlflow.naming import (
             build_mlflow_run_key,
             build_mlflow_run_key_hash,
             build_counter_key,
         )
-        from orchestration.jobs.tracking.config.loader import (
+        from tracking.mlflow.config_loader import (
             get_naming_config,
             get_auto_increment_config,
         )
-        from orchestration.jobs.tracking.mlflow_index import (
+        from tracking.mlflow.index import (
             commit_run_name_version as commit_version_internal,
         )
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from types import SimpleNamespace
 
-import orchestration.jobs.final_training.executor as executor
+import training_exec.executor as executor
 
 
 class DummyExperimentConfig(SimpleNamespace):

@@ -16,7 +16,11 @@ from typing import Any, Dict, Optional
 import mlflow
 from shared.logging_utils import get_logger
 
-from .metrics import read_trial_metrics
+# Lazy import to avoid circular dependency
+def _get_read_trial_metrics():
+    """Lazy import of read_trial_metrics to avoid circular dependencies."""
+    from .metrics import read_trial_metrics
+    return read_trial_metrics
 
 logger = get_logger(__name__)
 
@@ -130,6 +134,7 @@ class TrialExecutor:
             raise RuntimeError(f"Training failed: {result.stderr}")
 
         # Read metrics from output directory
+        read_trial_metrics = _get_read_trial_metrics()
         metrics = read_trial_metrics(
             trial_output_dir=output_dir,
             root_dir=self.root_dir,

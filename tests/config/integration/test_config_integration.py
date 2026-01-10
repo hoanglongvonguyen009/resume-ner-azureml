@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 
 from orchestration.naming_centralized import NamingContext, build_output_path
-from orchestration.jobs.tracking.naming.run_names import build_mlflow_run_name
-from orchestration.jobs.tracking.naming.tags import build_mlflow_tags
+from naming.mlflow.run_names import build_mlflow_run_name
+from naming.mlflow.tags import build_mlflow_tags
 from orchestration.paths import resolve_output_path
 
 

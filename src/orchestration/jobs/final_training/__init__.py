@@ -1,10 +1,24 @@
-"""Final training job modules."""
+"""Final training job modules - backward compatibility facade.
+
+This module re-exports from training_exec module for backward compatibility.
+"""
 
 from __future__ import annotations
 
-from orchestration.jobs.final_training.executor import execute_final_training
-from orchestration.jobs.final_training.lineage import extract_lineage_from_best_model
-from orchestration.jobs.final_training.tags import apply_lineage_tags
+import warnings
+
+# Re-export from new location
+from training_exec.executor import execute_final_training
+from training_exec.lineage import extract_lineage_from_best_model
+from training_exec.tags import apply_lineage_tags
+
+# Issue deprecation warning
+warnings.warn(
+    "Importing from 'orchestration.jobs.final_training' is deprecated. "
+    "Please import from 'training_exec' instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 __all__ = [
     "extract_lineage_from_best_model",

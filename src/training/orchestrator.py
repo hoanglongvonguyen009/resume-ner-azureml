@@ -95,9 +95,10 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
             import azureml.mlflow  # noqa: F401
         except ImportError:
             # If azureml.mlflow is not available, fallback to local tracking
+            # This is expected in some environments and the code handles it gracefully
             print(
-                "  [Training] WARNING: azureml.mlflow not available, but Azure ML URI detected. "
-                "Falling back to local tracking. Install azureml-mlflow to use Azure ML tracking.",
+                "  [Training] INFO: azureml.mlflow not available, but Azure ML URI detected. "
+                "Falling back to local tracking. (This is normal if azureml-mlflow is not installed)",
                 file=sys.stderr, flush=True)
             # Override with local tracking URI
             from shared.mlflow_setup import _get_local_tracking_uri
@@ -206,7 +207,7 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
         # Try to build systematic name using naming policy
         try:
             from naming import create_naming_context
-            from orchestration.jobs.tracking.mlflow_naming import build_mlflow_run_name
+            from tracking.mlflow.naming import build_mlflow_run_name
             from shared.platform_detection import detect_platform
 
             # Try to get study_key_hash and model from parent run

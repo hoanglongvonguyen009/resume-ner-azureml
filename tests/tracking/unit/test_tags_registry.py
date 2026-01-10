@@ -9,7 +9,7 @@ from typing import Any, Dict
 import pytest
 import yaml
 
-from orchestration.jobs.tracking.naming.tags_registry import (
+from naming.mlflow.tags_registry import (
     TagKeyError,
     TagsRegistry,
     load_tags_registry,

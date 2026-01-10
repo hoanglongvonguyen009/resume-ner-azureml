@@ -129,7 +129,7 @@ def run_benchmarking(
 
             # Build run name using systematic naming with auto-increment
             from naming import create_naming_context
-            from orchestration.jobs.tracking.mlflow_naming import build_mlflow_run_name
+            from tracking.mlflow.naming import build_mlflow_run_name
             from shared.platform_detection import detect_platform
             from pathlib import Path
 

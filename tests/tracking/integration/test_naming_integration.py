@@ -24,7 +24,10 @@ def test_end_to_end_final_training(tmp_path):
     seed = 42
     
     spec_fp = compute_spec_fp(model_hash, data_hash, train_hash, seed)
-    exec_fp = compute_exec_fp(git_sha="test123", torch_version="2.0", transformers_version="4.30")
+    exec_fp = compute_exec_fp(
+        git_sha="test123",
+        env_config={"torch_version": "2.0", "transformers_version": "4.30"}
+    )
     
     assert spec_fp is not None
     assert exec_fp is not None
@@ -94,10 +97,13 @@ def test_end_to_end_conversion(tmp_path):
     
     # Step 2: Compute conversion fingerprint
     conv_fp = compute_conv_fp(
-        parent_training_id=parent_id,
-        conversion_config_hash="conv1234567890",
-        optimum_version="1.10",
-        onnxruntime_version="1.15"
+        parent_spec_fp=spec_fp,
+        parent_exec_fp=exec_fp,
+        conversion_config={
+            "conversion_config_hash": "conv1234567890",
+            "optimum_version": "1.10",
+            "onnxruntime_version": "1.15"
+        }
     )
     
     # Step 3: Create conversion context

@@ -44,8 +44,8 @@ class TestAzureMLArtifactUploadIntegration:
 
     def test_artifact_upload_to_refit_run_with_monkey_patch(self, mock_azureml_workspace, temp_checkpoint_dir):
         """Test that artifacts can be uploaded to refit run with monkey-patch."""
-        from orchestration.jobs.tracking.trackers.sweep_tracker import MLflowSweepTracker
-        from orchestration.jobs.tracking.artifacts.manager import create_checkpoint_archive
+        from tracking.mlflow.trackers.sweep_tracker import MLflowSweepTracker
+        from tracking.mlflow.artifacts.manager import create_checkpoint_archive
         
         tracker = MLflowSweepTracker()
         
@@ -138,7 +138,7 @@ class TestMonkeyPatchBehavior:
 
     def test_patch_handles_tracking_uri_error(self):
         """Test that patch handles tracking_uri TypeError gracefully."""
-        from orchestration.jobs.tracking.trackers.sweep_tracker import MLflowSweepTracker
+        from tracking.mlflow.trackers.sweep_tracker import MLflowSweepTracker
         
         import mlflow.store.artifact.artifact_repository_registry as arr
         builder = arr._artifact_repository_registry._registry.get('azureml')

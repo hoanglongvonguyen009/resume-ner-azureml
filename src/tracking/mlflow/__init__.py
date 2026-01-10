@@ -13,6 +13,7 @@ The Azure ML compatibility patch is automatically applied when this module is im
 from tracking.mlflow.compatibility import apply_azureml_artifact_patch  # noqa: F401
 
 # Export artifact utilities
+# Import from artifacts subpackage (directory takes precedence over file)
 from tracking.mlflow.artifacts import (
     log_artifact_safe,
     log_artifacts_safe,

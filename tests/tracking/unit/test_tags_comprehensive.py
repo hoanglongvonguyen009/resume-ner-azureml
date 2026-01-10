@@ -4,12 +4,12 @@ import yaml
 from pathlib import Path
 import pytest
 
-from orchestration.jobs.tracking.naming.tags_registry import (
+from naming.mlflow.tags_registry import (
     TagKeyError,
     TagsRegistry,
     load_tags_registry,
 )
-from orchestration.jobs.tracking.naming.tags import (
+from naming.mlflow.tags import (
     get_tag_key,
     sanitize_tag_value,
     build_mlflow_tags,

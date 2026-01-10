@@ -315,7 +315,7 @@ def train_model(
     if not run_name:
         try:
             from naming import create_naming_context
-            from orchestration.jobs.tracking.mlflow_naming import build_mlflow_run_name
+            from tracking.mlflow.naming import build_mlflow_run_name
             from shared.platform_detection import detect_platform
 
             # Try to extract fingerprints from config if available

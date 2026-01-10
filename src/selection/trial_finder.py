@@ -289,7 +289,7 @@ def find_best_trial_from_study(
         )
 
         # Use resolve_storage_path to find the correct study folder (same logic as trial_meta_generator)
-        from orchestration.jobs.hpo.local.checkpoint.manager import resolve_storage_path
+        from hpo.checkpoint.storage import resolve_storage_path
 
         checkpoint_config = hpo_config.get(
             "checkpoint", {}) if hpo_config else {}
@@ -314,7 +314,7 @@ def find_best_trial_from_study(
         computed_trial_key_hash = None
         if hpo_config and data_config:
             try:
-                from orchestration.jobs.tracking.mlflow_naming import (
+                from tracking.mlflow.naming import (
                     build_hpo_study_key,
                     build_hpo_study_key_hash,
                     build_hpo_trial_key,
@@ -356,7 +356,7 @@ def find_best_trial_from_study(
             study_key_hash = None
             if hpo_config and data_config:
                 try:
-                    from orchestration.jobs.tracking.mlflow_naming import (
+                    from tracking.mlflow.naming import (
                         build_hpo_study_key,
                         build_hpo_study_key_hash,
                     )
@@ -551,7 +551,7 @@ def find_best_trials_for_backbones(
             hpo_backbone_dir = resolve_hpo_output_dir(local_path)
 
             if hpo_backbone_dir.exists():
-                from orchestration.jobs.hpo.local.checkpoint.manager import resolve_storage_path
+                from hpo.checkpoint.storage import resolve_storage_path
 
                 checkpoint_config = hpo_config.get("checkpoint", {})
                 study_name_template = (
@@ -573,7 +573,7 @@ def find_best_trials_for_backbones(
                     study_db_path = study_folder / "study.db"
                     if study_db_path.exists():
                         try:
-                            from orchestration.jobs.hpo.local.optuna.integration import import_optuna
+                            from hpo.core.optuna_integration import import_optuna
                             optuna, _, _, _ = import_optuna()
                         except ImportError:
                             import optuna
@@ -642,7 +642,7 @@ def find_best_trials_for_backbones(
             hpo_backbone_dir = resolve_hpo_output_dir(local_path)
 
             if hpo_backbone_dir.exists():
-                from orchestration.jobs.hpo.local.checkpoint.manager import resolve_storage_path
+                from hpo.checkpoint.storage import resolve_storage_path
 
                 checkpoint_config = hpo_config.get("checkpoint", {})
                 study_name_template = (

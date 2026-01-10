@@ -7,7 +7,7 @@ from unittest.mock import Mock, MagicMock, patch
 from pathlib import Path
 import pytest
 
-import orchestration.jobs.final_training.executor as executor
+import training_exec.executor as executor
 
 
 class DummyExperimentConfig(SimpleNamespace):

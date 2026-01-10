@@ -31,7 +31,7 @@ import pytest
 from orchestration import EXPERIMENT_NAME
 from config.loader import load_experiment_config
 from training_exec import extract_lineage_from_best_model
-from orchestration.jobs.tracking.naming.tags_registry import load_tags_registry
+from naming.mlflow.tags_registry import load_tags_registry
 from shared.platform_detection import detect_platform
 from shared.yaml_utils import load_yaml
 

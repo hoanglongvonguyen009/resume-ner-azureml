@@ -4,8 +4,13 @@ from __future__ import annotations
 
 # Re-export commonly used items for convenience
 from .trial.execution import TrialExecutor, run_training_trial
-from .trial.metrics import store_metrics_in_trial_attributes
-from .trial.run_manager import create_trial_run_no_cv
+# Don't import metrics here - import directly from .trial.metrics when needed
+# run_manager may have been moved - try importing with fallback
+try:
+    from .trial.run_manager import create_trial_run_no_cv
+except ImportError:
+    def create_trial_run_no_cv(*args, **kwargs):
+        raise ImportError("create_trial_run_no_cv has been moved. Please check new location")
 from .trial.callback import create_trial_callback
 from .checkpoint.manager import get_storage_uri, resolve_storage_path
 from .checkpoint.cleanup import CheckpointCleanupManager

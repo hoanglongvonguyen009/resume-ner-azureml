@@ -15,13 +15,13 @@ from config.loader import ExperimentConfig
 from config.conversion import load_conversion_config
 from naming import create_naming_context
 from paths import build_output_path
-from orchestration.jobs.tracking.mlflow_naming import (
+from tracking.mlflow.naming import (
     build_mlflow_run_name,
     build_mlflow_tags,
     build_mlflow_run_key,
     build_mlflow_run_key_hash,
 )
-from orchestration.jobs.tracking.mlflow_index import update_mlflow_index
+from tracking.mlflow.index import update_mlflow_index
 from shared.platform_detection import detect_platform
 
 

@@ -384,7 +384,7 @@ class TestBestTrialSelectionErrors:
         min_accuracy_gain = None
         
         # Should raise SelectionError for empty candidates
-        from orchestration.jobs.errors import SelectionError
+        from hpo.exceptions import SelectionError
         with pytest.raises(SelectionError, match="No candidates provided"):
             SelectionLogic.select_best(candidates, accuracy_threshold, use_relative_threshold, min_accuracy_gain)
 

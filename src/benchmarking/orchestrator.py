@@ -161,7 +161,7 @@ def compute_grouping_tags(
     study_family_hash = None
 
     try:
-        from orchestration.jobs.tracking.naming.hpo_keys import (
+        from naming.mlflow.hpo_keys import (
             build_hpo_study_key,
             build_hpo_study_key_hash,
             build_hpo_study_family_key,
