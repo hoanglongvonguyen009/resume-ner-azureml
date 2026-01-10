@@ -1,3 +1,29 @@
+"""
+@meta
+name: config_validation
+type: utility
+domain: config
+responsibility:
+  - Validate compatibility between paths.yaml and naming.yaml
+  - Check placeholder tokens are known and allowed
+  - Verify tokens are used within correct scopes
+inputs:
+  - paths.yaml configuration
+  - naming.yaml configuration
+outputs:
+  - List of validation issues (if any)
+tags:
+  - utility
+  - config
+  - validation
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Cross-file compatibility checks for paths.yaml and naming.yaml."""
 
 from typing import Any, Dict, List

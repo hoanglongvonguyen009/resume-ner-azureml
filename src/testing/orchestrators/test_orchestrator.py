@@ -1,3 +1,30 @@
+"""
+@meta
+name: test_orchestrator
+type: test
+scope: integration
+domain: testing
+responsibility:
+  - Coordinate test execution flow for HPO pipeline
+  - Orchestrate test components
+covers:
+  - HPO pipeline tests
+  - Deterministic HPO tests
+  - Dataset validation
+excludes:
+  - Unit tests
+  - Environment setup details
+tags:
+  - orchestration
+  - integration-test
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Test orchestration for HPO pipeline tests.
 
 This module is responsible solely for coordinating test execution flow.

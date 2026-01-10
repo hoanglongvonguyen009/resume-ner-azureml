@@ -1,4 +1,91 @@
 
+## R0: Use File-Level Metadata for Scripts and Tests
+
+Files with **behavioral weight** (scripts, orchestration logic, tests) must declare a small, structured metadata block at the top of the file.
+
+This metadata explains **intent, scope, and constraints** without requiring the reader to scan the entire file.
+
+Metadata improves:
+
+* Readability and intent discovery
+* Test selection (CI, GPU, cloud, slow tests)
+* Safe refactoring and deletion
+* Long-term maintainability in complex systems
+
+### Where Metadata Is Required
+
+| File Type                      | Required | Notes                                                  |
+| ------------------------------ | -------- | ------------------------------------------------------ |
+| Entry-point scripts            | ✅ Yes    | CLI, orchestration, jobs                               |
+| Orchestration / workflow files | ✅ Yes    | HPO, benchmarking, training                            |
+| Test modules                   | ✅ Yes    | Unit, integration, E2E                                 |
+| Migration / cleanup scripts    | ✅ Yes    | One-time or destructive logic                          |
+| Shared utilities               | ✅ Yes    | Clarifies intent, ownership, and safe reuse boundaries |
+| Small pure helpers             | ❌ No     | Avoid noise                                            |
+
+### Metadata Format (Python)
+
+Use a **comment-only docstring** at the top of the file.
+
+Do **not** include runtime logic or executable code.
+
+```python
+"""
+@meta
+name: hpo_local_sweep
+type: script            # script | test | utility | migration
+domain: hpo              # hpo | benchmarking | training | tracking | paths | conversion 
+responsibility:
+  - Launch local HPO sweeps
+  - Coordinate trial execution
+inputs:
+  - hpo.yaml
+  - paths.yaml
+outputs:
+  - MLflow runs
+  - study.db
+tags:
+  - entrypoint
+  - mlflow
+  - local-only
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active         # active | deprecated | legacy
+"""
+```
+
+### Metadata for Test Files
+
+Test metadata must clearly state **scope and exclusions**.
+
+```python
+"""
+@meta
+type: test
+scope: unit              # unit | integration | e2e
+domain: paths
+covers:
+  - path resolution
+  - env overrides
+excludes:
+  - azure ml
+  - gdrive
+tags:
+  - fast
+  - ci-safe
+"""
+```
+
+### Rules
+
+* Metadata **augments**, not replaces, docstrings
+* Keep metadata **minimal and truthful**
+* Do not add metadata to every file blindly
+* Lint checks should enforce **presence only**, not content correctness (initially)
+
 ## R1: Avoid Hard-Coded Numbers
 
 Don't use mysterious numbers in your formulas. Give them a name so others know what they represent.
@@ -95,6 +182,7 @@ A function should do one thing only. If it does "X *and* Y," split it up.
 
 * Each cell should perform a single, clear task. If a cell is doing multiple things (e.g., data loading, data cleaning, and plotting), **split it up** into separate cells. This improves readability and makes it easier to debug and maintain the code.
 * **Example**: Instead of doing everything in a single cell, have separate cells for:
+
  1. **Loading data**
  2. **Data preprocessing**
  3. **Data visualization**
@@ -209,13 +297,13 @@ Deeply nested `if/else` blocks are hard to read. Move the logic into its own fun
 Don't wait for a "cleanup phase." Improve code as you touch it.
 
 * **Example Scenario:**
- 	* *Bad approach:* You see a messy function but think, "I'll fix it next month when we have time." (You never will).
- 	* *Clean approach:* You see a messy function while fixing a bug. You spend 5 extra minutes renaming variables and simplifying loops before submitting your fix.
+  * *Bad approach:* You see a messy function but think, "I'll fix it next month when we have time." (You never will).
+  * *Clean approach:* You see a messy function while fixing a bug. You spend 5 extra minutes renaming variables and simplifying loops before submitting your fix.
 
 ## R10: Use Version Control
 
 Commit small chunks of work often rather than one massive file at the end of the week.
 
 * **Example Scenario:**
- 	* *Bad approach:* Saving files as `script_final.py`, `script_final_v2.py`, `script_really_final.py`.
- 	* *Clean approach:* Using Git to commit changes with messages like "Fix login bug" and "Refactor user validation logic."
+  * *Bad approach:* Saving files as `script_final.py`, `script_final_v2.py`, `script_really_final.py`.
+  * *Clean approach:* Using Git to commit changes with messages like "Fix login bug" and "Refactor user validation logic."

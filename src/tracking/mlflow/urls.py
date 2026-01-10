@@ -1,12 +1,35 @@
-"""MLflow URL generation utilities."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: tracking_mlflow_urls
+type: utility
+domain: tracking
+responsibility:
+  - Generate MLflow run URLs for UI navigation
+  - Handle Azure ML and standard MLflow tracking URIs
+inputs:
+  - Experiment IDs and run IDs
+outputs:
+  - MLflow run URLs
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - urls
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""MLflow URL generation utilities."""
 import mlflow
 from shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
-
 
 def get_mlflow_run_url(experiment_id: str, run_id: str) -> str:
     """

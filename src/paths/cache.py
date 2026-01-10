@@ -1,3 +1,28 @@
+"""
+@meta
+name: paths_cache
+type: utility
+domain: paths
+responsibility:
+  - Manage cache file paths based on strategy configuration
+  - Support latest, index, and timestamped cache files
+inputs:
+  - Cache type identifiers
+  - Configuration directories
+outputs:
+  - Cache file paths
+tags:
+  - utility
+  - paths
+  - cache
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Cache file path management."""
 
 from datetime import datetime

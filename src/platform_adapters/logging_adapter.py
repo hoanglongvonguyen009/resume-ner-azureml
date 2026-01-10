@@ -1,3 +1,27 @@
+"""
+@meta
+name: platform_logging_adapter
+type: utility
+domain: platform_adapters
+responsibility:
+  - Provide platform-specific logging adapters
+  - Handle Azure ML and local logging
+inputs:
+  - Metrics and parameters dictionaries
+outputs:
+  - Logged metrics and parameters
+tags:
+  - utility
+  - platform_adapters
+  - logging
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Logging adapters for different platforms."""
 
 from abc import ABC, abstractmethod

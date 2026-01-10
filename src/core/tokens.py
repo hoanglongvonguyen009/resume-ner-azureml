@@ -1,3 +1,29 @@
+"""
+@meta
+name: core_tokens
+type: utility
+domain: core
+responsibility:
+  - Maintain token registry for naming and path patterns
+  - Validate token scopes and permissions
+inputs:
+  - Token names
+  - Scope identifiers
+outputs:
+  - Token objects
+  - Validation results
+tags:
+  - utility
+  - core
+  - naming
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Shared token registry for naming and path patterns."""
 
 from dataclasses import dataclass

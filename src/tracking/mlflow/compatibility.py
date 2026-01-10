@@ -1,3 +1,30 @@
+from __future__ import annotations
+
+"""
+@meta
+name: tracking_mlflow_compatibility
+type: utility
+domain: tracking
+responsibility:
+  - Provide Azure ML compatibility patches for MLflow
+  - Fix compatibility issues between MLflow and azureml-mlflow
+inputs:
+  - Module imports (patch applied automatically)
+outputs:
+  - Patched MLflow artifact builders
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - compatibility
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Azure ML compatibility patches for MLflow.
 
 This module provides a monkey-patch for azureml_artifacts_builder to handle
@@ -6,9 +33,6 @@ MLflow 3.5.0 and azureml-mlflow 1.61.0.
 
 The patch is automatically applied when this module is imported.
 """
-
-from __future__ import annotations
-
 import functools
 import inspect
 from shared.logging_utils import get_logger
@@ -17,7 +41,6 @@ logger = get_logger(__name__)
 
 # Track if patch has been applied to prevent double-patching
 _patch_applied = False
-
 
 def apply_azureml_artifact_patch() -> None:
     """
@@ -90,7 +113,6 @@ def apply_azureml_artifact_patch() -> None:
         logger.info("Applied Azure ML artifact compatibility patch")
     except Exception as e:
         logger.warning(f"Failed to apply Azure ML artifact patch: {e}", exc_info=True)
-
 
 # Auto-apply patch on module import
 apply_azureml_artifact_patch()

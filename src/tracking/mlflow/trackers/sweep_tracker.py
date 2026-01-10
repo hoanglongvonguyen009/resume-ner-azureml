@@ -1,7 +1,33 @@
-"""MLflow tracker for sweep stage."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: tracking_mlflow_sweep_tracker
+type: utility
+domain: tracking
+responsibility:
+  - Track MLflow runs for HPO sweep stage
+  - Manage sweep and trial run lifecycle
+inputs:
+  - Sweep configurations
+  - Run names and contexts
+outputs:
+  - MLflow run handles
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - tracker
+  - hpo
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""MLflow tracker for sweep stage."""
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, Optional, List
@@ -36,7 +62,6 @@ from tracking.mlflow.trackers.base_tracker import BaseTracker
 # Tag key imports moved to local scope where needed
 
 logger = get_logger(__name__)
-
 
 class MLflowSweepTracker(BaseTracker):
     """Tracks MLflow runs for HPO sweeps."""

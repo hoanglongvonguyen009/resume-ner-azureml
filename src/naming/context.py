@@ -1,6 +1,31 @@
-"""NamingContext dataclass and factory function."""
-
 from __future__ import annotations
+
+"""
+@meta
+name: naming_context
+type: utility
+domain: naming
+responsibility:
+  - Define NamingContext dataclass for path generation
+  - Create naming contexts with fingerprint-based identity
+inputs:
+  - Process type and model information
+  - Fingerprints and identifiers
+outputs:
+  - NamingContext objects
+tags:
+  - utility
+  - naming
+  - context
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""NamingContext dataclass and factory function."""
 
 import logging
 from dataclasses import dataclass

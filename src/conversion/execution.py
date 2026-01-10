@@ -1,3 +1,33 @@
+"""
+@meta
+name: conversion_execution
+type: script
+domain: conversion
+responsibility:
+  - Main entry point for conversion subprocess execution
+  - Coordinate checkpoint resolution
+  - Execute ONNX export
+  - Run smoke tests
+  - Log results to MLflow
+inputs:
+  - PyTorch checkpoint directory
+  - Conversion configuration
+outputs:
+  - ONNX model file
+  - MLflow metrics and artifacts
+tags:
+  - entrypoint
+  - conversion
+  - onnx
+  - mlflow
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Conversion script entry point for subprocess execution.
 
 This module provides the main entry point for conversion execution when called

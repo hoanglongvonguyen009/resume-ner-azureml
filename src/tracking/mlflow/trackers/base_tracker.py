@@ -1,12 +1,35 @@
-"""Base tracker class with common functionality."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: tracking_mlflow_base_tracker
+type: utility
+domain: tracking
+responsibility:
+  - Provide base tracker class with common MLflow experiment setup
+  - Handle platform-aware MLflow configuration
+inputs:
+  - Experiment names
+outputs:
+  - Configured tracker instances
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - tracker
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Base tracker class with common functionality."""
 import mlflow
 from shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
-
 
 class BaseTracker:
     """Base class for MLflow trackers with common experiment setup."""

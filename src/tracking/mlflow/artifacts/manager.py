@@ -1,7 +1,32 @@
-"""Artifact upload and checkpoint archive management."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: tracking_mlflow_artifacts_manager
+type: utility
+domain: tracking
+responsibility:
+  - Manage artifact upload and checkpoint archive creation
+  - Handle file filtering and archive creation
+inputs:
+  - Checkpoint directories
+  - Archive paths
+outputs:
+  - Archive file paths
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - artifacts
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Artifact upload and checkpoint archive management."""
 import os
 import tarfile
 import tempfile
@@ -12,7 +37,6 @@ from typing import Any, Dict, Optional
 from shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
-
 
 def should_skip_file(file_path: Path, relative_path: str) -> bool:
     """
@@ -49,7 +73,6 @@ def should_skip_file(file_path: Path, relative_path: str) -> bool:
         return True
 
     return False
-
 
 def create_checkpoint_archive(
     checkpoint_dir: Path,

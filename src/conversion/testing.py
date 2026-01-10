@@ -1,3 +1,29 @@
+"""
+@meta
+name: conversion_smoke_test
+type: utility
+domain: conversion
+responsibility:
+  - Validate exported ONNX models
+  - Run minimal inference test
+  - Ensure model works correctly
+inputs:
+  - ONNX model file
+  - Checkpoint directory (for tokenizer)
+outputs:
+  - Validation result (pass/fail)
+tags:
+  - testing
+  - validation
+  - onnx
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Smoke testing for exported ONNX models.
 
 This module provides validation functionality for exported ONNX models by

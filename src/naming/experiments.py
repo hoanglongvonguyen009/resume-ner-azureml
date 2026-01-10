@@ -1,9 +1,32 @@
-"""Experiment and stage naming helpers (dict-based interface)."""
-
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Union
+"""
+@meta
+name: naming_experiments
+type: utility
+domain: naming
+responsibility:
+  - Build experiment and stage names
+  - Extract stage configurations
+inputs:
+  - Experiment configurations
+  - Stage identifiers
+outputs:
+  - Formatted experiment names
+tags:
+  - utility
+  - naming
+  - experiments
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
 
+"""Experiment and stage naming helpers (dict-based interface)."""
+from typing import Any, Dict, Optional, Union
 
 def get_stage_config(experiment_cfg: Union[dict, Any], stage: str) -> Dict[str, Any]:
     """
@@ -29,7 +52,6 @@ def get_stage_config(experiment_cfg: Union[dict, Any], stage: str) -> Dict[str, 
     
     return stages.get(stage, {}) or {}
 
-
 def build_aml_experiment_name(
     experiment_name: str,
     stage: str,
@@ -53,7 +75,6 @@ def build_aml_experiment_name(
     if backbone:
         parts.append(backbone)
     return "-".join(parts)
-
 
 def build_mlflow_experiment_name(experiment_name: str, stage: str, backbone: str) -> str:
     """Build MLflow experiment name from components.

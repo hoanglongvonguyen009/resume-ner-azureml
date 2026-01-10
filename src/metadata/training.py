@@ -1,3 +1,29 @@
+"""
+@meta
+name: metadata_training
+type: utility
+domain: metadata
+responsibility:
+  - Manage persistent metadata for training and conversion stages
+  - Load and save training metadata
+  - Extract metadata from output directories
+inputs:
+  - Training output directories
+  - Configuration directories
+outputs:
+  - Metadata dictionaries
+tags:
+  - utility
+  - metadata
+  - training
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Manage persistent metadata for training and conversion stages."""
 
 from pathlib import Path

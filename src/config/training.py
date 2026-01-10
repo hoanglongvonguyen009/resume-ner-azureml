@@ -1,7 +1,36 @@
-"""Load and resolve final training configuration from YAML."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: training_config_loader
+type: utility
+domain: config
+responsibility:
+  - Load and resolve final training configuration from YAML
+  - Resolve dataset configuration (auto-detect or explicit)
+  - Compute specification and execution fingerprints
+  - Resolve checkpoint paths
+  - Compute variant numbers
+  - Merge configurations with precedence
+inputs:
+  - final_training.yaml
+  - Best HPO configuration
+  - Experiment configuration
+outputs:
+  - Resolved final training configuration dictionary
+tags:
+  - utility
+  - config
+  - training
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Load and resolve final training configuration from YAML."""
 import os
 import warnings
 from pathlib import Path
@@ -14,7 +43,6 @@ from .loader import load_all_configs, ExperimentConfig
 from .merging import merge_configs_with_precedence
 from naming import create_naming_context
 from paths import build_output_path
-
 
 def load_final_training_config(
     root_dir: Path,
@@ -140,7 +168,6 @@ def load_final_training_config(
 
     return merged_config
 
-
 def _resolve_dataset_config(
     dataset_config: Dict[str, Any],
     experiment_config: ExperimentConfig,
@@ -176,7 +203,6 @@ def _resolve_dataset_config(
     # Auto-detect: use experiment_config.data_config
     return load_yaml(experiment_config.data_config)
 
-
 def _resolve_seed(
     seed_config: Dict[str, Any],
     train_config: Dict[str, Any],
@@ -204,7 +230,6 @@ def _resolve_seed(
 
     # Default
     return 42
-
 
 def _compute_fingerprints(
     root_dir: Path,
@@ -272,7 +297,6 @@ def _compute_fingerprints(
             stacklevel=2
         )
         return "placeholder_spec_fp", "placeholder_exec_fp"
-
 
 def _resolve_checkpoint(
     root_dir: Path,
@@ -417,7 +441,6 @@ def _resolve_checkpoint(
 
     return None
 
-
 def _resolve_checkpoint_from_best_config(
     root_dir: Path,
     config_dir: Path,
@@ -479,7 +502,6 @@ def _resolve_checkpoint_from_best_config(
             return bench_checkpoint
 
     return None
-
 
 def _resolve_checkpoint_from_fingerprints(
     root_dir: Path,
@@ -575,7 +597,6 @@ def _resolve_checkpoint_from_fingerprints(
 
     return None
 
-
 def _resolve_variant(
     root_dir: Path,
     config_dir: Path,
@@ -623,7 +644,6 @@ def _resolve_variant(
 
     # Increment to next available
     return _compute_next_variant(root_dir, config_dir, spec_fp, exec_fp, backbone)
-
 
 def _find_existing_variant(
     root_dir: Path,
@@ -688,7 +708,6 @@ def _find_existing_variant(
 
     return None
 
-
 def _is_variant_complete(
     root_dir: Path,
     config_dir: Path,
@@ -751,7 +770,6 @@ def _is_variant_complete(
 
     return False
 
-
 def _compute_next_variant(
     root_dir: Path,
     config_dir: Path,
@@ -777,7 +795,6 @@ def _compute_next_variant(
     if existing is None:
         return 1
     return existing + 1
-
 
 def _merge_configs(
     train_config: Dict[str, Any],
@@ -856,7 +873,6 @@ def _merge_configs(
         merged["mlflow"] = mlflow_config
 
     return merged
-
 
 def _build_final_training_config_inline(
     best_config: Dict[str, Any],

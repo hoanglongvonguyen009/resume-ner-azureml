@@ -1,3 +1,29 @@
+"""
+@meta
+name: config_merging
+type: utility
+domain: config
+responsibility:
+  - Merge configuration dictionaries with precedence rules
+  - Apply command-line argument overrides to configuration
+inputs:
+  - Base configuration dictionaries
+  - Override configuration dictionaries
+  - Command-line arguments
+outputs:
+  - Merged configuration dictionaries
+tags:
+  - utility
+  - config
+  - merging
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Shared configuration merging utilities."""
 
 import argparse

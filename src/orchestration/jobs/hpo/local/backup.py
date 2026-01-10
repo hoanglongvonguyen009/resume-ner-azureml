@@ -1,3 +1,28 @@
+"""
+@meta
+name: hpo_backup
+type: utility
+domain: hpo
+responsibility:
+  - Backup HPO study.db and study folders to Google Drive
+  - Verify trial_meta.json files
+inputs:
+  - HPO study directories
+  - Checkpoint configuration
+outputs:
+  - Backup verification status
+tags:
+  - utility
+  - hpo
+  - backup
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """HPO backup utilities for Colab environments.
 
 Handles backing up study.db and study folders to Google Drive,

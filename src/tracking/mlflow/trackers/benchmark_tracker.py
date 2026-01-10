@@ -1,7 +1,33 @@
-"""MLflow tracker for benchmark stage."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: tracking_mlflow_benchmark_tracker
+type: utility
+domain: tracking
+responsibility:
+  - Track MLflow runs for benchmarking stage
+  - Manage benchmark run lifecycle and artifacts
+inputs:
+  - Benchmark configurations
+  - Run names and contexts
+outputs:
+  - MLflow run handles
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - tracker
+  - benchmarking
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""MLflow tracker for benchmark stage."""
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, Optional, List
@@ -29,7 +55,6 @@ from tracking.mlflow.artifacts.manager import create_checkpoint_archive
 from tracking.mlflow.trackers.base_tracker import BaseTracker
 
 logger = get_logger(__name__)
-
 
 class MLflowBenchmarkTracker(BaseTracker):
     """Tracks MLflow runs for benchmarking stage."""

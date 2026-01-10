@@ -1,5 +1,29 @@
 from __future__ import annotations
 
+"""
+@meta
+name: hpo_azureml_sweeps
+type: utility
+domain: hpo
+responsibility:
+  - Create Azure ML HPO sweep jobs
+  - Translate search space to Azure ML primitives
+inputs:
+  - HPO configuration
+  - Azure ML environment and compute
+outputs:
+  - Azure ML sweep job definitions
+tags:
+  - utility
+  - hpo
+  - azureml
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: true
+lifecycle:
+  status: active
+"""
 from pathlib import Path
 from typing import Any, Dict
 
@@ -13,7 +37,6 @@ from azure.ai.ml.sweep import (
     Uniform,
     LogUniform,
 )
-
 
 def create_search_space(hpo_config: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -46,7 +69,6 @@ def create_search_space(hpo_config: Dict[str, Any]) -> Dict[str, Any]:
             )
     return search_space
 
-
 def _build_data_input_from_asset(data_asset: Data) -> Input:
     """
     Build a standard Azure ML ``Input`` for a ``uri_folder`` data asset.
@@ -62,7 +84,6 @@ def _build_data_input_from_asset(data_asset: Data) -> Input:
         path=f"azureml:{data_asset.name}:{data_asset.version}",
         mode="mount",
     )
-
 
 def create_dry_run_sweep_job_for_backbone(
     script_path: Path,
@@ -157,7 +178,6 @@ def create_dry_run_sweep_job_for_backbone(
         display_name=f"dry-run-sweep-{backbone}",
         description=f"Dry run sweep for {backbone}",
     )
-
 
 def create_hpo_sweep_job_for_backbone(
     script_path: Path,
@@ -267,7 +287,6 @@ def create_hpo_sweep_job_for_backbone(
         description=f"Production HPO sweep for {backbone}",
     )
 
-
 def _validate_job_status(job: Job, job_type: str, backbone: str) -> None:
     """
     Validate that a job has completed successfully.
@@ -282,7 +301,6 @@ def _validate_job_status(job: Job, job_type: str, backbone: str) -> None:
     """
     if job.status != "Completed":
         raise ValueError(f"{job_type} job for {backbone} failed with status: {job.status}")
-
 
 def _get_trial_count(job: Job, ml_client: MLClient | None = None) -> int | None:
     """
@@ -308,7 +326,6 @@ def _get_trial_count(job: Job, ml_client: MLClient | None = None) -> int | None:
             return None
     
     return None
-
 
 def validate_sweep_job(
     job: Job,
@@ -347,7 +364,4 @@ def validate_sweep_job(
             f"{job_type} job for {backbone} only produced {trial_count} trial(s), "
             f"expected at least {min_expected_trials}"
         )
-
-
-
 

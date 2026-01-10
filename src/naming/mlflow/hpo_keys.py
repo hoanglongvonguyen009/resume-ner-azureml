@@ -1,11 +1,35 @@
-"""HPO-specific key building (study, trial, family)."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: naming_mlflow_hpo_keys
+type: utility
+domain: naming
+responsibility:
+  - Build HPO-specific keys (study, trial, family)
+  - Compute deterministic hashes for HPO grouping
+inputs:
+  - Configuration dictionaries
+  - Hyperparameters
+outputs:
+  - HPO key strings and hashes
+tags:
+  - utility
+  - naming
+  - mlflow
+  - hpo
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""HPO-specific key building (study, trial, family)."""
 import hashlib
 import json
 from typing import Any, Dict, Optional
-
 
 def _compute_hash_64(data: str) -> str:
     """
@@ -18,7 +42,6 @@ def _compute_hash_64(data: str) -> str:
         64-character hex hash.
     """
     return hashlib.sha256(data.encode('utf-8')).hexdigest()
-
 
 def _normalize_hyperparameters(params: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -55,7 +78,6 @@ def _normalize_hyperparameters(params: Dict[str, Any]) -> Dict[str, Any]:
             # For other types, convert to string and normalize
             normalized[key] = str(value).lower().strip()
     return normalized
-
 
 def build_hpo_study_key(
     data_config: Dict[str, Any],
@@ -124,7 +146,6 @@ def build_hpo_study_key(
     # Use compact JSON (no spaces) for consistent hashing
     return json.dumps(payload, sort_keys=True, separators=(',', ':'))
 
-
 def build_hpo_study_key_hash(study_key: str) -> str:
     """
     Build hash of study key for tag storage.
@@ -136,7 +157,6 @@ def build_hpo_study_key_hash(study_key: str) -> str:
         64-character hex hash.
     """
     return _compute_hash_64(study_key)
-
 
 def build_hpo_study_family_key(
     data_config: Dict[str, Any],
@@ -197,7 +217,6 @@ def build_hpo_study_family_key(
 
     return json.dumps(payload, sort_keys=True, separators=(',', ':'))
 
-
 def build_hpo_study_family_hash(study_family_key: str) -> str:
     """
     Build hash of study family key for tag storage.
@@ -209,7 +228,6 @@ def build_hpo_study_family_hash(study_family_key: str) -> str:
         64-character hex hash.
     """
     return _compute_hash_64(study_family_key)
-
 
 def build_hpo_trial_key(
     study_key_hash: str,
@@ -239,7 +257,6 @@ def build_hpo_trial_key(
     }
 
     return json.dumps(payload, sort_keys=True, separators=(',', ':'))
-
 
 def build_hpo_trial_key_hash(trial_key: str) -> str:
     """

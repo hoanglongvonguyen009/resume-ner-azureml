@@ -1,14 +1,36 @@
 from __future__ import annotations
 
+"""
+@meta
+name: training_exec_jobs
+type: utility
+domain: training
+responsibility:
+  - Build final training configuration from best HPO config
+  - Create Azure ML training job definitions
+inputs:
+  - Best HPO configuration
+  - Training configuration
+outputs:
+  - Final training configuration dictionary
+tags:
+  - utility
+  - training
+  - azureml
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: true
+lifecycle:
+  status: active
+"""
 from pathlib import Path
 from typing import Any, Dict
 
 from azure.ai.ml import Input, Output, command
 from azure.ai.ml.entities import Environment, Job, Data
 
-
 DEFAULT_RANDOM_SEED = 42
-
 
 def build_final_training_config(
     best_config: Dict[str, Any],
@@ -47,7 +69,6 @@ def build_final_training_config(
         "use_all_data": True,  # Final training uses all data without validation split
     }
 
-
 def validate_final_training_job(job: Job) -> None:
     """
     Validate final training job completed successfully.
@@ -60,7 +81,6 @@ def validate_final_training_job(job: Job) -> None:
     """
     if job.status != "Completed":
         raise ValueError(f"Final training job failed with status: {job.status}")
-
 
 def _build_data_input_from_asset(data_asset: Data) -> Input:
     """
@@ -77,7 +97,6 @@ def _build_data_input_from_asset(data_asset: Data) -> Input:
         path=f"azureml:{data_asset.name}:{data_asset.version}",
         mode="mount",
     )
-
 
 def create_final_training_job(
     script_path: Path,
@@ -146,5 +165,4 @@ def create_final_training_job(
         display_name="final-training",
         description="Final production training with best HPO configuration",
     )
-
 

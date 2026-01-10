@@ -1,7 +1,33 @@
-"""MLflow run finder with priority-based retrieval and strict mode."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: tracking_mlflow_finder
+type: utility
+domain: tracking
+responsibility:
+  - Find MLflow runs using priority-based retrieval strategies
+  - Support strict and non-strict lookup modes
+inputs:
+  - Experiment names
+  - Naming contexts
+  - Run IDs and output directories
+outputs:
+  - Run lookup reports
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - finder
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""MLflow run finder with priority-based retrieval and strict mode."""
 from pathlib import Path
 from typing import Optional
 
@@ -16,7 +42,6 @@ from tracking.mlflow.config_loader import get_run_finder_config
 from shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
-
 
 def find_mlflow_run(
     experiment_name: str,

@@ -1,3 +1,28 @@
+"""
+@meta
+name: paths_config
+type: utility
+domain: paths
+responsibility:
+  - Load and manage paths.yaml configuration with caching
+  - Apply environment-specific overrides
+inputs:
+  - Configuration directories
+  - Storage environment identifiers
+outputs:
+  - Paths configuration dictionaries
+tags:
+  - utility
+  - paths
+  - config
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Load and manage paths.yaml configuration with caching."""
 
 import logging

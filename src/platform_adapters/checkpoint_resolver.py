@@ -1,3 +1,27 @@
+"""
+@meta
+name: platform_checkpoint_resolver
+type: utility
+domain: platform_adapters
+responsibility:
+  - Resolve checkpoint paths for different platforms
+  - Handle Azure ML mounted inputs and local paths
+inputs:
+  - Checkpoint path strings
+outputs:
+  - Resolved checkpoint directory paths
+tags:
+  - utility
+  - platform_adapters
+  - checkpoint
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Checkpoint path resolution for different platforms."""
 
 from abc import ABC, abstractmethod

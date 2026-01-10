@@ -1,4 +1,31 @@
 """
+@meta
+name: training_entrypoint
+type: script
+domain: training
+responsibility:
+  - Main training entry point for Resume NER model
+  - Launch single- or multi-GPU training
+  - Coordinate distributed training setup
+inputs:
+  - Training configuration (train.yaml)
+  - Training data
+outputs:
+  - Trained model checkpoint
+  - Training metrics
+tags:
+  - entrypoint
+  - training
+  - distributed
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""
 Training script for Resume NER model.
 
 Implements a minimal token-classification training/eval loop using transformers.

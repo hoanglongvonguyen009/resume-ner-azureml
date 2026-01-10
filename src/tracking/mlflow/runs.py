@@ -1,11 +1,36 @@
+from __future__ import annotations
+
+"""
+@meta
+name: tracking_mlflow_runs
+type: utility
+domain: tracking
+responsibility:
+  - Create MLflow runs including child runs
+  - Resolve experiments and manage run lifecycle
+inputs:
+  - Parent run IDs
+  - Experiment names
+outputs:
+  - MLflow run contexts
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - runs
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """MLflow run creation utilities.
 
 This module provides utilities for creating MLflow runs, including
 child runs, experiment resolution, and run management.
 """
-
-from __future__ import annotations
-
 from contextlib import contextmanager
 from typing import Any, Optional
 
@@ -13,7 +38,6 @@ import mlflow
 from shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
-
 
 @contextmanager
 def create_child_run(
@@ -210,7 +234,6 @@ def create_child_run(
         mlflow.end_run()
         logger.debug(f"Ended child run: {run.info.run_id[:12]}...")
 
-
 def create_run_safe(
     experiment_id: str,
     run_name: str,
@@ -254,7 +277,6 @@ def create_run_safe(
         logger.warning(f"Failed to create run: {e}", exc_info=True)
         return None
 
-
 def get_or_create_experiment(experiment_name: str) -> Optional[str]:
     """
     Get existing experiment or create new one.
@@ -279,7 +301,6 @@ def get_or_create_experiment(experiment_name: str) -> Optional[str]:
     except Exception as e:
         logger.warning(f"Failed to get or create experiment {experiment_name}: {e}")
         return None
-
 
 def resolve_experiment_id(
     experiment_name: Optional[str] = None,

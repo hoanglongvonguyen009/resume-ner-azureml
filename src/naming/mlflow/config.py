@@ -1,7 +1,31 @@
-"""MLflow configuration loader for systematic naming settings."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: naming_mlflow_config
+type: utility
+domain: naming
+responsibility:
+  - Load MLflow configuration from YAML with caching
+  - Provide naming configuration accessors
+inputs:
+  - Configuration directories
+outputs:
+  - MLflow configuration dictionaries
+tags:
+  - utility
+  - naming
+  - mlflow
+  - config
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""MLflow configuration loader for systematic naming settings."""
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -13,14 +37,12 @@ logger = get_logger(__name__)
 # Module-level cache for loaded config (with mtime check)
 _config_cache: Dict[tuple, tuple] = {}  # (config_dir, mtime) -> config
 
-
 def _get_config_mtime(config_path: Path) -> float:
     """Get modification time of config file, or 0 if doesn't exist."""
     try:
         return config_path.stat().st_mtime
     except (OSError, FileNotFoundError):
         return 0.0
-
 
 def load_mlflow_config(config_dir: Optional[Path] = None) -> Dict[str, Any]:
     """
@@ -62,7 +84,6 @@ def load_mlflow_config(config_dir: Optional[Path] = None) -> Dict[str, Any]:
         logger.warning(f"[MLflow Config] Failed to load config from {config_path}: {e}", exc_info=True)
         _config_cache[cache_key] = (mtime, {})
         return {}
-
 
 def _validate_naming_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and apply defaults for naming config."""
@@ -132,7 +153,6 @@ def _validate_naming_config(config: Dict[str, Any]) -> Dict[str, Any]:
     
     return result
 
-
 def get_naming_config(
     config_dir: Optional[Path] = None,
     config: Optional[Dict[str, Any]] = None,
@@ -155,7 +175,6 @@ def get_naming_config(
     
     naming_config = config.get("naming", {})
     return _validate_naming_config(naming_config)
-
 
 def _validate_index_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and apply defaults for index config."""
@@ -201,7 +220,6 @@ def _validate_index_config(config: Dict[str, Any]) -> Dict[str, Any]:
     
     return result
 
-
 def get_index_config(
     config_dir: Optional[Path] = None,
     config: Optional[Dict[str, Any]] = None,
@@ -225,7 +243,6 @@ def get_index_config(
     index_config = config.get("index", {})
     return _validate_index_config(index_config)
 
-
 def _validate_run_finder_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and apply defaults for run_finder config."""
     defaults = {
@@ -245,7 +262,6 @@ def _validate_run_finder_config(config: Dict[str, Any]) -> Dict[str, Any]:
             )
     
     return result
-
 
 def get_run_finder_config(
     config_dir: Optional[Path] = None,
@@ -267,7 +283,6 @@ def get_run_finder_config(
     
     run_finder_config = config.get("run_finder", {})
     return _validate_run_finder_config(run_finder_config)
-
 
 def _validate_auto_increment_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and apply defaults for auto_increment config."""
@@ -318,7 +333,6 @@ def _validate_auto_increment_config(config: Dict[str, Any]) -> Dict[str, Any]:
     
     return result
 
-
 def get_auto_increment_config(
     config_dir: Optional[Path] = None,
     process_type: Optional[str] = None,
@@ -365,7 +379,6 @@ def get_auto_increment_config(
         result["enabled_for_process"] = global_enabled and process_enabled
     
     return result
-
 
 def get_tracking_config(
     config_dir: Optional[Path] = None,

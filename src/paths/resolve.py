@@ -1,3 +1,29 @@
+"""
+@meta
+name: paths_resolve
+type: utility
+domain: paths
+responsibility:
+  - Resolve all output paths (single authority for filesystem layout)
+  - Build paths from naming contexts
+  - Apply path patterns and normalization
+inputs:
+  - Naming contexts
+  - Configuration directories
+outputs:
+  - Resolved output paths
+tags:
+  - utility
+  - paths
+  - filesystem
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Resolve all output paths (single authority for filesystem layout)."""
 
 import logging

@@ -1,7 +1,31 @@
-"""Selection logic for choosing best configuration across studies."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: selection_logic
+type: utility
+domain: selection
+responsibility:
+  - Implement selection logic for choosing best configuration
+  - Normalize speed scores
+  - Apply accuracy thresholds
+inputs:
+  - Candidate configurations
+  - Accuracy thresholds
+outputs:
+  - Selected best configuration
+tags:
+  - utility
+  - selection
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Selection logic for choosing best configuration across studies."""
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -18,7 +42,6 @@ MODEL_SPEED_SCORES = {
     "distilbert": 1.0,   # ~66M parameters (baseline)
     "deberta": 2.79,     # ~184M parameters (~2.79x slower)
 }
-
 
 class SelectionLogic:
     """Handles selection logic for best configuration."""

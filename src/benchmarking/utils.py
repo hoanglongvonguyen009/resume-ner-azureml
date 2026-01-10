@@ -1,7 +1,31 @@
-"""Benchmarking utility functions for running inference benchmarks."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: benchmarking_utils
+type: utility
+domain: benchmarking
+responsibility:
+  - Run inference benchmarks on model checkpoints
+  - Execute benchmark subprocess
+  - Log benchmark results
+inputs:
+  - Model checkpoint directory
+  - Test data path
+outputs:
+  - Benchmark results (JSON)
+tags:
+  - utility
+  - benchmarking
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Benchmarking utility functions for running inference benchmarks."""
 import json
 import subprocess
 import sys
@@ -11,7 +35,6 @@ from typing import Any, Dict, List, Optional
 from shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
-
 
 def run_benchmarking(
     checkpoint_dir: Path,

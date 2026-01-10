@@ -1,3 +1,29 @@
+"""
+@meta
+name: api_server_cli
+type: script
+domain: api
+responsibility:
+  - Start FastAPI server for Resume NER model
+  - Parse command-line arguments
+  - Configure server settings
+inputs:
+  - ONNX model file
+  - Checkpoint directory
+outputs:
+  - Running API server
+tags:
+  - entrypoint
+  - api
+  - fastapi
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """CLI script to start the FastAPI server."""
 
 import argparse

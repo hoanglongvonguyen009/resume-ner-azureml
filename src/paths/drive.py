@@ -1,3 +1,29 @@
+"""
+@meta
+name: paths_drive
+type: utility
+domain: paths
+responsibility:
+  - Map local paths to Google Drive backup paths
+  - Handle Colab-specific path resolution
+inputs:
+  - Local output paths
+  - Configuration directories
+outputs:
+  - Drive backup paths
+tags:
+  - utility
+  - paths
+  - drive
+  - colab
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Drive backup path mapping and Colab-specific path resolution."""
 
 import re

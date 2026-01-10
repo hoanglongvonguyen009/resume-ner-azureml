@@ -1,11 +1,37 @@
+from __future__ import annotations
+
+"""
+@meta
+name: hpo_trial_execution_legacy
+type: script
+domain: hpo
+responsibility:
+  - Execute HPO training trials (legacy wrapper)
+  - Handle subprocess execution
+  - Set up environment variables
+  - Read trial metrics
+inputs:
+  - Trial hyperparameters
+  - Training configuration
+outputs:
+  - Trial metrics
+tags:
+  - execution
+  - hpo
+  - legacy
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Trial execution for HPO training runs.
 
 Handles subprocess execution, environment setup, and metrics reading.
 Combines TrialExecutor class and run_training_trial function.
 """
-
-from __future__ import annotations
-
 import json
 import os
 import subprocess
@@ -23,7 +49,6 @@ def _get_read_trial_metrics():
     return read_trial_metrics
 
 logger = get_logger(__name__)
-
 
 class TrialExecutor:
     """Executes a single training trial via subprocess and returns metrics."""
@@ -268,7 +293,6 @@ class TrialExecutor:
                 env["MLFLOW_FOLD_SPLITS_FILE"] = str(fold_splits_file)
 
         return env
-
 
 def run_training_trial(
     trial_params: Dict[str, Any],

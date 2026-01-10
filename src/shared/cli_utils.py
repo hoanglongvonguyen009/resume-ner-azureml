@@ -1,3 +1,28 @@
+"""
+@meta
+name: shared_cli_utils
+type: utility
+domain: shared
+responsibility:
+  - Provide common CLI utilities for model path arguments
+  - Validate model paths
+inputs:
+  - ArgumentParser instances
+  - Path strings
+outputs:
+  - Validated Path objects
+tags:
+  - utility
+  - shared
+  - cli
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Common CLI utilities for argument parsing and validation."""
 
 import argparse

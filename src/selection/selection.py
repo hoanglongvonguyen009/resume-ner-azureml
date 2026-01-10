@@ -1,7 +1,32 @@
-"""Best configuration selection from HPO sweep jobs using MLflow."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: mlflow_selection
+type: utility
+domain: selection
+responsibility:
+  - Select best configuration from HPO sweep jobs using MLflow
+  - Fetch metrics and parameters from MLflow runs
+inputs:
+  - Azure ML sweep jobs
+  - MLflow tracking URI
+outputs:
+  - Best selected configuration
+tags:
+  - utility
+  - selection
+  - mlflow
+  - azureml
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: true
+lifecycle:
+  status: active
+"""
+
+"""Best configuration selection from HPO sweep jobs using MLflow."""
 from typing import Any, Dict, Optional
 
 import mlflow
@@ -13,7 +38,6 @@ try:
     import azureml.mlflow  # noqa: F401
 except ImportError:
     pass
-
 
 def _configure_mlflow(ml_client: MLClient) -> None:
     """Configure MLflow to use Azure ML workspace tracking URI."""
@@ -33,7 +57,6 @@ def _configure_mlflow(ml_client: MLClient) -> None:
         tracking_uri = workspace.mlflow_tracking_uri
         mlflow.set_tracking_uri(tracking_uri)
 
-
 def _get_metrics_from_mlflow(run_id: str) -> Dict[str, float]:
     """Fetch metrics for a run from MLflow."""
     try:
@@ -42,7 +65,6 @@ def _get_metrics_from_mlflow(run_id: str) -> Dict[str, float]:
     except Exception:
         return {}
 
-
 def _get_params_from_mlflow(run_id: str) -> Dict[str, Any]:
     """Fetch params for a run from MLflow."""
     try:
@@ -50,7 +72,6 @@ def _get_params_from_mlflow(run_id: str) -> Dict[str, Any]:
         return dict(run.data.params or {})
     except Exception:
         return {}
-
 
 def get_best_trial_from_sweep(
     ml_client: MLClient,
@@ -91,7 +112,6 @@ def get_best_trial_from_sweep(
 
     return best_trial, best_value
 
-
 def extract_trial_configuration(
     ml_client: MLClient,
     trial: Job,
@@ -108,7 +128,6 @@ def extract_trial_configuration(
         "metrics": _get_metrics_from_mlflow(trial.name),
         "dataset_version": trial.tags.get("data_version", dataset_version),
     }
-
 
 def select_best_configuration(
     ml_client: MLClient,

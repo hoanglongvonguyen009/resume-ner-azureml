@@ -1,7 +1,32 @@
-"""Tags registry for centralized MLflow tag key management."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: naming_mlflow_tags_registry
+type: utility
+domain: naming
+responsibility:
+  - Manage centralized MLflow tag key registry
+  - Load tag keys from config/tags.yaml
+  - Provide tag key accessors with validation
+inputs:
+  - Configuration directories
+outputs:
+  - TagsRegistry instances
+tags:
+  - utility
+  - naming
+  - mlflow
+  - tags
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Tags registry for centralized MLflow tag key management."""
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -15,12 +40,10 @@ logger = get_logger(__name__)
 _registry_cache: Optional[TagsRegistry] = None
 _registry_cache_path: Optional[Path] = None
 
-
 class TagKeyError(KeyError):
     """Raised when a tag key is missing from the registry."""
 
     pass
-
 
 @dataclass(frozen=True)
 class TagsRegistry:
@@ -72,7 +95,6 @@ class TagsRegistry:
                 f"Tag key '{section}.{name}' is not a string: {type(value)}"
             )
         return value
-
 
 def _get_default_tag_keys() -> Dict[str, Any]:
     """
@@ -149,7 +171,6 @@ def _get_default_tag_keys() -> Dict[str, Any]:
         },
     }
 
-
 def _deep_merge(defaults: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
     """
     Deep merge two dictionaries, with overrides taking precedence.
@@ -168,7 +189,6 @@ def _deep_merge(defaults: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str
         else:
             result[key] = value
     return result
-
 
 def load_tags_registry(config_dir: Optional[Path] = None) -> TagsRegistry:
     """
@@ -235,8 +255,5 @@ def load_tags_registry(config_dir: Optional[Path] = None) -> TagsRegistry:
 
     return registry
 
-
 __all__ = ["TagKeyError", "TagsRegistry", "load_tags_registry"]
-
-
 

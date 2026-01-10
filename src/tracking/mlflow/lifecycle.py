@@ -1,18 +1,42 @@
+from __future__ import annotations
+
+"""
+@meta
+name: tracking_mlflow_lifecycle
+type: utility
+domain: tracking
+responsibility:
+  - Manage MLflow run lifecycle with safe termination
+  - Handle run status checks and error handling
+inputs:
+  - Run IDs
+  - Termination status and tags
+outputs:
+  - Termination success status
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - lifecycle
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """MLflow run lifecycle management utilities.
 
 This module provides safe run termination functions with status checks
 and error handling.
 """
-
-from __future__ import annotations
-
 from typing import Optional, Dict
 
 import mlflow
 from shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
-
 
 def terminate_run_safe(
     run_id: str,
@@ -84,7 +108,6 @@ def terminate_run_safe(
         )
         return False
 
-
 def ensure_run_terminated(
     run_id: str,
     expected_status: str = "FINISHED",
@@ -134,7 +157,6 @@ def ensure_run_terminated(
             exc_info=True
         )
         return False
-
 
 def terminate_run_with_tags(
     run_id: str,

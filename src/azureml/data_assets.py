@@ -1,5 +1,31 @@
 from __future__ import annotations
 
+"""
+@meta
+name: azureml_data_assets
+type: utility
+domain: azureml
+responsibility:
+  - Resolve dataset paths from configuration
+  - Register data assets in Azure ML
+  - Build data asset references
+inputs:
+  - Data configuration
+  - Dataset directories
+outputs:
+  - Registered data assets
+  - Data asset references
+tags:
+  - utility
+  - azureml
+  - data
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: true
+lifecycle:
+  status: active
+"""
 from pathlib import Path
 from typing import Any, Dict
 
@@ -7,7 +33,6 @@ from azure.ai.ml import MLClient
 from azure.ai.ml.constants import AssetTypes
 from azure.ai.ml.entities import Data
 from azure.core.exceptions import ResourceNotFoundError
-
 
 def resolve_dataset_path(data_config: Dict[str, Any]) -> Path:
     """
@@ -43,7 +68,6 @@ def resolve_dataset_path(data_config: Dict[str, Any]) -> Path:
         dataset_path = dataset_path / f"seed{seed}"
 
     return dataset_path
-
 
 def register_data_asset(
     ml_client: MLClient,
@@ -90,7 +114,6 @@ def register_data_asset(
             type=AssetTypes.URI_FOLDER,
         )
         return ml_client.data.create_or_update(data_asset)
-
 
 def ensure_data_asset_uploaded(
     ml_client: MLClient,
@@ -182,7 +205,6 @@ def ensure_data_asset_uploaded(
                 # If we still can't get it, return the data_asset object we were given
                 # This should not happen in normal operation
                 return data_asset
-
 
 def build_data_asset_reference(ml_client: MLClient, data_asset: Data) -> Dict[str, Any]:
     """

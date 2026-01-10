@@ -1,6 +1,32 @@
-"""Platform-aware MLflow setup utility for cross-platform tracking."""
-
 from __future__ import annotations
+
+"""
+@meta
+name: shared_mlflow_setup
+type: utility
+domain: shared
+responsibility:
+  - Set up MLflow tracking for cross-platform execution
+  - Handle Azure ML and local MLflow URI registration
+  - Configure MLflow tracking URI and experiment
+inputs:
+  - Experiment names
+  - ML clients (for Azure ML)
+outputs:
+  - Configured MLflow tracking
+tags:
+  - utility
+  - shared
+  - mlflow
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Platform-aware MLflow setup utility for cross-platform tracking."""
 
 import os
 import sys

@@ -1,7 +1,31 @@
-"""Human-readable run name generation."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: naming_mlflow_run_names
+type: utility
+domain: naming
+responsibility:
+  - Generate human-readable MLflow run names
+  - Build run names from naming contexts
+inputs:
+  - Naming contexts
+  - Configuration directories
+outputs:
+  - Formatted run names
+tags:
+  - utility
+  - naming
+  - mlflow
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Human-readable run name generation."""
 from datetime import datetime
 import logging
 import os
@@ -26,13 +50,11 @@ from naming.display_policy import (
 
 logger = logging.getLogger(__name__)
 
-
 def _short(value: Optional[str], default: str = "unknown") -> str:
     """Return an 8-char short hash or a default if missing."""
     if not value:
         return default
     return value[:8]
-
 
 def _strip_env_prefix(trial_id: str, environment: Optional[str]) -> str:
     """
@@ -52,7 +74,6 @@ def _strip_env_prefix(trial_id: str, environment: Optional[str]) -> str:
     if trial_id.startswith(prefix):
         return trial_id[len(prefix):]
     return trial_id
-
 
 def build_mlflow_run_name(
     context: NamingContext,
@@ -217,7 +238,6 @@ def build_mlflow_run_name(
             return f"{env}_{context.trial_id}"
     
     return base_name
-
 
 def _build_legacy_run_name(
     context: NamingContext,

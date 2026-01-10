@@ -1,3 +1,27 @@
+"""
+@meta
+name: platform_outputs
+type: utility
+domain: platform_adapters
+responsibility:
+  - Resolve output paths for different platforms
+  - Handle Azure ML named outputs and local directories
+inputs:
+  - Output name identifiers
+outputs:
+  - Resolved output directory paths
+tags:
+  - utility
+  - platform_adapters
+  - outputs
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Output path resolution for different platforms."""
 
 from abc import ABC, abstractmethod

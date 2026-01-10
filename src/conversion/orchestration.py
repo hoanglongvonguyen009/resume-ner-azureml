@@ -1,3 +1,36 @@
+from __future__ import annotations
+
+"""
+@meta
+name: conversion_orchestration
+type: script
+domain: conversion
+responsibility:
+  - Orchestrate model conversion workflow
+  - Load conversion configuration
+  - Build output directories
+  - Create MLflow runs
+  - Execute conversion subprocess
+  - Handle errors and cleanup
+inputs:
+  - conversion.yaml
+  - Parent training checkpoint
+  - Parent training fingerprints
+outputs:
+  - ONNX model directory
+  - MLflow conversion run
+tags:
+  - orchestration
+  - conversion
+  - mlflow
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """High-level orchestration for model conversion workflow.
 
 This module orchestrates the conversion workflow from the orchestration layer:
@@ -7,9 +40,6 @@ This module orchestrates the conversion workflow from the orchestration layer:
 - Executes conversion subprocess
 - Handles errors and cleanup
 """
-
-from __future__ import annotations
-
 import os
 import subprocess
 import sys
@@ -34,7 +64,6 @@ from shared.platform_detection import detect_platform
 from shared.logging_utils import get_script_logger
 
 _log = get_script_logger("conversion.orchestration")
-
 
 def execute_conversion(
     root_dir: Path,
@@ -328,7 +357,6 @@ def execute_conversion(
     _log.info(f"Conversion completed. ONNX model: {onnx_model_path}")
     
     return conversion_output_dir
-
 
 def _find_onnx_model(output_dir: Path, quantization: str, filename_pattern: str) -> Path:
     """

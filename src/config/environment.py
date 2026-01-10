@@ -1,5 +1,34 @@
 from __future__ import annotations
 
+"""
+@meta
+name: environment_config_builder
+type: utility
+domain: config
+responsibility:
+  - Build Azure ML environment configuration from YAML
+  - Load conda environment specifications
+  - Compute environment hashes
+  - Get or create Azure ML environments
+  - Prepare environment images with warm-up jobs
+inputs:
+  - env.yaml configuration
+  - Conda environment files
+outputs:
+  - EnvironmentConfig dataclass
+  - Azure ML Environment objects
+tags:
+  - utility
+  - config
+  - azureml
+  - environment
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: true
+lifecycle:
+  status: active
+"""
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -14,7 +43,6 @@ from azure.core.exceptions import ResourceNotFoundError
 from .loader import CONFIG_HASH_LENGTH
 from shared.yaml_utils import load_yaml
 
-
 # Centralised defaults for the training environment. These can be overridden
 # by providing values in the env.yaml config (see EnvironmentConfig below).
 DEFAULT_ENVIRONMENT_NAME = "resume-ner-training"
@@ -24,7 +52,6 @@ DEFAULT_DOCKER_IMAGE = "mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04:lates
 # Warm-up job configuration
 WARMUP_DISPLAY_NAME = "environment-warmup"
 WARMUP_HISTORY_LIMIT = 10
-
 
 @dataclass(frozen=True)
 class EnvironmentConfig:
@@ -42,7 +69,6 @@ class EnvironmentConfig:
     docker_image: str
     warmup_display_name: str
     warmup_history_limit: int
-
 
 def build_environment_config(
     config_root: Path,
@@ -92,7 +118,6 @@ def build_environment_config(
         warmup_history_limit=warmup_limit,
     )
 
-
 def load_conda_environment(path: Path) -> Dict[str, Any]:
     """
     Load a conda environment specification from disk.
@@ -109,7 +134,6 @@ def load_conda_environment(path: Path) -> Dict[str, Any]:
     """
     # Centralized YAML parsing (keeps behavior consistent across the repo)
     return load_yaml(path)
-
 
 def compute_environment_hash(conda_deps: Dict[str, Any], docker_image: str) -> str:
     """
@@ -131,7 +155,6 @@ def compute_environment_hash(conda_deps: Dict[str, Any], docker_image: str) -> s
     env_str = json.dumps(env_spec, sort_keys=True)
     full_hash = hashlib.sha256(env_str.encode("utf-8")).hexdigest()
     return full_hash[:CONFIG_HASH_LENGTH]
-
 
 def get_or_create_environment(
     ml_client: MLClient,
@@ -165,7 +188,6 @@ def get_or_create_environment(
         )
         return ml_client.environments.create_or_update(environment)
 
-
 def create_training_environment(
     ml_client: MLClient,
     env_config: EnvironmentConfig,
@@ -196,7 +218,6 @@ def create_training_environment(
         conda_dependencies=conda_deps,
         docker_image=env_config.docker_image,
     )
-
 
 def prepare_environment_image(
     ml_client: MLClient,

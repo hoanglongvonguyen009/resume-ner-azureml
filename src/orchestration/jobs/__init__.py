@@ -15,7 +15,9 @@ New module locations:
 - tracking/mlflow/finder.py: Run finder
 """
 
+import sys
 import warnings
+from types import ModuleType
 from typing import Any
 
 # Issue deprecation warning
@@ -137,10 +139,7 @@ except ImportError:
 
 # Selection module - moved to selection/
 # Create proper module objects for backward compatibility
-import sys
-from types import ModuleType
-
-# Create orchestration.jobs.selection module
+# Always create the module to ensure it's available for patching
 if "orchestration.jobs.selection" not in sys.modules:
     selection_module = ModuleType("orchestration.jobs.selection")
     sys.modules["orchestration.jobs.selection"] = selection_module
@@ -166,6 +165,18 @@ if "orchestration.jobs.selection" not in sys.modules:
         sys.modules["orchestration.jobs.selection.cache"] = cache
     except ImportError:
         pass
+    
+    # Add selection attribute for backward compatibility
+    try:
+        from selection import selection as selection_func
+        selection_module.selection = selection_func
+    except ImportError:
+        pass
+
+# Ensure selection is available as an attribute
+if not hasattr(sys.modules[__name__], "selection"):
+    if "orchestration.jobs.selection" in sys.modules:
+        setattr(sys.modules[__name__], "selection", sys.modules["orchestration.jobs.selection"])
 
 # HPO trial metrics - moved to hpo/trial/metrics.py
 try:
@@ -183,25 +194,58 @@ except ImportError:
         sys.modules["orchestration.jobs.hpo.local.trial.metrics"] = _HPOTrialMetricsModule()
 
 # Benchmarking orchestrator - moved to benchmarking/orchestrator.py
+# Always create the module to ensure it's available for patching
 if "orchestration.jobs.benchmarking" not in sys.modules:
     benchmarking_module = ModuleType("orchestration.jobs.benchmarking")
     sys.modules["orchestration.jobs.benchmarking"] = benchmarking_module
     
+    # Create orchestrator module first
+    orchestrator_module = ModuleType("orchestration.jobs.benchmarking.orchestrator")
+    benchmarking_module.orchestrator = orchestrator_module
+    sys.modules["orchestration.jobs.benchmarking.orchestrator"] = orchestrator_module
+    
+    # Import and assign functions one by one to handle partial failures gracefully
     try:
-        from benchmarking.orchestrator import BenchmarkOrchestrator
-        # Create a module-like object that contains the class
-        orchestrator_module = ModuleType("orchestration.jobs.benchmarking.orchestrator")
+        from benchmarking.orchestrator import BenchmarkOrchestrator, benchmark_best_trials
         orchestrator_module.BenchmarkOrchestrator = BenchmarkOrchestrator
-        # Also add functions that might be imported
-        try:
-            from benchmarking.orchestrator import run_benchmarking
-            orchestrator_module.run_benchmarking = run_benchmarking
-        except ImportError:
-            pass
-        benchmarking_module.orchestrator = orchestrator_module
-        sys.modules["orchestration.jobs.benchmarking.orchestrator"] = orchestrator_module
+        orchestrator_module.benchmark_best_trials = benchmark_best_trials
     except ImportError:
         pass
+    
+    try:
+        from benchmarking.utils import run_benchmarking
+        orchestrator_module.run_benchmarking = run_benchmarking
+    except ImportError:
+        pass
+    
+    try:
+        from naming import create_naming_context
+        orchestrator_module.create_naming_context = create_naming_context
+    except ImportError:
+        pass
+    
+    try:
+        from paths.resolve import build_output_path
+        orchestrator_module.build_output_path = build_output_path
+    except ImportError:
+        pass
+    
+    try:
+        from paths.drive import resolve_output_path_for_colab
+        orchestrator_module.resolve_output_path_for_colab = resolve_output_path_for_colab
+    except ImportError:
+        pass
+    
+    try:
+        from paths.validation import validate_path_before_mkdir
+        orchestrator_module.validate_path_before_mkdir = validate_path_before_mkdir
+    except ImportError:
+        pass
+
+# Ensure benchmarking is available as an attribute
+if not hasattr(sys.modules[__name__], "benchmarking"):
+    if "orchestration.jobs.benchmarking" in sys.modules:
+        setattr(sys.modules[__name__], "benchmarking", sys.modules["orchestration.jobs.benchmarking"])
 
 __all__ = [
     # Training

@@ -1,3 +1,27 @@
+"""
+@meta
+name: paths_parse
+type: utility
+domain: paths
+responsibility:
+  - Parse HPO and other output paths to extract components
+  - Detect path patterns and versions
+inputs:
+  - Path objects
+outputs:
+  - Parsed path components dictionaries
+tags:
+  - utility
+  - paths
+  - parsing
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Path parsing and detection helpers."""
 
 import re

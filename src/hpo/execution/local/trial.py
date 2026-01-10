@@ -1,11 +1,37 @@
+from __future__ import annotations
+
+"""
+@meta
+name: hpo_trial_execution
+type: script
+domain: hpo
+responsibility:
+  - Execute single HPO training trial
+  - Handle subprocess execution
+  - Read trial metrics
+inputs:
+  - Trial hyperparameters
+  - Training configuration
+outputs:
+  - Trial metrics
+  - Trial checkpoint
+tags:
+  - execution
+  - hpo
+  - training
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Trial execution for HPO training runs.
 
 Handles subprocess execution, environment setup, and metrics reading.
 Combines TrialExecutor class and run_training_trial function.
 """
-
-from __future__ import annotations
-
 import json
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -27,7 +53,6 @@ from training.execution import (
 from hpo.trial.metrics import read_trial_metrics
 
 logger = get_logger(__name__)
-
 
 class TrialExecutor:
     """Executes a single training trial via subprocess and returns metrics."""
@@ -148,7 +173,6 @@ class TrialExecutor:
         )
 
         return metric_value
-
 
 def run_training_trial(
     trial_params: Dict[str, Any],

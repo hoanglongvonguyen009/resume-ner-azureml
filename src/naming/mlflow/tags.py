@@ -1,7 +1,31 @@
-"""MLflow tag construction utilities."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: naming_mlflow_tags
+type: utility
+domain: naming
+responsibility:
+  - Build MLflow tags from naming contexts
+  - Construct tag dictionaries for MLflow runs
+inputs:
+  - Naming contexts
+  - Configuration directories
+outputs:
+  - MLflow tag dictionaries
+tags:
+  - utility
+  - naming
+  - mlflow
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""MLflow tag construction utilities."""
 import os
 from pathlib import Path
 from typing import Dict, Optional
@@ -45,7 +69,6 @@ CODE_RUN_ID_PREFIX = "code.run_id_prefix"
 CODE_LINEAGE_PARENT_TRAINING_RUN_ID = "code.lineage.parent_training_run_id"
 CODE_LINEAGE_HPO_REFIT_RUN_ID = "code.lineage.hpo_refit_run_id"
 
-
 def get_tag_key(
     section: str,
     name: str,
@@ -84,7 +107,6 @@ def get_tag_key(
         # Re-raise the original exception
         raise
 
-
 def sanitize_tag_value(
     value: str,
     max_length: int = 250,
@@ -110,7 +132,6 @@ def sanitize_tag_value(
     # Truncate and add indicator
     truncated = value[:max_length - 3]
     return f"{truncated}..."
-
 
 def build_mlflow_tags(
     context: Optional[NamingContext] = None,

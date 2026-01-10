@@ -1,5 +1,34 @@
 from __future__ import annotations
 
+"""
+@meta
+name: config_loader
+type: utility
+domain: config
+responsibility:
+  - Load experiment configuration from YAML
+  - Load all domain configuration files
+  - Compute configuration hashes
+  - Create configuration metadata for tagging
+  - Validate configuration immutability
+inputs:
+  - Experiment YAML files
+  - Domain configuration files (data, model, train, hpo, env, benchmark)
+outputs:
+  - ExperimentConfig dataclass
+  - Loaded configuration dictionaries
+  - Configuration hashes
+tags:
+  - utility
+  - config
+  - loading
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict
@@ -10,7 +39,6 @@ import json
 from shared.yaml_utils import load_yaml
 
 CONFIG_HASH_LENGTH = 16
-
 
 @dataclass(frozen=True)
 class ExperimentConfig:
@@ -31,7 +59,6 @@ class ExperimentConfig:
     benchmark_config: Path
     stages: Dict[str, Any]
     naming: Dict[str, Any]
-
 
 def load_experiment_config(config_root: Path, experiment_name: str) -> ExperimentConfig:
     """
@@ -66,7 +93,6 @@ def load_experiment_config(config_root: Path, experiment_name: str) -> Experimen
         naming=raw.get("naming", {}) or {},
     )
 
-
 def load_all_configs(exp_cfg: ExperimentConfig) -> Dict[str, Any]:
     """
     Load all domain configuration files referenced by an ``ExperimentConfig``.
@@ -92,7 +118,6 @@ def load_all_configs(exp_cfg: ExperimentConfig) -> Dict[str, Any]:
     
     return configs
 
-
 def compute_config_hash(config: Dict[str, Any]) -> str:
     """
     Compute a deterministic short hash for a single configuration dictionary.
@@ -107,7 +132,6 @@ def compute_config_hash(config: Dict[str, Any]) -> str:
     full_hash = hashlib.sha256(config_str.encode("utf-8")).hexdigest()
     return full_hash[:CONFIG_HASH_LENGTH]
 
-
 def compute_config_hashes(configs: Dict[str, Any]) -> Dict[str, str]:
     """
     Compute short hashes for all domain configs in a configuration bundle.
@@ -119,7 +143,6 @@ def compute_config_hashes(configs: Dict[str, Any]) -> Dict[str, str]:
         Mapping from domain name to short hash string.
     """
     return {name: compute_config_hash(cfg) for name, cfg in configs.items()}
-
 
 def create_config_metadata(
     configs: Dict[str, Any],
@@ -145,7 +168,6 @@ def create_config_metadata(
         "model_backbone": str(configs["model"].get("backbone")),
     }
 
-
 def snapshot_configs(configs: Dict[str, Any]) -> Dict[str, str]:
     """
     Take immutable JSON snapshots of all configs for later mutation checks.
@@ -157,7 +179,6 @@ def snapshot_configs(configs: Dict[str, Any]) -> Dict[str, str]:
         Mapping from domain name to JSON-serialised string representation.
     """
     return {name: json.dumps(cfg, sort_keys=True) for name, cfg in configs.items()}
-
 
 def validate_config_immutability(
     configs: Dict[str, Any],

@@ -1,3 +1,28 @@
+"""
+@meta
+name: storage_drive
+type: utility
+domain: storage
+responsibility:
+  - Backup and restore files from Google Drive in Colab
+  - Provide clean API for Drive operations
+inputs:
+  - Local file paths
+outputs:
+  - Backup results
+tags:
+  - utility
+  - storage
+  - drive
+  - colab
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Google Drive backup/restore functionality for Colab environments.
 
 This module provides a clean, testable API for backing up and restoring files

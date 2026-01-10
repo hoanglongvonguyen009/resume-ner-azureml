@@ -1,7 +1,36 @@
-"""Final training execution module."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: final_training_executor
+type: script
+domain: training
+responsibility:
+  - Execute final training with best HPO configuration
+  - Load final training configuration
+  - Build training context and output directory
+  - Execute training subprocess
+  - Set lineage tags
+inputs:
+  - Best model configuration
+  - Final training configuration
+  - Experiment configuration
+outputs:
+  - Final training checkpoint directory
+  - MLflow training run
+tags:
+  - orchestration
+  - training
+  - final_training
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Final training execution module."""
 from pathlib import Path
 from typing import Any, Dict
 
@@ -30,7 +59,6 @@ from naming import create_naming_context
 from paths import build_output_path
 from shared.platform_detection import detect_platform
 from shared.yaml_utils import load_yaml
-
 
 def execute_final_training(
     root_dir: Path,

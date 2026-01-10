@@ -1,3 +1,28 @@
+"""
+@meta
+name: core_normalize
+type: utility
+domain: core
+responsibility:
+  - Normalize values for display names and filesystem paths
+  - Ensure consistency and safety in naming conventions
+inputs:
+  - Values to normalize
+  - Normalization rules
+outputs:
+  - Normalized values with warnings
+tags:
+  - utility
+  - core
+  - naming
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Normalization helpers for names and filesystem-safe paths.
 
 This module provides normalization utilities for the naming system foundation.

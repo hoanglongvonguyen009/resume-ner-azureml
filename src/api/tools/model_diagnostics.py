@@ -1,3 +1,30 @@
+"""
+@meta
+name: model_diagnostics
+type: script
+domain: api
+responsibility:
+  - Check model predictions and label mappings
+  - Validate ONNX model behavior
+  - Diagnose model issues
+inputs:
+  - ONNX model file
+  - Checkpoint directory
+  - Input text
+outputs:
+  - Diagnostic information
+tags:
+  - utility
+  - diagnostics
+  - onnx
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Model diagnostic tools for checking predictions and label mappings."""
 
 import numpy as np

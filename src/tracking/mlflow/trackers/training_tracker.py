@@ -1,7 +1,33 @@
-"""MLflow tracker for training stage."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: tracking_mlflow_training_tracker
+type: utility
+domain: tracking
+responsibility:
+  - Track MLflow runs for final training stage
+  - Manage training run lifecycle and artifacts
+inputs:
+  - Training configurations
+  - Run names and contexts
+outputs:
+  - MLflow run handles
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - tracker
+  - training
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""MLflow tracker for training stage."""
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, Optional, List
@@ -30,7 +56,6 @@ from tracking.mlflow.trackers.base_tracker import BaseTracker
 
 logger = get_logger(__name__)
 
-
 class MLflowTrainingTracker(BaseTracker):
     """Tracks MLflow runs for final training stage."""
 
@@ -42,7 +67,6 @@ class MLflowTrainingTracker(BaseTracker):
             experiment_name: MLflow experiment name.
         """
         super().__init__(experiment_name)
-
 
     @contextmanager
     def start_training_run(
@@ -312,6 +336,4 @@ class MLflowTrainingTracker(BaseTracker):
                 logger.debug("[Training Tracker] Metrics JSON logging disabled (tracking.training.log_metrics_json=false)")
         except Exception as e:
             logger.warning(f"Could not log training artifacts to MLflow: {e}")
-
-
 

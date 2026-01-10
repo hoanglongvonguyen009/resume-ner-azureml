@@ -1,7 +1,31 @@
-"""Naming policy loading and display name formatting (with caching)."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: naming_display_policy
+type: utility
+domain: naming
+responsibility:
+  - Load naming policy from YAML with caching
+  - Format display names using policy patterns
+inputs:
+  - Naming contexts
+  - Configuration directories
+outputs:
+  - Formatted display names
+tags:
+  - utility
+  - naming
+  - policy
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Naming policy loading and display name formatting (with caching)."""
 import logging
 import os
 import re
@@ -19,14 +43,12 @@ logger = logging.getLogger(__name__)
 # Cache for loaded policy: (config_dir, mtime) -> policy
 _policy_cache: Dict[tuple, tuple] = {}  # (key, mtime) -> policy
 
-
 def _get_policy_mtime(policy_path: Path) -> float:
     """Get modification time of policy file, or 0 if doesn't exist."""
     try:
         return policy_path.stat().st_mtime
     except (OSError, FileNotFoundError):
         return 0.0
-
 
 def load_naming_policy(
     config_dir: Optional[Path] = None,
@@ -77,7 +99,6 @@ def load_naming_policy(
             f"[Naming Policy] Failed to load policy from {policy_path}: {e}", exc_info=True)
         _policy_cache[cache_key] = (mtime, {})
         return {}
-
 
 def validate_naming_policy(policy: Dict[str, Any], policy_path: Optional[Path] = None) -> None:
     """
@@ -162,7 +183,6 @@ def validate_naming_policy(policy: Dict[str, Any], policy_path: Optional[Path] =
                     f"is not allowed for name scope{location}"
                 )
 
-
 def parse_parent_training_id(parent_id: str) -> Dict[str, str]:
     """
     Parse parent_training_id into spec_hash, exec_hash, and variant.
@@ -214,7 +234,6 @@ def parse_parent_training_id(parent_id: str) -> Dict[str, str]:
     )
     return {"spec_hash": "unknown", "exec_hash": "unknown", "variant": "1"}
 
-
 def normalize_value(value: str, rules: Optional[Dict[str, Any]] = None) -> str:
     """
     Apply normalization rules to a value.
@@ -244,7 +263,6 @@ def normalize_value(value: str, rules: Optional[Dict[str, Any]] = None) -> str:
         result = result.lower()
 
     return result
-
 
 def sanitize_semantic_suffix(study_name: str, max_length: int = 30, model: Optional[str] = None) -> str:
     """
@@ -289,13 +307,11 @@ def sanitize_semantic_suffix(study_name: str, max_length: int = 30, model: Optio
 
     return ""
 
-
 def _short(value: Optional[str], length: int = 8, default: str = "unknown") -> str:
     """Return a short hash of specified length or a default if missing."""
     if not value:
         return default
     return value[:length]
-
 
 def extract_component(
     context: NamingContext,
@@ -391,7 +407,6 @@ def extract_component(
         return short_value
 
     return default
-
 
 def format_run_name(
     process_type: str,
@@ -521,7 +536,6 @@ def format_run_name(
         name = pattern.format(**substitutions)
 
     return name
-
 
 def validate_run_name(name: str, policy: Dict[str, Any]) -> None:
     """

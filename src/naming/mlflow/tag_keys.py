@@ -1,3 +1,29 @@
+from __future__ import annotations
+
+"""
+@meta
+name: naming_mlflow_tag_keys
+type: utility
+domain: naming
+responsibility:
+  - Provide centralized tag key definitions
+  - Map tag sections and names to config values
+inputs:
+  - Configuration directories
+outputs:
+  - Tag key tuples
+tags:
+  - utility
+  - naming
+  - mlflow
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Centralized tag key definitions and helpers.
 
 This module provides a single source of truth for all tag key mappings,
@@ -6,9 +32,6 @@ eliminating duplication of hardcoded fallback strings throughout the codebase.
 All tag key values come from config/tags.yaml via TagsRegistry.
 This module only defines the structure (section, name) mappings.
 """
-
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -88,7 +111,6 @@ LEGACY_VARIANT: Tuple[str, str] = ("legacy", "variant")
 LEGACY_BENCHMARK_CONFIG_HASH: Tuple[str, str] = ("legacy", "benchmark_config_hash")
 LEGACY_RUN_ID_PREFIX: Tuple[str, str] = ("legacy", "run_id_prefix")
 
-
 # ---------------------------------------------------------------------------
 # Helper Functions - Direct access to commonly used tags
 # ---------------------------------------------------------------------------
@@ -113,164 +135,133 @@ def _get_tag_key_from_mapping(
     registry = load_tags_registry(config_dir)
     return registry.key(section, name)
 
-
 # Grouping tags
 def get_study_key_hash(config_dir: Optional[Path] = None) -> str:
     """Get study key hash tag key."""
     return _get_tag_key_from_mapping(GROUPING_STUDY_KEY_HASH, config_dir)
 
-
 def get_trial_key_hash(config_dir: Optional[Path] = None) -> str:
     """Get trial key hash tag key."""
     return _get_tag_key_from_mapping(GROUPING_TRIAL_KEY_HASH, config_dir)
-
 
 def get_parent_run_id(config_dir: Optional[Path] = None) -> str:
     """Get parent run ID tag key."""
     return _get_tag_key_from_mapping(GROUPING_PARENT_RUN_ID, config_dir)
 
-
 def get_run_key_hash(config_dir: Optional[Path] = None) -> str:
     """Get run key hash tag key."""
     return _get_tag_key_from_mapping(GROUPING_RUN_KEY_HASH, config_dir)
 
-
 def get_group_id(config_dir: Optional[Path] = None) -> str:
     """Get group ID tag key."""
     return _get_tag_key_from_mapping(GROUPING_GROUP_ID, config_dir)
-
 
 # Training tags
 def get_trained_on_full_data(config_dir: Optional[Path] = None) -> str:
     """Get trained on full data tag key."""
     return _get_tag_key_from_mapping(TRAINING_TRAINED_ON_FULL_DATA, config_dir)
 
-
 def get_source_training_run(config_dir: Optional[Path] = None) -> str:
     """Get source training run tag key."""
     return _get_tag_key_from_mapping(TRAINING_SOURCE_TRAINING_RUN, config_dir)
-
 
 def get_refit(config_dir: Optional[Path] = None) -> str:
     """Get refit tag key."""
     return _get_tag_key_from_mapping(TRAINING_REFIT, config_dir)
 
-
 def get_refit_has_validation(config_dir: Optional[Path] = None) -> str:
     """Get refit has validation tag key."""
     return _get_tag_key_from_mapping(TRAINING_REFIT_HAS_VALIDATION, config_dir)
 
-
 def get_interrupted(config_dir: Optional[Path] = None) -> str:
     """Get interrupted tag key."""
     return _get_tag_key_from_mapping(TRAINING_INTERRUPTED, config_dir)
-
 
 # HPO tags
 def get_hpo_trial_number(config_dir: Optional[Path] = None) -> str:
     """Get HPO trial number tag key."""
     return _get_tag_key_from_mapping(HPO_TRIAL_NUMBER, config_dir)
 
-
 def get_hpo_best_trial_run_id(config_dir: Optional[Path] = None) -> str:
     """Get HPO best trial run ID tag key."""
     return _get_tag_key_from_mapping(HPO_BEST_TRIAL_RUN_ID, config_dir)
-
 
 def get_hpo_best_trial_number(config_dir: Optional[Path] = None) -> str:
     """Get HPO best trial number tag key."""
     return _get_tag_key_from_mapping(HPO_BEST_TRIAL_NUMBER, config_dir)
 
-
 def get_hpo_refit_planned(config_dir: Optional[Path] = None) -> str:
     """Get HPO refit planned tag key."""
     return _get_tag_key_from_mapping(HPO_REFIT_PLANNED, config_dir)
-
 
 # Lineage tags
 def get_lineage_source(config_dir: Optional[Path] = None) -> str:
     """Get lineage source tag key."""
     return _get_tag_key_from_mapping(LINEAGE_SOURCE, config_dir)
 
-
 def get_lineage_hpo_study_key_hash(config_dir: Optional[Path] = None) -> str:
     """Get lineage HPO study key hash tag key."""
     return _get_tag_key_from_mapping(LINEAGE_HPO_STUDY_KEY_HASH, config_dir)
-
 
 def get_lineage_hpo_trial_key_hash(config_dir: Optional[Path] = None) -> str:
     """Get lineage HPO trial key hash tag key."""
     return _get_tag_key_from_mapping(LINEAGE_HPO_TRIAL_KEY_HASH, config_dir)
 
-
 def get_lineage_hpo_trial_run_id(config_dir: Optional[Path] = None) -> str:
     """Get lineage HPO trial run ID tag key."""
     return _get_tag_key_from_mapping(LINEAGE_HPO_TRIAL_RUN_ID, config_dir)
-
 
 def get_lineage_hpo_refit_run_id(config_dir: Optional[Path] = None) -> str:
     """Get lineage HPO refit run ID tag key."""
     return _get_tag_key_from_mapping(LINEAGE_HPO_REFIT_RUN_ID, config_dir)
 
-
 def get_lineage_hpo_sweep_run_id(config_dir: Optional[Path] = None) -> str:
     """Get lineage HPO sweep run ID tag key."""
     return _get_tag_key_from_mapping(LINEAGE_HPO_SWEEP_RUN_ID, config_dir)
 
-
 def get_lineage_parent_training_run_id(config_dir: Optional[Path] = None) -> str:
     """Get lineage parent training run ID tag key."""
     return _get_tag_key_from_mapping(LINEAGE_PARENT_TRAINING_RUN_ID, config_dir)
-
 
 # MLflow tags
 def get_mlflow_run_type(config_dir: Optional[Path] = None) -> str:
     """Get MLflow run type tag key."""
     return _get_tag_key_from_mapping(MLFLOW_RUN_TYPE, config_dir)
 
-
 def get_mlflow_parent_run_id(config_dir: Optional[Path] = None) -> str:
     """Get MLflow parent run ID tag key."""
     return _get_tag_key_from_mapping(MLFLOW_PARENT_RUN_ID, config_dir)
-
 
 # Azure ML tags
 def get_azureml_run_type(config_dir: Optional[Path] = None) -> str:
     """Get Azure ML run type tag key."""
     return _get_tag_key_from_mapping(AZUREML_RUN_TYPE, config_dir)
 
-
 def get_azureml_sweep(config_dir: Optional[Path] = None) -> str:
     """Get Azure ML sweep tag key."""
     return _get_tag_key_from_mapping(AZUREML_SWEEP, config_dir)
-
 
 # Process tags
 def get_process_stage(config_dir: Optional[Path] = None) -> str:
     """Get process stage tag key."""
     return _get_tag_key_from_mapping(PROCESS_STAGE, config_dir)
 
-
 def get_process_project(config_dir: Optional[Path] = None) -> str:
     """Get process project tag key."""
     return _get_tag_key_from_mapping(PROCESS_PROJECT, config_dir)
-
 
 def get_process_backbone(config_dir: Optional[Path] = None) -> str:
     """Get process backbone tag key."""
     return _get_tag_key_from_mapping(PROCESS_BACKBONE, config_dir)
 
-
 def get_process_model(config_dir: Optional[Path] = None) -> str:
     """Get process model tag key."""
     return _get_tag_key_from_mapping(PROCESS_MODEL, config_dir)
-
 
 # Legacy tags
 def get_legacy_trial_number(config_dir: Optional[Path] = None) -> str:
     """Get legacy trial number tag key."""
     return _get_tag_key_from_mapping(LEGACY_TRIAL_NUMBER, config_dir)
-
 
 __all__ = [
     # Mappings

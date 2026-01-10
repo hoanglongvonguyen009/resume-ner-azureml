@@ -1,3 +1,29 @@
+"""
+@meta
+name: shared_tokenization_utils
+type: utility
+domain: shared
+responsibility:
+  - Prepare tokenized inputs for ONNX inference
+  - Handle tokenizer output conversion
+inputs:
+  - Text strings
+  - Tokenizers
+outputs:
+  - Tokenized input dictionaries
+tags:
+  - utility
+  - shared
+  - tokenization
+  - onnx
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Shared tokenization utilities for ONNX inference and testing."""
 
 from typing import Dict, Optional, Set

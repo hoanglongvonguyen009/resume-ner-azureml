@@ -1,7 +1,37 @@
+from __future__ import annotations
+
+"""
+@meta
+name: local_hpo_sweep
+type: script
+domain: hpo
+responsibility:
+  - Run local HPO sweeps using Optuna
+  - Coordinate trial execution
+  - Manage MLflow tracking
+  - Handle checkpoint cleanup
+inputs:
+  - HPO configuration
+  - Training configuration
+  - Dataset path
+outputs:
+  - Optuna study with completed trials
+  - Trial checkpoints
+  - MLflow HPO runs
+tags:
+  - orchestration
+  - hpo
+  - optuna
+  - mlflow
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
 
 """Local hyperparameter optimization using Optuna."""
-
-from __future__ import annotations
 import logging
 from shared.json_cache import save_json
 from shared.logging_utils import get_logger
@@ -54,10 +84,8 @@ __all__ = [
     "run_local_hpo_sweep",
 ]
 
-
 # Functions are now imported from extracted modules above
 # Keeping this comment for clarity - old definitions removed
-
 
 def create_local_hpo_objective(
     dataset_path: str,
@@ -369,9 +397,7 @@ def create_local_hpo_objective(
 
     return objective, cleanup_non_best_checkpoints
 
-
 # run_refit_training is now imported from refit_executor module above
-
 
 def run_local_hpo_sweep(
     dataset_path: str,

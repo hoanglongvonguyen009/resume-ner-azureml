@@ -1,7 +1,31 @@
-"""Utilities for reading metrics from files and MLflow."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: shared_metrics_utils
+type: utility
+domain: shared
+responsibility:
+  - Read metrics from JSON files
+  - Read metrics from MLflow runs
+inputs:
+  - Metrics file paths
+  - MLflow run IDs
+outputs:
+  - Metric values
+tags:
+  - utility
+  - shared
+  - metrics
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Utilities for reading metrics from files and MLflow."""
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -9,7 +33,6 @@ from typing import Dict, Any, Optional
 from shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
-
 
 def read_metrics_from_file(
     metrics_file: Path,
@@ -55,7 +78,6 @@ def read_metrics_from_file(
 
     return None
 
-
 def read_all_metrics_from_file(metrics_file: Path) -> Dict[str, Any]:
     """
     Read all metrics from a metrics.json file.
@@ -75,7 +97,6 @@ def read_all_metrics_from_file(metrics_file: Path) -> Dict[str, Any]:
     except Exception as e:
         logger.warning(f"Could not read metrics from {metrics_file}: {e}")
         return {}
-
 
 def read_metric_from_mlflow(
     experiment_name: str,

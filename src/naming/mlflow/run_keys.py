@@ -1,11 +1,33 @@
-"""Run key building and hashing utilities."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: naming_mlflow_run_keys
+type: utility
+domain: naming
+responsibility:
+  - Build stable run_key identifiers from contexts
+  - Compute run key hashes
+inputs:
+  - Naming contexts
+outputs:
+  - Run key strings and hashes
+tags:
+  - utility
+  - naming
+  - mlflow
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Run key building and hashing utilities."""
 import hashlib
 
 from naming.context import NamingContext
-
 
 def build_mlflow_run_key(context: NamingContext) -> str:
     """
@@ -67,7 +89,6 @@ def build_mlflow_run_key(context: NamingContext) -> str:
         # Fallback for unknown process types
         return f"{context.process_type}:{context.model}:unknown"
 
-
 def build_mlflow_run_key_hash(run_key: str) -> str:
     """
     Build SHA256 hash of run_key for tag storage.
@@ -82,7 +103,6 @@ def build_mlflow_run_key_hash(run_key: str) -> str:
         SHA256 hash hex string (always 64 characters).
     """
     return hashlib.sha256(run_key.encode('utf-8')).hexdigest()
-
 
 def build_counter_key(
     project_name: str,

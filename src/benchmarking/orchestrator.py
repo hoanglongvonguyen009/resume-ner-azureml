@@ -1,3 +1,32 @@
+"""
+@meta
+name: benchmarking_orchestrator
+type: script
+domain: benchmarking
+responsibility:
+  - Orchestrate benchmarking for best HPO trials
+  - Handle checkpoint selection and resolution
+  - Run benchmarks on trial checkpoints
+  - Manage backup and restore operations
+inputs:
+  - Best trial information
+  - Test data path
+  - Benchmark configuration
+outputs:
+  - Benchmark results (JSON files)
+  - MLflow benchmark runs
+tags:
+  - orchestration
+  - benchmarking
+  - hpo
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Orchestrate benchmarking for best HPO trials.
 
 This module provides utilities to run benchmarks on best trial checkpoints

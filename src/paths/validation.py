@@ -1,3 +1,27 @@
+"""
+@meta
+name: paths_validation
+type: utility
+domain: paths
+responsibility:
+  - Validate paths before directory creation
+  - Ensure filesystem safety
+inputs:
+  - Path objects
+outputs:
+  - Validated path objects
+tags:
+  - utility
+  - paths
+  - validation
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Filesystem/path safety validation."""
 
 import re

@@ -1,12 +1,37 @@
+from __future__ import annotations
+
+"""
+@meta
+name: conversion_azureml
+type: utility
+domain: conversion
+responsibility:
+  - Create Azure ML conversion jobs
+  - Extract checkpoint outputs from training jobs
+  - Validate conversion job completion
+inputs:
+  - Training job outputs
+  - Azure ML environment and compute
+outputs:
+  - Azure ML conversion job definitions
+tags:
+  - utility
+  - conversion
+  - azureml
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: true
+lifecycle:
+  status: active
+"""
+
 """Azure ML job creation and validation for model conversion.
 
 This module provides Azure ML-specific functionality for creating and validating
 conversion jobs. It handles checkpoint extraction from training jobs, conversion
 job creation, and job validation.
 """
-
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -14,7 +39,6 @@ from azure.ai.ml import Input, MLClient, Output, command
 from azure.ai.ml.entities import Environment, Job
 
 from constants import CONVERSION_JOB_NAME
-
 
 def get_checkpoint_output_from_training_job(
     training_job: Job, ml_client: Optional[MLClient] = None
@@ -91,7 +115,6 @@ def get_checkpoint_output_from_training_job(
     asset_ref = f"azureml:{data_asset_name}:1"
     return asset_ref
 
-
 def _get_job_output_reference(
     job: Job,
     output_name: str,
@@ -117,7 +140,6 @@ def _get_job_output_reference(
             pass
 
     return f"azureml:{data_asset_name}:1"
-
 
 def create_conversion_job(
     script_path: Path,
@@ -172,7 +194,6 @@ def create_conversion_job(
         display_name=CONVERSION_JOB_NAME,
         description="Convert PyTorch checkpoint to optimized ONNX model (int8 quantized)",
     )
-
 
 def validate_conversion_job(job: Job, ml_client: Optional[MLClient] = None) -> None:
     """Validate conversion job completed successfully with required ONNX model output.

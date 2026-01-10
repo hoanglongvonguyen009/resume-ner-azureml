@@ -1,7 +1,31 @@
-"""MLflow utility functions for retry logic."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: tracking_mlflow_utils
+type: utility
+domain: tracking
+responsibility:
+  - Provide retry logic with exponential backoff for MLflow operations
+  - Handle retryable errors gracefully
+inputs:
+  - Functions to retry
+outputs:
+  - Function results or exceptions
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - retry
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""MLflow utility functions for retry logic."""
 import random
 import time
 from typing import Any, Callable
@@ -9,7 +33,6 @@ from typing import Any, Callable
 from shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
-
 
 def retry_with_backoff(
     func: Callable,

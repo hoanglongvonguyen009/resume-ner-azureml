@@ -1,13 +1,36 @@
-"""Index file management for fast lookup by spec_fp, env, model."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: metadata_index
+type: utility
+domain: metadata
+responsibility:
+  - Manage index files for fast lookup by fingerprints
+  - Update and query process type indexes
+inputs:
+  - Process contexts
+  - Metadata dictionaries
+outputs:
+  - Index file paths
+tags:
+  - utility
+  - metadata
+  - indexing
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Index file management for fast lookup by spec_fp, env, model."""
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from shared.json_cache import load_json, save_json
-
 
 def get_index_file_path(
     root_dir: Path,
@@ -27,7 +50,6 @@ def get_index_file_path(
     """
     cache_dir = root_dir / base_outputs / "cache"
     return cache_dir / f"{process_type}_index.json"
-
 
 def update_index(
     root_dir: Path,
@@ -116,7 +138,6 @@ def update_index(
     save_json(index_file, index_data)
     return index_file
 
-
 def find_by_spec_fp(
     root_dir: Path,
     spec_fp: str,
@@ -137,7 +158,6 @@ def find_by_spec_fp(
     index_data = load_json(index_file, default={"by_spec_fp": {}})
     
     return index_data.get("by_spec_fp", {}).get(spec_fp, [])
-
 
 def find_by_env(
     root_dir: Path,
@@ -160,7 +180,6 @@ def find_by_env(
     
     return index_data.get("by_env", {}).get(environment, [])
 
-
 def find_by_model(
     root_dir: Path,
     model: str,
@@ -182,7 +201,6 @@ def find_by_model(
     
     return index_data.get("by_model", {}).get(model, [])
 
-
 def find_by_spec_and_env(
     root_dir: Path,
     spec_fp: str,
@@ -203,7 +221,6 @@ def find_by_spec_and_env(
     """
     by_spec = find_by_spec_fp(root_dir, spec_fp, process_type)
     return [entry for entry in by_spec if entry.get("environment") == environment]
-
 
 def get_latest_entry(
     root_dir: Path,
@@ -244,5 +261,4 @@ def get_latest_entry(
     # Sort by last_updated (most recent first)
     entries.sort(key=lambda e: e.get("last_updated", ""), reverse=True)
     return entries[0]
-
 

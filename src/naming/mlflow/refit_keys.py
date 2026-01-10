@@ -1,12 +1,35 @@
-"""Refit protocol fingerprint computation."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: naming_mlflow_refit_keys
+type: utility
+domain: naming
+responsibility:
+  - Compute refit protocol fingerprints
+  - Capture refit/eval protocol for reproducibility
+inputs:
+  - Data and training configurations
+outputs:
+  - Refit protocol fingerprint hashes
+tags:
+  - utility
+  - naming
+  - mlflow
+  - refit
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Refit protocol fingerprint computation."""
 import json
 from typing import Any, Dict, Optional
 
 from naming.mlflow.hpo_keys import _compute_hash_64
-
 
 def compute_refit_protocol_fp(
     data_config: Dict[str, Any],

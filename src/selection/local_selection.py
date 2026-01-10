@@ -1,11 +1,35 @@
+from __future__ import annotations
+
+"""
+@meta
+name: local_selection
+type: utility
+domain: selection
+responsibility:
+  - Select best configuration from local Optuna HPO studies
+  - Coordinate study extraction, disk loading, and selection logic
+inputs:
+  - HPO study directories
+  - Benchmark results
+outputs:
+  - Best selected configuration
+tags:
+  - utility
+  - selection
+  - hpo
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Best configuration selection from local Optuna HPO studies.
 
 This module provides a facade for configuration selection, delegating to
 specialized modules for study extraction, disk loading, and selection logic.
 """
-
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -18,7 +42,6 @@ from hpo.core.study import extract_best_config_from_study
 
 logger = get_logger(__name__)
 
-
 def _import_optuna():
     """Lazy import optuna - only import when actually needed for local execution."""
     try:
@@ -30,7 +53,6 @@ def _import_optuna():
             "Install it with: pip install optuna"
         ) from e
 
-
 # Re-export for backward compatibility
 __all__ = [
     "extract_best_config_from_study",
@@ -40,7 +62,6 @@ __all__ = [
     "select_best_from_disk",
     "MODEL_SPEED_SCORES",
 ]
-
 
 def select_best_configuration_across_studies(
     studies: Optional[Dict[str, Any]] = None,
@@ -169,7 +190,6 @@ def select_best_configuration_across_studies(
     return SelectionLogic.select_best(
         candidates, accuracy_threshold, use_relative_threshold, min_accuracy_gain
     )
-
 
 def select_best_from_disk(
     hpo_output_dir: Path,

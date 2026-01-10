@@ -1,3 +1,28 @@
+"""
+@meta
+name: shared_platform_detection
+type: utility
+domain: shared
+responsibility:
+  - Detect execution platform (Colab, Kaggle, Azure, local)
+  - Resolve platform-specific checkpoint paths
+inputs:
+  - Environment variables
+outputs:
+  - Platform identifiers
+  - Resolved checkpoint paths
+tags:
+  - utility
+  - shared
+  - platform
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Platform detection utilities for Colab, Kaggle, and local environments."""
 
 import os

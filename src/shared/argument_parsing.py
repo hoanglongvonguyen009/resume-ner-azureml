@@ -1,3 +1,27 @@
+"""
+@meta
+name: shared_argument_parsing
+type: utility
+domain: shared
+responsibility:
+  - Provide shared argument parsing utilities for CLI scripts
+  - Add common arguments (config-dir, backbone, hyperparameters)
+inputs:
+  - ArgumentParser instances
+outputs:
+  - Configured parsers
+tags:
+  - utility
+  - shared
+  - cli
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Shared argument parsing utilities for CLI scripts."""
 
 import argparse

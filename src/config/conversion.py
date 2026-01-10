@@ -1,7 +1,34 @@
-"""Load and resolve conversion configuration from YAML."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: conversion_config_loader
+type: utility
+domain: config
+responsibility:
+  - Load and resolve conversion configuration from YAML
+  - Extract parent training information from metadata or paths
+  - Compute conversion fingerprint
+  - Extract parent training identifiers
+inputs:
+  - conversion.yaml
+  - Parent training output directory
+  - Parent training fingerprints
+outputs:
+  - Resolved conversion configuration dictionary
+tags:
+  - utility
+  - config
+  - conversion
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Load and resolve conversion configuration from YAML."""
 from pathlib import Path
 from typing import Any, Dict
 
@@ -9,7 +36,6 @@ from shared.yaml_utils import load_yaml
 from shared.json_cache import load_json
 from config.loader import ExperimentConfig
 from fingerprints import compute_conv_fp
-
 
 def load_conversion_config(
     root_dir: Path,
@@ -83,7 +109,6 @@ def load_conversion_config(
     
     return resolved_config
 
-
 def _extract_backbone_from_metadata(parent_training_output_dir: Path) -> str:
     """
     Extract canonical backbone name from metadata.json.
@@ -120,7 +145,6 @@ def _extract_backbone_from_metadata(parent_training_output_dir: Path) -> str:
     
     # Last resort: use directory name
     return parent_training_output_dir.name
-
 
 def _extract_parent_training_id(output_dir: Path) -> str:
     """

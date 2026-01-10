@@ -1,7 +1,32 @@
-"""Safe MLflow artifact upload utilities with retry logic and error handling."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: tracking_mlflow_artifacts
+type: utility
+domain: tracking
+responsibility:
+  - Provide safe MLflow artifact upload utilities with retry logic
+  - Handle artifact upload errors gracefully
+inputs:
+  - Local file paths
+  - Run IDs and artifact paths
+outputs:
+  - Upload success status
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - artifacts
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Safe MLflow artifact upload utilities with retry logic and error handling."""
 from pathlib import Path
 from typing import Optional
 import tempfile
@@ -14,7 +39,6 @@ from shared.logging_utils import get_logger
 from tracking.mlflow.utils import retry_with_backoff
 
 logger = get_logger(__name__)
-
 
 def log_artifact_safe(
     local_path: str | Path,
@@ -81,7 +105,6 @@ def log_artifact_safe(
             exc_info=True
         )
         return False
-
 
 def log_artifacts_safe(
     local_dir: str | Path,
@@ -152,7 +175,6 @@ def log_artifacts_safe(
             exc_info=True
         )
         return False
-
 
 def upload_checkpoint_archive(
     archive_path: Path,

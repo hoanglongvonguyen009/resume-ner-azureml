@@ -1,3 +1,27 @@
+"""
+@meta
+name: naming_context_tokens
+type: utility
+domain: naming
+responsibility:
+  - Expand NamingContext into token dictionary
+  - Generate short hash forms (8 chars) for paths and names
+inputs:
+  - NamingContext objects
+outputs:
+  - Token value dictionaries
+tags:
+  - utility
+  - naming
+  - tokens
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Expand NamingContext into token dict for path and naming patterns."""
 
 from typing import Dict

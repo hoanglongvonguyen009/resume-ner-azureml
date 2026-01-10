@@ -1,7 +1,33 @@
-"""Cross-validation orchestration for HPO trials."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: hpo_cv_orchestration
+type: script
+domain: hpo
+responsibility:
+  - Orchestrate k-fold cross-validation for HPO trials
+  - Create nested MLflow run structure
+  - Aggregate fold metrics
+inputs:
+  - Trial hyperparameters
+  - Fold splits
+outputs:
+  - Average CV metric
+  - Fold metrics
+tags:
+  - orchestration
+  - hpo
+  - cross-validation
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Cross-validation orchestration for HPO trials."""
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import json
@@ -14,7 +40,6 @@ from shared.logging_utils import get_logger
 from hpo.execution.local.trial import run_training_trial
 
 logger = get_logger(__name__)
-
 
 def run_training_trial_with_cv(
     trial_params: Dict[str, Any],
@@ -380,7 +405,6 @@ def run_training_trial_with_cv(
 
     return average_metric, fold_metrics
 
-
 def _create_trial_run(
     trial_params: Dict[str, Any],
     config_dir: Path,
@@ -585,7 +609,6 @@ def _create_trial_run(
     except Exception as e:
         logger.warning(f"Could not create trial run: {e}")
         return None
-
 
 def _log_cv_metrics_to_trial_run(
     trial_run_id: str,

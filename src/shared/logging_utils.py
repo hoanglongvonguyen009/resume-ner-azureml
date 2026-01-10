@@ -1,3 +1,27 @@
+"""
+@meta
+name: shared_logging_utils
+type: utility
+domain: shared
+responsibility:
+  - Provide consistent logging utilities across scripts
+  - Configure loggers with standardized formatting
+inputs:
+  - Logger names
+outputs:
+  - Configured logger instances
+tags:
+  - utility
+  - shared
+  - logging
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Shared logging utilities for consistent logging across scripts."""
 
 import logging

@@ -1,3 +1,26 @@
+"""
+@meta
+name: platform_mlflow_context
+type: utility
+domain: platform_adapters
+responsibility:
+  - Manage MLflow context for different platforms
+  - Handle Azure ML and local MLflow run lifecycle
+inputs:
+  - Platform identifiers
+outputs:
+  - MLflow context managers
+tags:
+  - utility
+  - platform_adapters
+  - mlflow
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
 
 """MLflow context management for different platforms."""
 

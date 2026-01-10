@@ -1,3 +1,26 @@
+"""
+@meta
+name: conversion_cli
+type: script
+domain: conversion
+responsibility:
+  - Parse command-line arguments for model conversion
+  - Define CLI interface for ONNX conversion
+inputs:
+  - Command-line arguments
+outputs:
+  - argparse.Namespace with parsed arguments
+tags:
+  - cli
+  - conversion
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Command-line argument parsing for conversion script.
 
 This module provides argument parsing functionality for the conversion execution

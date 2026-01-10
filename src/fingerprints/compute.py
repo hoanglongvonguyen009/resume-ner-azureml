@@ -1,16 +1,40 @@
-"""Fingerprint computation for reproducibility and traceability."""
-
 from __future__ import annotations
 
+"""
+@meta
+name: fingerprints_compute
+type: utility
+domain: fingerprints
+responsibility:
+  - Compute specification fingerprints (spec_fp)
+  - Compute execution fingerprints (exec_fp)
+  - Compute conversion fingerprints (conv_fp)
+  - Compute benchmarking fingerprints (bench_fp)
+inputs:
+  - Configuration dictionaries
+  - Git SHA and environment info
+outputs:
+  - 16-character hex fingerprints
+tags:
+  - utility
+  - fingerprints
+  - reproducibility
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""Fingerprint computation for reproducibility and traceability."""
 import hashlib
 import json
 from typing import Any, Dict, Optional
 
-
 def _compute_hash(data: str) -> str:
     """Compute SHA256 hash and return first 16 hex characters."""
     return hashlib.sha256(data.encode('utf-8')).hexdigest()[:16]
-
 
 def compute_spec_fp(
     model_config: Dict[str, Any],
@@ -47,7 +71,6 @@ def compute_spec_fp(
     # Sort keys for deterministic JSON
     spec_json = json.dumps(spec_data, sort_keys=True, default=str)
     return _compute_hash(spec_json)
-
 
 def compute_exec_fp(
     git_sha: Optional[str],
@@ -88,7 +111,6 @@ def compute_exec_fp(
     exec_json = json.dumps(exec_data, sort_keys=True, default=str)
     return _compute_hash(exec_json)
 
-
 def compute_conv_fp(
     parent_spec_fp: str,
     parent_exec_fp: str,
@@ -120,7 +142,6 @@ def compute_conv_fp(
     conv_json = json.dumps(conv_data, sort_keys=True, default=str)
     return _compute_hash(conv_json)
 
-
 def compute_bench_fp(
     model_config: Dict[str, Any],
     benchmark_config: Dict[str, Any],
@@ -146,7 +167,6 @@ def compute_bench_fp(
     
     bench_json = json.dumps(bench_data, sort_keys=True, default=str)
     return _compute_hash(bench_json)
-
 
 def compute_hardware_fp(
     hardware_info: Dict[str, Any],

@@ -1,10 +1,36 @@
+from __future__ import annotations
+
+"""
+@meta
+name: hpo_refit_execution
+type: script
+domain: hpo
+responsibility:
+  - Execute refit training on full dataset
+  - Use best trial hyperparameters
+  - Create canonical checkpoint for production
+inputs:
+  - Best trial
+  - Training configuration
+outputs:
+  - Refit checkpoint
+  - Refit metrics
+tags:
+  - execution
+  - hpo
+  - refit
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Refit training executor for HPO.
 
 Handles refit training on full dataset using best trial hyperparameters.
 """
-
-from __future__ import annotations
-
 import json
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -33,7 +59,6 @@ from training.execution import (
 from shared.platform_detection import detect_platform
 
 logger = get_logger(__name__)
-
 
 def run_refit_training(
     best_trial: Any,
@@ -280,7 +305,6 @@ def run_refit_training(
 
     return metrics, checkpoint_dir, refit_run_id
 
-
 def _read_refit_metrics(refit_output_dir: Path) -> Dict[str, float]:
     """Read metrics from refit output directory."""
     metrics_file = refit_output_dir / METRICS_FILENAME
@@ -294,7 +318,6 @@ def _read_refit_metrics(refit_output_dir: Path) -> Dict[str, float]:
     except Exception as e:
         logger.warning(f"[REFIT] Could not read metrics file: {e}")
         return {}
-
 
 def _log_refit_metrics_to_mlflow(
     refit_run_id: str,

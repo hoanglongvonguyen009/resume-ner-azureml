@@ -1,3 +1,30 @@
+"""
+@meta
+name: training_orchestrator
+type: script
+domain: training
+responsibility:
+  - Orchestrate training execution
+  - Set up MLflow tracking
+  - Handle distributed training context
+  - Manage training run lifecycle
+inputs:
+  - Training configuration
+  - Training arguments
+outputs:
+  - Trained model checkpoint
+  - Training metrics (via MLflow)
+tags:
+  - orchestration
+  - training
+  - mlflow
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
 
 """Training orchestration logic."""
 

@@ -1,3 +1,27 @@
+"""
+@meta
+name: platform_adapters
+type: utility
+domain: platform_adapters
+responsibility:
+  - Define platform adapter interface for platform-specific operations
+  - Implement Azure ML and local adapters
+inputs:
+  - Platform detection results
+outputs:
+  - Platform adapter instances
+tags:
+  - utility
+  - platform_adapters
+  - adapter_pattern
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Platform adapter interface and implementations.
 
 This module defines the adapter pattern for platform-specific operations,

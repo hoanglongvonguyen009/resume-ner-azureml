@@ -1,3 +1,32 @@
+from __future__ import annotations
+
+"""
+@meta
+name: local_selection_v2
+type: script
+domain: selection
+responsibility:
+  - Select best configuration from local Optuna HPO studies
+  - Config-aware study folder discovery
+  - CV-based trial selection
+  - Deterministic fold ordering
+inputs:
+  - HPO study directories
+  - Configuration files
+outputs:
+  - Best trial configuration
+tags:
+  - orchestration
+  - selection
+  - hpo
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Improved best configuration selection from local Optuna HPO studies.
 
 This module provides config-aware study folder discovery and CV-based trial selection.
@@ -13,14 +42,10 @@ when hpo_config is provided, maintaining backward compatibility while providing 
 improved behavior. This module can be used directly for new code that needs the
 improved functionality.
 """
-
-from __future__ import annotations
-
 import json
 import re
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
-
 
 def parse_version_from_name(name: str) -> Optional[Tuple[int, int, int]]:
     """
@@ -39,12 +64,10 @@ def parse_version_from_name(name: str) -> Optional[Tuple[int, int, int]]:
     suffix = int(m.group(3)) if m.group(3) else -1
     return (major, minor, suffix)
 
-
 def fold_index(name: str) -> int:
     """Extract numeric fold index from folder name (e.g., 'fold0' -> 0, 'fold10' -> 10)."""
     m = re.search(r'fold(\d+)', name)
     return int(m.group(1)) if m else 10**9
-
 
 def find_study_folder_by_config(
     backbone_dir: Path,
@@ -145,7 +168,6 @@ def find_study_folder_by_config(
     # Sort by version (descending), fallback to modification time
     matching_folders.sort(key=get_version_key, reverse=True)
     return matching_folders[0]
-
 
 def load_best_trial_from_study_folder(
     study_folder: Path,
@@ -321,7 +343,6 @@ def load_best_trial_from_study_folder(
         "metrics": metrics_to_use or {},
     }
 
-
 def write_active_study_marker(
     backbone_dir: Path,
     study_folder: Path,
@@ -352,7 +373,6 @@ def write_active_study_marker(
         import logging
         logger = logging.getLogger(__name__)
         logger.warning(f"Could not write .active_study.json: {e}")
-
 
 def _get_checkpoint_path_from_trial_dir(trial_dir: Path) -> Optional[Path]:
     """
@@ -432,7 +452,6 @@ def _get_checkpoint_path_from_trial_dir(trial_dir: Path) -> Optional[Path]:
         return root_checkpoint
     
     return None
-
 
 def find_trial_checkpoint_by_hash(
     hpo_backbone_dir: Path,

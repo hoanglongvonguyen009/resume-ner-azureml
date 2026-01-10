@@ -1,3 +1,28 @@
+"""
+@meta
+name: onnx_export
+type: utility
+domain: conversion
+responsibility:
+  - Export PyTorch models to ONNX format
+  - Apply int8 quantization
+  - Handle model loading and dynamic axes
+inputs:
+  - PyTorch checkpoint directory
+outputs:
+  - ONNX model file
+tags:
+  - utility
+  - conversion
+  - onnx
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Core ONNX model export and quantization functionality.
 
 This module provides the core logic for exporting PyTorch models to ONNX format
