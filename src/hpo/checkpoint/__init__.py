@@ -1,19 +1,18 @@
-"""HPO checkpoint management."""
+"""Compatibility shim for hpo.checkpoint module.
 
-from hpo.checkpoint.cleanup import CheckpointCleanupManager
-from hpo.checkpoint.storage import get_storage_uri, resolve_storage_path
+DEPRECATED: This module has been moved to training.hpo.checkpoint.
+This shim will be removed in a future release.
+Please update your imports to use training.hpo.checkpoint instead.
+"""
 
-__all__ = [
-    "get_storage_uri",
-    "resolve_storage_path",
-    "CheckpointCleanupManager",
-]
+import warnings
 
+warnings.warn(
+    "Importing from 'hpo.checkpoint' is deprecated. "
+    "Please use 'training.hpo.checkpoint' instead. "
+    "This shim will be removed in a future release.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-
-
-
-
-
-
-
+from training.hpo.checkpoint import *  # noqa: F403, F401

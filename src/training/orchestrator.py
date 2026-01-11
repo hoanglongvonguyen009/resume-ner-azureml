@@ -34,10 +34,10 @@ from pathlib import Path
 
 from training.config import build_training_config, resolve_distributed_config
 from data.loaders import load_dataset
-from training.trainer import train_model
+from training.core.trainer import train_model
 from training.logging import log_metrics
-from training.utils import set_seed
-from training.distributed import (
+from training.core.utils import set_seed
+from training.execution.distributed import (
     create_run_context,
     init_process_group_if_needed,
 )

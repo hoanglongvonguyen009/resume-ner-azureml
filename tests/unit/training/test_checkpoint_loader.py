@@ -11,7 +11,7 @@ import pytest
 
 pytestmark = pytest.mark.torch
 
-from training.checkpoint_loader import resolve_training_checkpoint_path, validate_checkpoint
+from training.core.checkpoint_loader import resolve_training_checkpoint_path, validate_checkpoint
 
 
 class TestValidateCheckpoint:

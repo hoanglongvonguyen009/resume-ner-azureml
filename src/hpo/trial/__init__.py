@@ -1,18 +1,18 @@
-"""Trial-specific utilities."""
+"""Compatibility shim for hpo.trial module.
 
-from hpo.trial.callback import create_trial_callback
-from hpo.trial.meta import (
-    extract_trial_info_from_dirname,
-    generate_missing_trial_meta,
-    generate_missing_trial_meta_for_all_studies,
+DEPRECATED: This module has been moved to training.hpo.trial.
+This shim will be removed in a future release.
+Please update your imports to use training.hpo.trial instead.
+"""
+
+import warnings
+
+warnings.warn(
+    "Importing from 'hpo.trial' is deprecated. "
+    "Please use 'training.hpo.trial' instead. "
+    "This shim will be removed in a future release.",
+    DeprecationWarning,
+    stacklevel=2,
 )
-from hpo.trial.metrics import read_trial_metrics
 
-__all__ = [
-    "create_trial_callback",
-    "read_trial_metrics",
-    "extract_trial_info_from_dirname",
-    "generate_missing_trial_meta",
-    "generate_missing_trial_meta_for_all_studies",
-]
-
+from training.hpo.trial import *  # noqa: F403, F401

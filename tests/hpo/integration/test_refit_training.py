@@ -12,14 +12,14 @@ except ImportError:
     optuna = None
     pytest.skip("optuna not available", allow_module_level=True)
 
-from hpo.execution.local.refit import run_refit_training
+from training.hpo.execution.local.refit import run_refit_training
 
 
 class TestRefitTrainingSetup:
     """Test refit training setup and configuration."""
 
-    @patch("hpo.execution.local.refit.execute_training_subprocess")
-    @patch("hpo.execution.local.refit.mlflow")
+    @patch("training.hpo.execution.local.refit.execute_training_subprocess")
+    @patch("training.hpo.execution.local.refit.mlflow")
     def test_refit_uses_best_trial_hyperparameters(self, mock_mlflow, mock_execute, tmp_path):
         """Test that refit training uses hyperparameters from best trial."""
         # Setup
@@ -94,8 +94,8 @@ class TestRefitTrainingSetup:
         assert "--use-all-data" in call_args
         assert "true" in call_args
 
-    @patch("hpo.execution.local.refit.execute_training_subprocess")
-    @patch("hpo.execution.local.refit.mlflow")
+    @patch("training.hpo.execution.local.refit.execute_training_subprocess")
+    @patch("training.hpo.execution.local.refit.mlflow")
     def test_refit_creates_mlflow_run(self, mock_mlflow, mock_execute, tmp_path):
         """Test that refit creates MLflow run as child of HPO parent."""
         config_dir = tmp_path / "config"
@@ -162,8 +162,8 @@ class TestRefitTrainingSetup:
         # Verify refit_run_id is returned
         assert refit_run_id == "refit_run_123"
 
-    @patch("hpo.execution.local.refit.execute_training_subprocess")
-    @patch("hpo.execution.local.refit.mlflow")
+    @patch("training.hpo.execution.local.refit.execute_training_subprocess")
+    @patch("training.hpo.execution.local.refit.mlflow")
     def test_refit_creates_v2_output_directory(self, mock_mlflow, mock_execute, tmp_path):
         """Test that refit creates output directory in v2 structure (trial-{hash}/refit)."""
         config_dir = tmp_path / "config"
@@ -221,8 +221,8 @@ class TestRefitTrainingSetup:
 class TestRefitTrainingExecution:
     """Test refit training execution and metrics."""
 
-    @patch("hpo.execution.local.refit.execute_training_subprocess")
-    @patch("hpo.execution.local.refit.mlflow")
+    @patch("training.hpo.execution.local.refit.execute_training_subprocess")
+    @patch("training.hpo.execution.local.refit.mlflow")
     def test_refit_reads_metrics_from_file(self, mock_mlflow, mock_execute, tmp_path):
         """Test that refit reads metrics from metrics.json file."""
         config_dir = tmp_path / "config"
@@ -280,8 +280,8 @@ class TestRefitTrainingExecution:
         if returned_metrics:
             assert "macro-f1" in returned_metrics or returned_metrics.get("macro-f1") == 0.80
 
-    @patch("hpo.execution.local.refit.execute_training_subprocess")
-    @patch("hpo.execution.local.refit.mlflow")
+    @patch("training.hpo.execution.local.refit.execute_training_subprocess")
+    @patch("training.hpo.execution.local.refit.mlflow")
     def test_refit_logs_metrics_to_mlflow(self, mock_mlflow, mock_execute, tmp_path):
         """Test that refit logs metrics to MLflow run."""
         config_dir = tmp_path / "config"
@@ -333,8 +333,8 @@ class TestRefitTrainingExecution:
         # The key is that the function doesn't crash
         pass  # Function completed without error
 
-    @patch("hpo.execution.local.refit.execute_training_subprocess")
-    @patch("hpo.execution.local.refit.mlflow")
+    @patch("training.hpo.execution.local.refit.execute_training_subprocess")
+    @patch("training.hpo.execution.local.refit.mlflow")
     def test_refit_creates_checkpoint_directory(self, mock_mlflow, mock_execute, tmp_path):
         """Test that refit creates checkpoint directory."""
         config_dir = tmp_path / "config"
@@ -410,8 +410,8 @@ class TestRefitTrainingExecution:
 class TestRefitTrainingSmokeYaml:
     """Test refit training with smoke.yaml configuration."""
 
-    @patch("hpo.execution.local.refit.execute_training_subprocess")
-    @patch("hpo.execution.local.refit.mlflow")
+    @patch("training.hpo.execution.local.refit.execute_training_subprocess")
+    @patch("training.hpo.execution.local.refit.mlflow")
     def test_refit_enabled_in_smoke_yaml(self, mock_mlflow, mock_execute, tmp_path):
         """Test that refit is enabled in smoke.yaml (refit.enabled=true)."""
         config_dir = tmp_path / "config"
@@ -467,8 +467,8 @@ class TestRefitTrainingSmokeYaml:
         assert checkpoint_dir is not None
         assert refit_run_id is not None
 
-    @patch("hpo.execution.local.refit.execute_training_subprocess")
-    @patch("hpo.execution.local.refit.mlflow")
+    @patch("training.hpo.execution.local.refit.execute_training_subprocess")
+    @patch("training.hpo.execution.local.refit.mlflow")
     def test_refit_uses_full_epochs(self, mock_mlflow, mock_execute, tmp_path):
         """Test that refit uses full epochs (not minimal like HPO trials)."""
         config_dir = tmp_path / "config"

@@ -6,8 +6,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
 from infrastructure.config.loader import load_experiment_config, load_all_configs
-from hpo.tracking.setup import setup_hpo_mlflow_run
-from hpo.utils.helpers import create_study_name
+from training.hpo.tracking.setup import setup_hpo_mlflow_run
+from training.hpo.utils.helpers import create_study_name
 
 
 class TestHPOSweepSetup:
@@ -264,7 +264,7 @@ run_names:
 
     def test_checkpoint_file_created(self, tmp_path):
         """Test that checkpoint file is created at {study_name}/study.db."""
-        from hpo.checkpoint.storage import (
+        from training.hpo.checkpoint.storage import (
             resolve_storage_path,
         )
         

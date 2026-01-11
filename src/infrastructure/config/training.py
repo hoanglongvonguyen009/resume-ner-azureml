@@ -38,8 +38,12 @@ from typing import Any, Dict, Optional
 
 from common.shared.yaml_utils import load_yaml
 from common.shared.platform_detection import detect_platform
-from training.checkpoint_loader import validate_checkpoint
 from .loader import load_all_configs, ExperimentConfig
+
+# Lazy import to avoid circular dependency
+def _get_validate_checkpoint():
+    from training.core.checkpoint_loader import validate_checkpoint
+    return validate_checkpoint
 from .merging import merge_configs_with_precedence
 from infrastructure.naming import create_naming_context
 from infrastructure.paths import build_output_path

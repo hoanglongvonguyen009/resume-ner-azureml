@@ -1,18 +1,18 @@
-"""HPO-specific tracking utilities."""
+"""Compatibility shim for hpo.tracking module.
 
-from hpo.tracking.cleanup import cleanup_interrupted_runs, should_skip_cleanup
-from hpo.tracking.runs import (
-    create_trial_run_no_cv,
-    finalize_trial_run_no_cv,
+DEPRECATED: This module has been moved to training.hpo.tracking.
+This shim will be removed in a future release.
+Please update your imports to use training.hpo.tracking instead.
+"""
+
+import warnings
+
+warnings.warn(
+    "Importing from 'hpo.tracking' is deprecated. "
+    "Please use 'training.hpo.tracking' instead. "
+    "This shim will be removed in a future release.",
+    DeprecationWarning,
+    stacklevel=2,
 )
-from hpo.tracking.setup import commit_run_name_version, setup_hpo_mlflow_run
 
-__all__ = [
-    "setup_hpo_mlflow_run",
-    "commit_run_name_version",
-    "cleanup_interrupted_runs",
-    "should_skip_cleanup",
-    "create_trial_run_no_cv",
-    "finalize_trial_run_no_cv",
-]
-
+from training.hpo.tracking import *  # noqa: F403, F401

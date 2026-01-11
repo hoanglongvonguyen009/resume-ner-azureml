@@ -16,7 +16,7 @@ from __future__ import annotations
 import warnings
 
 # Re-export all public functions from hpo/ module
-from hpo import (
+from training.hpo import (
     # Checkpoint management
     get_storage_uri,
     resolve_storage_path,
@@ -45,7 +45,7 @@ from hpo import (
 from orchestration.jobs.hpo.local.backup import backup_hpo_study_to_drive
 
 # Re-export trial meta function
-from hpo.trial.meta import generate_missing_trial_meta_for_all_studies
+from training.hpo.trial.meta import generate_missing_trial_meta_for_all_studies
 
 # Issue deprecation warning on import
 warnings.warn(

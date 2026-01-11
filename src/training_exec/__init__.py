@@ -1,21 +1,18 @@
-"""Final training execution module.
+"""Compatibility shim for training_exec module.
 
-This module provides final training job execution functionality.
+DEPRECATED: This module has been moved to training.execution.
+This shim will be removed in a future release.
+Please update your imports to use training.execution instead.
 """
 
-from __future__ import annotations
+import warnings
 
-from . import executor
-from .executor import execute_final_training
-from .lineage import extract_lineage_from_best_model
-from .tags import apply_lineage_tags
+warnings.warn(
+    "Importing from 'training_exec' is deprecated. "
+    "Please use 'training.execution' instead. "
+    "This shim will be removed in a future release.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-__all__ = [
-    "executor",
-    "extract_lineage_from_best_model",
-    "apply_lineage_tags",
-    "execute_final_training",
-]
-
-
-
+from training.execution import *  # noqa: F403, F401

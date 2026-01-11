@@ -1,75 +1,24 @@
-"""
-@meta
-name: training_entrypoint
-type: script
-domain: training
-responsibility:
-  - Main training entry point for Resume NER model
-  - Launch single- or multi-GPU training
-  - Coordinate distributed training setup
-inputs:
-  - Training configuration (train.yaml)
-  - Training data
-outputs:
-  - Trained model checkpoint
-  - Training metrics
-tags:
-  - entrypoint
-  - training
-  - distributed
-ci:
-  runnable: true
-  needs_gpu: true
-  needs_cloud: false
-lifecycle:
-  status: active
+"""Compatibility shim for training.train.
+
+DEPRECATED: This module has been moved to training.cli.train.
+This shim will be removed in a future release.
+Please update your imports to use training.cli.train instead.
 """
 
-"""
-Training script for Resume NER model.
+import warnings
 
-Implements a minimal token-classification training/eval loop using transformers.
+warnings.warn(
+    "Importing from 'training.train' is deprecated. "
+    "Please use 'training.cli.train' instead. "
+    "This shim will be removed in a future release.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-This module also acts as the central launcher for single- and multi-GPU
-training. It decides whether to run in:
+from training.cli.train import *  # noqa: F403, F401
 
-- single-process mode (CPU or single GPU), or
-- multi-process DDP mode (one process per GPU)
-
-based on `config/train.yaml` and the available hardware. Notebooks and higher-
-level orchestration only ever call this entrypoint; they do not manage ranks.
-"""
-
-from .cli import parse_training_arguments
-from .distributed_launcher import launch_training
-
-
-def main() -> None:
-    """Main training entry point."""
-    args = parse_training_arguments()
-    launch_training(args)
-
-
+# Support running as module: python -m training.train
 if __name__ == "__main__":
+    from training.cli.train import main
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

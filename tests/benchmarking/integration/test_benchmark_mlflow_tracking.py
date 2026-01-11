@@ -16,10 +16,8 @@ class TestBenchmarkMlflowTrackingWithTrialId:
     @patch("benchmarking.orchestrator.build_output_path")
     @patch("benchmarking.orchestrator.resolve_output_path_for_colab")
     @patch("benchmarking.orchestrator.validate_path_before_mkdir")
-    @patch("benchmarking.orchestrator.get_benchmark_tracker")
     def test_benchmark_passes_trial_id_to_run_benchmarking(
         self,
-        mock_get_tracker,
         mock_validate_path,
         mock_resolve_colab,
         mock_build_path,
@@ -59,8 +57,6 @@ class TestBenchmarkMlflowTrackingWithTrialId:
         mock_context.trial_id = "trial-25d03eeb"
         mock_create_context.return_value = mock_context
         mock_run_benchmarking.return_value = True
-        mock_tracker = Mock()
-        mock_get_tracker.return_value = mock_tracker
         
         # Create benchmark script
         benchmark_script = root_dir / "src" / "benchmarking" / "cli.py"
@@ -89,10 +85,8 @@ class TestBenchmarkMlflowTrackingWithTrialId:
     @patch("benchmarking.orchestrator.build_output_path")
     @patch("benchmarking.orchestrator.resolve_output_path_for_colab")
     @patch("benchmarking.orchestrator.validate_path_before_mkdir")
-    @patch("benchmarking.orchestrator.get_benchmark_tracker")
     def test_benchmark_passes_trial_id_old_format(
         self,
-        mock_get_tracker,
         mock_validate_path,
         mock_resolve_colab,
         mock_build_path,
@@ -132,8 +126,6 @@ class TestBenchmarkMlflowTrackingWithTrialId:
         mock_context.trial_id = "1_20251231_161745"
         mock_create_context.return_value = mock_context
         mock_run_benchmarking.return_value = True
-        mock_tracker = Mock()
-        mock_get_tracker.return_value = mock_tracker
         
         # Create benchmark script
         benchmark_script = root_dir / "src" / "benchmarking" / "cli.py"
@@ -158,12 +150,10 @@ class TestBenchmarkMlflowTrackingWithTrialId:
         assert call_kwargs["trial_id"] == "1_20251231_161745"
 
     @patch("benchmarking.utils.subprocess.run")
-    @patch("benchmarking.utils.create_naming_context")
-    @patch("benchmarking.utils.detect_platform")
-    @patch("benchmarking.utils.get_benchmark_tracker")
+    @patch("infrastructure.naming.create_naming_context")
+    @patch("common.shared.platform_detection.detect_platform")
     def test_run_benchmarking_mlflow_tracking_with_trial_id(
         self,
-        mock_get_tracker,
         mock_detect_platform,
         mock_create_context,
         mock_subprocess,
@@ -203,9 +193,8 @@ class TestBenchmarkMlflowTrackingWithTrialId:
         mock_context_manager.__enter__ = Mock(return_value=mock_run)
         mock_context_manager.__exit__ = Mock(return_value=None)
         mock_tracker.start_benchmark_run = Mock(return_value=mock_context_manager)
-        mock_get_tracker.return_value = mock_tracker
         
-        # Call with trial_id
+        # Call with trial_id (pass tracker as parameter)
         success = run_benchmarking(
             checkpoint_dir=mock_checkpoint_dir,
             test_data_path=mock_test_data_file,
@@ -220,10 +209,10 @@ class TestBenchmarkMlflowTrackingWithTrialId:
             benchmark_source="hpo_trial",
             study_key_hash="abc123",
             trial_key_hash="def456",
+            tracker=mock_tracker,  # Pass tracker as parameter
         )
         
         # Verify MLflow tracker was called
-        assert mock_get_tracker.called
         assert mock_tracker.start_benchmark_run.called
         
         # Verify naming context was created with trial_id
@@ -234,10 +223,8 @@ class TestBenchmarkMlflowTrackingWithTrialId:
     @patch("benchmarking.utils.subprocess.run")
     @patch("infrastructure.naming.create_naming_context")
     @patch("common.shared.platform_detection.detect_platform")
-    @patch("benchmarking.utils.get_benchmark_tracker")
     def test_run_benchmarking_mlflow_tracking_fallback_to_trial_key_hash(
         self,
-        mock_get_tracker,
         mock_detect_platform,
         mock_create_context,
         mock_subprocess,
@@ -277,9 +264,8 @@ class TestBenchmarkMlflowTrackingWithTrialId:
         mock_context_manager.__enter__ = Mock(return_value=mock_run)
         mock_context_manager.__exit__ = Mock(return_value=None)
         mock_tracker.start_benchmark_run = Mock(return_value=mock_context_manager)
-        mock_get_tracker.return_value = mock_tracker
         
-        # Call without trial_id, should fallback to trial_key_hash
+        # Call without trial_id, should fallback to trial_key_hash (pass tracker as parameter)
         trial_key_hash = "25d03eebe00267cc"
         success = run_benchmarking(
             checkpoint_dir=mock_checkpoint_dir,
@@ -295,10 +281,10 @@ class TestBenchmarkMlflowTrackingWithTrialId:
             benchmark_source="hpo_trial",
             study_key_hash="abc123",
             trial_key_hash=trial_key_hash,
+            tracker=mock_tracker,  # Pass tracker as parameter
         )
         
         # Verify MLflow tracker was called
-        assert mock_get_tracker.called
         assert mock_tracker.start_benchmark_run.called
         
         # Verify naming context was created with constructed trial_id

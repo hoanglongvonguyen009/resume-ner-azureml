@@ -1,11 +1,11 @@
 """Legacy facade for benchmark_utils module.
 
-This module provides backward compatibility by re-exporting from benchmarking.utils.
+This module provides backward compatibility by re-exporting from evaluation.benchmarking.utils.
 All imports from this module are deprecated.
 """
 
 import warnings
-from benchmarking.utils import run_benchmarking
+from evaluation.benchmarking.utils import run_benchmarking
 
 __all__ = [
     "run_benchmarking",
@@ -14,7 +14,7 @@ __all__ = [
 # Issue deprecation warning
 warnings.warn(
     "Importing 'benchmark_utils' from 'orchestration' is deprecated. "
-    "Please import from 'benchmarking.utils' instead.",
+    "Please import from 'evaluation.benchmarking.utils' instead.",
     DeprecationWarning,
     stacklevel=2
 )

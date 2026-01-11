@@ -1,33 +1,18 @@
-"""Core HPO logic (no external dependencies)."""
+"""Compatibility shim for hpo.core module.
 
-from hpo.core.optuna_integration import (
-    create_optuna_pruner,
-    import_optuna,
+DEPRECATED: This module has been moved to training.hpo.core.
+This shim will be removed in a future release.
+Please update your imports to use training.hpo.core instead.
+"""
+
+import warnings
+
+warnings.warn(
+    "Importing from 'hpo.core' is deprecated. "
+    "Please use 'training.hpo.core' instead. "
+    "This shim will be removed in a future release.",
+    DeprecationWarning,
+    stacklevel=2,
 )
-from hpo.core.search_space import (
-    SearchSpaceTranslator,
-    create_search_space,
-    translate_search_space_to_optuna,
-)
-from hpo.core.study import (
-    StudyManager,
-    extract_best_config_from_study,
-)
 
-__all__ = [
-    # Search space
-    "SearchSpaceTranslator",
-    "create_search_space",
-    "translate_search_space_to_optuna",
-    # Study
-    "StudyManager",
-    "extract_best_config_from_study",
-    # Optuna integration
-    "import_optuna",
-    "create_optuna_pruner",
-]
-
-
-
-
-
+from training.hpo.core import *  # noqa: F403, F401

@@ -43,7 +43,7 @@ except ImportError:
 
 # HPO sweep job creation - moved to hpo/execution/azureml/sweeps.py
 try:
-    from hpo.execution.azureml.sweeps import (
+    from training.hpo.execution.azureml.sweeps import (
         create_search_space,
         create_dry_run_sweep_job_for_backbone,
         create_hpo_sweep_job_for_backbone,
@@ -75,7 +75,7 @@ except ImportError:
 
 # HPO exceptions - moved to hpo/exceptions.py
 try:
-    from hpo.exceptions import (
+    from training.hpo.exceptions import (
         HPOError,
         TrialExecutionError,
         SelectionError,
@@ -97,9 +97,9 @@ try:
 except ImportError:
     apply_lineage_tags = None
 
-# Improved selection - moved to selection/local_selection_v2.py
+# Improved selection - moved to evaluation.selection.local_selection_v2
 try:
-    from selection.local_selection_v2 import (
+    from evaluation.selection.local_selection_v2 import (
         find_study_folder_by_config,
         load_best_trial_from_study_folder,
         write_active_study_marker,
@@ -146,21 +146,21 @@ if "orchestration.jobs.selection" not in sys.modules:
     
     # Import and assign submodules
     try:
-        from selection import mlflow_selection
+        from evaluation.selection import mlflow_selection
         selection_module.mlflow_selection = mlflow_selection
         sys.modules["orchestration.jobs.selection.mlflow_selection"] = mlflow_selection
     except ImportError:
         pass
     
     try:
-        from selection import artifact_acquisition
+        from evaluation.selection import artifact_acquisition
         selection_module.artifact_acquisition = artifact_acquisition
         sys.modules["orchestration.jobs.selection.artifact_acquisition"] = artifact_acquisition
     except ImportError:
         pass
     
     try:
-        from selection import cache
+        from evaluation.selection import cache
         selection_module.cache = cache
         sys.modules["orchestration.jobs.selection.cache"] = cache
     except ImportError:
@@ -168,7 +168,7 @@ if "orchestration.jobs.selection" not in sys.modules:
     
     # Add selection attribute for backward compatibility
     try:
-        from selection import selection as selection_func
+        from evaluation.selection import selection as selection_func
         selection_module.selection = selection_func
     except ImportError:
         pass
@@ -180,7 +180,7 @@ if not hasattr(sys.modules[__name__], "selection"):
 
 # HPO trial metrics - moved to hpo/trial/metrics.py
 try:
-    from hpo.trial.metrics import (
+    from training.hpo.trial.metrics import (
         read_trial_metrics,
         parse_metrics_file,
     )
@@ -206,20 +206,20 @@ if "orchestration.jobs.benchmarking" not in sys.modules:
     
     # Import and assign functions one by one to handle partial failures gracefully
     try:
-        from benchmarking.orchestrator import BenchmarkOrchestrator, benchmark_best_trials
+        from evaluation.benchmarking.orchestrator import BenchmarkOrchestrator, benchmark_best_trials
         orchestrator_module.BenchmarkOrchestrator = BenchmarkOrchestrator
         orchestrator_module.benchmark_best_trials = benchmark_best_trials
     except ImportError:
         pass
     
     try:
-        from benchmarking.utils import run_benchmarking
+        from evaluation.benchmarking.utils import run_benchmarking
         orchestrator_module.run_benchmarking = run_benchmarking
     except ImportError:
         pass
     
     try:
-        from naming import create_naming_context
+        from infrastructure.naming import create_naming_context
         orchestrator_module.create_naming_context = create_naming_context
     except ImportError:
         pass

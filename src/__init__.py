@@ -3,10 +3,17 @@ Source code package for Resume NER training and conversion scripts.
 
 This package contains:
 - Training modules (training/)
+  - Core training logic (training.core.*)
+  - Hyperparameter optimization (training.hpo.*)
+  - Training execution (training.execution.*)
+  - Command-line interfaces (training.cli.*)
+- Evaluation modules (evaluation/)
+  - Benchmarking (evaluation.benchmarking.*)
+  - Model selection (evaluation.selection.*)
 - API modules (api/)
 - Model conversion utilities (conversion/)
-- Shared utilities (shared/)
-- Platform adapters (platform_adapters/)
+- Shared utilities (common/)
+- Platform adapters (infrastructure/)
 - Orchestration utilities (orchestration/)
 """
 
@@ -14,8 +21,7 @@ This package contains:
 # Use relative imports to avoid path issues
 # Make imports optional to avoid blocking module execution when only API is needed
 try:
-    from .training import train_model
-    from .training.config import build_training_config
+    from .training import train_model, build_training_config
     __all__ = [
         "train_model",
         "build_training_config",
@@ -23,8 +29,7 @@ try:
 except ImportError:
     # Fallback: try absolute import if src is in path
     try:
-        from src.training import train_model
-        from src.training.config import build_training_config
+        from src.training import train_model, build_training_config
         __all__ = [
             "train_model",
             "build_training_config",
@@ -32,8 +37,7 @@ except ImportError:
     except ImportError:
         # Last resort: try direct import (when src is current directory)
         try:
-            from training import train_model
-            from training.config import build_training_config
+            from training import train_model, build_training_config
             __all__ = [
                 "train_model",
                 "build_training_config",

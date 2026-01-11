@@ -13,9 +13,9 @@ except ImportError:
     optuna = None
     pytest.skip("optuna not available", allow_module_level=True)
 
-from hpo.checkpoint.cleanup import CheckpointCleanupManager
-from hpo.tracking.cleanup import should_skip_cleanup
-from hpo.core.study import StudyManager
+from training.hpo.checkpoint.cleanup import CheckpointCleanupManager
+from training.hpo.tracking.cleanup import should_skip_cleanup
+from training.hpo.core.study import StudyManager
 
 
 class TestTimeoutMinutes:

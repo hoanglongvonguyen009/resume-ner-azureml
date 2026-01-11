@@ -411,6 +411,7 @@ src/
 ## Phase 11: Future Phases (After Infrastructure Migration)
 
 - [ ] **Phase 2: Training Module** (future)
+  - [ ] See detailed plan: `docs/implementation_plans/phase2-training-module-reorganization.plan.md`
   - [ ] Consolidate `training/`, `training_exec/`, `hpo/` into `training/`
   - [ ] Create `training/core/`, `training/hpo/`, `training/execution/`
   - [ ] Note: Data handling moved to top-level `data/` module

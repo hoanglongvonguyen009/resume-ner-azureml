@@ -5,14 +5,14 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from hpo import TrialExecutor
-from hpo.execution.local.cv import run_training_trial_with_cv
+from training.hpo import TrialExecutor
+from training.hpo.execution.local.cv import run_training_trial_with_cv
 
 
 class TestTrialExecutionNoCV:
     """Test trial execution without CV (k_fold.enabled=false)."""
 
-    @patch("hpo.execution.local.trial.execute_training_subprocess")
+    @patch("training.hpo.execution.local.trial.execute_training_subprocess")
     def test_trial_execution_no_cv_creates_single_run(self, mock_execute, tmp_path):
         """Test that trial execution without CV creates single trial run (no fold runs)."""
         # Setup
@@ -61,7 +61,7 @@ class TestTrialExecutionNoCV:
         assert metric_value == 0.75
         assert mock_execute.called
 
-    @patch("hpo.execution.local.trial.execute_training_subprocess")
+    @patch("training.hpo.execution.local.trial.execute_training_subprocess")
     def test_trial_execution_no_cv_output_path(self, mock_execute, tmp_path):
         """Test that trial execution without CV uses correct output path."""
         config_dir = tmp_path / "config"
@@ -100,7 +100,7 @@ class TestTrialExecutionNoCV:
         assert "study-abc12345" in str(output_dir)
         assert "trial-def67890" in str(output_dir)
 
-    @patch("hpo.execution.local.trial.execute_training_subprocess")
+    @patch("training.hpo.execution.local.trial.execute_training_subprocess")
     def test_trial_execution_no_cv_metrics_file(self, mock_execute, tmp_path):
         """Test that metrics.json is read from trial output directory."""
         config_dir = tmp_path / "config"
@@ -144,8 +144,8 @@ class TestTrialExecutionNoCV:
 class TestTrialExecutionWithCV:
     """Test trial execution with CV (k_fold.enabled=true, n_splits=2)."""
 
-    @patch("hpo.execution.local.trial.run_training_trial")
-    @patch("hpo.execution.local.cv.mlflow")
+    @patch("training.hpo.execution.local.trial.run_training_trial")
+    @patch("training.hpo.execution.local.cv.mlflow")
     def test_trial_execution_with_cv_creates_nested_runs(self, mock_mlflow, mock_run_trial, tmp_path):
         """Test that trial execution with CV creates trial run and fold runs."""
         # Setup
@@ -185,7 +185,7 @@ class TestTrialExecutionWithCV:
         ]
         
         fold_splits_file = output_dir / "fold_splits.json"
-        from training.cv_utils import save_fold_splits
+        from training.core.cv_utils import save_fold_splits
         save_fold_splits(fold_splits, fold_splits_file, {"k": 2, "random_seed": 42})
         
         trial_params = {
@@ -218,8 +218,8 @@ class TestTrialExecutionWithCV:
         # Verify trial run was created
         assert mock_client.create_run.called
 
-    @patch("hpo.execution.local.trial.run_training_trial")
-    @patch("hpo.execution.local.cv.mlflow")
+    @patch("training.hpo.execution.local.trial.run_training_trial")
+    @patch("training.hpo.execution.local.cv.mlflow")
     def test_trial_execution_with_cv_creates_fold_runs(self, mock_mlflow, mock_run_trial, tmp_path):
         """Test that each fold creates a fold-level MLflow run (child of trial run)."""
         config_dir = tmp_path / "config"
@@ -267,7 +267,7 @@ class TestTrialExecutionWithCV:
         ]
         
         fold_splits_file = output_dir / "fold_splits.json"
-        from training.cv_utils import save_fold_splits
+        from training.core.cv_utils import save_fold_splits
         save_fold_splits(fold_splits, fold_splits_file, {"k": 2})
         
         avg_metric, fold_metrics = run_training_trial_with_cv(
@@ -291,8 +291,8 @@ class TestTrialExecutionWithCV:
         # Verify trial run was created
         assert mock_client.create_run.called
 
-    @patch("hpo.execution.local.trial.run_training_trial")
-    @patch("hpo.execution.local.cv.mlflow")
+    @patch("training.hpo.execution.local.trial.run_training_trial")
+    @patch("training.hpo.execution.local.cv.mlflow")
     def test_trial_execution_with_cv_aggregates_metrics(self, mock_mlflow, mock_run_trial, tmp_path):
         """Test that CV trial aggregates metrics across folds (average)."""
         config_dir = tmp_path / "config"
@@ -331,7 +331,7 @@ class TestTrialExecutionWithCV:
         ]
         
         fold_splits_file = output_dir / "fold_splits.json"
-        from training.cv_utils import save_fold_splits
+        from training.core.cv_utils import save_fold_splits
         save_fold_splits(fold_splits, fold_splits_file, {"k": 2})
         
         avg_metric, fold_metrics = run_training_trial_with_cv(
@@ -354,8 +354,8 @@ class TestTrialExecutionWithCV:
         assert avg_metric == pytest.approx(0.775)  # (0.70 + 0.85) / 2
         assert fold_metrics == [0.70, 0.85]
 
-    @patch("hpo.execution.local.trial.run_training_trial")
-    @patch("hpo.execution.local.cv.mlflow")
+    @patch("training.hpo.execution.local.trial.run_training_trial")
+    @patch("training.hpo.execution.local.cv.mlflow")
     def test_trial_execution_with_cv_output_paths(self, mock_mlflow, mock_run_trial, tmp_path):
         """Test that CV trial creates fold-specific output directories."""
         config_dir = tmp_path / "config"
@@ -395,7 +395,7 @@ class TestTrialExecutionWithCV:
         ]
         
         fold_splits_file = study_dir / "fold_splits.json"
-        from training.cv_utils import save_fold_splits
+        from training.core.cv_utils import save_fold_splits
         save_fold_splits(fold_splits, fold_splits_file, {"k": 2})
         
         # Capture output_dir passed to run_training_trial
@@ -435,8 +435,8 @@ class TestTrialExecutionWithCV:
         for call in mock_run_trial.call_args_list:
             assert "fold_idx" in call.kwargs or len(call.args) > 0
 
-    @patch("hpo.execution.local.trial.run_training_trial")
-    @patch("hpo.execution.local.cv.mlflow")
+    @patch("training.hpo.execution.local.trial.run_training_trial")
+    @patch("training.hpo.execution.local.cv.mlflow")
     def test_trial_execution_with_cv_smoke_yaml_params(self, mock_mlflow, mock_run_trial, tmp_path):
         """Test CV trial execution with smoke.yaml parameters (n_splits=2, random_seed=42)."""
         config_dir = tmp_path / "config"
@@ -473,7 +473,7 @@ class TestTrialExecutionWithCV:
         ]
         
         fold_splits_file = output_dir / "fold_splits.json"
-        from training.cv_utils import save_fold_splits
+        from training.core.cv_utils import save_fold_splits
         save_fold_splits(fold_splits, fold_splits_file, {
             "k": 2,
             "random_seed": 42,  # smoke.yaml value

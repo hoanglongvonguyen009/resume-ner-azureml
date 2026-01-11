@@ -14,7 +14,7 @@ from typing import Optional, Callable
 # Re-export from new locations with deprecation warnings
 from infrastructure.paths.validation import validate_path_before_mkdir
 from infrastructure.paths.drive import resolve_output_path_for_colab
-from hpo.utils.paths import resolve_hpo_output_dir
+from training.hpo.utils.paths import resolve_hpo_output_dir
 
 
 def _deprecation_warning(name: str, new_module: str) -> None:

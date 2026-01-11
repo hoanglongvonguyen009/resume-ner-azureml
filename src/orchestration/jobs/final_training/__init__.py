@@ -8,9 +8,9 @@ from __future__ import annotations
 import warnings
 
 # Re-export from new location
-from training_exec.executor import execute_final_training
-from training_exec.lineage import extract_lineage_from_best_model
-from training_exec.tags import apply_lineage_tags
+from training.execution.executor import execute_final_training
+from training.execution.lineage import extract_lineage_from_best_model
+from training.execution.tags import apply_lineage_tags
 
 # Issue deprecation warning
 warnings.warn(

@@ -13,8 +13,8 @@ except ImportError:
     optuna = None
     pytest.skip("optuna not available", allow_module_level=True)
 
-from hpo.core.study import StudyManager
-from hpo.checkpoint.storage import resolve_storage_path, get_storage_uri
+from training.hpo.core.study import StudyManager
+from training.hpo.checkpoint.storage import resolve_storage_path, get_storage_uri
 
 
 class TestCheckpointCreation:

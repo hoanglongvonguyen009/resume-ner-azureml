@@ -1,19 +1,19 @@
-"""Utility functions for training."""
+"""Compatibility shim for training.utils.
 
-from typing import Optional
+DEPRECATED: This module has been moved to training.core.utils.
+This shim will be removed in a future release.
+Please update your imports to use training.core.utils instead.
+"""
 
-import torch
+import warnings
 
+warnings.warn(
+    "Importing from 'training.utils' is deprecated. "
+    "Please use 'training.core.utils' instead. "
+    "This shim will be removed in a future release.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-def set_seed(seed: Optional[int]) -> None:
-    """
-    Set random seed for reproducibility.
-
-    Args:
-        seed: Random seed value. If None, no seed is set.
-    """
-    if seed is None:
-        return
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+from training.core.utils import *  # noqa: F403, F401
 

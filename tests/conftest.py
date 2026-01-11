@@ -11,13 +11,80 @@ from pathlib import Path
 import pytest
 
 # Add project root and src to Python path for all tests
+# IMPORTANT: Add SRC_DIR first to ensure src modules are found before test modules
 ROOT_DIR = Path(__file__).parent.parent
 SRC_DIR = ROOT_DIR / "src"
 
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+# Add SRC_DIR first to avoid namespace collisions with test directories
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(1, str(ROOT_DIR))  # Insert after SRC_DIR
+
+# Install compatibility shim import finders early to handle submodule imports
+# This ensures that imports like "from selection.selection_logic import ..." work
+# even when selection module hasn't been imported yet
+try:
+    import importlib
+    import importlib.util
+    from importlib.abc import MetaPathFinder, Loader
+    from importlib.util import spec_from_loader
+    
+    class ProxyLoader(Loader):
+        """Loader that loads from evaluation.* but registers as selection.* or benchmarking.*"""
+        def __init__(self, target_module_name):
+            self.target_module_name = target_module_name
+        
+        def create_module(self, spec):
+            # Import the actual module and register it under the proxy name
+            actual_module = importlib.import_module(self.target_module_name)
+            # Register it under the proxy name in sys.modules
+            sys.modules[spec.name] = actual_module
+            return actual_module
+        
+        def exec_module(self, module):
+            # Module is already loaded, nothing to do
+            pass
+    
+    class SelectionSubmoduleFinder(MetaPathFinder):
+        """Custom finder for selection.* submodules."""
+        def find_spec(self, name, path, target=None):
+            if name.startswith('selection.') and name != 'selection':
+                submodule_name = name.replace('selection.', 'evaluation.selection.', 1)
+                try:
+                    spec = importlib.util.find_spec(submodule_name)
+                    if spec is not None:
+                        loader = ProxyLoader(submodule_name)
+                        return spec_from_loader(name, loader)
+                except (ImportError, ValueError):
+                    pass
+            return None
+    
+    class BenchmarkingSubmoduleFinder(MetaPathFinder):
+        """Custom finder for benchmarking.* submodules."""
+        def find_spec(self, name, path, target=None):
+            if name.startswith('benchmarking.') and name != 'benchmarking':
+                submodule_name = name.replace('benchmarking.', 'evaluation.benchmarking.', 1)
+                try:
+                    spec = importlib.util.find_spec(submodule_name)
+                    if spec is not None:
+                        loader = ProxyLoader(submodule_name)
+                        return spec_from_loader(name, loader)
+                except (ImportError, ValueError):
+                    pass
+            return None
+    
+    # Install finders if not already installed
+    _selection_finder_installed = any(isinstance(f, SelectionSubmoduleFinder) for f in sys.meta_path)
+    _benchmarking_finder_installed = any(isinstance(f, BenchmarkingSubmoduleFinder) for f in sys.meta_path)
+    
+    if not _selection_finder_installed:
+        sys.meta_path.insert(0, SelectionSubmoduleFinder())
+    if not _benchmarking_finder_installed:
+        sys.meta_path.insert(0, BenchmarkingSubmoduleFinder())
+except Exception:
+    # If finder installation fails, continue - the shims will handle it when modules are imported
+    pass
 
 from infrastructure.paths import resolve_output_path
 

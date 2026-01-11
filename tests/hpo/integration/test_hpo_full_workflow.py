@@ -22,7 +22,7 @@ class TestFullHPOWorkflow:
 
     @patch("orchestration.jobs.hpo.local.trial.execution.subprocess.run")
     @patch("orchestration.jobs.hpo.local.refit.executor.subprocess.run")
-    @patch("hpo.execution.local.sweep.mlflow")
+    @patch("training.hpo.execution.local.sweep.mlflow")
     def test_full_hpo_workflow_with_cv_and_refit(self, mock_mlflow, mock_refit_subprocess, mock_trial_subprocess, tmp_path):
         """Test complete HPO workflow with CV and refit (smoke.yaml configuration)."""
         # Setup config directory
@@ -338,7 +338,7 @@ patterns:
         assert mock_client.log_metric.called
 
     @patch("orchestration.jobs.hpo.local.trial.execution.subprocess.run")
-    @patch("hpo.execution.local.sweep.mlflow")
+    @patch("training.hpo.execution.local.sweep.mlflow")
     def test_full_hpo_workflow_no_cv_no_refit(self, mock_mlflow, mock_subprocess, tmp_path):
         """Test complete HPO workflow without CV and without refit."""
         # Setup config directory
@@ -473,7 +473,7 @@ patterns:
             assert not refit_folder.exists()
 
     @patch("orchestration.jobs.hpo.local.trial.execution.subprocess.run")
-    @patch("hpo.execution.local.sweep.mlflow")
+    @patch("training.hpo.execution.local.sweep.mlflow")
     def test_full_hpo_workflow_creates_correct_path_structure(self, mock_mlflow, mock_subprocess, tmp_path):
         """Test that full HPO workflow creates correct v2 path structure."""
         config_dir = tmp_path / "config"

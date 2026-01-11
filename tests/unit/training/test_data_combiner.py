@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from training.data_combiner import combine_datasets
+from data.processing.data_combiner import combine_datasets
 
 
 @pytest.fixture

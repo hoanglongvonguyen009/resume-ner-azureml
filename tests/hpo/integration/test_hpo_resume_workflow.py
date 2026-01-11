@@ -12,8 +12,8 @@ except ImportError:
     optuna = None
     pytest.skip("optuna not available", allow_module_level=True)
 
-from hpo import run_local_hpo_sweep
-from hpo.core.study import StudyManager
+from training.hpo import run_local_hpo_sweep
+from training.hpo.core.study import StudyManager
 from common.constants import METRICS_FILENAME
 
 
@@ -21,7 +21,7 @@ class TestHPOResumeWorkflow:
     """Test complete HPO resume workflow from checkpoint."""
 
     @patch("orchestration.jobs.hpo.local.trial.execution.subprocess.run")
-    @patch("hpo.execution.local.sweep.mlflow")
+    @patch("training.hpo.execution.local.sweep.mlflow")
     def test_resume_workflow_preserves_trials(self, mock_mlflow, mock_subprocess, tmp_path):
         """Test that resuming from checkpoint preserves existing trials and allows new ones."""
         # Setup config directory
@@ -198,7 +198,7 @@ patterns:
         assert len(study2.trials) > first_run_trial_count, f"Expected more than {first_run_trial_count} trials, got {len(study2.trials)}"
 
     @patch("orchestration.jobs.hpo.local.trial.execution.subprocess.run")
-    @patch("hpo.execution.local.sweep.mlflow")
+    @patch("training.hpo.execution.local.sweep.mlflow")
     def test_resume_workflow_with_different_run_id(self, mock_mlflow, mock_subprocess, tmp_path):
         """Test that resuming works even with a different run_id (study_name should be consistent)."""
         # Setup (same as previous test)
@@ -339,7 +339,7 @@ patterns:
         assert len(study2.trials) > first_trial_count  # New trial added
 
     @patch("orchestration.jobs.hpo.local.trial.execution.subprocess.run")
-    @patch("hpo.execution.local.sweep.mlflow")
+    @patch("training.hpo.execution.local.sweep.mlflow")
     def test_resume_workflow_with_cv(self, mock_mlflow, mock_subprocess, tmp_path):
         """Test resume workflow with CV enabled."""
         # Setup

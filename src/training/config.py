@@ -37,27 +37,10 @@ def build_training_config(args: argparse.Namespace, config_dir: Path) -> Dict[st
     Returns:
         Dictionary containing merged configuration.
     """
-    # Check if CHECKPOINT_PATH is set (for checkpoint loading)
-    import os
-    has_checkpoint = bool(os.environ.get("CHECKPOINT_PATH"))
-    
     # Load base training config
     train_config = load_config_file(config_dir, "train.yaml")
-    
-    if has_checkpoint:
-        # Checkpoint loading is handled via CHECKPOINT_PATH environment variable
-        # The checkpoint path is resolved by the training script or orchestration layer
-        checkpoint_config = {}
-        if checkpoint_config:
-            merged_training["checkpoint"] = checkpoint_config
-        
-        train_config_dict = merged_training
-        base_train_config = train_config  # For distributed config
-    else:
-        # Standard training config
-        train_config = load_config_file(config_dir, "train.yaml")
-        train_config_dict = train_config.get("training", {}).copy()
-        base_train_config = train_config
+    train_config_dict = train_config.get("training", {}).copy()
+    base_train_config = train_config
     
     model_config = load_config_file(config_dir, f"model/{args.backbone}.yaml")
     data_config = load_config_file(config_dir, "data/resume_v1.yaml")

@@ -118,7 +118,7 @@ def build_training_command(
     args = [
         sys.executable,
         "-m",
-        "training.train",
+        "training.cli.train",
         "--data-asset",
         str(dataset_path),
         "--config-dir",

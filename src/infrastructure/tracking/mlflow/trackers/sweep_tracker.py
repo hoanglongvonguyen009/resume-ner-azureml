@@ -564,8 +564,8 @@ class MLflowSweepTracker(BaseTracker):
             else:
                 # Try multiple search strategies with retry logic for timing issues
                 import time
-                max_retries = 3
-                retry_delay = 2  # seconds
+                max_retries = 5  # Increased from 3 to 5
+                retry_delay = 3  # Increased from 2 to 3 seconds
 
                 for attempt in range(max_retries):
                     try:

@@ -5,16 +5,16 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from hpo import (
+from training.hpo import (
     TrialExecutor,
     extract_best_config_from_study,
     SearchSpaceTranslator,
 )
-from hpo.execution.local.trial import run_training_trial
-from hpo.execution.local.cv import run_training_trial_with_cv
-from hpo.execution.local.refit import run_refit_training
-from hpo.trial.metrics import read_trial_metrics
-from hpo.core.study import StudyManager
+from training.hpo.execution.local.trial import run_training_trial
+from training.hpo.execution.local.cv import run_training_trial_with_cv
+from training.hpo.execution.local.refit import run_refit_training
+from training.hpo.trial.metrics import read_trial_metrics
+from training.hpo.core.study import StudyManager
 from selection.selection_logic import SelectionLogic
 from orchestration.jobs.errors import SelectionError
 from common.constants import METRICS_FILENAME
@@ -30,8 +30,8 @@ except ImportError:
 class TestTrialExecutionErrors:
     """Test error handling in trial execution."""
 
-    @patch("hpo.execution.local.trial.execute_training_subprocess")
-    @patch("hpo.tracking.runs.create_trial_run_no_cv")
+    @patch("training.hpo.execution.local.trial.execute_training_subprocess")
+    @patch("training.hpo.tracking.runs.create_trial_run_no_cv")
     def test_training_subprocess_failure(self, mock_create_run, mock_execute, tmp_path):
         """Test that training subprocess failure raises RuntimeError."""
         mock_create_run.return_value = "trial_run_123"
@@ -106,8 +106,8 @@ class TestTrialExecutionErrors:
         # Should return empty dict when metrics file is missing and no MLflow
         assert metrics == {}
 
-    @patch("hpo.execution.local.trial.execute_training_subprocess")
-    @patch("hpo.tracking.runs.create_trial_run_no_cv")
+    @patch("training.hpo.execution.local.trial.execute_training_subprocess")
+    @patch("training.hpo.tracking.runs.create_trial_run_no_cv")
     def test_missing_objective_metric_in_metrics(self, mock_create_run, mock_execute, tmp_path):
         """Test that missing objective metric raises ValueError."""
         mock_create_run.return_value = "trial_run_123"
@@ -154,8 +154,8 @@ class TestTrialExecutionErrors:
 class TestCVOrchestratorErrors:
     """Test error handling in CV orchestrator."""
 
-    @patch("hpo.execution.local.trial.run_training_trial")
-    @patch("hpo.execution.local.cv.mlflow")
+    @patch("training.hpo.execution.local.trial.run_training_trial")
+    @patch("training.hpo.execution.local.cv.mlflow")
     def test_cv_trial_failure_propagates_error(self, mock_mlflow, mock_run_trial, tmp_path):
         """Test that CV trial failure raises RuntimeError."""
         # Mock run_training_trial to raise RuntimeError
@@ -197,7 +197,7 @@ class TestCVOrchestratorErrors:
                 study_key_hash="a" * 64,
             )
 
-    @patch("hpo.execution.local.cv.mlflow")
+    @patch("training.hpo.execution.local.cv.mlflow")
     def test_cv_missing_trial_key_hash_raises_error(self, mock_mlflow, tmp_path):
         """Test that missing trial_key_hash in v2 study folder raises RuntimeError."""
         config_dir = tmp_path / "config"
@@ -242,8 +242,8 @@ class TestCVOrchestratorErrors:
 class TestRefitExecutionErrors:
     """Test error handling in refit execution."""
 
-    @patch("hpo.execution.local.refit.execute_training_subprocess")
-    @patch("hpo.execution.local.refit.mlflow")
+    @patch("training.hpo.execution.local.refit.execute_training_subprocess")
+    @patch("training.hpo.execution.local.refit.mlflow")
     def test_refit_subprocess_failure(self, mock_mlflow, mock_execute, tmp_path):
         """Test that refit subprocess failure raises RuntimeError."""
         
@@ -448,7 +448,7 @@ class TestSearchSpaceErrors:
 class TestMLflowErrors:
     """Test error handling in MLflow operations."""
 
-    @patch("hpo.tracking.runs.mlflow")
+    @patch("training.hpo.tracking.runs.mlflow")
     def test_mlflow_run_creation_failure_handled_gracefully(self, mock_mlflow, tmp_path):
         """Test that MLflow run creation failure is handled gracefully."""
         # Mock MLflow client to raise exception
@@ -459,13 +459,13 @@ class TestMLflowErrors:
         
         # The code should handle this gracefully (either log warning or raise)
         # This depends on implementation - check if it raises or logs
-        from hpo.tracking.runs import create_trial_run_no_cv
+        from training.hpo.tracking.runs import create_trial_run_no_cv
         
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         
         # Should either raise or return None/empty
-        from hpo.tracking.runs import create_trial_run_no_cv
+        from training.hpo.tracking.runs import create_trial_run_no_cv
         with pytest.raises(Exception, match="MLflow connection failed|unexpected keyword"):
             create_trial_run_no_cv(
                 trial_params={"backbone": "distilbert", "trial_number": 0},

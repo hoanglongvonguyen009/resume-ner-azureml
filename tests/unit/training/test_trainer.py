@@ -19,12 +19,12 @@ except ImportError:
 class TestPrepareDataLoaders:
     """Tests for prepare_data_loaders function."""
 
-    @patch("training.trainer.ResumeNERDataset")
-    @patch("training.trainer.DataLoader")
-    @patch("training.trainer.DataCollatorForTokenClassification")
+    @patch("training.core.trainer.ResumeNERDataset")
+    @patch("training.core.trainer.DataLoader")
+    @patch("training.core.trainer.DataCollatorForTokenClassification")
     def test_prepare_data_loaders_basic(self, mock_collator_class, mock_loader_class, mock_dataset_class):
         """Test basic data loader preparation."""
-        from training.trainer import prepare_data_loaders
+        from training.core.trainer import prepare_data_loaders
         
         config = {
             "model": {
@@ -56,12 +56,12 @@ class TestPrepareDataLoaders:
         assert val_loader == mock_val_loader
         assert mock_dataset_class.call_count == 2
 
-    @patch("training.trainer.ResumeNERDataset")
-    @patch("training.trainer.DataLoader")
-    @patch("training.trainer.DataCollatorForTokenClassification")
+    @patch("training.core.trainer.ResumeNERDataset")
+    @patch("training.core.trainer.DataLoader")
+    @patch("training.core.trainer.DataCollatorForTokenClassification")
     def test_prepare_data_loaders_with_indices(self, mock_collator_class, mock_loader_class, mock_dataset_class):
         """Test data loader preparation with fold indices."""
-        from training.trainer import prepare_data_loaders
+        from training.core.trainer import prepare_data_loaders
         
         config = {
             "model": {
@@ -110,12 +110,12 @@ class TestPrepareDataLoaders:
         assert len(val_call_args) == 1
         assert val_call_args[0]["text"] == "test2"
 
-    @patch("training.trainer.ResumeNERDataset")
-    @patch("training.trainer.DataLoader")
-    @patch("training.trainer.DataCollatorForTokenClassification")
+    @patch("training.core.trainer.ResumeNERDataset")
+    @patch("training.core.trainer.DataLoader")
+    @patch("training.core.trainer.DataCollatorForTokenClassification")
     def test_prepare_data_loaders_use_all_data(self, mock_collator_class, mock_loader_class, mock_dataset_class):
         """Test data loader preparation with use_all_data=True."""
-        from training.trainer import prepare_data_loaders
+        from training.core.trainer import prepare_data_loaders
         
         config = {
             "model": {
@@ -145,12 +145,12 @@ class TestPrepareDataLoaders:
         assert val_loader is None
         assert mock_dataset_class.call_count == 1
 
-    @patch("training.trainer.ResumeNERDataset")
-    @patch("training.trainer.DataLoader")
-    @patch("training.trainer.DataCollatorForTokenClassification")
+    @patch("training.core.trainer.ResumeNERDataset")
+    @patch("training.core.trainer.DataLoader")
+    @patch("training.core.trainer.DataCollatorForTokenClassification")
     def test_prepare_data_loaders_deberta_batch_size_cap(self, mock_collator_class, mock_loader_class, mock_dataset_class):
         """Test that DeBERTa batch size is capped."""
-        from training.trainer import prepare_data_loaders
+        from training.core.trainer import prepare_data_loaders
         
         config = {
             "model": {
@@ -181,12 +181,12 @@ class TestPrepareDataLoaders:
         call_args = mock_loader_class.call_args_list[0]
         assert call_args[1]["batch_size"] == 8
 
-    @patch("training.trainer.ResumeNERDataset")
-    @patch("training.trainer.DataLoader")
-    @patch("training.trainer.DataCollatorForTokenClassification")
+    @patch("training.core.trainer.ResumeNERDataset")
+    @patch("training.core.trainer.DataLoader")
+    @patch("training.core.trainer.DataCollatorForTokenClassification")
     def test_prepare_data_loaders_val_split_fallback(self, mock_collator_class, mock_loader_class, mock_dataset_class):
         """Test validation split fallback when no validation data."""
-        from training.trainer import prepare_data_loaders
+        from training.core.trainer import prepare_data_loaders
         
         config = {
             "model": {
@@ -216,15 +216,15 @@ class TestPrepareDataLoaders:
         assert train_loader == mock_train_loader
         assert val_loader == mock_val_loader
 
-    @patch("training.trainer.ResumeNERDataset")
-    @patch("training.trainer.DataLoader")
-    @patch("training.trainer.DataCollatorForTokenClassification")
+    @patch("training.core.trainer.ResumeNERDataset")
+    @patch("training.core.trainer.DataLoader")
+    @patch("training.core.trainer.DataCollatorForTokenClassification")
     def test_prepare_data_loaders_kfold_cv_val_from_train_data(self, mock_collator_class, mock_loader_class, mock_dataset_class):
         """Test that k-fold CV validation data comes from original train_data, not val_data.
         
         This test verifies the fix for IndexError when val_data is empty but val_indices are provided.
         """
-        from training.trainer import prepare_data_loaders
+        from training.core.trainer import prepare_data_loaders
         
         config = {
             "model": {
@@ -275,10 +275,10 @@ class TestPrepareDataLoaders:
 class TestCreateOptimizerAndScheduler:
     """Tests for create_optimizer_and_scheduler function."""
 
-    @patch("training.trainer.get_linear_schedule_with_warmup")
+    @patch("training.core.trainer.get_linear_schedule_with_warmup")
     def test_create_optimizer_and_scheduler_defaults(self, mock_scheduler_fn):
         """Test optimizer and scheduler creation with defaults."""
-        from training.trainer import create_optimizer_and_scheduler
+        from training.core.trainer import create_optimizer_and_scheduler
         
         mock_model = MagicMock()
         mock_model.parameters.return_value = [torch.nn.Parameter(torch.zeros(1))]
@@ -298,10 +298,10 @@ class TestCreateOptimizerAndScheduler:
         assert scheduler == mock_scheduler
         assert max_grad_norm == 1.0
 
-    @patch("training.trainer.get_linear_schedule_with_warmup")
+    @patch("training.core.trainer.get_linear_schedule_with_warmup")
     def test_create_optimizer_and_scheduler_custom(self, mock_scheduler_fn):
         """Test optimizer and scheduler creation with custom values."""
-        from training.trainer import create_optimizer_and_scheduler
+        from training.core.trainer import create_optimizer_and_scheduler
         
         mock_model = MagicMock()
         mock_model.parameters.return_value = [torch.nn.Parameter(torch.zeros(1))]
@@ -328,10 +328,10 @@ class TestCreateOptimizerAndScheduler:
         assert max_grad_norm == 2.0
         mock_scheduler_fn.assert_called_once()
 
-    @patch("training.trainer.get_linear_schedule_with_warmup")
+    @patch("training.core.trainer.get_linear_schedule_with_warmup")
     def test_create_optimizer_and_scheduler_warmup_capped(self, mock_scheduler_fn):
         """Test that warmup steps are capped by max_warmup_steps."""
-        from training.trainer import create_optimizer_and_scheduler
+        from training.core.trainer import create_optimizer_and_scheduler
         
         mock_model = MagicMock()
         mock_model.parameters.return_value = [torch.nn.Parameter(torch.zeros(1))]
@@ -359,7 +359,7 @@ class TestRunTrainingLoop:
 
     def test_run_training_loop_basic(self):
         """Test basic training loop execution."""
-        from training.trainer import run_training_loop
+        from training.core.trainer import run_training_loop
         
         mock_model = MagicMock()
         mock_outputs = MagicMock()
@@ -383,7 +383,7 @@ class TestRunTrainingLoop:
         mock_scheduler = MagicMock()
         
         # Create a mock RunContext
-        from training.distributed import RunContext
+        from training.execution.distributed import RunContext
         mock_context = MagicMock(spec=RunContext)
         mock_context.device = torch.device("cpu")
         mock_context.is_distributed = False
@@ -402,7 +402,7 @@ class TestRunTrainingLoop:
 
     def test_run_training_loop_multiple_epochs(self):
         """Test training loop with multiple epochs."""
-        from training.trainer import run_training_loop
+        from training.core.trainer import run_training_loop
         
         mock_model = MagicMock()
         mock_outputs = MagicMock()
@@ -430,7 +430,7 @@ class TestRunTrainingLoop:
         mock_scheduler = MagicMock()
         
         # Create a mock RunContext
-        from training.distributed import RunContext
+        from training.execution.distributed import RunContext
         mock_context = MagicMock(spec=RunContext)
         mock_context.device = torch.device("cpu")
         mock_context.is_distributed = False
@@ -451,7 +451,7 @@ class TestSaveCheckpoint:
 
     def test_save_checkpoint_success(self, tmp_path):
         """Test successful checkpoint saving."""
-        from training.trainer import save_checkpoint
+        from training.core.trainer import save_checkpoint
         
         mock_model = MagicMock()
         mock_tokenizer = MagicMock()
@@ -466,7 +466,7 @@ class TestSaveCheckpoint:
 
     def test_save_checkpoint_creates_directory(self, tmp_path):
         """Test that checkpoint directory is created if it doesn't exist."""
-        from training.trainer import save_checkpoint
+        from training.core.trainer import save_checkpoint
         
         mock_model = MagicMock()
         mock_tokenizer = MagicMock()
@@ -481,17 +481,17 @@ class TestSaveCheckpoint:
 class TestTrainModel:
     """Tests for train_model function."""
 
-    @patch("training.trainer.save_checkpoint")
-    @patch("training.trainer.run_training_loop")
-    @patch("training.trainer.create_optimizer_and_scheduler")
-    @patch("training.trainer.prepare_data_loaders")
-    @patch("training.trainer.create_model_and_tokenizer")
-    @patch("training.trainer.build_label_list")
-    @patch("training.trainer.evaluate_model")
+    @patch("training.core.trainer.save_checkpoint")
+    @patch("training.core.trainer.run_training_loop")
+    @patch("training.core.trainer.create_optimizer_and_scheduler")
+    @patch("training.core.trainer.prepare_data_loaders")
+    @patch("training.core.trainer.create_model_and_tokenizer")
+    @patch("training.core.trainer.build_label_list")
+    @patch("training.core.trainer.evaluate_model")
     def test_train_model_basic(self, mock_evaluate, mock_build_labels, mock_create_model,
                                mock_prepare_loaders, mock_create_optimizer, mock_run_loop, mock_save, tmp_path):
         """Test basic model training."""
-        from training.trainer import train_model
+        from training.core.trainer import train_model
         
         config = {
             "data": {"schema": {"entity_types": ["PERSON", "ORG"]}},
@@ -528,17 +528,17 @@ class TestTrainModel:
         mock_evaluate.assert_called_once()
         mock_save.assert_called_once()
 
-    @patch("training.trainer.save_checkpoint")
-    @patch("training.trainer.run_training_loop")
-    @patch("training.trainer.create_optimizer_and_scheduler")
-    @patch("training.trainer.prepare_data_loaders")
-    @patch("training.trainer.create_model_and_tokenizer")
-    @patch("training.trainer.build_label_list")
-    @patch("training.trainer.load_fold_splits")
+    @patch("training.core.trainer.save_checkpoint")
+    @patch("training.core.trainer.run_training_loop")
+    @patch("training.core.trainer.create_optimizer_and_scheduler")
+    @patch("training.core.trainer.prepare_data_loaders")
+    @patch("training.core.trainer.create_model_and_tokenizer")
+    @patch("training.core.trainer.build_label_list")
+    @patch("training.core.trainer.load_fold_splits")
     def test_train_model_with_fold_splits(self, mock_load_splits, mock_build_labels, mock_create_model,
                                          mock_prepare_loaders, mock_create_optimizer, mock_run_loop, mock_save, tmp_path):
         """Test model training with fold splits."""
-        from training.trainer import train_model
+        from training.core.trainer import train_model
         
         config = {
             "data": {"schema": {"entity_types": ["PERSON"]}},
@@ -578,16 +578,16 @@ class TestTrainModel:
         mock_load_splits.assert_called_once()
         mock_prepare_loaders.assert_called_once()
 
-    @patch("training.trainer.save_checkpoint")
-    @patch("training.trainer.run_training_loop")
-    @patch("training.trainer.create_optimizer_and_scheduler")
-    @patch("training.trainer.prepare_data_loaders")
-    @patch("training.trainer.create_model_and_tokenizer")
-    @patch("training.trainer.build_label_list")
+    @patch("training.core.trainer.save_checkpoint")
+    @patch("training.core.trainer.run_training_loop")
+    @patch("training.core.trainer.create_optimizer_and_scheduler")
+    @patch("training.core.trainer.prepare_data_loaders")
+    @patch("training.core.trainer.create_model_and_tokenizer")
+    @patch("training.core.trainer.build_label_list")
     def test_train_model_use_all_data(self, mock_build_labels, mock_create_model,
                                      mock_prepare_loaders, mock_create_optimizer, mock_run_loop, mock_save, tmp_path):
         """Test model training with use_all_data=True."""
-        from training.trainer import train_model
+        from training.core.trainer import train_model
         
         config = {
             "data": {"schema": {"entity_types": ["PERSON"]}},
@@ -623,10 +623,10 @@ class TestTrainModel:
         assert "note" in metrics
         assert "No validation set" in metrics["note"]
 
-    @patch("training.trainer.load_fold_splits")
+    @patch("training.core.trainer.load_fold_splits")
     def test_train_model_invalid_fold_idx(self, mock_load_splits, tmp_path):
         """Test model training with invalid fold index."""
-        from training.trainer import train_model
+        from training.core.trainer import train_model
         
         config = {
             "data": {"schema": {"entity_types": ["PERSON"]}},

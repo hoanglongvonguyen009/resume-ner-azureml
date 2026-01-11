@@ -4,7 +4,7 @@ import json
 import pytest
 from pathlib import Path
 
-from training.cv_utils import (
+from training.core.cv_utils import (
     create_kfold_splits,
     save_fold_splits,
     load_fold_splits,

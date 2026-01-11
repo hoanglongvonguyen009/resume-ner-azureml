@@ -14,9 +14,9 @@ try:
 except ImportError:
     # run_manager may have been moved - create stubs
     def create_trial_run_no_cv(*args, **kwargs):
-        raise ImportError("create_trial_run_no_cv has been moved. Please import from hpo.trial.run_manager")
+        raise ImportError("create_trial_run_no_cv has been moved. Please import from training.hpo.trial.run_manager")
     def finalize_trial_run_no_cv(*args, **kwargs):
-        raise ImportError("finalize_trial_run_no_cv has been moved. Please import from hpo.trial.run_manager")
+        raise ImportError("finalize_trial_run_no_cv has been moved. Please import from training.hpo.trial.run_manager")
 
 try:
     from .callback import create_trial_callback

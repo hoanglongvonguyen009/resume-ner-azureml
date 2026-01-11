@@ -12,7 +12,7 @@ from typing import Any, Dict
 ROOT_DIR = Path(__file__).resolve().parents[3]
 sys.path.append(str(ROOT_DIR))
 
-from training.cv_utils import create_kfold_splits
+from training.core.cv_utils import create_kfold_splits
 from data.loaders import load_dataset
 
 from testing.fixtures.config.test_config_loader import DEFAULT_RANDOM_SEED

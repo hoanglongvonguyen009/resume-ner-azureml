@@ -12,7 +12,7 @@ from typing import Any, Dict
 ROOT_DIR = Path(__file__).resolve().parents[3]
 sys.path.append(str(ROOT_DIR))
 
-from hpo import run_local_hpo_sweep
+from training.hpo import run_local_hpo_sweep
 
 from testing.fixtures.config.test_config_loader import DEFAULT_BACKBONE
 

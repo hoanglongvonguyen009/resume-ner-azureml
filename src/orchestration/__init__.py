@@ -109,8 +109,20 @@ except ImportError:
     # Fallback to local implementation if not in tracking module
     from .mlflow_utils import setup_mlflow_for_stage
 
-# Benchmarking - moved to benchmarking module
-from benchmarking.utils import run_benchmarking
+# Benchmarking - moved to evaluation.benchmarking module
+# Use lazy import via __getattr__ to avoid circular dependencies during module initialization
+try:
+    from evaluation.benchmarking.utils import run_benchmarking
+except (ImportError, ModuleNotFoundError):
+    # Benchmarking module not available - use lazy import
+    run_benchmarking = None
+
+def __getattr__(name: str):
+    """Lazy import for benchmarking functions."""
+    if name == "run_benchmarking" and run_benchmarking is None:
+        from evaluation.benchmarking.utils import run_benchmarking
+        return run_benchmarking
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 # Config - moved to config module
 try:

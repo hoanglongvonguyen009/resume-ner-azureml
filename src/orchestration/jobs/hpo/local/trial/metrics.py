@@ -7,7 +7,7 @@ from __future__ import annotations
 
 # Use lazy imports to avoid circular import issues
 # Import the module first, then assign attributes
-import hpo.trial.metrics as _metrics_module
+import training.hpo.trial.metrics as _metrics_module
 
 # Re-export functions
 read_trial_metrics = _metrics_module.read_trial_metrics

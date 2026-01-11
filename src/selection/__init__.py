@@ -1,80 +1,85 @@
-"""Configuration selection utilities.
+"""Compatibility shim for selection module.
 
-This module provides functionality for selecting the best configuration from HPO results,
-supporting both local (Optuna) and Azure ML selection methods.
+This module provides backward compatibility by re-exporting from evaluation.selection.
+
+DEPRECATED: Use 'from evaluation.selection import ...' instead.
+This shim will be removed in 2 releases.
 """
 
-from __future__ import annotations
+import sys
+import warnings
+import importlib
+from types import ModuleType
+from importlib.abc import MetaPathFinder, Loader
+from importlib.util import spec_from_loader
 
-from .disk_loader import load_benchmark_speed_score, load_best_trial_from_disk
-from .local_selection import (
-    extract_best_config_from_study,
-    load_best_trial_from_disk as load_best_trial,
-    select_best_configuration_across_studies,
-)
-from .mlflow_selection import find_best_model_from_mlflow
-from .artifact_acquisition import acquire_best_model_checkpoint
-from .selection import select_best_configuration
-from .cache import (
-    compute_selection_cache_key,
-    load_cached_best_model,
-    save_best_model_cache,
-)
-from .trial_finder import (
-    find_best_trials_for_backbones,
-    find_study_folder_in_backbone_dir,
-)
-from .study_summary import (
-    extract_cv_statistics,
-    get_trial_hash_info,
-    load_study_from_disk,
-    find_trial_hash_info_for_study,
-    format_study_summary_line,
-    print_study_summaries,
-)
+# Make this module act as a package by setting __path__
+__path__ = []
 
-# Alias for backward compatibility
-select_production_configuration = select_best_configuration
-from .selection_logic import MODEL_SPEED_SCORES, SelectionLogic
+# Custom import finder to handle submodule imports
+class SelectionSubmoduleFinder(MetaPathFinder):
+    """Custom finder for selection.* submodules."""
+    
+    def find_spec(self, name, path, target=None):
+        if name.startswith('selection.') and name != 'selection':
+            # Redirect to evaluation.selection.*
+            submodule_name = name.replace('selection.', 'evaluation.selection.', 1)
+            try:
+                # Try to import the actual module
+                spec = importlib.util.find_spec(submodule_name)
+                if spec is not None:
+                    # Create a loader that loads from evaluation.selection
+                    loader = importlib.util.LazyLoader(spec.loader)
+                    return spec_from_loader(name, loader)
+            except (ImportError, ValueError):
+                pass
+        return None
 
-__all__ = [
-    # Disk loading
-    "load_benchmark_speed_score",
-    "load_best_trial_from_disk",
-    "load_best_trial",
-    # Local selection
-    "extract_best_config_from_study",
-    "select_best_configuration_across_studies",
-    # Azure ML selection
-    "select_production_configuration",
-    # MLflow selection
-    "find_best_model_from_mlflow",
-    # Artifact acquisition
-    "acquire_best_model_checkpoint",
-    # Trial finding
-    "find_best_trials_for_backbones",
-    "find_study_folder_in_backbone_dir",
-    # Selection logic
-    "MODEL_SPEED_SCORES",
-    "SelectionLogic",
-    # Cache management
-    "compute_selection_cache_key",
-    "load_cached_best_model",
-    "save_best_model_cache",
-    # Study summary
-    "extract_cv_statistics",
-    "get_trial_hash_info",
-    "load_study_from_disk",
-    "find_trial_hash_info_for_study",
-    "format_study_summary_line",
-    "print_study_summaries",
+# Install the finder if not already installed
+_finder_installed = False
+for finder in sys.meta_path:
+    if isinstance(finder, SelectionSubmoduleFinder):
+        _finder_installed = True
+        break
+
+if not _finder_installed:
+    sys.meta_path.insert(0, SelectionSubmoduleFinder())
+
+# Create submodule proxies for backward compatibility
+_submodules = [
+    'selection_logic',
+    'mlflow_selection',
+    'artifact_acquisition',
+    'cache',
+    'local_selection',
+    'local_selection_v2',
+    'disk_loader',
+    'trial_finder',
+    'study_summary',
+    'selection',
 ]
 
+def _create_submodule_proxy(name: str) -> ModuleType:
+    """Create a proxy module for a submodule."""
+    try:
+        module = importlib.import_module(f'evaluation.selection.{name}')
+        return module
+    except ImportError:
+        return ModuleType(f'selection.{name}')
 
+# Register submodule proxies
+_current_module = sys.modules[__name__]
+for submodule_name in _submodules:
+    submodule = _create_submodule_proxy(submodule_name)
+    sys.modules[f'selection.{submodule_name}'] = submodule
+    setattr(_current_module, submodule_name, submodule)
 
+warnings.warn(
+    "selection is deprecated, use evaluation.selection instead. "
+    "This shim will be removed in 2 releases.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
-
-
-
-
-
+# Re-export everything from evaluation.selection
+from evaluation.selection import *  # noqa: F403, F401

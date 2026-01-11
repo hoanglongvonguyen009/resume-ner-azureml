@@ -211,7 +211,7 @@ class TrialExecutor:
         args = [
             sys.executable,
             "-m",
-            "training.train",
+            "training.cli.train",
             "--data-asset",
             dataset_path,
             "--config-dir",
