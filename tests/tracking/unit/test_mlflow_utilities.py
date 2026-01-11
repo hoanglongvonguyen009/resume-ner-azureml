@@ -37,7 +37,7 @@ class TestArtifactUploadUtilities:
 
     def test_log_artifact_safe_with_active_run(self, mock_active_run):
         """Test log_artifact_safe with active run."""
-        from tracking.mlflow import log_artifact_safe
+        from infrastructure.tracking.mlflow import log_artifact_safe
         
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
             test_file = Path(tmp_file.name)
@@ -58,7 +58,7 @@ class TestArtifactUploadUtilities:
 
     def test_log_artifact_safe_with_explicit_run_id(self, mock_mlflow_client):
         """Test log_artifact_safe with explicit run_id."""
-        from tracking.mlflow import log_artifact_safe
+        from infrastructure.tracking.mlflow import log_artifact_safe
         
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
             test_file = Path(tmp_file.name)
@@ -81,7 +81,7 @@ class TestArtifactUploadUtilities:
 
     def test_log_artifact_safe_handles_errors(self, mock_active_run):
         """Test log_artifact_safe handles errors gracefully."""
-        from tracking.mlflow import log_artifact_safe
+        from infrastructure.tracking.mlflow import log_artifact_safe
         
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
             test_file = Path(tmp_file.name)
@@ -101,7 +101,7 @@ class TestArtifactUploadUtilities:
 
     def test_log_artifacts_safe_with_directory(self, mock_active_run):
         """Test log_artifacts_safe with directory."""
-        from tracking.mlflow import log_artifacts_safe
+        from infrastructure.tracking.mlflow import log_artifacts_safe
         
         with tempfile.TemporaryDirectory() as tmpdir:
             test_dir = Path(tmpdir)
@@ -120,7 +120,7 @@ class TestArtifactUploadUtilities:
 
     def test_upload_checkpoint_archive(self, mock_mlflow_client):
         """Test upload_checkpoint_archive utility."""
-        from tracking.mlflow import upload_checkpoint_archive
+        from infrastructure.tracking.mlflow import upload_checkpoint_archive
         
         with tempfile.NamedTemporaryFile(suffix='.tar.gz', delete=False) as tmp_file:
             archive_path = Path(tmp_file.name)
@@ -161,7 +161,7 @@ class TestRunLifecycleUtilities:
 
     def test_terminate_run_safe_with_running_run(self, mock_mlflow_client):
         """Test terminate_run_safe with RUNNING run."""
-        from tracking.mlflow import terminate_run_safe
+        from infrastructure.tracking.mlflow import terminate_run_safe
         
         run_id = "test-run-id-123"
         mock_run = MagicMock()
@@ -181,7 +181,7 @@ class TestRunLifecycleUtilities:
 
     def test_terminate_run_safe_with_already_terminated(self, mock_mlflow_client):
         """Test terminate_run_safe with already-terminated run."""
-        from tracking.mlflow import terminate_run_safe
+        from infrastructure.tracking.mlflow import terminate_run_safe
         
         run_id = "test-run-id-123"
         mock_run = MagicMock()
@@ -199,7 +199,7 @@ class TestRunLifecycleUtilities:
 
     def test_terminate_run_safe_with_tags(self, mock_mlflow_client):
         """Test terminate_run_safe with tags."""
-        from tracking.mlflow import terminate_run_safe
+        from infrastructure.tracking.mlflow import terminate_run_safe
         
         run_id = "test-run-id-123"
         tags = {"tag1": "value1", "tag2": "value2"}
@@ -220,7 +220,7 @@ class TestRunLifecycleUtilities:
 
     def test_terminate_run_with_tags(self, mock_mlflow_client):
         """Test terminate_run_with_tags convenience function."""
-        from tracking.mlflow import terminate_run_with_tags
+        from infrastructure.tracking.mlflow import terminate_run_with_tags
         
         run_id = "test-run-id-123"
         tags = {"tag1": "value1"}
@@ -240,7 +240,7 @@ class TestRunLifecycleUtilities:
 
     def test_ensure_run_terminated(self, mock_mlflow_client):
         """Test ensure_run_terminated utility."""
-        from tracking.mlflow import ensure_run_terminated
+        from infrastructure.tracking.mlflow import ensure_run_terminated
         
         run_id = "test-run-id-123"
         mock_run = MagicMock()
@@ -257,7 +257,7 @@ class TestRunLifecycleUtilities:
 
     def test_ensure_run_terminated_already_finished(self, mock_mlflow_client):
         """Test ensure_run_terminated with already-finished run."""
-        from tracking.mlflow import ensure_run_terminated
+        from infrastructure.tracking.mlflow import ensure_run_terminated
         
         run_id = "test-run-id-123"
         mock_run = MagicMock()
@@ -286,7 +286,7 @@ class TestRunCreationUtilities:
 
     def test_get_or_create_experiment_existing(self):
         """Test get_or_create_experiment with existing experiment."""
-        from tracking.mlflow import get_or_create_experiment
+        from infrastructure.tracking.mlflow import get_or_create_experiment
         
         experiment_name = "test-experiment"
         mock_experiment = MagicMock()
@@ -299,7 +299,7 @@ class TestRunCreationUtilities:
 
     def test_get_or_create_experiment_new(self):
         """Test get_or_create_experiment with new experiment."""
-        from tracking.mlflow import get_or_create_experiment
+        from infrastructure.tracking.mlflow import get_or_create_experiment
         
         experiment_name = "new-experiment"
         
@@ -311,7 +311,7 @@ class TestRunCreationUtilities:
 
     def test_resolve_experiment_id_from_parent(self, mock_mlflow_client):
         """Test resolve_experiment_id from parent run."""
-        from tracking.mlflow import resolve_experiment_id
+        from infrastructure.tracking.mlflow import resolve_experiment_id
         
         parent_run_id = "parent-run-123"
         mock_run = MagicMock()
@@ -324,7 +324,7 @@ class TestRunCreationUtilities:
 
     def test_resolve_experiment_id_from_name(self):
         """Test resolve_experiment_id from experiment name."""
-        from tracking.mlflow import resolve_experiment_id
+        from infrastructure.tracking.mlflow import resolve_experiment_id
         
         experiment_name = "test-exp"
         mock_experiment = MagicMock()
@@ -341,7 +341,7 @@ class TestURLUtilities:
 
     def test_get_mlflow_run_url_azureml(self):
         """Test get_mlflow_run_url with Azure ML tracking URI."""
-        from tracking.mlflow import get_mlflow_run_url
+        from infrastructure.tracking.mlflow import get_mlflow_run_url
         
         experiment_id = "exp-123"
         run_id = "run-456"
@@ -355,7 +355,7 @@ class TestURLUtilities:
 
     def test_get_mlflow_run_url_standard(self):
         """Test get_mlflow_run_url with standard MLflow tracking URI."""
-        from tracking.mlflow import get_mlflow_run_url
+        from infrastructure.tracking.mlflow import get_mlflow_run_url
         
         experiment_id = "exp-123"
         run_id = "run-456"

@@ -51,7 +51,6 @@ try:
 except ImportError:
     # During pytest collection, path might not be set up yet
     get_mlflow_run_url = None
-from infrastructure.tracking.mlflow.artifacts.manager import create_checkpoint_archive
 from infrastructure.tracking.mlflow.trackers.base_tracker import BaseTracker
 
 logger = get_logger(__name__)
@@ -459,8 +458,7 @@ class MLflowBenchmarkTracker(BaseTracker):
                         mlflow.log_metric(
                             "throughput_samples_per_sec", batch_results["throughput_docs_per_sec"])
 
-            # Log artifact using MLflow (works for both Azure ML and non-Azure ML backends)
-            # Check if artifact logging is enabled
+            # Log artifact using unified uploader (works for both Azure ML and non-Azure ML backends)
             config_dir = None
             if benchmark_json_path:
                 # Try to infer config_dir from benchmark_json_path
@@ -472,16 +470,15 @@ class MLflowBenchmarkTracker(BaseTracker):
                         break
                     current = current.parent
             
-            from infrastructure.tracking.mlflow.config_loader import get_tracking_config
-            from infrastructure.tracking.mlflow import log_artifact_safe
-            tracking_config = get_tracking_config(config_dir=config_dir, stage="benchmark")
-            if tracking_config.get("log_artifacts", True) and benchmark_json_path.exists():
-                log_artifact_safe(
-                    local_path=benchmark_json_path,
-                    artifact_path="benchmark.json",
-                    run_id=None,  # Use active run
-                )
-            elif not tracking_config.get("log_artifacts", True):
-                logger.debug("[Benchmark Tracker] Artifact logging disabled (tracking.benchmark.log_artifacts=false)")
+            from infrastructure.tracking.mlflow.artifacts.stage_helpers import upload_benchmark_artifacts
+            
+            results = upload_benchmark_artifacts(
+                benchmark_json_path=benchmark_json_path,
+                run_id=None,  # Use active run (detected automatically)
+                config_dir=config_dir,
+            )
+            
+            if not results.get("benchmark_json") and benchmark_json_path.exists():
+                logger.debug("[Benchmark Tracker] Artifact upload skipped or failed")
         except Exception as e:
             logger.warning(f"Could not log benchmark results to MLflow: {e}")

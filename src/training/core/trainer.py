@@ -532,42 +532,42 @@ def train_model(
             print(f"  [Training] Skipping artifact logging (MLFLOW_SKIP_ARTIFACT_LOGGING=true) - HPO trial artifacts will be logged only for best trial refit", file=sys.stderr, flush=True)
         else:
             try:
-                import mlflow
-                active_run = mlflow.active_run()
-                mlflow_run_id = os.environ.get("MLFLOW_RUN_ID")
+                # Infer config_dir from output_dir (similar to training_tracker.py)
+                config_dir = None
+                current = output_dir.parent
+                while current.parent != current:
+                    if current.name == "outputs":
+                        root_dir_for_config = current.parent
+                        config_dir = root_dir_for_config / "config" if root_dir_for_config else None
+                        break
+                    current = current.parent
                 
-                # Determine which run_id to use: active run or MLFLOW_RUN_ID env var
-                target_run_id = None
-                if active_run is not None:
-                    target_run_id = active_run.info.run_id
-                    print(f"  [Training] Active MLflow run detected: {target_run_id[:12]}...", file=sys.stderr, flush=True)
-                elif mlflow_run_id:
-                    target_run_id = mlflow_run_id
-                    print(f"  [Training] Using MLflow run from environment: {target_run_id[:12]}...", file=sys.stderr, flush=True)
+                from infrastructure.tracking.mlflow.artifacts.stage_helpers import upload_training_artifacts
+                from infrastructure.tracking.mlflow.utils import get_mlflow_run_id
+                
+                target_run_id = get_mlflow_run_id()
                 
                 if target_run_id:
+                    print(f"  [Training] MLflow run detected: {target_run_id[:12]}...", file=sys.stderr, flush=True)
+                    
                     checkpoint_dir = output_dir / "checkpoint"
-                    if checkpoint_dir.exists():
-                        print(f"  [Training] Logging checkpoint artifacts from: {checkpoint_dir}", file=sys.stderr, flush=True)
-                        from infrastructure.tracking.mlflow import log_artifacts_safe, log_artifact_safe
-                        log_artifacts_safe(
-                            local_dir=checkpoint_dir,
-                            artifact_path="checkpoint",
-                            run_id=target_run_id,
-                        )
+                    metrics_json_path = output_dir / "metrics.json" if (output_dir / "metrics.json").exists() else None
+                    
+                    results = upload_training_artifacts(
+                        checkpoint_dir=checkpoint_dir,
+                        metrics_json_path=metrics_json_path,
+                        run_id=target_run_id,
+                        config_dir=config_dir,
+                    )
+                    
+                    if results.get("checkpoint"):
                         print(f"  [Training] ✓ Logged checkpoint artifacts to MLflow", file=sys.stderr, flush=True)
+                    elif checkpoint_dir.exists():
+                        print(f"  [Training] ⚠ Checkpoint directory exists but upload was skipped (check config)", file=sys.stderr, flush=True)
                     else:
                         print(f"  [Training] ⚠ Checkpoint directory does not exist: {checkpoint_dir}", file=sys.stderr, flush=True)
                     
-                    # Log metrics.json if it exists
-                    metrics_json_path = output_dir / "metrics.json"
-                    if metrics_json_path.exists():
-                        from infrastructure.tracking.mlflow import log_artifact_safe
-                        log_artifact_safe(
-                            local_path=metrics_json_path,
-                            artifact_path="metrics.json",
-                            run_id=target_run_id,
-                        )
+                    if results.get("metrics_json"):
                         print(f"  [Training] ✓ Logged metrics.json to MLflow", file=sys.stderr, flush=True)
                 else:
                     print(f"  [Training] ⚠ No active MLflow run and no MLFLOW_RUN_ID - cannot log artifacts", file=sys.stderr, flush=True)

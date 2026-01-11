@@ -51,7 +51,6 @@ if tracking_uri and "azureml" in tracking_uri.lower():
         pass
 
 import mlflow
-from infrastructure.tracking.mlflow import log_artifact_safe  # noqa: F401
 
 from .cli import parse_conversion_arguments
 from .export import export_to_onnx
@@ -214,11 +213,12 @@ def main() -> None:
 
             # Log ONNX model as artifact
             if onnx_path and onnx_path.exists():
-                success = log_artifact_safe(
-                    local_path=onnx_path,
-                    artifact_path="onnx_model",
-                    run_id=None,
-                    max_retries=5,
+                from infrastructure.tracking.mlflow.artifacts.stage_helpers import upload_conversion_artifacts
+                
+                success = upload_conversion_artifacts(
+                    onnx_path=onnx_path,
+                    run_id=use_run_id,  # Use the run_id from environment
+                    config_dir=config_dir,
                 )
                 if success:
                     _log.info(f"Logged ONNX model to MLflow: {onnx_path}")

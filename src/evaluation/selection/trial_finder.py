@@ -133,8 +133,10 @@ def find_best_trial_in_study_folder(
     with open(metrics_file, "r") as f:
         metrics = json.load(f)
 
-    # Try to read trial_meta.json for run_id
+    # Try to read trial_meta.json for run_id and hashes
     trial_run_id = None
+    study_key_hash = None
+    trial_key_hash = None
     trial_meta_path = best_trial_dir / "trial_meta.json"
     if trial_meta_path.exists():
         try:
@@ -147,8 +149,11 @@ def find_best_trial_in_study_folder(
                     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
                     re.IGNORECASE
                 )
-                if uuid_pattern.match(run_id_from_meta):
-                    trial_run_id = run_id_from_meta
+            # Extract hashes for benchmarking
+            study_key_hash = trial_meta.get("study_key_hash")
+            trial_key_hash = trial_meta.get("trial_key_hash")
+            if uuid_pattern.match(run_id_from_meta):
+                trial_run_id = run_id_from_meta
         except Exception:
             pass
 
@@ -161,6 +166,12 @@ def find_best_trial_in_study_folder(
 
     if trial_run_id:
         result["trial_run_id"] = trial_run_id
+    
+    # Include hashes for benchmarking
+    if study_key_hash:
+        result["study_key_hash"] = study_key_hash
+    if trial_key_hash:
+        result["trial_key_hash"] = trial_key_hash
 
     # Verify the trial_dir actually exists before returning
     if not best_trial_dir.exists():
@@ -443,6 +454,19 @@ def find_best_trial_from_study(
 
         # Construct best_trial_from_disk from study.best_trial
         if best_trial_dir:
+            # Extract hashes from trial_meta.json if available
+            study_key_hash = None
+            trial_key_hash = None
+            trial_meta_path = best_trial_dir / "trial_meta.json"
+            if trial_meta_path.exists():
+                try:
+                    with open(trial_meta_path, "r") as f:
+                        meta = json.load(f)
+                    study_key_hash = meta.get("study_key_hash")
+                    trial_key_hash = meta.get("trial_key_hash")
+                except Exception:
+                    pass
+            
             best_trial_from_disk = {
                 "trial_name": best_trial_dir.name,
                 "trial_dir": str(best_trial_dir),
@@ -451,6 +475,8 @@ def find_best_trial_from_study(
                 "accuracy": best_trial_config.get("selection_criteria", {}).get("best_value"),
                 "metrics": best_trial_config.get("metrics", {}),
                 "hyperparameters": best_trial_config.get("hyperparameters", {}),
+                "study_key_hash": study_key_hash,  # Include hashes for benchmarking
+                "trial_key_hash": trial_key_hash,
             }
         else:
             # Fallback: trial directory not found by hash or number
@@ -469,6 +495,20 @@ def find_best_trial_from_study(
             )
 
             if best_trial_from_folder:
+                # Extract hashes from trial_meta.json if available
+                study_key_hash = None
+                trial_key_hash = None
+                trial_dir_path = Path(best_trial_from_folder["trial_dir"])
+                trial_meta_path = trial_dir_path / "trial_meta.json"
+                if trial_meta_path.exists():
+                    try:
+                        with open(trial_meta_path, "r") as f:
+                            meta = json.load(f)
+                        study_key_hash = meta.get("study_key_hash")
+                        trial_key_hash = meta.get("trial_key_hash")
+                    except Exception:
+                        pass
+                
                 best_trial_from_disk = {
                     "trial_name": best_trial_from_folder["trial_name"],
                     "trial_dir": best_trial_from_folder["trial_dir"],
@@ -478,6 +518,8 @@ def find_best_trial_from_study(
                     "metrics": best_trial_from_folder.get("metrics", {}),
                     # Use from study if available
                     "hyperparameters": best_trial_config.get("hyperparameters", {}),
+                    "study_key_hash": study_key_hash,  # Include hashes for benchmarking
+                    "trial_key_hash": trial_key_hash,
                 }
             else:
                 # Last resort: Try to find ANY v2 trial directory in the study folder
@@ -492,6 +534,19 @@ def find_best_trial_from_study(
                         f"Using found v2 trial directory as fallback: {any_trial_dir.name} "
                         f"(NOTE: This may not be the best trial, but it exists)"
                     )
+                    # Extract hashes from trial_meta.json if available
+                    study_key_hash = None
+                    trial_key_hash = None
+                    trial_meta_path = any_trial_dir / "trial_meta.json"
+                    if trial_meta_path.exists():
+                        try:
+                            with open(trial_meta_path, "r") as f:
+                                meta = json.load(f)
+                            study_key_hash = meta.get("study_key_hash")
+                            trial_key_hash = meta.get("trial_key_hash")
+                        except Exception:
+                            pass
+                    
                     best_trial_from_disk = {
                         "trial_name": any_trial_dir.name,
                         "trial_dir": str(any_trial_dir),
@@ -500,6 +555,8 @@ def find_best_trial_from_study(
                         "accuracy": best_trial_config.get("selection_criteria", {}).get("best_value"),
                         "metrics": best_trial_config.get("metrics", {}),
                         "hyperparameters": best_trial_config.get("hyperparameters", {}),
+                        "study_key_hash": study_key_hash,  # Include hashes for benchmarking
+                        "trial_key_hash": trial_key_hash,
                     }
                 else:
                     logger.error(
@@ -627,6 +684,9 @@ def find_best_trials_for_backbones(
                         "accuracy": best_trial_from_disk["accuracy"],
                         "metrics": best_trial_from_disk["metrics"],
                         "hyperparameters": best_trial_from_disk["hyperparameters"],
+                        # Include hashes from trial_meta.json for benchmarking
+                        "study_key_hash": best_trial_from_disk.get("study_key_hash"),
+                        "trial_key_hash": best_trial_from_disk.get("trial_key_hash"),
                     }
 
                     identifier = format_trial_identifier(

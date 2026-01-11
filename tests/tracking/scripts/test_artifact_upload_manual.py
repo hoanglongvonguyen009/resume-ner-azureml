@@ -30,7 +30,7 @@ def test_monkey_patch_registration():
     print("Testing monkey-patch registration...")
     
     # Import should trigger the patch
-    from tracking.mlflow.trackers.sweep_tracker import MLflowSweepTracker
+    from infrastructure.tracking.mlflow.trackers.sweep_tracker import MLflowSweepTracker
     
     import mlflow.store.artifact.artifact_repository_registry as arr
     builder = arr._artifact_repository_registry._registry.get('azureml')

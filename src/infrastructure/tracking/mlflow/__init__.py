@@ -18,6 +18,11 @@ from .artifacts import (
     log_artifact_safe,
     log_artifacts_safe,
     upload_checkpoint_archive,
+    ArtifactUploader,
+    upload_training_artifacts,
+    upload_conversion_artifacts,
+    upload_benchmark_artifacts,
+    upload_hpo_artifacts,
 )
 
 # Export lifecycle utilities
@@ -38,8 +43,8 @@ from .runs import (
 # Export URL utilities
 from .urls import get_mlflow_run_url
 
-# Re-export retry_with_backoff for convenience
-from .utils import retry_with_backoff
+# Re-export retry_with_backoff and get_mlflow_run_id for convenience
+from .utils import retry_with_backoff, get_mlflow_run_id
 
 # Export setup utilities
 from .setup import setup_mlflow_for_stage
@@ -51,6 +56,11 @@ __all__ = [
     "log_artifact_safe",
     "log_artifacts_safe",
     "upload_checkpoint_archive",
+    "ArtifactUploader",
+    "upload_training_artifacts",
+    "upload_conversion_artifacts",
+    "upload_benchmark_artifacts",
+    "upload_hpo_artifacts",
     # Lifecycle
     "terminate_run_safe",
     "ensure_run_terminated",
@@ -64,6 +74,7 @@ __all__ = [
     "get_mlflow_run_url",
     # Utilities
     "retry_with_backoff",
+    "get_mlflow_run_id",
     # Setup
     "setup_mlflow_for_stage",
 ]

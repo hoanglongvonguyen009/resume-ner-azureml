@@ -172,6 +172,31 @@ def compute_grouping_tags(
     trial_key_hash = None
     study_family_hash = None
 
+    # First, try to use hashes directly from trial_info (if available from trial_meta.json)
+    study_key_hash = trial_info.get("study_key_hash")
+    trial_key_hash = trial_info.get("trial_key_hash")
+    
+    # If hashes are already present, compute study_family_hash if needed
+    if study_key_hash and trial_key_hash:
+        try:
+            from infrastructure.naming.mlflow.hpo_keys import (
+                build_hpo_study_family_key,
+                build_hpo_study_family_hash,
+            )
+            if data_config and hpo_config:
+                study_family_key = build_hpo_study_family_key(
+                    data_config=data_config,
+                    hpo_config=hpo_config,
+                    benchmark_config=benchmark_config,
+                )
+                study_family_hash = build_hpo_study_family_hash(study_family_key)
+        except Exception:
+            pass
+        
+        # Return early if we have both hashes
+        return study_key_hash, trial_key_hash, study_family_hash
+
+    # Fallback: Compute hashes from hyperparameters if not available
     try:
         from infrastructure.naming.mlflow.hpo_keys import (
             build_hpo_study_key,

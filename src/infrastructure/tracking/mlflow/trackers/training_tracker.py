@@ -51,7 +51,6 @@ try:
 except ImportError:
     # During pytest collection, path might not be set up yet
     get_mlflow_run_url = None
-from infrastructure.tracking.mlflow.artifacts.manager import create_checkpoint_archive
 from infrastructure.tracking.mlflow.trackers.base_tracker import BaseTracker
 
 logger = get_logger(__name__)
@@ -310,30 +309,21 @@ class MLflowTrainingTracker(BaseTracker):
                         break
                     current = current.parent
             
-            from infrastructure.tracking.mlflow.config_loader import get_tracking_config
-            tracking_config = get_tracking_config(config_dir=config_dir, stage="training")
+            from infrastructure.tracking.mlflow.artifacts.stage_helpers import upload_training_artifacts
             
-            # Use MLflow for artifact upload (works for both Azure ML and non-Azure ML backends)
-            from infrastructure.tracking.mlflow import log_artifacts_safe, log_artifact_safe
-            # Log checkpoint directory if enabled
-            if tracking_config.get("log_checkpoint", True) and checkpoint_dir.exists():
-                log_artifacts_safe(
-                    local_dir=checkpoint_dir,
-                    artifact_path="checkpoint",
-                    run_id=None,  # Use active run
-                )
-            elif not tracking_config.get("log_checkpoint", True):
-                logger.debug("[Training Tracker] Checkpoint logging disabled (tracking.training.log_checkpoint=false)")
-
-            # Log metrics.json if provided and enabled
-            if tracking_config.get("log_metrics_json", True) and metrics_json_path and metrics_json_path.exists():
-                log_artifact_safe(
-                    local_path=metrics_json_path,
-                    artifact_path="metrics.json",
-                    run_id=None,  # Use active run
-                )
-            elif not tracking_config.get("log_metrics_json", True):
-                logger.debug("[Training Tracker] Metrics JSON logging disabled (tracking.training.log_metrics_json=false)")
+            # Use unified uploader (works for both Azure ML and non-Azure ML backends)
+            results = upload_training_artifacts(
+                checkpoint_dir=checkpoint_dir,
+                metrics_json_path=metrics_json_path,
+                run_id=None,  # Use active run (detected automatically)
+                config_dir=config_dir,
+            )
+            
+            # Log results for debugging
+            if not results.get("checkpoint") and checkpoint_dir.exists():
+                logger.debug("[Training Tracker] Checkpoint upload skipped or failed")
+            if not results.get("metrics_json") and metrics_json_path and metrics_json_path.exists():
+                logger.debug("[Training Tracker] Metrics JSON upload skipped or failed")
         except Exception as e:
             logger.warning(f"Could not log training artifacts to MLflow: {e}")
 

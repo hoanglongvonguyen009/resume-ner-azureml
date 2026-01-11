@@ -354,10 +354,15 @@ def acquire_best_model_checkpoint(
     # Strategy 1: Local disk selection (using hashes from best_model)
     if "local" in priority and checkpoint_path is None:
         try:
-            from orchestration.jobs.local_selection_v2 import find_trial_checkpoint_by_hash
+            from evaluation.selection.local_selection_v2 import find_trial_checkpoint_by_hash
+            from common.shared.logging_utils import get_logger
+            
+            logger = get_logger(__name__)
 
             if study_key_hash and trial_key_hash:
                 hpo_output_dir = root_dir / "outputs" / "hpo" / platform / backbone
+                logger.info(f"[ACQUISITION] Checking local disk for checkpoint: {hpo_output_dir} (study={study_key_hash[:8]}..., trial={trial_key_hash[:8]}...)")
+                
                 found_path = find_trial_checkpoint_by_hash(
                     hpo_backbone_dir=hpo_output_dir,
                     study_key_hash=study_key_hash,
@@ -366,6 +371,7 @@ def acquire_best_model_checkpoint(
 
                 if found_path:
                     found_path = Path(found_path)
+                    logger.info(f"[ACQUISITION] Found local checkpoint at: {found_path}")
 
                     if acquisition_config["local"].get("validate", True):
                         if _validate_checkpoint(found_path):
@@ -379,7 +385,10 @@ def acquire_best_model_checkpoint(
                                 if target_path.exists():
                                     shutil.rmtree(target_path)
                                 shutil.copytree(found_path, target_path)
+                                logger.info(f"[ACQUISITION] Copied local checkpoint to: {target_path}")
                             checkpoint_path = target_path
+                        else:
+                            logger.warning(f"[ACQUISITION] Local checkpoint found but validation failed: {found_path}")
                     else:
                         if found_path.exists():
                             # Copy to best_model_selection directory for consistency
@@ -392,10 +401,21 @@ def acquire_best_model_checkpoint(
                                 if target_path.exists():
                                     shutil.rmtree(target_path)
                                 shutil.copytree(found_path, target_path)
+                                logger.info(f"[ACQUISITION] Copied local checkpoint to: {target_path}")
                             checkpoint_path = target_path
+                else:
+                    logger.info(f"[ACQUISITION] No local checkpoint found at: {hpo_output_dir}")
+            else:
+                logger.warning(f"[ACQUISITION] Missing hashes for local lookup (study_key_hash={study_key_hash is not None}, trial_key_hash={trial_key_hash is not None})")
 
-        except Exception:
-            pass
+        except ImportError as e:
+            from common.shared.logging_utils import get_logger
+            logger = get_logger(__name__)
+            logger.warning(f"[ACQUISITION] Could not import find_trial_checkpoint_by_hash: {e}")
+        except Exception as e:
+            from common.shared.logging_utils import get_logger
+            logger = get_logger(__name__)
+            logger.warning(f"[ACQUISITION] Error during local checkpoint lookup: {e}", exc_info=True)
 
     # Strategy 2: Drive restore (Colab only) - optimized to scan Drive metadata and restore only checkpoint
     if "drive" in priority and restore_from_drive and in_colab and acquisition_config["drive"]["enabled"] and checkpoint_path is None:

@@ -11,6 +11,15 @@ from infrastructure.tracking.mlflow.artifacts.manager import (
     should_skip_file,
 )
 
+# Import new unified uploader and stage helpers
+from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+from infrastructure.tracking.mlflow.artifacts.stage_helpers import (
+    upload_training_artifacts,
+    upload_conversion_artifacts,
+    upload_benchmark_artifacts,
+    upload_hpo_artifacts,
+)
+
 # Import artifact upload functions from the artifacts.py file (sibling file)
 # Use importlib to avoid circular import issues
 import importlib.util
@@ -56,4 +65,9 @@ __all__ = [
     "log_artifact_safe",
     "log_artifacts_safe",
     "upload_checkpoint_archive",
+    "ArtifactUploader",
+    "upload_training_artifacts",
+    "upload_conversion_artifacts",
+    "upload_benchmark_artifacts",
+    "upload_hpo_artifacts",
 ]

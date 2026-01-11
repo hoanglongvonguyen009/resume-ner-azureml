@@ -126,7 +126,7 @@ def test_logging_eval_interval_loaded_from_config(tmp_path, monkeypatch):
         return result
 
     # Patch the actual subprocess execution function - patch it in the executor module where it's imported
-    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
+    monkeypatch.setattr(executor, "execute_training_subprocess", fake_execute_training_subprocess)
 
     mock_client = Mock()
     mock_experiment = Mock()
@@ -220,7 +220,7 @@ def test_logging_save_interval_loaded_from_config(tmp_path, monkeypatch):
         return result
 
     # Patch the actual subprocess execution function - patch it in the executor module where it's imported
-    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
+    monkeypatch.setattr(executor, "execute_training_subprocess", fake_execute_training_subprocess)
 
     mock_client = Mock()
     mock_experiment = Mock()
@@ -316,7 +316,7 @@ def test_logging_intervals_both_loaded_from_config(tmp_path, monkeypatch):
         return result
 
     # Patch the actual subprocess execution function - patch it in the executor module where it's imported
-    monkeypatch.setattr("training_exec.executor.execute_training_subprocess", fake_execute_training_subprocess)
+    monkeypatch.setattr(executor, "execute_training_subprocess", fake_execute_training_subprocess)
 
     mock_client = Mock()
     mock_experiment = Mock()

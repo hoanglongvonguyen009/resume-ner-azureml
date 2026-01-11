@@ -461,9 +461,12 @@ def find_trial_checkpoint_by_hash(
         if not study_folder.is_dir() or study_folder.name.startswith("trial_"):
             continue
         
-        # Scan all trial folders in this study
+        # Scan all trial folders in this study (support both v2 "trial-{hash}" and legacy "trial_{n}_{run_id}" formats)
         for trial_dir in study_folder.iterdir():
-            if not trial_dir.is_dir() or not trial_dir.name.startswith("trial_"):
+            if not trial_dir.is_dir():
+                continue
+            # Support both v2 format (trial-{hash}) and legacy format (trial_{n}_{run_id})
+            if not (trial_dir.name.startswith("trial-") or trial_dir.name.startswith("trial_")):
                 continue
             
             # Read trial metadata

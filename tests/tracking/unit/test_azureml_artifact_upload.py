@@ -20,7 +20,7 @@ class TestAzureMLArtifactBuilderPatch:
     def test_patch_registered_on_import(self):
         """Test that the monkey-patch is registered when tracking.mlflow is imported."""
         # Import should trigger the patch
-        from tracking.mlflow import apply_azureml_artifact_patch
+        from infrastructure.tracking.mlflow import apply_azureml_artifact_patch
         
         # Verify the patch is registered
         import mlflow.store.artifact.artifact_repository_registry as arr
@@ -33,7 +33,7 @@ class TestAzureMLArtifactBuilderPatch:
 
     def test_patch_handles_tracking_uri_parameter(self):
         """Test that the patched builder handles tracking_uri parameter gracefully."""
-        from tracking.mlflow import apply_azureml_artifact_patch
+        from infrastructure.tracking.mlflow import apply_azureml_artifact_patch
         
         import mlflow.store.artifact.artifact_repository_registry as arr
         builder = arr._artifact_repository_registry._registry.get('azureml')
@@ -57,7 +57,7 @@ class TestAzureMLArtifactBuilderPatch:
             del sys.modules['tracking.mlflow']
         
         # Import the module - should auto-apply patch
-        from tracking.mlflow import apply_azureml_artifact_patch  # noqa: F401
+        from infrastructure.tracking.mlflow import apply_azureml_artifact_patch  # noqa: F401
         
         # Verify patch was applied
         import mlflow.store.artifact.artifact_repository_registry as arr
@@ -88,7 +88,7 @@ class TestArtifactUploadToChildRun:
 
     def test_upload_to_refit_run_when_available(self, mock_mlflow_client, mock_active_run):
         """Test that artifacts are uploaded to refit run when available."""
-        from tracking.mlflow import upload_checkpoint_archive
+        from infrastructure.tracking.mlflow import upload_checkpoint_archive
         from pathlib import Path
         import tempfile
         
@@ -125,7 +125,7 @@ class TestArtifactUploadToChildRun:
 
     def test_upload_to_parent_run_when_refit_not_available(self, mock_mlflow_client, mock_active_run):
         """Test that artifacts are uploaded to parent run when refit run is not available."""
-        from tracking.mlflow import upload_checkpoint_archive
+        from infrastructure.tracking.mlflow import upload_checkpoint_archive
         from pathlib import Path
         import tempfile
         
@@ -180,7 +180,7 @@ class TestRefitRunFinishedStatus:
 
     def test_refit_run_marked_finished_after_successful_upload(self, mock_mlflow_client):
         """Test that refit run is marked as FINISHED after successful artifact upload."""
-        from tracking.mlflow import terminate_run_with_tags
+        from infrastructure.tracking.mlflow import terminate_run_with_tags
         
         refit_run_id = "refit-run-id-456"
         tags = {"code.refit_artifacts_uploaded": "true"}
@@ -202,7 +202,7 @@ class TestRefitRunFinishedStatus:
 
     def test_refit_run_marked_failed_after_upload_failure(self, mock_mlflow_client):
         """Test that refit run is marked as FAILED after artifact upload failure."""
-        from tracking.mlflow import terminate_run_with_tags
+        from infrastructure.tracking.mlflow import terminate_run_with_tags
         
         refit_run_id = "refit-run-id-456"
         upload_error = Exception("Upload failed")
@@ -229,7 +229,7 @@ class TestRefitRunFinishedStatus:
 
     def test_refit_run_not_terminated_if_already_finished(self, mock_mlflow_client):
         """Test that refit run is not terminated if it's already FINISHED."""
-        from tracking.mlflow import terminate_run_safe
+        from infrastructure.tracking.mlflow import terminate_run_safe
         
         refit_run_id = "refit-run-id-456"
         
@@ -255,7 +255,7 @@ class TestAzureMLCompatibility:
     def test_azureml_mlflow_imported(self):
         """Test that azureml.mlflow is imported when tracking.mlflow is imported."""
         # Import should trigger azureml.mlflow import
-        from tracking.mlflow import apply_azureml_artifact_patch  # noqa: F401
+        from infrastructure.tracking.mlflow import apply_azureml_artifact_patch  # noqa: F401
         
         # Verify azureml.mlflow was imported (check if it's in sys.modules)
         import sys
@@ -265,7 +265,7 @@ class TestAzureMLCompatibility:
 
     def test_artifact_repository_registry_has_azureml(self):
         """Test that Azure ML artifact repository is registered."""
-        from tracking.mlflow import apply_azureml_artifact_patch  # noqa: F401
+        from infrastructure.tracking.mlflow import apply_azureml_artifact_patch  # noqa: F401
         
         import mlflow.store.artifact.artifact_repository_registry as arr
         registry = arr._artifact_repository_registry._registry

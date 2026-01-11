@@ -26,9 +26,11 @@ lifecycle:
 """
 
 """MLflow utility functions for retry logic."""
+import os
 import random
 import time
-from typing import Any, Callable
+from pathlib import Path
+from typing import Any, Callable, Optional
 
 from common.shared.logging_utils import get_logger
 
@@ -85,4 +87,64 @@ def retry_with_backoff(
 
     # Should never reach here, but just in case
     raise RuntimeError(f"Retry logic exhausted for {operation_name}")
+
+
+def get_mlflow_run_id() -> Optional[str]:
+    """
+    Get MLflow run ID from active run or environment variable.
+    
+    This function checks for an active MLflow run first, then falls back
+    to the MLFLOW_RUN_ID environment variable. This provides a unified
+    way to detect the current run ID across different execution contexts.
+    
+    Returns:
+        Run ID string if found, None otherwise.
+    """
+    try:
+        import mlflow
+        active_run = mlflow.active_run()
+        if active_run:
+            return active_run.info.run_id
+    except Exception:
+        pass
+    return os.environ.get("MLFLOW_RUN_ID")
+
+
+def infer_config_dir_from_path(path: Optional[Path]) -> Path:
+    """
+    Infer config directory by searching up the parent chain from a given path.
+    
+    This function searches up the directory tree from the given path to find
+    a parent directory that contains a "config" subdirectory. This ensures
+    config directories are found correctly regardless of directory structure depth.
+    
+    Args:
+        path: Starting path to search from (e.g., output_dir, checkpoint_dir).
+              If None, falls back to cwd/config.
+    
+    Returns:
+        Path to config directory. Falls back to Path.cwd() / "config" if not found.
+    
+    Examples:
+        >>> # Typical structure: /workspace/outputs/hpo/...
+        >>> # Will find: /workspace/config
+        >>> infer_config_dir_from_path(Path("/workspace/outputs/hpo/local/distilbert"))
+        Path("/workspace/config")
+        
+        >>> # Deep structure: /workspace/outputs/hpo/local/distilbert/study-abc/trial-xyz
+        >>> # Will still find: /workspace/config
+        >>> infer_config_dir_from_path(Path("/workspace/outputs/hpo/local/distilbert/study-abc/trial-xyz"))
+        Path("/workspace/config")
+    """
+    if path is None:
+        return Path.cwd() / "config"
+    
+    # Search up the parent chain to find a config directory
+    for parent in path.parents:
+        candidate = parent / "config"
+        if candidate.exists():
+            return candidate
+    
+    # Fall back to cwd/config if not found
+    return Path.cwd() / "config"
 

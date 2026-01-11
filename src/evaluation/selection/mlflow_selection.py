@@ -17,7 +17,6 @@ def find_best_model_from_mlflow(
     hpo_experiments: Dict[str, Dict[str, str]],
     tags_config: Union[TagsRegistry, Dict[str, Any]],
     selection_config: Dict[str, Any],
-    use_python_filtering: bool = True,
 ) -> Optional[Dict[str, Any]]:
     """
     Find best model by joining benchmark runs with training (refit) runs.
@@ -34,7 +33,6 @@ def find_best_model_from_mlflow(
         hpo_experiments: Dict mapping backbone -> experiment info (name, id)
         tags_config: TagsRegistry or Dict with tags configuration (for backward compatibility)
         selection_config: Selection configuration
-        use_python_filtering: If True, fetch all runs and filter in Python (recommended for AzureML)
 
     Returns:
         Dict with best run info or None if no matches found
@@ -53,8 +51,6 @@ def find_best_model_from_mlflow(
         return None
 
     # Tag keys from config (support both TagsRegistry and dict for backward compatibility)
-    # Check if it's a TagsRegistry by checking for the key() method (more robust than isinstance)
-    # This handles cases where isinstance might fail due to import/class definition issues
     if hasattr(tags_config, 'key') and callable(getattr(tags_config, 'key', None)):
         # It's a TagsRegistry object (or compatible object with key() method)
         study_key_tag = tags_config.key("grouping", "study_key_hash")
@@ -68,17 +64,10 @@ def find_best_model_from_mlflow(
         stage_tag = tags_config["process"]["stage"]
         backbone_tag = tags_config["process"]["backbone"]
     else:
-        # Fallback: try isinstance check
-        if isinstance(tags_config, TagsRegistry):
-            study_key_tag = tags_config.key("grouping", "study_key_hash")
-            trial_key_tag = tags_config.key("grouping", "trial_key_hash")
-            stage_tag = tags_config.key("process", "stage")
-            backbone_tag = tags_config.key("process", "backbone")
-        else:
-            raise TypeError(
-                f"tags_config must be TagsRegistry or dict, got {type(tags_config)}. "
-                f"Object: {tags_config}"
-            )
+        raise TypeError(
+            f"tags_config must be TagsRegistry or dict, got {type(tags_config)}. "
+            f"Object: {tags_config}"
+        )
 
     # Selection config
     objective_metric = selection_config["objective"]["metric"]
@@ -95,13 +84,6 @@ def find_best_model_from_mlflow(
             f1_weight = f1_weight / total_weight
             latency_weight = latency_weight / total_weight
 
-    print(f"🔍 Finding best model from MLflow...")
-    print(f"   Benchmark experiment: {benchmark_experiment['name']}")
-    print(f"   HPO experiments: {len(hpo_experiments)}")
-    print(f"   Objective metric: {objective_metric}")
-    print(
-        f"   Composite weights: F1={f1_weight:.2f}, Latency={latency_weight:.2f}")
-
     logger.info(f"Finding best model from MLflow")
     logger.info(f"  Benchmark experiment: {benchmark_experiment['name']}")
     logger.info(f"  HPO experiments: {len(hpo_experiments)}")
@@ -110,7 +92,6 @@ def find_best_model_from_mlflow(
         f"  Composite weights: F1={f1_weight:.2f}, Latency={latency_weight:.2f}")
 
     # Step 1: Query benchmark runs
-    print(f"\n📊 Querying benchmark runs...")
     logger.info("Querying benchmark runs...")
 
     all_benchmark_runs = client.search_runs(
@@ -135,8 +116,6 @@ def find_best_model_from_mlflow(
         if has_required_metrics and has_grouping_tags:
             valid_benchmark_runs.append(run)
 
-    print(
-        f"   Found {len(valid_benchmark_runs)} benchmark runs with required metrics and grouping tags")
     logger.info(
         f"Found {len(valid_benchmark_runs)} benchmark runs with required metrics and grouping tags")
 
@@ -145,7 +124,6 @@ def find_best_model_from_mlflow(
         return None
 
     # Step 2: Preload ALL trial runs (for metrics) and refit runs (for artifacts) from HPO experiments
-    print(f"\n🔗 Preloading trial runs (metrics) and refit runs (artifacts) from HPO experiments...")
     logger.info("Preloading trial and refit runs from HPO experiments...")
     trial_lookup: Dict[Tuple[str, str], Any] = {}
     refit_lookup: Dict[Tuple[str, str], Any] = {}
@@ -169,41 +147,36 @@ def find_best_model_from_mlflow(
         refit_runs = [r for r in finished_runs if r.data.tags.get(
             stage_tag) == "hpo_refit"]
 
-        print(
-            f"   {exp_info['name']}: {len(finished_runs)} finished runs, {len(trial_runs)} trial runs, {len(refit_runs)} refit runs")
         logger.debug(
             f"Found {len(trial_runs)} trial runs and {len(refit_runs)} refit runs in {exp_info['name']}")
 
+        # Helper function to add run to lookup, handling duplicates
+        def add_to_lookup(lookup: Dict, run: Any, run_type: str) -> None:
+            study_hash = run.data.tags.get(study_key_tag)
+            trial_hash = run.data.tags.get(trial_key_tag)
+            
+            if not study_hash or not trial_hash:
+                return
+            
+            key = (study_hash, trial_hash)
+            existing = lookup.get(key)
+            if existing is None:
+                lookup[key] = run
+            elif run.info.start_time > existing.info.start_time:
+                logger.warning(
+                    f"Duplicate {run_type} hash found: key=({study_hash[:8]}..., {trial_hash[:8]}...). "
+                    f"Keeping LATER run: run_id={run.info.run_id[:8]}... over run_id={existing.info.run_id[:8]}..."
+                )
+                lookup[key] = run
+
         # Build trial lookup: (study_key_hash, trial_key_hash) -> trial_run (for metrics)
         for trial_run in trial_runs:
-            study_hash = trial_run.data.tags.get(study_key_tag)
-            trial_hash = trial_run.data.tags.get(trial_key_tag)
-
-            if not study_hash or not trial_hash:
-                continue
-
-            key = (study_hash, trial_hash)
-            existing = trial_lookup.get(key)
-            if existing is None or trial_run.info.start_time > existing.info.start_time:
-                trial_lookup[key] = trial_run
+            add_to_lookup(trial_lookup, trial_run, "trial")
 
         # Build refit lookup: (study_key_hash, trial_key_hash) -> refit_run (for artifacts)
         for refit_run in refit_runs:
-            study_hash = refit_run.data.tags.get(study_key_tag)
-            trial_hash = refit_run.data.tags.get(trial_key_tag)
+            add_to_lookup(refit_lookup, refit_run, "refit")
 
-            if not study_hash or not trial_hash:
-                continue
-
-            key = (study_hash, trial_hash)
-            existing = refit_lookup.get(key)
-            if existing is None or refit_run.info.start_time > existing.info.start_time:
-                refit_lookup[key] = refit_run
-
-    print(
-        f"   Built trial lookup with {len(trial_lookup)} unique (study_hash, trial_hash) pairs")
-    print(
-        f"   Built refit lookup with {len(refit_lookup)} unique (study_hash, trial_hash) pairs")
     logger.info(
         f"Built trial lookup with {len(trial_lookup)} unique (study_hash, trial_hash) pairs")
     logger.info(
@@ -214,7 +187,6 @@ def find_best_model_from_mlflow(
         return None
 
     # Step 3: Join benchmark runs with trial runs (for metrics) and refit runs (for artifacts)
-    print(f"\n🔗 Joining benchmark runs with trial runs (metrics) and refit runs (artifacts)...")
     logger.info("Joining benchmark runs with trial runs and refit runs...")
     candidates = []
 
@@ -262,8 +234,6 @@ def find_best_model_from_mlflow(
             "trial_key_hash": trial_hash,
         })
 
-    print(
-        f"   Found {len(candidates)} candidate(s) with both benchmark and training metrics")
     logger.info(
         f"Found {len(candidates)} candidate(s) with both benchmark and training metrics")
 
@@ -273,7 +243,6 @@ def find_best_model_from_mlflow(
         return None
 
     # Step 4: Compute normalized composite scores
-    logger.info("Computing composite scores...")
 
     f1_scores = [c["f1_score"] for c in candidates]
     latency_scores = [c["latency_ms"] for c in candidates]
@@ -307,13 +276,10 @@ def find_best_model_from_mlflow(
     artifact_run = best_candidate["artifact_run"]
     trial_run = best_candidate["trial_run"]
 
-    logger.info("Best model selected:")
-    logger.info(f"  Artifact Run ID: {artifact_run.info.run_id}")
-    logger.info(f"  Trial Run ID: {trial_run.info.run_id}")
-    logger.info(f"  Backbone: {best_candidate['backbone']}")
-    logger.info(f"  F1 Score: {best_candidate['f1_score']:.4f}")
-    logger.info(f"  Latency: {best_candidate['latency_ms']:.2f} ms")
-    logger.info(f"  Composite Score: {best_candidate['composite_score']:.4f}")
+    logger.info(f"Best model selected: backbone={best_candidate['backbone']}, "
+                f"f1={best_candidate['f1_score']:.4f}, "
+                f"latency={best_candidate['latency_ms']:.2f}ms, "
+                f"composite={best_candidate['composite_score']:.4f}")
 
     # Find experiment name for best candidate
     best_experiment_name = None

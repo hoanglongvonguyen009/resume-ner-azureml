@@ -51,7 +51,6 @@ try:
 except ImportError:
     # During pytest collection, path might not be set up yet
     get_mlflow_run_url = None
-from infrastructure.tracking.mlflow.artifacts.manager import create_checkpoint_archive
 from infrastructure.tracking.mlflow.trackers.base_tracker import BaseTracker
 
 logger = get_logger(__name__)

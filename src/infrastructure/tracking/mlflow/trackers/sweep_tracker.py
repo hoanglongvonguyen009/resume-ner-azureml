@@ -57,8 +57,9 @@ from common.shared.logging_utils import get_logger
 from infrastructure.tracking.mlflow.types import RunHandle
 from infrastructure.tracking.mlflow.naming import build_mlflow_tags, build_mlflow_run_key, build_mlflow_run_key_hash
 from infrastructure.tracking.mlflow.index import update_mlflow_index
-from infrastructure.tracking.mlflow.artifacts.manager import create_checkpoint_archive
+from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
 from infrastructure.tracking.mlflow.trackers.base_tracker import BaseTracker
+from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
 # Tag key imports moved to local scope where needed
 
 logger = get_logger(__name__)
@@ -117,17 +118,8 @@ class MLflowSweepTracker(BaseTracker):
                 experiment_id = parent_run.info.experiment_id
                 tracking_uri = mlflow.get_tracking_uri()
 
-                # Infer config_dir from output_dir by searching for nearest parent
-                # that has a sibling config directory. Fall back to cwd/config.
-                config_dir = None
-                if output_dir:
-                    for parent in output_dir.parents:
-                        candidate = parent / "config"
-                        if candidate.exists():
-                            config_dir = candidate
-                            break
-                if config_dir is None:
-                    config_dir = Path.cwd() / "config"
+                # Infer config_dir from output_dir
+                config_dir = infer_config_dir_from_path(output_dir)
 
                 # Compute grouping tags if configs available
                 study_key_hash = None
@@ -241,17 +233,8 @@ class MLflowSweepTracker(BaseTracker):
         goal = hpo_config.get("objective", {}).get("goal", "maximize")
         max_trials = hpo_config["sampling"]["max_trials"]
 
-        # Infer config_dir from output_dir by searching for nearest parent
-        # that has a sibling config directory. Fall back to cwd/config.
-        config_dir = None
-        if output_dir:
-            for parent in output_dir.parents:
-                candidate = parent / "config"
-                if candidate.exists():
-                    config_dir = candidate
-                    break
-        if config_dir is None:
-            config_dir = Path.cwd() / "config"
+        # Infer config_dir from output_dir
+        config_dir = infer_config_dir_from_path(output_dir)
 
         # Mark parent run as sweep job for Azure ML UI
         from infrastructure.naming.mlflow.tag_keys import (
@@ -321,21 +304,14 @@ class MLflowSweepTracker(BaseTracker):
             f"parent_run_id={parent_run_id[:12] if parent_run_id else 'None'}..."
         )
 
-        # Infer config_dir and output_dir if not provided
-        if config_dir is None:
-            if output_dir:
-                # Infer config_dir from output_dir by searching for nearest parent
-                # that has a sibling config directory. Fall back to cwd/config.
-                for parent in output_dir.parents:
-                    candidate = parent / "config"
-                    if candidate.exists():
-                        config_dir = candidate
-                        break
-            if config_dir is None:
-                config_dir = Path.cwd() / "config"
-        
+        # Infer output_dir if not provided
         if output_dir is None:
             output_dir = hpo_output_dir
+        
+        # Infer config_dir if not provided
+        if config_dir is None:
+            # Use output_dir (or hpo_output_dir) for config inference
+            config_dir = infer_config_dir_from_path(output_dir)
 
         try:
             # Count completed trials
@@ -652,11 +628,8 @@ class MLflowSweepTracker(BaseTracker):
             best_run_id = trial_to_run_id.get(best_trial_number)
 
             if best_run_id:
-                # Infer config_dir if available
-                config_dir = None
-                if output_dir:
-                    root_dir_for_config = output_dir.parent.parent if output_dir.parent.name == "outputs" else output_dir.parent.parent.parent
-                    config_dir = root_dir_for_config / "config" if root_dir_for_config else None
+                # Infer config_dir from output_dir
+                config_dir = infer_config_dir_from_path(output_dir)
                 
                 from infrastructure.naming.mlflow.tag_keys import (
                     get_hpo_best_trial_number,
@@ -877,9 +850,8 @@ class MLflowSweepTracker(BaseTracker):
             except Exception:
                 pass
 
-            # Use MLflow for artifact upload (works for both Azure ML and non-Azure ML backends)
+            # Use ArtifactUploader for unified checkpoint upload
             artifact_logged = False
-            archive_path = None
             try:
                 active_run = mlflow.active_run()
                 if not active_run:
@@ -891,25 +863,23 @@ class MLflowSweepTracker(BaseTracker):
                     raise ValueError(
                         "Active MLflow run does not have 'info.run_id' attribute")
 
-                logger.info("Creating checkpoint archive...")
-                archive_path, manifest = create_checkpoint_archive(
-                    checkpoint_dir, best_trial_number
-                )
-
-                # Upload archive with retry logic using safe utility
-                artifact_logged = upload_checkpoint_archive(
-                    archive_path=archive_path,
-                    manifest=manifest,
-                    artifact_path="best_trial_checkpoint.tar.gz",
+                # Infer config_dir from checkpoint_dir
+                config_dir = infer_config_dir_from_path(checkpoint_dir)
+                
+                # Use ArtifactUploader for unified checkpoint upload
+                uploader = ArtifactUploader(
                     run_id=None,  # Use active run
-                    max_retries=5,
-                    base_delay=2.0,
-                    cleanup_on_failure=False,  # We'll clean up in finally block
+                    stage=None,  # HPO doesn't have a specific stage config
+                    config_dir=config_dir,
                 )
-                logger.info(
-                    f"Uploaded best trial checkpoint archive: {manifest['file_count']} files "
-                    f"({manifest['total_size'] / 1024 / 1024:.1f}MB) for trial {best_trial_number}"
+                
+                logger.info("Uploading checkpoint archive...")
+                artifact_logged = uploader.upload_checkpoint(
+                    checkpoint_dir=checkpoint_dir,
+                    artifact_path="best_trial_checkpoint.tar.gz",
+                    trial_number=best_trial_number,
                 )
+                
             except Exception as archive_error:
                 error_type = type(archive_error).__name__
                 error_msg = str(archive_error)
@@ -918,16 +888,6 @@ class MLflowSweepTracker(BaseTracker):
                 )
                 artifact_logged = False
                 raise
-            finally:
-                # Clean up temp archive file
-                if archive_path and archive_path.exists():
-                    try:
-                        archive_path.unlink()
-                        logger.debug(
-                            f"Cleaned up temporary archive: {archive_path}")
-                    except Exception as cleanup_error:
-                        logger.warning(
-                            f"Could not clean up archive file: {cleanup_error}")
 
             # Mark study as complete if checkpoint was successfully uploaded
             if artifact_logged:
@@ -1043,12 +1003,10 @@ class MLflowSweepTracker(BaseTracker):
             )
             return
 
-        # Upload checkpoint using MLflow (works for both Azure ML and non-Azure ML backends)
-        archive_path = None
-        archive_path, manifest = create_checkpoint_archive(
-            checkpoint_dir, best_trial_number
-        )
+        # Infer config_dir from checkpoint_dir
+        config_dir = infer_config_dir_from_path(checkpoint_dir)
 
+        # Use ArtifactUploader for unified checkpoint upload
         try:
             logger.info("Uploading checkpoint archive to MLflow...")
 
@@ -1057,29 +1015,32 @@ class MLflowSweepTracker(BaseTracker):
             if refit_run_id:
                 logger.info(
                     f"Uploading checkpoint to refit run {refit_run_id[:12]} "
-                    f"(child of parent {parent_run_id[:12]})"
+                    f"(child of parent {parent_run_id[:12] if parent_run_id else 'N/A'})"
                 )
             else:
                 logger.info(
-                    f"Uploading checkpoint to parent run {parent_run_id[:12]}"
+                    f"Uploading checkpoint to parent run {parent_run_id[:12] if parent_run_id else 'N/A'}"
                 )
             
-            # Use safe upload utility with explicit run_id
-            # Upload as best_trial_checkpoint.tar.gz (file name, not directory)
-            upload_checkpoint_archive(
-                archive_path=archive_path,
-                manifest=manifest,
-                artifact_path="best_trial_checkpoint.tar.gz",
+            # Use ArtifactUploader for unified checkpoint upload
+            uploader = ArtifactUploader(
                 run_id=run_id_to_use,
-                max_retries=5,
-                base_delay=2.0,
-                cleanup_on_failure=False,  # We'll clean up in finally block
+                stage=None,  # HPO doesn't have a specific stage config
+                config_dir=config_dir,
+            )
+            
+            artifact_logged = uploader.upload_checkpoint(
+                checkpoint_dir=checkpoint_dir,
+                artifact_path="best_trial_checkpoint.tar.gz",
+                trial_number=best_trial_number,
             )
 
-            logger.info(
-                f"Uploaded checkpoint archive: {manifest['file_count']} files "
-                f"({manifest['total_size'] / 1024 / 1024:.1f}MB) for trial {best_trial_number}"
-            )
+            # Note: Detailed upload message (file count, size) is already logged by uploader.upload_checkpoint()
+            # This message confirms the overall operation completed
+            if artifact_logged:
+                logger.info(
+                    f"Checkpoint upload completed successfully for trial {best_trial_number}"
+                )
 
             # Mark study as complete after successful checkpoint upload
             try:
@@ -1097,16 +1058,11 @@ class MLflowSweepTracker(BaseTracker):
                 logger.warning(
                     f"Could not mark study as complete: {attr_error}"
                 )
-
-            # Clean up
-            if archive_path.exists():
-                archive_path.unlink()
+            else:
+                logger.warning("Checkpoint upload returned False (may have been skipped)")
 
         except Exception as e:
             logger.error(f"Failed to upload checkpoint via MLflow: {e}")
-            # Clean up on failure
-            if archive_path and archive_path.exists():
-                archive_path.unlink()
             raise
 
     def log_tracking_info(self) -> None:
