@@ -11,6 +11,11 @@ from .run_mode import (
     is_reuse_if_exists,
     is_resume_if_incomplete,
 )
+from .run_decision import (
+    ProcessType,
+    should_reuse_existing,
+    get_load_if_exists_flag,
+)
 from .variants import (
     compute_next_variant,
     find_existing_variants,
@@ -25,6 +30,10 @@ __all__ = [
     "is_force_new",
     "is_reuse_if_exists",
     "is_resume_if_incomplete",
+    # Run decision utilities
+    "ProcessType",
+    "should_reuse_existing",
+    "get_load_if_exists_flag",
     # Variant utilities
     "compute_next_variant",
     "find_existing_variants",

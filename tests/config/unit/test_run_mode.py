@@ -161,3 +161,4 @@ class TestRunModeIntegration:
         assert get_run_mode(final_training_config) == "resume_if_incomplete"
         assert is_resume_if_incomplete(final_training_config) is True
 
+

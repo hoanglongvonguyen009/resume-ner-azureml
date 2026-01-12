@@ -199,40 +199,60 @@ class StudyManager:
             storage_path.parent.mkdir(parents=True, exist_ok=True)
             storage_uri = get_storage_uri(storage_path)
 
-            # Check if should resume (if study.db already exists in v2 folder)
-            should_resume = (
-                self.checkpoint_config.get("auto_resume", True)
-                and storage_path.exists()
-            )
+            # Check if storage exists
+            storage_exists = storage_path.exists()
 
             # If not found in v2 folder, check if legacy folder has it (for migration)
-            if not storage_path.exists() and self.restore_from_drive is not None:
+            if not storage_exists and self.restore_from_drive is not None:
                 try:
                     restored = self.restore_from_drive(storage_path)
                     if restored:
                         logger.info(
                             f"Restored HPO checkpoint from Drive: {storage_path}")
+                        storage_exists = True
                 except Exception as e:
                     logger.debug(f"Drive backup not found for checkpoint: {e}")
+
+            # Use unified decision logic
+            from infrastructure.config.run_decision import should_reuse_existing
+            should_resume = should_reuse_existing(
+                config=combined_config,
+                exists=storage_exists,
+                process_type="hpo"
+            )
+            # Also respect auto_resume config (if auto_resume=False, don't resume even if exists)
+            if should_resume:
+                auto_resume = self.checkpoint_config.get("auto_resume", True)
+                if not auto_resume:
+                    should_resume = False
+                    logger.info(
+                        f"[HPO] auto_resume=false: Creating new study '{study_name}' "
+                        f"(ignoring existing study)"
+                    )
         else:
             # Use legacy storage path resolution
-            storage_path, storage_uri, should_resume = setup_checkpoint_storage(
+            storage_path, storage_uri, legacy_should_resume = setup_checkpoint_storage(
                 output_dir,
                 self.checkpoint_config,
                 self.backbone,
                 study_name,
                 restore_from_drive=self.restore_from_drive,
             )
-
-        # Respect run.mode: force_new (same logic as final training)
-        # When force_new, always create new study even if one exists
-        from infrastructure.config.run_mode import is_force_new
-        if is_force_new(combined_config):
-            should_resume = False
-            logger.info(
-                f"[HPO] run.mode=force_new: Creating new study '{study_name}' "
-                f"(ignoring existing study if present)"
+            
+            # Use unified decision logic (legacy path may have already checked existence)
+            from infrastructure.config.run_decision import should_reuse_existing
+            # If legacy function says should_resume, storage likely exists
+            storage_exists = legacy_should_resume or storage_path.exists()
+            should_resume = should_reuse_existing(
+                config=combined_config,
+                exists=storage_exists,
+                process_type="hpo"
             )
+            # Also respect auto_resume config
+            if should_resume:
+                auto_resume = self.checkpoint_config.get("auto_resume", True)
+                if not auto_resume:
+                    should_resume = False
 
         if should_resume:
             return self._load_existing_study(study_name, storage_path, storage_uri)
@@ -258,24 +278,28 @@ class StudyManager:
             )
 
             # Check if HPO is already complete
-            user_attrs = study.user_attrs if hasattr(
-                study, "user_attrs") else {}
-            hpo_complete = user_attrs.get(
-                "hpo_complete", "false").lower() == "true"
-            checkpoint_uploaded = (
-                user_attrs.get("checkpoint_uploaded",
-                               "false").lower() == "true"
-            )
-
-            if hpo_complete and checkpoint_uploaded:
-                best_trial_num = user_attrs.get("best_trial_number", "unknown")
-                completion_time = user_attrs.get(
-                    "completion_timestamp", "unknown")
-                logger.info(
-                    f"✓ HPO already completed and checkpoint uploaded (best trial: {best_trial_num}, "
-                    f"completed: {completion_time}). Skipping HPO execution."
+            # Skip this check if force_new (we want to create new, not reuse even if complete)
+            from infrastructure.config.run_mode import is_force_new
+            combined_config_check = {**self.hpo_config, **(self.checkpoint_config or {})}
+            if not is_force_new(combined_config_check):
+                user_attrs = study.user_attrs if hasattr(
+                    study, "user_attrs") else {}
+                hpo_complete = user_attrs.get(
+                    "hpo_complete", "false").lower() == "true"
+                checkpoint_uploaded = (
+                    user_attrs.get("checkpoint_uploaded",
+                                   "false").lower() == "true"
                 )
-                return study, study_name, storage_path, storage_uri, True
+
+                if hpo_complete and checkpoint_uploaded:
+                    best_trial_num = user_attrs.get("best_trial_number", "unknown")
+                    completion_time = user_attrs.get(
+                        "completion_timestamp", "unknown")
+                    logger.info(
+                        f"✓ HPO already completed and checkpoint uploaded (best trial: {best_trial_num}, "
+                        f"completed: {completion_time}). Skipping HPO execution."
+                    )
+                    return study, study_name, storage_path, storage_uri, True
 
             # Mark any RUNNING trials as FAILED (they were interrupted)
             self._mark_running_trials_as_failed(study)
@@ -319,30 +343,73 @@ class StudyManager:
         self, study_name: str, storage_path: Path, storage_uri: str
     ) -> Tuple[Any, str, Path, str, bool]:
         """Create new study."""
-        # Check run_mode to determine if we should load existing study
-        from infrastructure.config.run_mode import is_force_new
+        # Use unified decision logic for load_if_exists flag
+        from infrastructure.config.run_decision import get_load_if_exists_flag
         combined_config = {**self.hpo_config, **(self.checkpoint_config or {})}
-        force_new = is_force_new(combined_config)
         
         if storage_uri:
             logger.info(
                 f"[HPO] Starting optimization for {self.backbone} with checkpointing..."
             )
             logger.debug(f"Checkpoint: {storage_path}")
-            # When checkpointing is enabled and NOT force_new, use load_if_exists=True so we can resume
-            # When force_new, always create new study (load_if_exists=False)
-            load_if_exists = self.checkpoint_enabled and not force_new
+            # Use unified function to determine load_if_exists flag
+            load_if_exists = get_load_if_exists_flag(
+                config=combined_config,
+                checkpoint_enabled=self.checkpoint_enabled,
+                process_type="hpo"
+            )
         else:
             load_if_exists = False
 
-        study = self.optuna.create_study(
-            direction=self.direction,
-            sampler=self.sampler,
-            pruner=self.pruner,
-            study_name=study_name,
-            storage=storage_uri,
-            load_if_exists=load_if_exists,
-        )
+        # Check if force_new is set (needed for error handling)
+        from infrastructure.config.run_mode import is_force_new
+        force_new = is_force_new(combined_config)
+        
+        # Try to create study, handling DuplicatedStudyError when force_new
+        try:
+            study = self.optuna.create_study(
+                direction=self.direction,
+                sampler=self.sampler,
+                pruner=self.pruner,
+                study_name=study_name,
+                storage=storage_uri,
+                load_if_exists=load_if_exists,
+            )
+        except self.optuna.exceptions.DuplicatedStudyError:
+            # If study name already exists in database and force_new is set,
+            # increment variant and try again
+            if force_new and storage_uri:
+                logger.warning(
+                    f"Study '{study_name}' already exists in database. "
+                    f"Incrementing variant for force_new mode..."
+                )
+                # Extract base name and current variant
+                # Check if study_name ends with _v{N} pattern
+                import re
+                variant_match = re.search(r'_v(\d+)$', study_name)
+                if variant_match:
+                    # Already has variant suffix (e.g., hpo_distilbert_v2)
+                    base = study_name[:variant_match.start()]
+                    current_variant = int(variant_match.group(1))
+                    new_variant = current_variant + 1
+                    study_name = f"{base}_v{new_variant}"
+                else:
+                    # No variant suffix, add _v2 (base name exists in database)
+                    study_name = f"{study_name}_v2"
+                
+                logger.info(f"Retrying with incremented study name: '{study_name}'")
+                # Retry with incremented name and load_if_exists=False to force new
+                study = self.optuna.create_study(
+                    direction=self.direction,
+                    sampler=self.sampler,
+                    pruner=self.pruner,
+                    study_name=study_name,
+                    storage=storage_uri,
+                    load_if_exists=False,  # Force new even if exists
+                )
+            else:
+                # Re-raise if not force_new or no storage
+                raise
 
         # If checkpointing is enabled and we loaded an existing study, check auto_resume
         # But skip this if force_new (we already set load_if_exists=False above)

@@ -7,6 +7,9 @@ Single source of truth for run.mode extraction across all stages:
 - Benchmarking: Inherits from HPO
 
 This module replaces 4+ duplicate extractions throughout the codebase.
+
+See also: `run_decision.py` for unified decision logic (should_reuse_existing, get_load_if_exists_flag)
+that uses the run mode extracted by this module to make reuse vs. create new decisions.
 """
 
 from __future__ import annotations

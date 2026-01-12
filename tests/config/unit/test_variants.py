@@ -288,3 +288,4 @@ class TestVariantsIntegration:
         )
         assert variant == 3
 
+

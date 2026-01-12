@@ -187,49 +187,62 @@ def execute_final_training(
     final_training_yaml = load_yaml(config_dir / "final_training.yaml")
 
     # Check if run should be skipped based on run.mode
-    from infrastructure.config.run_mode import is_reuse_if_exists
+    from infrastructure.config.run_decision import should_reuse_existing
+    from infrastructure.config.run_mode import is_force_new
+    
     final_checkpoint_dir = final_output_dir / "checkpoint"
 
-    if is_reuse_if_exists(final_training_yaml):
-        # Helper function to check if a checkpoint is complete
-        def is_checkpoint_complete(checkpoint_dir: Path, metadata_file: Path) -> bool:
-            """Check if checkpoint is complete (has metadata with completion flag, or valid checkpoint files)."""
-            # First check: metadata.json with completion flag
-            if metadata_file.exists():
-                try:
-                    from common.shared.json_cache import load_json
-                    metadata = load_json(metadata_file, default={})
-                    if metadata.get("status", {}).get("training", {}).get("completed", False):
-                        return True
-                except Exception:
-                    pass
-
-            # Fallback: check if checkpoint exists and has model files (indicates training completed)
-            if checkpoint_dir.exists():
-                # Check for key model files that indicate successful training
-                required_files = ["config.json", "model.safetensors"]
-                # Also accept .bin or .pt files as alternatives
-                model_files = list(checkpoint_dir.glob("model.*"))
-                config_file = checkpoint_dir / "config.json"
-
-                if config_file.exists() and (model_files or any(
-                    (checkpoint_dir / f).exists() for f in required_files
-                )):
+    # Helper function to check if a checkpoint is complete
+    def is_checkpoint_complete(checkpoint_dir: Path, metadata_file: Path) -> bool:
+        """Check if checkpoint is complete (has metadata with completion flag, or valid checkpoint files)."""
+        # First check: metadata.json with completion flag
+        if metadata_file.exists():
+            try:
+                from common.shared.json_cache import load_json
+                metadata = load_json(metadata_file, default={})
+                if metadata.get("status", {}).get("training", {}).get("completed", False):
                     return True
+            except Exception:
+                pass
 
-            return False
+        # Fallback: check if checkpoint exists and has model files (indicates training completed)
+        if checkpoint_dir.exists():
+            # Check for key model files that indicate successful training
+            required_files = ["config.json", "model.safetensors"]
+            # Also accept .bin or .pt files as alternatives
+            model_files = list(checkpoint_dir.glob("model.*"))
+            config_file = checkpoint_dir / "config.json"
 
-        # First check: exact match (resolved variant)
-        metadata_file = final_output_dir / "metadata.json"
-        if is_checkpoint_complete(final_checkpoint_dir, metadata_file):
-            print(f"✓ Found existing completed final training run")
-            print(f"  Output directory: {final_output_dir}")
-            print(f"  Checkpoint: {final_checkpoint_dir}")
-            print(f"  Reusing existing checkpoint (run.mode: reuse_if_exists)")
-            return final_checkpoint_dir
+            if config_file.exists() and (model_files or any(
+                (checkpoint_dir / f).exists() for f in required_files
+            )):
+                return True
 
-        # Second check: search for any complete variant with same spec_fp + exec_fp
-        # This handles cases where _resolve_variant didn't find the complete variant
+        return False
+
+    # First check: exact match (resolved variant)
+    metadata_file = final_output_dir / "metadata.json"
+    checkpoint_exists = final_checkpoint_dir.exists()
+    is_complete = is_checkpoint_complete(final_checkpoint_dir, metadata_file) if checkpoint_exists else False
+    
+    should_reuse = should_reuse_existing(
+        config=final_training_yaml,
+        exists=checkpoint_exists,
+        is_complete=is_complete,
+        process_type="final_training"
+    )
+    
+    if should_reuse:
+        print(f"✓ Found existing completed final training run")
+        print(f"  Output directory: {final_output_dir}")
+        print(f"  Checkpoint: {final_checkpoint_dir}")
+        print(f"  Reusing existing checkpoint (run.mode: {final_training_yaml.get('run', {}).get('mode', 'reuse_if_exists')})")
+        return final_checkpoint_dir
+
+    # Second check: search for any complete variant with same spec_fp + exec_fp
+    # This handles cases where _resolve_variant didn't find the complete variant
+    # Skip variant search if force_new (we want to create new, not reuse any variant)
+    if not is_force_new(final_training_yaml):
         try:
             from infrastructure.paths import resolve_output_path
             base_output_dir = resolve_output_path(
@@ -252,8 +265,18 @@ def execute_final_training(
                         for variant_dir in variant_dirs:
                             variant_checkpoint = variant_dir / "checkpoint"
                             variant_metadata = variant_dir / "metadata.json"
-
-                            if is_checkpoint_complete(variant_checkpoint, variant_metadata):
+                            
+                            variant_exists = variant_checkpoint.exists()
+                            variant_complete = is_checkpoint_complete(variant_checkpoint, variant_metadata) if variant_exists else False
+                            
+                            should_reuse_variant = should_reuse_existing(
+                                config=final_training_yaml,
+                                exists=variant_exists,
+                                is_complete=variant_complete,
+                                process_type="final_training"
+                            )
+                            
+                            if should_reuse_variant:
                                 print(
                                     f"✓ Found existing completed final training run")
                                 print(
@@ -261,7 +284,7 @@ def execute_final_training(
                                 print(
                                     f"  Checkpoint: {variant_checkpoint}")
                                 print(
-                                    f"  Reusing existing checkpoint (run.mode: reuse_if_exists)")
+                                    f"  Reusing existing checkpoint (run.mode: {final_training_yaml.get('run', {}).get('mode', 'reuse_if_exists')})")
                                 return variant_checkpoint
                         break  # Only check the matching spec_exec directory
         except Exception as e:

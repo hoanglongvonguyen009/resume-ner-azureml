@@ -553,7 +553,10 @@ def run_local_hpo_sweep(
     )
 
     # Check if HPO is already complete (early return)
-    if should_resume:
+    # Skip this check if force_new (we want to create new, not reuse even if complete)
+    from infrastructure.config.run_mode import is_force_new
+    combined_config = {**hpo_config, **(checkpoint_config or {})}
+    if should_resume and not is_force_new(combined_config):
         user_attrs = study.user_attrs if hasattr(study, "user_attrs") else {}
         hpo_complete = user_attrs.get(
             "hpo_complete", "false").lower() == "true"
