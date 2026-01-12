@@ -108,6 +108,8 @@ class StudyManager:
         checkpoint_config: Optional[Dict[str, Any]] = None,
         restore_from_drive: Optional[Any] = None,
         output_dir: Optional[Path] = None,
+        root_dir: Optional[Path] = None,
+        config_dir: Optional[Path] = None,
     ):
         """
         Initialize study manager.
@@ -118,11 +120,15 @@ class StudyManager:
             checkpoint_config: Optional checkpoint configuration.
             restore_from_drive: Optional function to restore checkpoint from Drive.
             output_dir: Base output directory for checkpoints.
+            root_dir: Optional project root directory (for variant computation).
+            config_dir: Optional config directory (for variant computation).
         """
         self.backbone = backbone
         self.hpo_config = hpo_config
         self.checkpoint_config = checkpoint_config
         self.restore_from_drive = restore_from_drive
+        self.root_dir = root_dir
+        self.config_dir = config_dir
 
         # Lazy import optuna
         self.optuna, _, self.RandomSampler, _ = _import_optuna()
@@ -169,12 +175,20 @@ class StudyManager:
         # Resolve study_name FIRST (needed for {study_name} placeholder in storage_path)
         # Use temporary should_resume=False for initial study_name resolution
         # We'll recalculate should_resume after checking if study exists
+        # Extract run_mode from configs
+        from infrastructure.config.run_mode import get_run_mode
+        combined_config = {**self.hpo_config, **(self.checkpoint_config or {})}
+        run_mode = get_run_mode(combined_config)
+        
         study_name = create_study_name(
             self.backbone,
             run_id,
             should_resume=False,
             checkpoint_config=self.checkpoint_config,
             hpo_config=self.hpo_config,
+            run_mode=run_mode,
+            root_dir=self.root_dir,
+            config_dir=self.config_dir,
         )
 
         # Set up checkpoint storage with resolved study_name
@@ -208,6 +222,16 @@ class StudyManager:
                 self.backbone,
                 study_name,
                 restore_from_drive=self.restore_from_drive,
+            )
+
+        # Respect run.mode: force_new (same logic as final training)
+        # When force_new, always create new study even if one exists
+        from infrastructure.config.run_mode import is_force_new
+        if is_force_new(combined_config):
+            should_resume = False
+            logger.info(
+                f"[HPO] run.mode=force_new: Creating new study '{study_name}' "
+                f"(ignoring existing study if present)"
             )
 
         if should_resume:
@@ -295,14 +319,19 @@ class StudyManager:
         self, study_name: str, storage_path: Path, storage_uri: str
     ) -> Tuple[Any, str, Path, str, bool]:
         """Create new study."""
+        # Check run_mode to determine if we should load existing study
+        from infrastructure.config.run_mode import is_force_new
+        combined_config = {**self.hpo_config, **(self.checkpoint_config or {})}
+        force_new = is_force_new(combined_config)
+        
         if storage_uri:
             logger.info(
                 f"[HPO] Starting optimization for {self.backbone} with checkpointing..."
             )
             logger.debug(f"Checkpoint: {storage_path}")
-            # When checkpointing is enabled, use load_if_exists=True so we can resume
-            # if the study already exists in the database (even if file was just created)
-            load_if_exists = self.checkpoint_enabled
+            # When checkpointing is enabled and NOT force_new, use load_if_exists=True so we can resume
+            # When force_new, always create new study (load_if_exists=False)
+            load_if_exists = self.checkpoint_enabled and not force_new
         else:
             load_if_exists = False
 
@@ -316,8 +345,9 @@ class StudyManager:
         )
 
         # If checkpointing is enabled and we loaded an existing study, check auto_resume
+        # But skip this if force_new (we already set load_if_exists=False above)
         should_resume = False
-        if self.checkpoint_enabled and load_if_exists and len(study.trials) > 0:
+        if self.checkpoint_enabled and load_if_exists and len(study.trials) > 0 and not force_new:
             auto_resume = self.checkpoint_config.get("auto_resume", True)
 
             if auto_resume:
@@ -359,7 +389,8 @@ class StudyManager:
                     f"({completed_trials} completed), but auto_resume=false.\n"
                     f"   To start fresh, you must use a different study_name.\n"
                     f"   Current study_name: '{study_name}'\n"
-                    f"   Solution: Add 'study_name: \"hpo_{self.backbone}_new_name\"' to checkpoint config."
+                    f"   Solution: Add 'study_name: \"hpo_{self.backbone}_new_name\"' to checkpoint config, "
+                    f"or set 'run.mode: force_new' to create a new variant."
                 )
 
         return study, study_name, storage_path, storage_uri, should_resume

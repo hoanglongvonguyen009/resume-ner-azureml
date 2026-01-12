@@ -187,11 +187,10 @@ def execute_final_training(
     final_training_yaml = load_yaml(config_dir / "final_training.yaml")
 
     # Check if run should be skipped based on run.mode
-    run_mode = final_training_yaml.get(
-        "run", {}).get("mode", "reuse_if_exists")
+    from infrastructure.config.run_mode import is_reuse_if_exists
     final_checkpoint_dir = final_output_dir / "checkpoint"
 
-    if run_mode == "reuse_if_exists":
+    if is_reuse_if_exists(final_training_yaml):
         # Helper function to check if a checkpoint is complete
         def is_checkpoint_complete(checkpoint_dir: Path, metadata_file: Path) -> bool:
             """Check if checkpoint is complete (has metadata with completion flag, or valid checkpoint files)."""

@@ -37,6 +37,13 @@ objective:
   metric: "macro-f1"
   goal: "maximize"
 
+# Run mode configuration (unified behavior control)
+run:
+  # Run mode determines overall behavior:
+  # - reuse_if_exists: Reuse existing study if found (default, respects auto_resume)
+  # - force_new: Always create a new study with next variant (v1, v2, v3...)
+  mode: reuse_if_exists  # or force_new
+
 # Selection strategy configuration for accuracy-speed tradeoff
 selection:
   # Accuracy threshold for speed tradeoff (0.015 = 1.5% relative)
@@ -63,6 +70,8 @@ k_fold:
 
 checkpoint:
   enabled: true
+  # study_name: null  # null = auto-generate base as "hpo_{backbone}" (default)
+  #                    # When run.mode=force_new, code will compute next variant (v1, v2, v3...)
   study_name: "hpo_{backbone}_prod"
   storage_path: "{study_name}/study.db"
   auto_resume: true

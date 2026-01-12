@@ -473,12 +473,25 @@ def run_local_hpo_sweep(
             import traceback
             logger.debug(f"Traceback: {traceback.format_exc()}")
 
+    # Derive root_dir from output_dir if not already available
+    # (needed for variant computation in create_study_name)
+    root_dir_for_variants = None
+    if output_dir:
+        current = output_dir
+        while current.parent != current:  # Stop at filesystem root
+            if current.name == "outputs":
+                root_dir_for_variants = current.parent
+                break
+            current = current.parent
+    
     # Create study manager and load/create study
     study_manager = StudyManager(
         backbone=backbone,
         hpo_config=hpo_config,
         checkpoint_config=checkpoint_config,
         restore_from_drive=restore_from_drive,
+        root_dir=root_dir_for_variants,
+        config_dir=project_config_dir,
     )
 
     # Create v2 folder and use it for study.db (study_key_hash required)

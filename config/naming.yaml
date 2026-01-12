@@ -74,7 +74,8 @@ run_names:
       semantic_suffix:
         enabled: true
         max_length: 30
-        source: "study_name"  # Code will sanitize: remove spaces, replace / with -
+        source: "study_name"  # When study_name: null (auto-generated), semantic_suffix is "" (empty)
+                               # For custom study names, code will sanitize: remove spaces, replace / with -
         default: ""
 
   # Final Training Run

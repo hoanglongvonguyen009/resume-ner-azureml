@@ -266,15 +266,18 @@ def normalize_value(value: str, rules: Optional[Dict[str, Any]] = None) -> str:
 
 def sanitize_semantic_suffix(study_name: str, max_length: int = 30, model: Optional[str] = None) -> str:
     """
-    Sanitize HPO study semantic suffix.
+    Sanitize HPO study semantic suffix for custom study names.
+
+    Note: Auto-generated study names (when study_name: null) are handled upstream
+    by passing None to the context, so this function only processes custom study names.
 
     Args:
-        study_name: Study name to sanitize.
+        study_name: Custom study name to sanitize (never None - handled upstream).
         max_length: Maximum length for the suffix.
         model: Optional model name to strip from beginning if present (avoids duplication).
 
     Returns:
-        Sanitized suffix (empty string if disabled or invalid).
+        Sanitized suffix with underscore prefix (empty string if nothing remains after sanitization).
     """
     if not study_name:
         return ""
@@ -288,8 +291,11 @@ def sanitize_semantic_suffix(study_name: str, max_length: int = 30, model: Optio
     if model and label.startswith(model):
         # Remove model name and any following separator (_, -, etc.)
         remaining = label[len(model):].lstrip("_-")
-        if remaining:  # Only use if there's something left after stripping
+        if remaining:  # Only use if there's something meaningful left after stripping
             label = remaining
+        else:
+            # Nothing meaningful left - return empty to avoid redundancy
+            return ""
 
     # Replace spaces and slashes
     label = label.replace(" ", "").replace("/", "-")
@@ -373,12 +379,16 @@ def extract_component(
     # Handle special cases
     if source == "study_name":
         # Semantic suffix for hpo_sweep
+        # When study_name is None (auto-generated default), semantic_suffix is "" (empty)
+        # This avoids redundancy: local_distilbert_hpo_study-{hash}_1 instead of
+        # local_distilbert_hpo_study-{hash}_distilbert_1
         max_length = component_config.get("max_length", 30)
         enabled = component_config.get("enabled", True)
         if enabled and value:
             # Pass model name to avoid duplication (e.g., "distilbert" in study_name)
             model_name = context.model if hasattr(context, "model") else None
             return sanitize_semantic_suffix(value, max_length, model=model_name)
+        # value is None or disabled - return empty string
         return ""
 
     # Format numeric values

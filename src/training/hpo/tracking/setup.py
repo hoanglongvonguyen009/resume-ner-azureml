@@ -78,6 +78,25 @@ def setup_hpo_mlflow_run(
             env = "local"
             storage_env_val = "local"
 
+        # Determine if study_name is auto-generated default
+        # If study_name: null in config, we pass None to context to avoid redundant semantic_suffix
+        study_name_for_context = None
+        if study_name:
+            # Check if study_name is the auto-generated default pattern
+            model_short = backbone.split("-")[0] if "-" in backbone else backbone
+            default_pattern = f"hpo_{model_short}"
+            
+            # Check if it matches default or default with variant
+            if study_name == default_pattern:
+                # Auto-generated default - pass None to avoid redundancy
+                study_name_for_context = None
+            elif study_name.startswith(f"{default_pattern}_v") and study_name[len(default_pattern)+2:].isdigit():
+                # Auto-generated default with variant - pass None to avoid redundancy
+                study_name_for_context = None
+            else:
+                # Custom study_name - use it
+                study_name_for_context = study_name
+        
         try:
             hpo_parent_context = create_naming_context(
                 process_type="hpo",
@@ -85,7 +104,7 @@ def setup_hpo_mlflow_run(
                 environment=env,
                 storage_env=storage_env_val,
                 stage="hpo_sweep",
-                study_name=study_name,
+                study_name=study_name_for_context,
                 trial_id=None,
                 study_key_hash=study_key_hash,
             )
@@ -145,13 +164,21 @@ def setup_hpo_mlflow_run(
             if config_dir.exists():
                 policy = load_naming_policy(config_dir)
                 if policy and "run_names" in policy:
+                    # Use same logic for fallback context
+                    model_short = backbone.split("-")[0] if "-" in backbone else backbone
+                    default_pattern = f"hpo_{model_short}"
+                    study_name_for_fallback = None
+                    if study_name and study_name != default_pattern and not (
+                        study_name.startswith(f"{default_pattern}_v") and 
+                        study_name[len(default_pattern)+2:].isdigit()
+                    ):
+                        study_name_for_fallback = study_name
+                    
                     minimal_context = create_naming_context(
                         process_type="hpo",
-                        model=backbone.split("-")[0]
-                        if "-" in backbone
-                        else backbone,
+                        model=model_short,
                         environment=detect_platform(),
-                        study_name=study_name,
+                        study_name=study_name_for_fallback,
                         study_key_hash=study_key_hash,
                     )
                     mlflow_run_name = format_run_name(

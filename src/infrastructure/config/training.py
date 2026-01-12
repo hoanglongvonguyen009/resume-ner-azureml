@@ -139,8 +139,8 @@ def load_final_training_config(
     )
 
     # Compute variant based on run.mode
-    run_mode = final_training_config.get(
-        "run", {}).get("mode", "reuse_if_exists")
+    from infrastructure.config.run_mode import get_run_mode
+    run_mode = get_run_mode(final_training_config)
     variant = _resolve_variant(
         root_dir,
         config_dir,

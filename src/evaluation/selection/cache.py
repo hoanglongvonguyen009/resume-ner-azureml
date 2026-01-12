@@ -94,8 +94,8 @@ def load_cached_best_model(
         Cached data dict if valid, None otherwise.
     """
     # Check run mode - if force_new, skip cache entirely
-    run_mode = selection_config.get("run", {}).get("mode", "reuse_if_exists")
-    if run_mode == "force_new":
+    from infrastructure.config.run_mode import is_force_new
+    if is_force_new(selection_config):
         print(f"  Mode is 'force_new' - skipping cache")
         logger.debug(f"Run mode is 'force_new', skipping cache load")
         return None
