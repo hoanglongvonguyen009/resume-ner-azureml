@@ -461,21 +461,9 @@ def _set_phase2_hpo_tags(
             except Exception as e:
                 logger.debug(f"Could not compute data fingerprint: {e}")
         
-        # Try to get eval_config from train_config (primary) or hpo_config (fallback)
-        eval_config = None
-        if train_config:
-            eval_config = train_config.get("eval", {})
-        
-        if not eval_config:
-            eval_config = hpo_config.get("evaluation", {})
-        
-        if not eval_config:
-            # Fallback: create minimal eval config from objective
-            objective = hpo_config.get("objective", {})
-            eval_config = {
-                "evaluator_version": "default",
-                "metric": objective,
-            }
+        # Derive eval_config consistently using centralized utility
+        from infrastructure.tracking.mlflow.hash_utils import derive_eval_config
+        eval_config = derive_eval_config(train_config, hpo_config)
         
         try:
             eval_fp = compute_eval_fingerprint(eval_config)
@@ -615,25 +603,35 @@ def run_local_hpo_sweep(
     run_id = generate_run_id()
 
     # Compute study_key_hash EARLY (before creating study) to enable v2 folder creation
-    # This allows us to create study.db in the v2 folder from the start, avoiding legacy folder creation
+    # This allows us to create study.db in the v2 folder from the start, avoiding legacy folder creation.
+    # Fallback hierarchy:
+    #   1) v2 study key with fingerprints (preferred)
+    #   2) v1 study key (fallback, still hashed into study-{hash} folder name)
     study_key_hash = None
-    if data_config and hpo_config:
+
+    # Preferred: v2 key using fingerprints (requires data_config, hpo_config, train_config)
+    # Use centralized utility for consistency
+    if data_config and hpo_config and train_config:
         try:
-            from infrastructure.naming.mlflow.hpo_keys import (
-                build_hpo_study_key,
-                build_hpo_study_key_hash,
+            from infrastructure.tracking.mlflow.hash_utils import compute_study_key_hash_v2
+            study_key_hash = compute_study_key_hash_v2(
+                data_config, hpo_config, train_config, backbone, project_config_dir
             )
-            study_key = build_hpo_study_key(
-                data_config=data_config,
-                hpo_config=hpo_config,
-                model=backbone,
-                benchmark_config=benchmark_config,
-            )
-            study_key_hash = build_hpo_study_key_hash(study_key)
+            if study_key_hash:
+                logger.info(f"[EARLY HASH] Computed v2 study_key_hash={study_key_hash[:16]}... for folder creation")
         except Exception as e:
-            logger.warning(f"✗ Could not compute study_key_hash early: {e}")
+            logger.warning(f"✗ Could not compute v2 study_key_hash early: {e}")
             import traceback
             logger.debug(f"Traceback: {traceback.format_exc()}")
+    else:
+        missing = []
+        if not data_config:
+            missing.append("data_config")
+        if not hpo_config:
+            missing.append("hpo_config")
+        if not train_config:
+            missing.append("train_config")
+        logger.warning(f"✗ Cannot compute v2 study_key_hash early - missing: {', '.join(missing)}")
 
     # Derive root_dir from output_dir if not already available
     # (needed for variant computation in create_study_name)
@@ -893,6 +891,7 @@ def run_local_hpo_sweep(
             should_resume=should_resume,
             data_config=data_config,
             benchmark_config=benchmark_config,
+            train_config=train_config,
         ) as parent_run:
             # Store parent run ID for signal handler
             if parent_run:
@@ -1041,113 +1040,102 @@ def run_local_hpo_sweep(
             refit_enabled = refit_config.get(
                 "enabled", True)  # Default: enabled
 
+            # Initialize refit_run_id early to avoid UnboundLocalError if import fails
+            refit_run_id = None
+
             if refit_enabled and study.best_trial is not None:
                 try:
                     logger.info(
                         f"[REFIT] Starting refit training for best trial {study.best_trial.number}"
                     )
 
-                    # Get grouping tags and compute trial_key_hash
-                    # Priority: 1) recompute from configs (most reliable), 2) get from parent tags
+                    # Get grouping tags and compute trial_key_hash using centralized utilities
+                    # Priority: 1) Retrieve from tags (SSOT), 2) Compute from configs (fallback)
+                    from infrastructure.tracking.mlflow.hash_utils import (
+                        get_study_key_hash_from_run,
+                        get_study_family_hash_from_run,
+                        get_trial_key_hash_from_run,
+                        compute_trial_key_hash_from_trial_run,
+                        compute_trial_key_hash_from_configs,
+                        compute_study_key_hash_v2,
+                    )
+                    from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+                    
+                    client = mlflow.tracking.MlflowClient()
+                    config_dir_for_refit = infer_config_dir_from_path(output_dir)
+                    
+                    # Priority 1: Retrieve study_key_hash from parent run tags (SSOT)
                     refit_study_key_hash = None
-                    refit_study_family_hash = None
-                    refit_trial_key_hash = None
+                    if parent_run_id:
+                        refit_study_key_hash = get_study_key_hash_from_run(
+                            parent_run_id, client, config_dir_for_refit
+                            )
 
-                    # Primary: compute grouping hashes from configs (ensures canonicalization matches)
-                    if data_config and hpo_config:
+                    # Priority 2: Compute v2 from configs if tags unavailable
+                    if not refit_study_key_hash and data_config and hpo_config and train_config:
+                        refit_study_key_hash = compute_study_key_hash_v2(
+                            data_config, hpo_config, train_config, backbone, config_dir_for_refit
+                        )
+                        if refit_study_key_hash:
+                                logger.debug(
+                                    f"[REFIT] Computed v2 study_key_hash from configs: "
+                                    f"{refit_study_key_hash[:16]}... (fallback)"
+                                )
+
+                    # Priority 1: Retrieve study_family_hash from parent run tags (SSOT)
+                    refit_study_family_hash = None
+                    if parent_run_id:
+                        refit_study_family_hash = get_study_family_hash_from_run(
+                            parent_run_id, client, config_dir_for_refit
+                        )
+                    
+                    # Priority 2: Compute from configs if tags unavailable
+                    if not refit_study_family_hash and data_config and hpo_config:
                         try:
                             from infrastructure.tracking.mlflow.naming import (
-                                build_hpo_study_key,
                                 build_hpo_study_family_key,
-                                build_hpo_study_key_hash,
                                 build_hpo_study_family_hash,
                             )
-                            study_key = build_hpo_study_key(
-                                data_config, hpo_config, backbone, benchmark_config
-                            )
-                            refit_study_key_hash = build_hpo_study_key_hash(
-                                study_key)
                             study_family_key = build_hpo_study_family_key(
                                 data_config, hpo_config, benchmark_config
                             )
-                            refit_study_family_hash = build_hpo_study_family_hash(
-                                study_family_key)
-                            logger.debug(
-                                f"[REFIT] Computed grouping hashes from configs: "
-                                f"study_key_hash={refit_study_key_hash[:16]}..., "
-                                f"study_family_hash={refit_study_family_hash[:16]}..."
-                            )
+                            refit_study_family_hash = build_hpo_study_family_hash(study_family_key)
                         except Exception as e:
-                            logger.debug(
-                                f"Could not compute grouping hashes from configs for refit: {e}")
+                            logger.debug(f"Could not compute study_family_hash: {e}")
 
-                    # Fallback: get from parent run tags (for backward compatibility)
-                    if (not refit_study_key_hash or not refit_study_family_hash) and parent_run_id:
-                        try:
-                            # Use mlflow from top-level import (line 15)
-                            client = mlflow.tracking.MlflowClient()
-                            parent_run = client.get_run(parent_run_id)
-                            if not refit_study_key_hash:
-                                refit_study_key_hash = parent_run.data.tags.get(
-                                    "code.study_key_hash")
-                                if refit_study_key_hash:
-                                    logger.debug(
-                                        f"[REFIT] Retrieved study_key_hash from parent tags: {refit_study_key_hash[:16]}..."
-                                    )
-                            if not refit_study_family_hash:
-                                refit_study_family_hash = parent_run.data.tags.get(
-                                    "code.study_family_hash")
-                                if refit_study_family_hash:
-                                    logger.debug(
-                                        f"[REFIT] Retrieved study_family_hash from parent tags: {refit_study_family_hash[:16]}..."
-                                    )
-                        except Exception as e:
-                            logger.debug(
-                                f"Could not get grouping tags from parent run for refit: {e}")
-
-                    # Compute trial_key_hash from best trial hyperparameters and study_key_hash
-                    # CRITICAL: Use the study_key_hash from the parent run (which matches trial runs)
-                    # rather than recomputing, to ensure consistency
-                    trial_study_key_hash = refit_study_key_hash
-                    if parent_run_id:
-                        try:
-                            client = mlflow.tracking.MlflowClient()
-                            parent_run = client.get_run(parent_run_id)
-                            parent_study_key_hash = parent_run.data.tags.get("code.study_key_hash")
-                            if parent_study_key_hash:
-                                trial_study_key_hash = parent_study_key_hash
-                                logger.debug(
-                                    f"[REFIT] Using study_key_hash from parent run for trial_key_hash computation: "
-                                    f"{trial_study_key_hash[:16]}... (matches trial runs)"
-                                )
-                        except Exception as e:
-                            logger.debug(
-                                f"Could not get study_key_hash from parent run: {e}. "
-                                f"Using computed study_key_hash instead."
-                            )
+                    # CRITICAL: Retrieve trial_key_hash from best trial run tags (SSOT)
+                    # This is the primary way refit runs should get their trial_key_hash
+                    refit_trial_key_hash = None
+                    best_trial_run_id = None
                     
-                    if trial_study_key_hash and study.best_trial:
+                    if study.best_trial and parent_run_id:
+                        # Get best trial run_id from parent run tags (SSOT)
                         try:
-                            from infrastructure.tracking.mlflow.naming import (
-                                build_hpo_trial_key,
-                                build_hpo_trial_key_hash,
+                            parent_run = client.get_run(parent_run_id)
+                            from infrastructure.naming.mlflow.tag_keys import (
+                                get_hpo_best_trial_run_id,
                             )
-                            # Extract hyperparameters from best trial
-                            hyperparameters = {
-                                k: v for k, v in study.best_trial.params.items()
-                                if k not in ("backbone", "trial_number", "run_id")
-                            }
-                            trial_key = build_hpo_trial_key(
-                                trial_study_key_hash, hyperparameters)
-                            refit_trial_key_hash = build_hpo_trial_key_hash(
-                                trial_key)
-                            logger.info(
-                                f"[REFIT] Computed trial_key_hash={refit_trial_key_hash[:16]}... "
-                                f"from study_key_hash={trial_study_key_hash[:16]}... and best trial hyperparameters"
-                            )
+                            best_trial_run_id_tag = get_hpo_best_trial_run_id(config_dir_for_refit)
+                            best_trial_run_id = parent_run.data.tags.get(best_trial_run_id_tag) or parent_run.data.tags.get("best_trial_run_id")
                         except Exception as e:
-                            logger.warning(
-                                f"Could not compute trial_key_hash for refit: {e}", exc_info=True)
+                            logger.debug(f"Could not retrieve best_trial_run_id from parent run: {e}")
+                        
+                        # Retrieve trial_key_hash from best trial run tags (SSOT)
+                        if best_trial_run_id:
+                            refit_trial_key_hash = compute_trial_key_hash_from_trial_run(
+                                best_trial_run_id, client, config_dir_for_refit
+                            )
+                            if refit_trial_key_hash:
+                                logger.info(
+                                    f"[REFIT] Retrieved trial_key_hash={refit_trial_key_hash[:16]}... "
+                                    f"from best trial run {best_trial_run_id[:12]}... tags (source of truth)"
+                                )
+                    
+                    if not refit_trial_key_hash:
+                        logger.warning(
+                            f"[REFIT] Could not determine trial_key_hash from best trial run tags. "
+                            f"Refit run may not match trial run."
+                        )
 
                     # Compute refit protocol fingerprint
                     from infrastructure.tracking.mlflow.naming import compute_refit_protocol_fp
@@ -1180,7 +1168,7 @@ def run_local_hpo_sweep(
                     refit_ok = False
                     refit_checkpoint_dir = None
                     refit_metrics = None
-                    refit_run_id = None
+                    # refit_run_id already initialized above
 
                     try:
                         refit_metrics, refit_checkpoint_dir, refit_run_id = run_refit_training(

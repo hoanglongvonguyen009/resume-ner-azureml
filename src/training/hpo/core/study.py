@@ -354,50 +354,60 @@ class StudyManager:
         force_new = is_force_new(combined_config)
         
         # Try to create study, handling DuplicatedStudyError when force_new
-        try:
-            study = self.optuna.create_study(
-                direction=self.direction,
-                sampler=self.sampler,
-                pruner=self.pruner,
-                study_name=study_name,
-                storage=storage_uri,
-                load_if_exists=load_if_exists,
-            )
-        except self.optuna.exceptions.DuplicatedStudyError:
-            # If study name already exists in database and force_new is set,
-            # increment variant and try again
-            if force_new and storage_uri:
-                logger.warning(
-                    f"Study '{study_name}' already exists in database. "
-                    f"Incrementing variant for force_new mode..."
-                )
-                # Extract base name and current variant
-                # Check if study_name ends with _v{N} pattern
-                import re
-                variant_match = re.search(r'_v(\d+)$', study_name)
-                if variant_match:
-                    # Already has variant suffix (e.g., hpo_distilbert_v2)
-                    base = study_name[:variant_match.start()]
-                    current_variant = int(variant_match.group(1))
-                    new_variant = current_variant + 1
-                    study_name = f"{base}_v{new_variant}"
-                else:
-                    # No variant suffix, add _v2 (base name exists in database)
-                    study_name = f"{study_name}_v2"
-                
-                logger.info(f"Retrying with incremented study name: '{study_name}'")
-                # Retry with incremented name and load_if_exists=False to force new
+        # Loop until we find an available study name (if force_new)
+        max_retries = 100  # Safety limit
+        retry_count = 0
+        original_study_name = study_name
+        
+        while retry_count < max_retries:
+            try:
                 study = self.optuna.create_study(
                     direction=self.direction,
                     sampler=self.sampler,
                     pruner=self.pruner,
                     study_name=study_name,
                     storage=storage_uri,
-                    load_if_exists=False,  # Force new even if exists
+                    load_if_exists=load_if_exists,
                 )
-            else:
-                # Re-raise if not force_new or no storage
-                raise
+                # Success - break out of loop
+                break
+            except self.optuna.exceptions.DuplicatedStudyError:
+                # If study name already exists in database and force_new is set,
+                # increment variant and try again
+                if force_new and storage_uri:
+                    if retry_count == 0:
+                        logger.warning(
+                            f"Study '{study_name}' already exists in database. "
+                            f"Incrementing variant for force_new mode..."
+                        )
+                    # Extract base name and current variant
+                    # Check if study_name ends with _v{N} pattern
+                    import re
+                    variant_match = re.search(r'_v(\d+)$', study_name)
+                    if variant_match:
+                        # Already has variant suffix (e.g., hpo_distilbert_v2)
+                        base = study_name[:variant_match.start()]
+                        current_variant = int(variant_match.group(1))
+                        new_variant = current_variant + 1
+                        study_name = f"{base}_v{new_variant}"
+                    else:
+                        # No variant suffix, add _v2 (base name exists in database)
+                        study_name = f"{study_name}_v2"
+                    
+                    retry_count += 1
+                    logger.info(f"Retry {retry_count}: Trying study name '{study_name}'")
+                    # Continue loop to retry with incremented name
+                    load_if_exists = False  # Force new even if exists
+                else:
+                    # Re-raise if not force_new or no storage
+                    raise
+        else:
+            # Exhausted retries
+            raise RuntimeError(
+                f"Could not find available study name after {max_retries} retries. "
+                f"Started with '{original_study_name}', last tried '{study_name}'. "
+                f"Please clean up existing studies or use a different base name."
+            )
 
         # If checkpointing is enabled and we loaded an existing study, check auto_resume
         # But skip this if force_new (we already set load_if_exists=False above)

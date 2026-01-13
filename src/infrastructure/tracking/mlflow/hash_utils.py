@@ -1,0 +1,351 @@
+"""Centralized hash retrieval and computation utilities.
+
+This module provides a single source of truth for hash retrieval and computation,
+following the principle that tags are the source of truth (SSOT).
+
+Priority order:
+1. Retrieve from tags (highest priority - tags are SSOT)
+2. Compute from configs (when tags don't exist)
+3. Fallback (warn and continue if both fail)
+"""
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+from mlflow.tracking import MlflowClient
+
+from common.shared.logging_utils import get_logger
+
+logger = get_logger(__name__)
+
+
+def get_study_key_hash_from_run(
+    run_id: str,
+    mlflow_client: MlflowClient,
+    config_dir: Optional[Path] = None,
+) -> Optional[str]:
+    """
+    Retrieve study_key_hash from MLflow run tags (SSOT).
+    
+    Priority:
+    1. code.study_key_hash
+    2. code.grouping.study_key_hash (legacy)
+    
+    Args:
+        run_id: MLflow run ID
+        mlflow_client: MLflow client instance
+        config_dir: Optional config directory for tag registry
+        
+    Returns:
+        study_key_hash if found, None otherwise
+    """
+    try:
+        run = mlflow_client.get_run(run_id)
+        tags = run.data.tags
+        
+        # Priority 1: code.study_key_hash
+        study_key_hash = tags.get("code.study_key_hash")
+        if study_key_hash:
+            logger.debug(f"Retrieved study_key_hash from code.study_key_hash tag: {study_key_hash[:16]}...")
+            return study_key_hash
+        
+        # Priority 2: code.grouping.study_key_hash (legacy)
+        study_key_hash = tags.get("code.grouping.study_key_hash")
+        if study_key_hash:
+            logger.debug(f"Retrieved study_key_hash from code.grouping.study_key_hash tag (legacy): {study_key_hash[:16]}...")
+            return study_key_hash
+        
+        # Try tag registry if config_dir provided
+        if config_dir:
+            try:
+                from infrastructure.naming.mlflow.tags_registry import load_tags_registry
+                tags_registry = load_tags_registry(config_dir)
+                study_key_tag = tags_registry.key("grouping", "study_key_hash")
+                study_key_hash = tags.get(study_key_tag)
+                if study_key_hash:
+                    logger.debug(f"Retrieved study_key_hash from registry tag {study_key_tag}: {study_key_hash[:16]}...")
+                    return study_key_hash
+            except Exception as e:
+                logger.debug(f"Could not use tag registry: {e}")
+        
+        return None
+    except Exception as e:
+        logger.debug(f"Could not retrieve study_key_hash from run {run_id[:12]}...: {e}")
+        return None
+
+
+def get_trial_key_hash_from_run(
+    run_id: str,
+    mlflow_client: MlflowClient,
+    config_dir: Optional[Path] = None,
+) -> Optional[str]:
+    """
+    Retrieve trial_key_hash from MLflow run tags (SSOT).
+    
+    Priority:
+    1. code.trial_key_hash
+    2. code.grouping.trial_key_hash
+    
+    Args:
+        run_id: MLflow run ID
+        mlflow_client: MLflow client instance
+        config_dir: Optional config directory for tag registry
+        
+    Returns:
+        trial_key_hash if found, None otherwise
+    """
+    try:
+        run = mlflow_client.get_run(run_id)
+        tags = run.data.tags
+        
+        # Priority 1: code.trial_key_hash
+        trial_key_hash = tags.get("code.trial_key_hash")
+        if trial_key_hash:
+            logger.debug(f"Retrieved trial_key_hash from code.trial_key_hash tag: {trial_key_hash[:16]}...")
+            return trial_key_hash
+        
+        # Priority 2: code.grouping.trial_key_hash
+        trial_key_hash = tags.get("code.grouping.trial_key_hash")
+        if trial_key_hash:
+            logger.debug(f"Retrieved trial_key_hash from code.grouping.trial_key_hash tag: {trial_key_hash[:16]}...")
+            return trial_key_hash
+        
+        # Try tag registry if config_dir provided
+        if config_dir:
+            try:
+                from infrastructure.naming.mlflow.tags_registry import load_tags_registry
+                tags_registry = load_tags_registry(config_dir)
+                trial_key_tag = tags_registry.key("grouping", "trial_key_hash")
+                trial_key_hash = tags.get(trial_key_tag)
+                if trial_key_hash:
+                    logger.debug(f"Retrieved trial_key_hash from registry tag {trial_key_tag}: {trial_key_hash[:16]}...")
+                    return trial_key_hash
+            except Exception as e:
+                logger.debug(f"Could not use tag registry: {e}")
+        
+        return None
+    except Exception as e:
+        logger.debug(f"Could not retrieve trial_key_hash from run {run_id[:12]}...: {e}")
+        return None
+
+
+def get_study_family_hash_from_run(
+    run_id: str,
+    mlflow_client: MlflowClient,
+    config_dir: Optional[Path] = None,
+) -> Optional[str]:
+    """
+    Retrieve study_family_hash from MLflow run tags (SSOT).
+    
+    Priority:
+    1. code.study_family_hash
+    2. code.grouping.study_family_hash (legacy)
+    
+    Args:
+        run_id: MLflow run ID
+        mlflow_client: MLflow client instance
+        config_dir: Optional config directory for tag registry
+        
+    Returns:
+        study_family_hash if found, None otherwise
+    """
+    try:
+        run = mlflow_client.get_run(run_id)
+        tags = run.data.tags
+        
+        # Priority 1: code.study_family_hash
+        study_family_hash = tags.get("code.study_family_hash")
+        if study_family_hash:
+            logger.debug(f"Retrieved study_family_hash from code.study_family_hash tag: {study_family_hash[:16]}...")
+            return study_family_hash
+        
+        # Priority 2: code.grouping.study_family_hash (legacy)
+        study_family_hash = tags.get("code.grouping.study_family_hash")
+        if study_family_hash:
+            logger.debug(f"Retrieved study_family_hash from code.grouping.study_family_hash tag (legacy): {study_family_hash[:16]}...")
+            return study_family_hash
+        
+        # Try tag registry if config_dir provided
+        if config_dir:
+            try:
+                from infrastructure.naming.mlflow.tags_registry import load_tags_registry
+                tags_registry = load_tags_registry(config_dir)
+                study_family_tag = tags_registry.key("grouping", "study_family_hash")
+                study_family_hash = tags.get(study_family_tag)
+                if study_family_hash:
+                    logger.debug(f"Retrieved study_family_hash from registry tag {study_family_tag}: {study_family_hash[:16]}...")
+                    return study_family_hash
+            except Exception as e:
+                logger.debug(f"Could not use tag registry: {e}")
+        
+        return None
+    except Exception as e:
+        logger.debug(f"Could not retrieve study_family_hash from run {run_id[:12]}...: {e}")
+        return None
+
+
+def derive_eval_config(
+    train_config: Optional[Dict[str, Any]],
+    hpo_config: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Derive eval_config consistently across all hash computation.
+    
+    Priority:
+    1. train_config.get("eval", {})
+    2. hpo_config.get("evaluation", {})
+    3. Create from hpo_config.get("objective", {}) with evaluator_version: "default"
+    
+    Args:
+        train_config: Training configuration dictionary
+        hpo_config: HPO configuration dictionary
+        
+    Returns:
+        Non-empty dict (at minimum: {"evaluator_version": "default"}).
+    """
+    eval_config = {}
+    
+    # Priority 1: train_config.get("eval", {})
+    if train_config:
+        eval_config = train_config.get("eval", {}) or {}
+    
+    # Priority 2: hpo_config.get("evaluation", {})
+    if not eval_config and hpo_config:
+        eval_config = hpo_config.get("evaluation", {}) or {}
+    
+    # Priority 3: Create from objective
+    if not eval_config and hpo_config:
+        objective = hpo_config.get("objective", {})
+        eval_config = {
+            "evaluator_version": "default",
+            "metric": objective,
+        }
+    
+    # Ensure at minimum we have evaluator_version
+    if not eval_config:
+        eval_config = {"evaluator_version": "default"}
+    
+    return eval_config
+
+
+def compute_study_key_hash_v2(
+    data_config: Dict[str, Any],
+    hpo_config: Dict[str, Any],
+    train_config: Dict[str, Any],
+    model: str,
+    config_dir: Optional[Path] = None,
+) -> Optional[str]:
+    """
+    Compute v2 study_key_hash from configs (when tags unavailable).
+    
+    Args:
+        data_config: Data configuration dictionary
+        hpo_config: HPO configuration dictionary
+        train_config: Training configuration dictionary
+        model: Model backbone name
+        config_dir: Optional config directory
+        
+    Returns:
+        study_key_hash if computation succeeds, None otherwise
+    """
+    try:
+        from infrastructure.naming.mlflow.hpo_keys import (
+            build_hpo_study_key_v2,
+            build_hpo_study_key_hash,
+            compute_data_fingerprint,
+            compute_eval_fingerprint,
+        )
+        
+        # Always compute fingerprints (they handle empty dicts)
+        data_fp = compute_data_fingerprint(data_config or {})
+        
+        # Derive eval_config consistently
+        eval_config = derive_eval_config(train_config, hpo_config)
+        eval_fp = compute_eval_fingerprint(eval_config)
+        
+        # Only build v2 if both fingerprints are available
+        if data_fp and eval_fp:
+            study_key_v2 = build_hpo_study_key_v2(
+                data_config=data_config,
+                hpo_config=hpo_config,
+                train_config=train_config,
+                model=model,
+                data_fingerprint=data_fp,
+                eval_fingerprint=eval_fp,
+            )
+            study_key_hash = build_hpo_study_key_hash(study_key_v2)
+            logger.debug(f"Computed v2 study_key_hash from configs: {study_key_hash[:16]}...")
+            return study_key_hash
+        
+        logger.warning(
+            f"Cannot compute v2 study_key_hash - missing fingerprints: "
+            f"data_fp={'present' if data_fp else 'missing'}, "
+            f"eval_fp={'present' if eval_fp else 'missing'}"
+        )
+        return None
+    except Exception as e:
+        logger.warning(f"Could not compute v2 study_key_hash: {e}", exc_info=True)
+        return None
+
+
+def compute_trial_key_hash_from_trial_run(
+    trial_run_id: str,
+    mlflow_client: MlflowClient,
+    config_dir: Optional[Path] = None,
+) -> Optional[str]:
+    """
+    Get trial_key_hash from trial run tags (SSOT for refit runs).
+    
+    This is the primary way refit runs should get their trial_key_hash.
+    
+    Args:
+        trial_run_id: Trial run ID
+        mlflow_client: MLflow client instance
+        config_dir: Optional config directory
+        
+    Returns:
+        trial_key_hash if found, None otherwise
+    """
+    return get_trial_key_hash_from_run(trial_run_id, mlflow_client, config_dir)
+
+
+def compute_trial_key_hash_from_configs(
+    study_key_hash: str,
+    hyperparameters: Dict[str, Any],
+    config_dir: Optional[Path] = None,
+) -> Optional[str]:
+    """
+    Compute trial_key_hash from study_key_hash + hyperparameters (fallback only).
+    
+    Only use when trial run tags are unavailable.
+    
+    Args:
+        study_key_hash: Study key hash
+        hyperparameters: Dictionary of hyperparameters (will be normalized)
+        config_dir: Optional config directory
+        
+    Returns:
+        trial_key_hash if computation succeeds, None otherwise
+    """
+    try:
+        from infrastructure.tracking.mlflow.naming import (
+            build_hpo_trial_key,
+            build_hpo_trial_key_hash,
+        )
+        
+        # Normalize hyperparameters (exclude metadata fields)
+        normalized_hyperparameters = {
+            k: v for k, v in hyperparameters.items()
+            if k not in ("backbone", "trial_number", "run_id")
+        }
+        
+        trial_key = build_hpo_trial_key(study_key_hash, normalized_hyperparameters)
+        trial_key_hash = build_hpo_trial_key_hash(trial_key)
+        logger.debug(f"Computed trial_key_hash from configs: {trial_key_hash[:16]}...")
+        return trial_key_hash
+    except Exception as e:
+        logger.warning(f"Could not compute trial_key_hash from configs: {e}", exc_info=True)
+        return None
+
+

@@ -356,7 +356,22 @@ def acquire_best_model_checkpoint(
     study_key_hash = best_run_info.get("study_key_hash")
     trial_key_hash = best_run_info.get("trial_key_hash")
     backbone = best_run_info.get("backbone", "unknown")
-    experiment_name = best_run_info.get("experiment_name", "unknown")
+    experiment_name = best_run_info.get("experiment_name")
+    
+    # Fallback: Get experiment name from MLflow run if not provided
+    if not experiment_name or experiment_name == "unknown":
+        try:
+            from mlflow.tracking import MlflowClient
+            from common.shared.logging_utils import get_logger
+            client = MlflowClient()
+            run = client.get_run(run_id)
+            experiment = client.get_experiment(run.info.experiment_id)
+            experiment_name = experiment.name if experiment else "unknown"
+        except Exception as e:
+            from common.shared.logging_utils import get_logger
+            logger = get_logger(__name__)
+            logger.debug(f"Could not retrieve experiment name from MLflow run: {e}")
+            experiment_name = "unknown"
 
     priority = acquisition_config["priority"]
     checkpoint_path = None
@@ -371,7 +386,7 @@ def acquire_best_model_checkpoint(
 
             if study_key_hash and trial_key_hash:
                 hpo_output_dir = root_dir / "outputs" / "hpo" / platform / backbone
-                logger.info(f"[ACQUISITION] Checking local disk for checkpoint: {hpo_output_dir} (study={study_key_hash[:8]}..., trial={trial_key_hash[:8]}...)")
+                logger.info(f"[ACQUISITION] Strategy 1: Checking local disk for checkpoint: {hpo_output_dir} (study={study_key_hash[:8]}..., trial={trial_key_hash[:8]}...)")
                 
                 found_path = find_trial_checkpoint_by_hash(
                     hpo_backbone_dir=hpo_output_dir,
@@ -381,7 +396,7 @@ def acquire_best_model_checkpoint(
 
                 if found_path:
                     found_path = Path(found_path)
-                    logger.info(f"[ACQUISITION] Found local checkpoint at: {found_path}")
+                    logger.info(f"[ACQUISITION] ✓ Found local checkpoint at: {found_path}")
 
                     if acquisition_config["local"].get("validate", True):
                         if _validate_checkpoint(found_path):
@@ -489,6 +504,9 @@ def acquire_best_model_checkpoint(
 
     # Strategy 3: MLflow download
     if "mlflow" in priority and acquisition_config["mlflow"]["enabled"] and checkpoint_path is None:
+        from common.shared.logging_utils import get_logger
+        logger = get_logger(__name__)
+        logger.info(f"[ACQUISITION] Strategy 3: Downloading checkpoint from MLflow (run {run_id[:12]}...)")
         try:
             checkpoint_dir = _build_checkpoint_dir(
                 root_dir, config_dir, platform, backbone, run_id,
@@ -510,17 +528,30 @@ def acquire_best_model_checkpoint(
             # Deterministic: only use the resolved refit run_id
             run_ids_to_try = [refit_run_id]
 
-            # Validate artifact availability on the refit run before downloading
+            # Check artifact availability tag (informational, not blocking)
+            # If tag is missing or false, we'll still attempt download but log a warning
             from infrastructure.naming.mlflow.tags_registry import load_tags_registry
             tags_registry = load_tags_registry(config_dir)
             artifact_available_tag = tags_registry.key("artifact", "available")
             refit_run = client.get_run(refit_run_id)
             artifact_available = refit_run.data.tags.get(artifact_available_tag)
+            require_tag = acquisition_config["mlflow"].get("require_artifact_tag", False)
+            
             if str(artifact_available).lower() not in ("true", "1", "yes"):
-                raise ValueError(
-                    f"Refit run {refit_run_id[:12]}... is missing artifact availability tag "
-                    f"({artifact_available_tag}) or it is not true."
-                )
+                if require_tag:
+                    # Strict mode: fail if tag is missing or false
+                    raise ValueError(
+                        f"Refit run {refit_run_id[:12]}... is missing artifact availability tag "
+                        f"({artifact_available_tag}) or it is not true. "
+                        f"Set require_artifact_tag: false in mlflow config to allow download without tag."
+                    )
+                else:
+                    # Lenient mode: warn but continue
+                    logger.warning(
+                        f"[ACQUISITION] Refit run {refit_run_id[:12]}... is missing artifact availability tag "
+                        f"({artifact_available_tag}) or it is not true. "
+                        f"Attempting download anyway - will fail if artifact doesn't exist."
+                    )
             
             # Try each run until we find a checkpoint
             checkpoint_artifact_path = None
@@ -533,24 +564,40 @@ def acquire_best_model_checkpoint(
                     artifact_paths = [artifact.path for artifact in artifacts]
                     
                     # Check if this run has checkpoint artifacts
-                    checkpoint_artifacts = [p for p in artifact_paths if "checkpoint" in p.lower()]
+                    checkpoint_artifacts = [
+                        p for p in artifact_paths 
+                        if "checkpoint" in p.lower() or "best_trial" in p.lower()
+                    ]
                     if not checkpoint_artifacts:
                         logger.debug(
-                            f"[ACQUISITION] Run {candidate_run_id[:12]}... has no checkpoint artifacts, skipping"
+                            f"[ACQUISITION] Run {candidate_run_id[:12]}... has no checkpoint artifacts. "
+                            f"Available artifacts: {artifact_paths[:10]}"
                         )
                         continue
                     
-                    # Look for checkpoint in artifact paths
+                    # Look for checkpoint in artifact paths (priority order)
+                    # 1. "best_trial_checkpoint.tar.gz" or "best_trial_checkpoint" (preferred)
+                    # 2. "checkpoint" or "checkpoint/" (fallback)
+                    # 3. Any path containing "checkpoint" or "best_trial"
                     for path in artifact_paths:
-                        if "checkpoint" in path.lower():
-                            if path == "checkpoint" or path == "checkpoint/":
+                        path_lower = path.lower()
+                        if "best_trial_checkpoint" in path_lower:
+                            checkpoint_artifact_path = path
+                            break
+                        elif path == "checkpoint" or path == "checkpoint/":
+                            if checkpoint_artifact_path is None:
                                 checkpoint_artifact_path = path
-                                break
-                            elif checkpoint_artifact_path is None:
-                                checkpoint_artifact_path = path
+                        elif "checkpoint" in path_lower and checkpoint_artifact_path is None:
+                            checkpoint_artifact_path = path
                     
                     if checkpoint_artifact_path is None:
-                        checkpoint_artifact_path = "checkpoint"
+                        # Last resort: try common artifact names
+                        for fallback_path in ["best_trial_checkpoint.tar.gz", "best_trial_checkpoint", "checkpoint"]:
+                            if fallback_path in artifact_paths:
+                                checkpoint_artifact_path = fallback_path
+                                break
+                        if checkpoint_artifact_path is None:
+                            checkpoint_artifact_path = "best_trial_checkpoint.tar.gz"  # Default to what's typically uploaded
                     
                     # Download artifacts
                     local_path = client.download_artifacts(

@@ -4,11 +4,12 @@
 
 ### Purpose
 
-This plan merges two related refactoring efforts into a unified, step-by-step implementation:
+This plan merges multiple related refactoring efforts into a unified, step-by-step implementation:
 
 1. **Unify Run Mode Logic**: Single source of truth for `run.mode` extraction across all stages ✅ **COMPLETED**
 2. **Unify Run Decision Logic**: Single source of truth for reuse vs. create new decisions ✅ **COMPLETED**
-3. **Champion Selection**: Deterministic champion selection per backbone + idempotent benchmarking ⏳ **PENDING**
+3. **Hash Consistency & Single Source of Truth**: MLflow tags as SSOT for hashes, consistent computation ⏳ **COMPLETED**
+4. **Champion Selection**: Deterministic champion selection per backbone + idempotent benchmarking ⏳ **PENDING**
 
 **Key Principle**: Follow DRY by reusing and generalizing existing code rather than duplicating.
 
@@ -20,17 +21,38 @@ This plan merges two related refactoring efforts into a unified, step-by-step im
 - Unified run decision logic implemented
 - All redundant code removed
 
-**⏳ Phase 2: Champion Selection** - PENDING
-- study_key_hash v2 with bound fingerprints not yet implemented
-- Champion selection with safety requirements not yet implemented
+**✅ Phase 1.5: Unified Run Decision Logic** - COMPLETED
+- `run_decision.py` module created with `should_reuse_existing()`
+- `get_load_if_exists_flag()` implemented for Optuna
+- HPO and final training refactored to use unified logic
+- Redundant fallbacks removed
 
-**⏳ Phase 3: Idempotent Benchmarking** - PENDING
+**✅ Phase 1.6: Hash Consistency & Single Source of Truth** - COMPLETED
+- Centralized hash retrieval utilities (`hash_utils.py`) created
+- MLflow tags established as SSOT for all hashes
+- Standardized hash retrieval pattern across codebase
+- Fixed trial run hash computation in `cv.py`
+- Fixed refit run hash retrieval in `sweep.py`
+- Standardized parent run hash computation in `sweep_tracker.py`
+- Fixed trial finder refit search in `trial_finder.py`
+- Created consistent `eval_config` derivation utility
+- Removed unused fallbacks and redundant logic (DRY cleanup)
+- Artifact acquisition now checks local disk first (as configured)
+
+**⏳ Phase 2: Champion Selection** - PENDING (BLOCKED on Phase 1.6 ✅)
+- study_key_hash v2 with bound fingerprints - **READY TO IMPLEMENT** (foundation complete)
+- Champion selection with safety requirements - **READY TO IMPLEMENT**
+- MLflow query patterns extraction - **READY TO IMPLEMENT**
+
+**⏳ Phase 3: Idempotent Benchmarking** - PENDING (DEPENDS on Phase 2)
 - Benchmark idempotency not yet implemented
+- Stable benchmark keys using champion run_id + fingerprints - **READY TO IMPLEMENT** (after Phase 2)
 
 ### Why Merge?
 
 - **HPO variants** are the foundation for everything else
-- **Retrieval** needs variant-aware logic from HPO
+- **Hash consistency** ensures reliable grouping and retrieval (foundation for Phase 2)
+- **Retrieval** needs variant-aware logic from HPO and consistent hashes
 - **Benchmarking** uses both HPO variants and retrieval results
 - **Run mode** controls behavior across all three stages
 - **Shared utilities** reduce duplication (DRY)
@@ -40,7 +62,8 @@ This plan merges two related refactoring efforts into a unified, step-by-step im
 **In scope:**
 - Phase 1: HPO run mode + variant generation (foundation) ✅ **COMPLETED**
 - Phase 1.5: Unified run decision logic ✅ **COMPLETED**
-- Phase 2: Deterministic best trial retrieval (uses HPO variants) ⏳ **PENDING**
+- Phase 1.6: Hash consistency & single source of truth ✅ **COMPLETED**
+- Phase 2: Deterministic best trial retrieval (uses HPO variants + consistent hashes) ⏳ **PENDING**
 - Phase 3: Idempotent benchmarking (uses both HPO + retrieval) ⏳ **PENDING**
 - Extract shared utilities following DRY principles ✅ **COMPLETED**
 - Reuse existing code where possible ✅ **COMPLETED**
@@ -57,6 +80,7 @@ This plan merges two related refactoring efforts into a unified, step-by-step im
 - **G1**: Single source of truth for run mode extraction (no duplication) ✅ **COMPLETED**
 - **G2**: HPO variants (v1, v2, v3) with run.mode control ✅ **COMPLETED**
 - **G1.5**: Unified run decision logic (single source of truth for reuse vs. create new) ✅ **COMPLETED**
+- **G1.6**: Hash consistency & SSOT (MLflow tags as source of truth, consistent computation) ✅ **COMPLETED**
 - **G3**: Deterministic champion selection per backbone (MLflow-first, safe grouping) ⏳ **PENDING**
 - **G4**: Idempotent benchmarking with stable keys ⏳ **PENDING**
 - **G5**: Reuse existing code (DRY) - no unnecessary duplication ✅ **COMPLETED**
@@ -66,6 +90,10 @@ This plan merges two related refactoring efforts into a unified, step-by-step im
 - [x] `run_mode.py` utility replaces all 4+ duplicate extractions
 - [x] HPO creates variants (v1, v2, v3) based on `run.mode`
 - [x] Unified `run_decision.py` module for consistent reuse logic
+- [x] Centralized `hash_utils.py` for hash retrieval and computation (SSOT)
+- [x] MLflow tags established as single source of truth for hashes
+- [x] Consistent hash retrieval pattern across all modules
+- [x] Artifact acquisition checks local disk first (respects priority config)
 - [x] All existing tests pass
 - [x] No code duplication (shared utilities used)
 - [ ] `select_champion_per_backbone()` with MLflow-first priority and all safety requirements
@@ -1792,7 +1820,19 @@ else:
 - ✅ Step 1.5.5: Remove redundant fallbacks and duplicate logic
 - ✅ Step 1.5.6: All tests pass
 
-### Phase 2: Deterministic Retrieval (Champion Selection)
+### Phase 1.6: Hash Consistency & Single Source of Truth (Completed)
+- ✅ Step 1.6.1: Create centralized `hash_utils.py` with SSOT retrieval functions
+- ✅ Step 1.6.2: Standardize hash retrieval pattern across codebase
+- ✅ Step 1.6.3: Fix trial run hash computation in `cv.py`
+- ✅ Step 1.6.4: Fix refit run hash retrieval in `sweep.py`
+- ✅ Step 1.6.5: Standardize parent run hash computation in `sweep_tracker.py`
+- ✅ Step 1.6.6: Fix trial finder refit search in `trial_finder.py`
+- ✅ Step 1.6.7: Create consistent `eval_config` derivation utility
+- ✅ Step 1.6.8: Remove unused fallbacks and redundant logic (DRY cleanup)
+- ✅ All indentation errors fixed, code compiles successfully
+
+### Phase 2: Deterministic Retrieval (Champion Selection) - READY TO START
+**Prerequisites:** ✅ Phase 1.6 complete - hash consistency foundation in place
 - [ ] Step 2.0: Update selection configuration (centralized config with all requirements)
 - [ ] Step 2.1: Upgrade study_key_hash to v2 (bound fingerprints)
 - [ ] Step 2.2: Extract MLflow query patterns (DRY)
@@ -1850,6 +1890,7 @@ else:
 - Run mode utility: `src/infrastructure/config/run_mode.py` ✅ **CREATED**
 - Run decision utility: `src/infrastructure/config/run_decision.py` ✅ **CREATED**
 - Variants utility: `src/infrastructure/config/variants.py` ✅ **CREATED**
+- Hash utilities: `src/infrastructure/tracking/mlflow/hash_utils.py` ✅ **CREATED**
 - Existing MLflow querying: `src/evaluation/selection/mlflow_selection.py`
 - Existing trial finding: `src/evaluation/selection/trial_finder.py`
 - Existing fingerprints: `src/infrastructure/fingerprints/`
@@ -1858,4 +1899,34 @@ else:
 
 - `unify-run-decision-logic.plan.md` - ✅ **COMPLETED** (Phase 1.5)
 - `unify-run-mode-logic.plan.md` - ✅ **COMPLETED** (Phase 1)
+- `hash_consistency_single_source_of_truth.md` - ✅ **COMPLETED** (Phase 1.6)
 
+
+## Next Steps
+
+### Immediate Next Steps (Phase 2)
+
+With Phase 1.6 complete, the foundation is in place for Phase 2:
+
+1. **Leverage existing hash utilities**: `hash_utils.py` provides `compute_study_key_hash_v2()` which can be extended for bound fingerprints
+2. **Use existing SSOT pattern**: All hash retrieval now follows the SSOT pattern established in Phase 1.6
+3. **Build on consistent eval_config**: `derive_eval_config()` utility ensures consistent eval config derivation
+
+### Key Files Created/Modified in Phase 1.6
+
+- ✅ `src/infrastructure/tracking/mlflow/hash_utils.py` (NEW) - Centralized hash utilities
+- ✅ `src/training/hpo/execution/local/sweep.py` - Updated to use SSOT pattern
+- ✅ `src/training/hpo/execution/local/cv.py` - Updated to use SSOT pattern
+- ✅ `src/infrastructure/tracking/mlflow/trackers/sweep_tracker.py` - Updated to use SSOT pattern
+- ✅ `src/evaluation/selection/trial_finder.py` - Updated to use SSOT pattern, simplified artifact filtering
+- ✅ `src/evaluation/selection/artifact_acquisition.py` - Fixed to respect priority config (local → drive → MLflow)
+- ✅ `notebooks/02_best_config_selection.ipynb` - Removed redundant checks, follows DRY principle
+
+### Phase 2 Prerequisites Met
+
+- ✅ Hash consistency foundation in place
+- ✅ SSOT pattern established and used consistently
+- ✅ Centralized hash utilities available
+- ✅ Consistent eval_config derivation utility
+- ✅ Artifact acquisition respects priority config
+- ✅ All code compiles without errors

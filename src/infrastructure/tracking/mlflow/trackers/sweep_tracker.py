@@ -91,6 +91,7 @@ class MLflowSweepTracker(BaseTracker):
         group_id: Optional[str] = None,
         data_config: Optional[Dict[str, Any]] = None,
         benchmark_config: Optional[Dict[str, Any]] = None,
+        train_config: Optional[Dict[str, Any]] = None,
     ):
         """
         Start a parent MLflow run for HPO sweep.
@@ -108,6 +109,7 @@ class MLflowSweepTracker(BaseTracker):
             group_id: Optional group/session identifier.
             data_config: Optional data configuration dictionary (for grouping tags).
             benchmark_config: Optional benchmark configuration dictionary (for grouping tags).
+            train_config: Optional training configuration dictionary (for v2 hash computation).
 
         Yields:
             RunHandle with run information.
@@ -121,35 +123,47 @@ class MLflowSweepTracker(BaseTracker):
                 # Infer config_dir from output_dir
                 config_dir = infer_config_dir_from_path(output_dir)
 
-                # Compute grouping tags if configs available
+                # Compute grouping tags using centralized utilities
+                # Priority: 1) Compute v2 from configs (for new runs), 2) Fallback to v1
+                from infrastructure.tracking.mlflow.hash_utils import (
+                    compute_study_key_hash_v2,
+                )
+                
                 study_key_hash = None
                 study_family_hash = None
-                study_key = None
-                if hpo_config and data_config and context and context.model:
+                
+                # Compute v2 hash using fingerprints (requires data_config, hpo_config, train_config)
+                if hpo_config and data_config and train_config and context and context.model:
+                    study_key_hash = compute_study_key_hash_v2(
+                        data_config, hpo_config, train_config, context.model, config_dir
+                            )
+                    if study_key_hash:
+                            logger.info(
+                                f"[START_SWEEP_RUN] Computed v2 grouping hashes: "
+                            f"study_key_hash={study_key_hash[:16]}..."
+                        )
+                
+                # Always compute family hash (v1, doesn't depend on train_config)
+                if not study_family_hash and hpo_config and data_config:
                     try:
                         from infrastructure.tracking.mlflow.naming import (
-                            build_hpo_study_key,
                             build_hpo_study_family_key,
-                            build_hpo_study_key_hash,
                             build_hpo_study_family_hash,
-                        )
-                        study_key = build_hpo_study_key(
-                            data_config, hpo_config, context.model, benchmark_config
                         )
                         study_family_key = build_hpo_study_family_key(
                             data_config, hpo_config, benchmark_config
                         )
-                        study_key_hash = build_hpo_study_key_hash(study_key)
                         study_family_hash = build_hpo_study_family_hash(
                             study_family_key)
-                        logger.info(
-                            f"[START_SWEEP_RUN] Computed grouping hashes: "
-                            f"study_key_hash={study_key_hash[:16]}..., "
-                            f"study_family_hash={study_family_hash[:16]}..."
-                        )
+                        if study_key_hash:
+                            logger.info(
+                                f"[START_SWEEP_RUN] Computed grouping hashes: "
+                                f"study_key_hash={study_key_hash[:16]}..., "
+                                f"study_family_hash={study_family_hash[:16]}..."
+                            )
                     except Exception as e:
                         logger.warning(
-                            f"[START_SWEEP_RUN] Could not compute study grouping hashes: {e}",
+                            f"[START_SWEEP_RUN] Could not compute study_family_hash: {e}",
                             exc_info=True
                         )
 
@@ -528,137 +542,74 @@ class MLflowSweepTracker(BaseTracker):
             best_run_id = None
             trial_to_run_id = {}
 
-            all_runs = []
-
-            if cached_child_runs is not None:
-                all_runs = [
-                    run for run in cached_child_runs
-                    if run.data.tags.get("mlflow.parentRunId") == parent_run_id
-                ]
-                logger.info(
-                    f"Using {len(all_runs)} cached child runs for trial search")
-            else:
-                # Try multiple search strategies with retry logic for timing issues
-                import time
-                max_retries = 5  # Increased from 3 to 5
-                retry_delay = 3  # Increased from 2 to 3 seconds
-
-                for attempt in range(max_retries):
-                    try:
-                        # Strategy 1: Search by parent run ID filter
-                        all_runs = client.search_runs(
-                            experiment_ids=[experiment_id],
-                            filter_string=f"tags.mlflow.parentRunId = '{parent_run_id}'",
-                            max_results=1000,
-                        )
-                        logger.info(
-                            f"Found {len(all_runs)} child runs via parentRunId filter (attempt {attempt + 1}/{max_retries})"
-                        )
-                        # If we found runs or this is the last attempt, break
-                        if len(all_runs) > 0 or attempt == max_retries - 1:
-                            break
-                    except Exception as search_error:
-                        logger.warning(
-                            f"Search by parentRunId failed (attempt {attempt + 1}): {search_error}")
-                        # On last attempt, try fallback
-                        if attempt == max_retries - 1:
-                            # Strategy 2: Get all runs and filter manually
-                            try:
-                                all_runs = client.search_runs(
-                                    experiment_ids=[experiment_id],
-                                    max_results=1000,
-                                )
-                                all_runs = [
-                                    run for run in all_runs
-                                    if run.data.tags.get("mlflow.parentRunId") == parent_run_id
-                                ]
-                                logger.info(
-                                    f"Found {len(all_runs)} child runs via manual filter (fallback)")
-                            except Exception as fallback_error:
-                                logger.warning(
-                                    f"Fallback search also failed: {fallback_error}")
-                                all_runs = []
-                        break  # Exit retry loop on exception
-
-                    # If no runs found and not last attempt, wait and retry
-                    if len(all_runs) == 0 and attempt < max_retries - 1:
-                        logger.info(
-                            f"Retry {attempt + 1}/{max_retries}: No child runs found, "
-                            f"waiting {retry_delay}s before retry (may be timing issue)..."
-                        )
-                        time.sleep(retry_delay)
-
-            # Add info-level logging for visibility
-            logger.info(
-                f"Searching for trial {best_trial_number} in {len(all_runs)} child runs. "
-                f"Parent run ID: {parent_run_id[:12]}..."
-            )
-
-            # If no child runs found, log a warning with more details
-            if len(all_runs) == 0:
-                logger.warning(
-                    f"No child runs found for parent {parent_run_id[:12]}... "
-                    f"This may indicate: (1) runs haven't been created yet, "
-                    f"(2) runs are not direct children of parent, or "
-                    f"(3) search filter is incorrect. Experiment ID: {experiment_id}"
-                )
-
-            for run in all_runs:
-                trial_num = self._extract_trial_number(run)
-                if trial_num is not None:
-                    if trial_num not in trial_to_run_id:
-                        trial_to_run_id[trial_num] = run.info.run_id
-                        logger.info(
-                            f"Found trial {trial_num}: run ID {run.info.run_id[:12]}... "
-                            f"(run_name: {run.data.tags.get('mlflow.runName') or run.info.run_name})"
-                        )
-                    else:
-                        logger.debug(
-                            f"Skipping duplicate trial {trial_num} (already mapped to {trial_to_run_id[trial_num][:12]}...)"
-                        )
-                else:
-                    # Log at INFO level (not debug) when runs don't have trial numbers - this helps diagnose
-                    run_name_display = run.data.tags.get(
-                        "mlflow.runName") or run.info.run_name or "unnamed"
-                    logger.info(
-                        f"Child run {run.info.run_id[:12]}... ({run_name_display}) has no extractable trial number. "
-                        f"Tags: {list(run.data.tags.keys())}"
-                    )
-
-            best_run_id = trial_to_run_id.get(best_trial_number)
-
-            if best_run_id:
-                # Infer config_dir from output_dir
-                config_dir = infer_config_dir_from_path(output_dir)
+            # Search for best trial run using study_key_hash + trial_number + parentRunId
+            # This is more reliable than searching by mlflow.parentRunId alone, which doesn't work
+            # due to MLflow's parent-child relationship limitations with nested runs
+            try:
+                # Get study_key_hash from parent run tags
+                parent_run = client.get_run(parent_run_id)
+                study_key_hash = parent_run.data.tags.get("code.study_key_hash")
                 
-                from infrastructure.naming.mlflow.tag_keys import (
-                    get_hpo_best_trial_number,
-                    get_hpo_best_trial_run_id,
-                )
-                best_trial_run_id_tag = get_hpo_best_trial_run_id(config_dir)
-                best_trial_number_tag = get_hpo_best_trial_number(config_dir)
-                mlflow.log_param("best_trial_run_id", best_run_id)
-                mlflow.set_tag(best_trial_run_id_tag, best_run_id)
-                mlflow.set_tag(best_trial_number_tag, str(best_trial_number))
-                logger.info(
-                    f"Best trial: {best_trial_number} "
-                    f"(run ID: {best_run_id[:12]}...)"
-                )
-            else:
-                # Enhanced warning with more diagnostic info
-                if len(all_runs) == 0:
-                    logger.warning(
-                        f"Could not find MLflow run ID for best trial {best_trial_number}. "
-                        f"No child runs found for parent {parent_run_id[:12]}... "
-                        f"This may be a timing issue - trial runs may not be created/committed yet."
+                if study_key_hash:
+                    # Search for runs with matching study_key_hash and trial_number
+                    filter_str = (
+                        f"tags.code.study_key_hash = '{study_key_hash}' AND "
+                        f"tags.trial_number = '{best_trial_number}'"
                     )
+                    candidate_runs = client.search_runs(
+                        experiment_ids=[experiment_id],
+                        filter_string=filter_str,
+                        max_results=100,
+                    )
+                    
+                    # Filter results to only include runs that belong to this parent
+                    # (to avoid matching trial runs from other sweeps with same study_key_hash)
+                    matching_runs = []
+                    for run in candidate_runs:
+                        run_parent_id = run.data.tags.get("mlflow.parentRunId")
+                        if run_parent_id == parent_run_id:
+                            trial_num = self._extract_trial_number(run)
+                            if trial_num == best_trial_number:
+                                matching_runs.append(run)
+                    
+                    if len(matching_runs) > 0:
+                        # Use the first matching run
+                        best_run = matching_runs[0]
+                        best_run_id = best_run.info.run_id
+                        logger.info(
+                            f"Found best trial {best_trial_number} "
+                            f"(study_key_hash + trial_number + parentRunId): {best_run_id[:12]}..."
+                        )
+                        # Log it
+                        config_dir = infer_config_dir_from_path(output_dir)
+                        from infrastructure.naming.mlflow.tag_keys import (
+                            get_hpo_best_trial_number,
+                            get_hpo_best_trial_run_id,
+                        )
+                        best_trial_run_id_tag = get_hpo_best_trial_run_id(config_dir)
+                        best_trial_number_tag = get_hpo_best_trial_number(config_dir)
+                        mlflow.log_param("best_trial_run_id", best_run_id)
+                        mlflow.set_tag(best_trial_run_id_tag, best_run_id)
+                        mlflow.set_tag(best_trial_number_tag, str(best_trial_number))
+                    else:
+                        logger.warning(
+                            f"Could not find MLflow run ID for best trial {best_trial_number}. "
+                            f"Found {len(candidate_runs)} runs with matching study_key_hash and trial_number, "
+                            f"but none belong to parent {parent_run_id[:12]}... "
+                            f"This may be a timing issue - trial runs may not be created/committed yet."
+                        )
                 else:
                     logger.warning(
                         f"Could not find MLflow run ID for best trial {best_trial_number}. "
-                        f"Found {len(all_runs)} child runs but none with trial_number={best_trial_number}. "
-                        f"Available trial numbers: {sorted(trial_to_run_id.keys())}. "
-                        f"This suggests trial runs may not have trial_number tags set correctly."
+                        f"Parent run {parent_run_id[:12]}... missing study_key_hash tag. "
+                        f"This may be a timing issue - parent run tags may not be set yet."
                     )
+            except Exception as search_error:
+                logger.warning(
+                    f"Could not find MLflow run ID for best trial {best_trial_number}. "
+                    f"Search failed: {search_error}. "
+                    f"This may be a timing issue - trial runs may not be created/committed yet."
+                )
 
         except Exception as e:
             error_msg = str(e)

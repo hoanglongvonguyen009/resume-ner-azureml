@@ -20,4 +20,5 @@ mlflow:
   enabled: true
   validate: true
   download_timeout: 300
+  require_artifact_tag: false  # If true, requires artifact.available tag to be true before downloading. If false, warns but still attempts download.
 

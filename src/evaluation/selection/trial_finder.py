@@ -324,39 +324,46 @@ def find_best_trial_from_study(
         best_trial = study.best_trial
         best_trial_number = best_trial.number
 
-        # Compute trial_key_hash from Optuna trial hyperparameters
+        # Compute trial_key_hash from Optuna trial hyperparameters using centralized utilities
         computed_trial_key_hash = None
         if hpo_config and data_config:
             try:
+                from infrastructure.tracking.mlflow.hash_utils import (
+                    compute_study_key_hash_v2,
+                    compute_trial_key_hash_from_configs,
+                )
                 from infrastructure.tracking.mlflow.naming import (
                     build_hpo_study_key,
                     build_hpo_study_key_hash,
-                    build_hpo_trial_key,
-                    build_hpo_trial_key_hash,
                 )
 
-                # Compute study_key_hash
-                study_key = build_hpo_study_key(
-                    data_config=data_config,
-                    hpo_config=hpo_config,
-                    backbone=backbone_name,
-                    benchmark_config=None,  # Not needed for trial lookup
-                )
-                study_key_hash = build_hpo_study_key_hash(study_key)
+                # Try v2 first (requires train_config, which we don't have here)
+                # Fallback to v1 for backward compatibility
+                study_key_hash = None
+                try:
+                    # We don't have train_config here, so use v1 fallback
+                    study_key = build_hpo_study_key(
+                        data_config=data_config,
+                        hpo_config=hpo_config,
+                        backbone=backbone_name,
+                        benchmark_config=None,  # Not needed for trial lookup
+                    )
+                    study_key_hash = build_hpo_study_key_hash(study_key)
+                except Exception:
+                    pass
 
-                # Extract hyperparameters (excluding metadata fields)
-                hyperparameters = {
-                    k: v
-                    for k, v in best_trial.params.items()
-                    if k not in ("backbone", "trial_number")
-                }
+                if study_key_hash:
+                    # Extract hyperparameters (excluding metadata fields)
+                    hyperparameters = {
+                        k: v
+                        for k, v in best_trial.params.items()
+                        if k not in ("backbone", "trial_number")
+                    }
 
-                # Compute trial_key_hash
-                trial_key = build_hpo_trial_key(
-                    study_key_hash=study_key_hash,
-                    hyperparameters=hyperparameters,
-                )
-                computed_trial_key_hash = build_hpo_trial_key_hash(trial_key)
+                    # Compute trial_key_hash using centralized utility
+                    computed_trial_key_hash = compute_trial_key_hash_from_configs(
+                        study_key_hash, hyperparameters, None
+                    )
 
             except Exception:
                 pass
@@ -1015,11 +1022,28 @@ def select_champion_per_backbone(
             schema_version_used = "2.0" if groups_v2 else "1.0"
     
     if not groups_to_use:
-        logger.warning(
-            f"No valid groups found for {backbone}. "
-            f"Found {len(groups_v1)} v1 group(s) and {len(groups_v2)} v2 group(s), "
-            f"but none matched selection criteria (schema_version preference: {prefer_schema_version})"
-        )
+        # Provide more helpful warning message
+        if len(groups_v1) == 0 and len(groups_v2) == 0:
+            logger.warning(
+                f"No valid groups found for {backbone}. "
+                f"No trial runs found in HPO experiment '{hpo_experiment.get('name', 'unknown')}'. "
+                f"This may indicate:\n"
+                f"  - HPO was not run for this backbone\n"
+                f"  - Runs exist but don't have required tags (stage='hpo_trial' or 'hpo', backbone tag)\n"
+                f"  - Runs exist but were filtered out (missing metrics, artifacts, or grouping tags)\n"
+                f"Skipping champion selection for {backbone}."
+            )
+        else:
+            logger.warning(
+                f"No valid groups found for {backbone}. "
+                f"Found {len(groups_v1)} v1 group(s) and {len(groups_v2)} v2 group(s), "
+                f"but none matched selection criteria (schema_version preference: {prefer_schema_version}). "
+                f"This may indicate:\n"
+                f"  - Groups don't meet min_trials requirement\n"
+                f"  - Schema version mismatch (prefer_schema_version={prefer_schema_version})\n"
+                f"  - Groups filtered out by other criteria\n"
+                f"Skipping champion selection for {backbone}."
+            )
         return None
     
     # Log version usage
@@ -1147,30 +1171,49 @@ def select_champion_per_backbone(
     # CRITICAL: Find refit run for this champion trial (checkpoints are usually in refit runs)
     # According to plan: "champion run_id" ≠ "checkpoint run_id" in a refit workflow
     refit_run_id = None
+    refit_runs = []
+    
     try:
         refit_of_trial_tag = tags_registry.key("refit", "of_trial_run_id")
         stage_tag = tags_registry.key("process", "stage")
+        trial_key_tag = tags_registry.key("grouping", "trial_key_hash")
         
-        # Strategy 1: Search for refit run using linking tag (most reliable)
-        refit_runs = mlflow_client.search_runs(
-            experiment_ids=[hpo_experiment["id"]],
-            filter_string=f"tags.{refit_of_trial_tag} = '{champion_run_id}'",
-            max_results=10,
-        )
+        # Strategy 1: Search by trial_key_hash + stage (most reliable - uses simpler tag names)
+        if champion_trial_key:
+            try:
+                refit_runs = mlflow_client.search_runs(
+                    experiment_ids=[hpo_experiment["id"]],
+                    filter_string=f"tags.code.trial_key_hash = '{champion_trial_key}' AND tags.code.stage = 'hpo_refit'",
+                    max_results=10,
+                )
+                if refit_runs:
+                    logger.debug(
+                        f"Found {len(refit_runs)} refit run(s) using trial_key_hash search"
+                    )
+            except Exception as search_error:
+                logger.warning(
+                    f"Search by trial_key_hash failed: {search_error}"
+                )
+                refit_runs = []
         
-        # Strategy 2: Fallback - search by trial_key_hash if linking tag doesn't exist
-        # (for existing refit runs created before linking tag was implemented)
-        if not refit_runs and champion_trial_key:
-            logger.debug(
-                f"No refit run found with linking tag for trial {champion_run_id[:12]}... "
-                f"- trying fallback search by trial_key_hash={champion_trial_key[:8]}..."
-            )
-            trial_key_tag = tags_registry.key("grouping", "trial_key_hash")
-            refit_runs = mlflow_client.search_runs(
-                experiment_ids=[hpo_experiment["id"]],
-                filter_string=f"tags.{stage_tag} = 'hpo_refit' AND tags.{trial_key_tag} = '{champion_trial_key}'",
-                max_results=10,
-            )
+        # Strategy 2: Fallback - search by linking tag if trial_key_hash search failed
+        if not refit_runs:
+            try:
+                refit_runs = mlflow_client.search_runs(
+                    experiment_ids=[hpo_experiment["id"]],
+                    filter_string=f"tags.{refit_of_trial_tag} = '{champion_run_id}'",
+                    max_results=10,
+                )
+                if refit_runs:
+                    logger.debug(
+                        f"Found {len(refit_runs)} refit run(s) using linking tag for trial {champion_run_id[:12]}..."
+                    )
+            except Exception as search_error:
+                # Filter string might fail due to Azure ML MLflow limitations (e.g., multiple dots in tag names)
+                logger.debug(
+                    f"Linking tag search failed (may be filter syntax issue): {search_error}"
+                )
+                refit_runs = []
         
         if refit_runs:
             # If multiple refit runs exist (reruns), pick the latest by start_time
@@ -1185,11 +1228,60 @@ def select_champion_per_backbone(
                 f"(selected latest from {len(refit_runs)} refit run(s))"
             )
         else:
-            raise ValueError(
+            # Diagnostic: Check if ANY refit runs exist in the experiment
+            diagnostic_info = []
+            try:
+                any_refit_runs = mlflow_client.search_runs(
+                    experiment_ids=[hpo_experiment["id"]],
+                    filter_string="tags.code.stage = 'hpo_refit'",
+                    max_results=5,  # Just need a sample
+                )
+                if any_refit_runs:
+                    diagnostic_info.append(
+                        f"Found {len(any_refit_runs)} refit run(s) in experiment, but none matched the champion trial."
+                    )
+                    # Show sample of refit run tags for debugging
+                    sample_refit = any_refit_runs[0]
+                    sample_trial_key = (
+                        sample_refit.data.tags.get(trial_key_tag) or 
+                        sample_refit.data.tags.get("code.trial_key_hash") or
+                        "missing"
+                    )
+                    sample_linking = (
+                        sample_refit.data.tags.get(refit_of_trial_tag) or 
+                        sample_refit.data.tags.get("code.refit.of_trial_run_id") or
+                        "missing"
+                    )
+                    diagnostic_info.append(
+                        f"Sample refit run {sample_refit.info.run_id[:12]}... tags: "
+                        f"trial_key_hash={sample_trial_key[:16] if isinstance(sample_trial_key, str) else sample_trial_key}..., "
+                        f"linking_tag={sample_linking[:16] if isinstance(sample_linking, str) else sample_linking}..."
+                    )
+                else:
+                    diagnostic_info.append(
+                        "No refit runs found in experiment (tags.code.stage = 'hpo_refit' returned 0 results)."
+                    )
+            except Exception as diag_error:
+                diagnostic_info.append(f"Could not diagnose: {diag_error}")
+            
+            # Provide helpful error message
+            error_msg = (
                 f"No refit run found for champion trial {champion_run_id[:12]}... "
                 f"(trial_key_hash={champion_trial_key[:8] if champion_trial_key else 'missing'}...). "
-                f"Refit is required to acquire checkpoint deterministically."
+                f"Refit is required to acquire checkpoint deterministically.\n"
+                f"Tried search strategies:\n"
             )
+            if champion_trial_key:
+                error_msg += (
+                    f"  1. Trial key hash: tags.code.trial_key_hash = '{champion_trial_key[:8]}...' AND tags.code.stage = 'hpo_refit'\n"
+                )
+            error_msg += f"  2. Linking tag: tags.{refit_of_trial_tag} = '{champion_run_id[:12]}...'\n"
+            if diagnostic_info:
+                error_msg += f"\nDiagnostics:\n" + "\n".join(f"  - {info}" for info in diagnostic_info)
+            raise ValueError(error_msg)
+    except ValueError:
+        # Re-raise ValueError as-is (these are our explicit errors)
+        raise
     except Exception as e:
         logger.error(
             f"Could not find refit run for champion trial {champion_run_id[:12]}...: {e}. "
@@ -1220,6 +1312,8 @@ def select_champion_per_backbone(
             "study_key_hash": winning_key,
             "schema_version": schema_version_used,  # Track which version was used
             "checkpoint_path": checkpoint_path,
+            "experiment_name": hpo_experiment.get("name"),  # Include experiment name for artifact acquisition
+            "experiment_id": hpo_experiment.get("id"),  # Include experiment ID for artifact acquisition
         },
         "all_groups": {
             k: {
@@ -1274,87 +1368,51 @@ def _filter_by_artifact_availability(
         runs_missing_tag = 0
         
         for run in runs:
-            # Check if this is a legacy run (no Phase 2 tags)
-            # Legacy runs don't have schema_version tag, so we should be lenient with artifact filter
-            is_legacy_run = run.data.tags.get(schema_version_tag) is None
+            parent_run_id = run.data.tags.get("mlflow.parentRunId")
+            artifact_available = True  # Default: allow through (lenient)
+            tag_source = "default (allowing)"
             
-            # Check run's own tag first
-            run_tag_value = run.data.tags.get(artifact_tag)
-            artifact_available = False
-            tag_source = "run"
-            
-            if run_tag_value is not None:
-                # Tag exists
-                artifact_available = run_tag_value.lower() == "true"
-                if not artifact_available:
-                    # Tag is explicitly "false"
-                    if is_legacy_run:
-                        # Legacy run with false tag - be lenient (tag might not have been updated)
-                        runs_missing_tag += 1
-                        artifact_available = True
-                        tag_source = "false (legacy, allowing)"
-                        logger.debug(
-                            f"Run {run.info.run_id[:12]}...: artifact.available=false on legacy run "
-                            f"(allowing through - tag may not have been updated)"
-                        )
-                    else:
-                        runs_explicitly_false += 1
-            else:
-                # Tag is missing - check parent run for legacy runs
-                if mlflow_client:
-                    parent_run_id = run.data.tags.get("mlflow.parentRunId")
-                    if parent_run_id:
-                        try:
-                            parent_run = mlflow_client.get_run(parent_run_id)
-                            parent_tag_value = parent_run.data.tags.get(artifact_tag)
-                            if parent_tag_value is not None:
-                                # Parent has tag - use it
-                                artifact_available = parent_tag_value.lower() == "true"
-                                tag_source = "parent"
-                                if artifact_available:
-                                    logger.debug(
-                                        f"Run {run.info.run_id[:12]}...: artifact.available found on parent run"
-                                    )
-                                else:
-                                    # Parent has false tag
-                                    if is_legacy_run:
-                                        # Legacy run - be lenient
-                                        runs_missing_tag += 1
-                                        artifact_available = True
-                                        tag_source = "parent false (legacy, allowing)"
-                                        logger.debug(
-                                            f"Run {run.info.run_id[:12]}...: artifact.available=false on parent "
-                                            f"of legacy run (allowing through)"
-                                        )
-                                    else:
-                                        runs_explicitly_false += 1
-                            else:
-                                # Both run and parent missing tag - legacy run, be lenient
+            # Check parent run's artifact tag first (authoritative source)
+            if mlflow_client and parent_run_id:
+                try:
+                    parent_run = mlflow_client.get_run(parent_run_id)
+                    parent_tag_value = parent_run.data.tags.get(artifact_tag)
+                    if parent_tag_value is not None:
+                        artifact_available = parent_tag_value.lower() == "true"
+                        tag_source = "parent"
+                        if not artifact_available:
+                            # Check if parent is legacy (no schema_version)
+                            parent_schema_version = parent_run.data.tags.get(schema_version_tag)
+                            if parent_schema_version is None:
+                                # Legacy run - be lenient
+                                artifact_available = True
+                                tag_source = "parent false (legacy, allowing)"
                                 runs_missing_tag += 1
-                                artifact_available = True  # Allow through for legacy runs
-                                tag_source = "missing (legacy, allowing)"
-                                logger.debug(
-                                    f"Run {run.info.run_id[:12]}...: artifact tag missing on run and parent "
-                                    f"(legacy run, allowing through)"
-                                )
-                        except Exception as e:
-                            logger.debug(
-                                f"Could not check parent run {parent_run_id[:12]}... for artifact tag: {e}"
-                            )
-                            # If we can't check parent, be lenient for legacy runs
-                            runs_missing_tag += 1
+                            else:
+                                # v1/v2 run with explicit false - filter out
+                                runs_explicitly_false += 1
+                except Exception as e:
+                    logger.debug(f"Could not check parent run {parent_run_id[:12]}... for artifact tag: {e}")
+            
+            # If parent check didn't find tag, check run itself
+            if tag_source == "default (allowing)":
+                run_tag_value = run.data.tags.get(artifact_tag)
+                if run_tag_value is not None:
+                    artifact_available = run_tag_value.lower() == "true"
+                    tag_source = "run"
+                    if not artifact_available:
+                        # Check if run is legacy
+                        run_schema_version = run.data.tags.get(schema_version_tag)
+                        if run_schema_version is None:
+                            # Legacy run - be lenient
                             artifact_available = True
-                            tag_source = "missing (legacy, allowing)"
-                    else:
-                        # No parent run ID - be lenient
-                        runs_missing_tag += 1
-                        artifact_available = True
-                        tag_source = "missing (legacy, allowing)"
+                            tag_source = "run false (legacy, allowing)"
+                            runs_missing_tag += 1
+                        else:
+                            runs_explicitly_false += 1
                 else:
-                    # No MLflow client - be lenient
+                    # Tag missing on both - allow through (may be in progress)
                     runs_missing_tag += 1
-                    artifact_available = True
-                    tag_source = "missing (legacy, allowing)"
             
             if not artifact_available:
                 runs_without_tag += 1
