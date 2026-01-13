@@ -261,6 +261,23 @@ def run_refit_training(
                 tags=refit_tags,
                 parent_run_id=hpo_parent_run_id,
             )
+            
+            # CRITICAL: Try to set linking tag immediately after run creation
+            # (in case run gets finalized before _log_refit_metrics_to_mlflow is called)
+            if refit_run_id and trial_key_hash:
+                try:
+                    _link_refit_to_trial_run(
+                        refit_run_id=refit_run_id,
+                        trial_key_hash=trial_key_hash,
+                        hpo_parent_run_id=hpo_parent_run_id,
+                        config_dir=config_dir,
+                        trial_number=best_trial.number,
+                    )
+                except Exception as e:
+                    logger.debug(
+                        f"[REFIT] Could not set linking tag immediately after run creation: {e}. "
+                        f"Will retry after training completes."
+                    )
         except Exception as e:
             logger.warning(f"Could not create refit MLflow run: {e}", exc_info=True)
 
@@ -300,6 +317,8 @@ def run_refit_training(
             metrics=metrics,
             refit_params=refit_params,
             config_dir=config_dir,
+            trial_key_hash=trial_key_hash,  # Pass for linking
+            hpo_parent_run_id=hpo_parent_run_id,  # Pass for linking
         )
 
     checkpoint_dir = refit_output_dir / "checkpoint"
@@ -329,6 +348,8 @@ def _log_refit_metrics_to_mlflow(
     metrics: Dict[str, Any],
     refit_params: Dict[str, Any],
     config_dir: Path,
+    trial_key_hash: Optional[str] = None,
+    hpo_parent_run_id: Optional[str] = None,
 ) -> None:
     """Log metrics and parameters to MLflow refit run."""
     try:
@@ -359,10 +380,25 @@ def _log_refit_metrics_to_mlflow(
             get_refit,
             get_refit_has_validation,
         )
+        from infrastructure.naming.mlflow.tags_registry import load_tags_registry
+        
+        tags_registry = load_tags_registry(config_dir)
         refit_tag = get_refit(config_dir)
         refit_has_validation_tag = get_refit_has_validation(config_dir)
         client.set_tag(refit_run_id, refit_tag, "true")
         client.set_tag(refit_run_id, refit_has_validation_tag, "false")
+        
+        # CRITICAL: Link refit run to trial run for deterministic mapping
+        # This is called after training completes, but we also try immediately after run creation
+        # Note: trial_number is not available here, so we pass None
+        # (it was already tried immediately after run creation with trial_number)
+        _link_refit_to_trial_run(
+            refit_run_id=refit_run_id,
+            trial_key_hash=trial_key_hash,
+            hpo_parent_run_id=hpo_parent_run_id,
+            config_dir=config_dir,
+            trial_number=None,  # Not available in this context
+        )
 
         # Log hyperparameters
         for param_name, param_value in refit_params.items():
@@ -372,5 +408,224 @@ def _log_refit_metrics_to_mlflow(
             f"[REFIT] Logged metrics to MLflow (run will be marked FINISHED after artifacts are uploaded)"
         )
     except Exception as e:
-        logger.warning(f"[REFIT] Could not log metrics to MLflow: {e}")
+        logger.warning(f"[REFIT] Could not log metrics to MLflow: {e}", exc_info=True)
+
+
+def _link_refit_to_trial_run(
+    refit_run_id: str,
+    trial_key_hash: Optional[str],
+    hpo_parent_run_id: Optional[str],
+    config_dir: Path,
+    trial_number: Optional[int] = None,
+) -> None:
+    """
+    Link refit run to trial run by setting refit.of_trial_run_id tag.
+    
+    This function can be called multiple times safely (idempotent).
+    """
+    from common.shared.logging_utils import get_logger
+    logger = get_logger(__name__)
+    
+    # Search for trial run that matches trial_key_hash
+    trial_run_id = None
+    logger.info(
+        f"[REFIT] Attempting to link refit run {refit_run_id[:12]}... to trial run. "
+        f"trial_key_hash={'present' if trial_key_hash else 'missing'}, "
+        f"hpo_parent_run_id={'present' if hpo_parent_run_id else 'missing'}"
+    )
+    
+    if trial_key_hash and hpo_parent_run_id:
+        try:
+            from mlflow.tracking import MlflowClient
+            from infrastructure.naming.mlflow.tags_registry import load_tags_registry
+            
+            mlflow_client = MlflowClient()
+            tags_registry = load_tags_registry(config_dir)
+            trial_key_tag = tags_registry.key("grouping", "trial_key_hash")
+            stage_tag = tags_registry.key("process", "stage")
+                
+            # Get experiment ID from parent run
+            parent_run = mlflow_client.get_run(hpo_parent_run_id)
+            experiment_id = parent_run.info.experiment_id
+            logger.debug(
+                f"[REFIT] Parent run experiment_id: {experiment_id}, "
+                f"searching for trial runs with trial_key_hash={trial_key_hash[:16]}..."
+            )
+            
+            # Strategy 1: Search for trial runs with matching trial_key_hash
+            # Note: Azure ML MLflow backend doesn't support parentheses in filter strings
+            # So we search for hpo_trial first, then hpo as fallback
+            try:
+                # Try hpo_trial first (preferred)
+                filter_str_trial = f"tags.{trial_key_tag} = '{trial_key_hash}' AND tags.{stage_tag} = 'hpo_trial'"
+                logger.debug(f"[REFIT] Search filter (hpo_trial): {filter_str_trial}")
+                trial_runs = mlflow_client.search_runs(
+                    experiment_ids=[experiment_id],
+                    filter_string=filter_str_trial,
+                    max_results=10,
+                )
+                logger.debug(f"[REFIT] Found {len(trial_runs)} trial run(s) with stage='hpo_trial' matching trial_key_hash")
+                
+                # If no hpo_trial runs found, try hpo stage (legacy)
+                if not trial_runs:
+                    filter_str_hpo = f"tags.{trial_key_tag} = '{trial_key_hash}' AND tags.{stage_tag} = 'hpo'"
+                    logger.debug(f"[REFIT] Search filter (hpo, fallback): {filter_str_hpo}")
+                    trial_runs = mlflow_client.search_runs(
+                        experiment_ids=[experiment_id],
+                        filter_string=filter_str_hpo,
+                        max_results=10,
+                    )
+                    logger.debug(f"[REFIT] Found {len(trial_runs)} trial run(s) with stage='hpo' matching trial_key_hash")
+                
+                # Find the trial run (prefer hpo_trial, fallback to hpo)
+                for trial_run in trial_runs:
+                    trial_stage = trial_run.data.tags.get(stage_tag)
+                    trial_run_hash = trial_run.data.tags.get(trial_key_tag)
+                    logger.debug(
+                        f"[REFIT] Trial run {trial_run.info.run_id[:12]}...: "
+                        f"stage={trial_stage}, trial_key_hash={trial_run_hash[:16] if trial_run_hash else 'missing'}..."
+                    )
+                    # Prefer hpo_trial, but accept hpo as fallback
+                    if trial_stage in ("hpo_trial", "hpo"):
+                        trial_run_id = trial_run.info.run_id
+                        if trial_stage == "hpo_trial":
+                            break  # Prefer hpo_trial
+                
+                if trial_run_id:
+                    logger.info(
+                        f"[REFIT] Found trial run {trial_run_id[:12]}... by trial_key_hash={trial_key_hash[:8]}..."
+                    )
+            except Exception as e:
+                logger.warning(f"[REFIT] Search by trial_key_hash failed: {e}", exc_info=True)
+            
+            # Strategy 2: Fallback - search for child runs of HPO parent (trial runs are children)
+            if not trial_run_id:
+                try:
+                    logger.debug(
+                        f"[REFIT] Trying fallback: searching for child runs of parent {hpo_parent_run_id[:12]}..."
+                    )
+                    # Get all child runs of the HPO parent
+                    # Note: Azure ML MLflow backend doesn't support parentheses, so search separately
+                    # First try hpo_trial
+                    child_runs = mlflow_client.search_runs(
+                        experiment_ids=[experiment_id],
+                        filter_string=f"tags.mlflow.parentRunId = '{hpo_parent_run_id}' AND tags.{stage_tag} = 'hpo_trial'",
+                        max_results=100,
+                    )
+                    # If no hpo_trial runs, try hpo (legacy)
+                    if not child_runs:
+                        child_runs = mlflow_client.search_runs(
+                            experiment_ids=[experiment_id],
+                            filter_string=f"tags.mlflow.parentRunId = '{hpo_parent_run_id}' AND tags.{stage_tag} = 'hpo'",
+                            max_results=100,
+                        )
+                    logger.debug(f"[REFIT] Found {len(child_runs)} child run(s) of HPO parent")
+                    
+                    # Filter by matching trial_key_hash first
+                    for child_run in child_runs:
+                        child_trial_hash = child_run.data.tags.get(trial_key_tag)
+                        child_stage = child_run.data.tags.get(stage_tag)
+                        logger.debug(
+                            f"[REFIT] Child run {child_run.info.run_id[:12]}...: "
+                            f"stage={child_stage}, trial_key_hash={child_trial_hash[:16] if child_trial_hash else 'missing'}..."
+                        )
+                        if child_trial_hash == trial_key_hash:
+                            trial_run_id = child_run.info.run_id
+                            logger.info(
+                                f"[REFIT] Found trial run {trial_run_id[:12]}... by parent-child relationship "
+                                f"(trial_key_hash={trial_key_hash[:8]}...)"
+                            )
+                            break
+                    
+                    # Strategy 3: If still not found and we have trial_number, search by trial number
+                    # (Trial runs might not have trial_key_hash tag set, but should have trial number)
+                    if not trial_run_id and trial_number is not None:
+                        logger.debug(
+                            f"[REFIT] Trying fallback by trial number: searching for trial {trial_number} "
+                            f"among {len(child_runs)} child runs..."
+                        )
+                        from infrastructure.naming.mlflow.tag_keys import get_trial_number
+                        trial_number_tag = get_trial_number(config_dir)
+                        
+                        for child_run in child_runs:
+                            child_trial_num = child_run.data.tags.get(trial_number_tag)
+                            child_stage = child_run.data.tags.get(stage_tag)
+                            # Check if this is a trial run (not a fold run) with matching trial number
+                            # Trial runs typically don't have "fold" in their name/tags
+                            run_name = child_run.data.tags.get("mlflow.runName", "")
+                            is_fold_run = "fold" in run_name.lower()
+                            
+                            logger.debug(
+                                f"[REFIT] Child run {child_run.info.run_id[:12]}...: "
+                                f"stage={child_stage}, trial_number={child_trial_num}, "
+                                f"is_fold_run={is_fold_run}, name={run_name[:50]}..."
+                            )
+                            
+                            # Match by trial number and ensure it's not a fold run
+                            # Trial runs have naming pattern like: ..._t00_... or ..._trial_0_...
+                            trial_number_in_name = f"_t{trial_number:02d}_" in run_name or f"_trial_{trial_number}_" in run_name
+                            
+                            if (child_trial_num == str(trial_number) or 
+                                trial_number_in_name or
+                                (child_trial_num is None and not is_fold_run and trial_number == 0)):
+                                # Additional check: trial runs are usually parents of fold runs
+                                # or have specific naming patterns (trial runs don't have "fold" in name)
+                                if not is_fold_run and child_stage in ("hpo_trial", "hpo"):
+                                    trial_run_id = child_run.info.run_id
+                                    logger.info(
+                                        f"[REFIT] Found trial run {trial_run_id[:12]}... by trial number {trial_number} "
+                                        f"(name: {run_name[:50]}..., matched by: "
+                                        f"{'tag' if child_trial_num == str(trial_number) else 'name pattern'})"
+                                    )
+                                    break
+                except Exception as e:
+                    logger.warning(f"[REFIT] Fallback search by parent-child relationship failed: {e}", exc_info=True)
+            
+            # Set linking tag if we found a trial run
+            if trial_run_id:
+                try:
+                    refit_of_trial_tag = tags_registry.key("refit", "of_trial_run_id")
+                    logger.info(
+                        f"[REFIT] Setting tag {refit_of_trial_tag} = {trial_run_id} on refit run {refit_run_id[:12]}..."
+                    )
+                    mlflow_client.set_tag(refit_run_id, refit_of_trial_tag, trial_run_id)
+                    
+                    # Verify tag was set
+                    verify_run = mlflow_client.get_run(refit_run_id)
+                    verify_tag = verify_run.data.tags.get(refit_of_trial_tag)
+                    if verify_tag == trial_run_id:
+                        logger.info(
+                            f"[REFIT] ✓ Successfully linked refit run {refit_run_id[:12]}... to trial run {trial_run_id[:12]}... "
+                            f"(trial_key_hash={trial_key_hash[:8]}...)"
+                        )
+                    else:
+                        logger.error(
+                            f"[REFIT] ❌ Tag verification failed! Expected {trial_run_id}, got {verify_tag}. "
+                            f"Tag may not have been set correctly. Run may be finalized."
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"[REFIT] ❌ Failed to set linking tag: {e}",
+                        exc_info=True
+                    )
+            else:
+                logger.warning(
+                    f"[REFIT] ⚠ Could not find trial run for trial_key_hash={trial_key_hash[:8]}... "
+                    f"- refit run will not be linked to trial run. "
+                    f"Checkpoint acquisition may fail or use fallback search."
+                )
+        except Exception as e:
+            logger.error(
+                f"[REFIT] ❌ Error linking refit run to trial run: {e}. "
+                f"This may affect checkpoint acquisition later.",
+                exc_info=True
+            )
+    elif not trial_key_hash:
+        logger.warning(
+            f"[REFIT] ⚠ trial_key_hash not available - cannot link refit run to trial run"
+        )
+    elif not hpo_parent_run_id:
+        logger.warning(
+            f"[REFIT] ⚠ hpo_parent_run_id not available - cannot link refit run to trial run"
+        )
 

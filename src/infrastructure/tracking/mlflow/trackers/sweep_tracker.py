@@ -1042,6 +1042,34 @@ class MLflowSweepTracker(BaseTracker):
                     f"Checkpoint upload completed successfully for trial {best_trial_number}"
                 )
 
+                # Update artifact.available tag to "true" after successful checkpoint upload
+                try:
+                    from infrastructure.naming.mlflow.tags_registry import load_tags_registry
+                    tags_registry = load_tags_registry(config_dir)
+                    artifact_tag = tags_registry.key("artifact", "available")
+                    
+                    # Update on the run where artifacts were uploaded
+                    client.set_tag(run_id_to_use, artifact_tag, "true")
+                    logger.info(
+                        f"[LOG_BEST_CHECKPOINT] Updated {artifact_tag}=true on run {run_id_to_use[:12]}... "
+                        f"after successful checkpoint upload"
+                    )
+                    
+                    # Also update on parent run (where Phase 2 tags are set)
+                    # This ensures parent run has artifact.available=true for champion selection
+                    if parent_run_id and run_id_to_use != parent_run_id:
+                        client.set_tag(parent_run_id, artifact_tag, "true")
+                        logger.debug(
+                            f"[LOG_BEST_CHECKPOINT] Updated {artifact_tag}=true on parent run {parent_run_id[:12]}... "
+                            f"(artifacts uploaded to child run)"
+                        )
+                except Exception as tag_error:
+                    logger.warning(
+                        f"[LOG_BEST_CHECKPOINT] Could not update artifact.available tag: {tag_error}"
+                    )
+            else:
+                logger.warning("Checkpoint upload returned False (may have been skipped)")
+
             # Mark study as complete after successful checkpoint upload
             try:
                 from datetime import datetime
@@ -1058,8 +1086,6 @@ class MLflowSweepTracker(BaseTracker):
                 logger.warning(
                     f"Could not mark study as complete: {attr_error}"
                 )
-            else:
-                logger.warning("Checkpoint upload returned False (may have been skipped)")
 
         except Exception as e:
             logger.error(f"Failed to upload checkpoint via MLflow: {e}")

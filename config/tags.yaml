@@ -14,6 +14,23 @@ grouping:
   group_id: "code.group_id"
   grouping_schema_version: "code.grouping_schema_version"
 
+# Study metadata tags (Phase 2)
+study:
+  key_schema_version: "code.study.key_schema_version"
+
+# Fingerprint tags (Phase 2)
+fingerprint:
+  data: "code.fingerprint.data"
+  eval: "code.fingerprint.eval"
+
+# Objective tags (Phase 2)
+objective:
+  direction: "code.objective.direction"
+
+# Artifact tags (Phase 2)
+artifact:
+  available: "code.artifact.available"
+
 # Process/stage identification
 process:
   stage: "code.stage"
@@ -33,6 +50,10 @@ training:
   refit: "code.refit"
   refit_has_validation: "code.refit_has_validation"
   interrupted: "code.interrupted"
+
+# Refit linking tags (for mapping trial runs to refit runs)
+refit:
+  of_trial_run_id: "code.refit.of_trial_run_id"  # Links refit run to the trial run it was created from
 
 # HPO-specific tags
 hpo:

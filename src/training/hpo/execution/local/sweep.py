@@ -399,6 +399,168 @@ def create_local_hpo_objective(
 
 # run_refit_training is now imported from refit_executor module above
 
+def _set_phase2_hpo_tags(
+    parent_run_id: str,
+    data_config: Optional[Dict[str, Any]],
+    hpo_config: Dict[str, Any],
+    train_config: Dict[str, Any],
+    backbone: str,
+    config_dir: Optional[Path] = None,
+) -> None:
+    """
+    Set Phase 2 tags on HPO parent run.
+    
+    Sets:
+    - code.study.key_schema_version = "2.0" (or "1.0" for backward compat)
+    - code.fingerprint.data = data_fingerprint
+    - code.fingerprint.eval = eval_fingerprint
+    - code.artifact.available = "false" (will be updated after checkpoint save)
+    - code.objective.direction = "maximize" or "minimize"
+    
+    Args:
+        parent_run_id: MLflow parent run ID
+        data_config: Data configuration dictionary
+        hpo_config: HPO configuration dictionary
+        train_config: Training configuration dictionary
+        backbone: Model backbone name
+    """
+    from common.shared.logging_utils import get_logger
+    logger = get_logger(__name__)
+    
+    if not parent_run_id:
+        logger.warning("_set_phase2_hpo_tags: parent_run_id is empty, skipping")
+        return
+    
+    try:
+        import mlflow
+        from infrastructure.naming.mlflow.hpo_keys import (
+            build_hpo_study_key_v2,
+            build_hpo_study_key_hash,
+            compute_data_fingerprint,
+            compute_eval_fingerprint,
+        )
+        from infrastructure.naming.mlflow.tags_registry import load_tags_registry
+        
+        client = mlflow.tracking.MlflowClient()
+        # Use provided config_dir or infer from current directory
+        if config_dir is None:
+            from pathlib import Path
+            config_dir = Path.cwd() / "config"
+            if not config_dir.exists():
+                config_dir = Path.cwd().parent / "config"
+        tags_registry = load_tags_registry(config_dir)
+        
+        # Compute fingerprints
+        data_fp = None
+        eval_fp = None
+        schema_version = "1.0"  # Default to v1 for backward compat
+        
+        if data_config:
+            try:
+                data_fp = compute_data_fingerprint(data_config)
+            except Exception as e:
+                logger.debug(f"Could not compute data fingerprint: {e}")
+        
+        # Try to get eval_config from train_config (primary) or hpo_config (fallback)
+        eval_config = None
+        if train_config:
+            eval_config = train_config.get("eval", {})
+        
+        if not eval_config:
+            eval_config = hpo_config.get("evaluation", {})
+        
+        if not eval_config:
+            # Fallback: create minimal eval config from objective
+            objective = hpo_config.get("objective", {})
+            eval_config = {
+                "evaluator_version": "default",
+                "metric": objective,
+            }
+        
+        try:
+            eval_fp = compute_eval_fingerprint(eval_config)
+        except Exception as e:
+            logger.debug(f"Could not compute eval fingerprint: {e}")
+        
+        # Try to build v2 study key (if fingerprints are available)
+        if data_fp and eval_fp and data_config:
+            try:
+                study_key_v2 = build_hpo_study_key_v2(
+                    data_config=data_config,
+                    hpo_config=hpo_config,
+                    train_config=train_config,
+                    model=backbone,
+                    data_fingerprint=data_fp,
+                    eval_fingerprint=eval_fp,
+                )
+                study_key_hash_v2 = build_hpo_study_key_hash(study_key_v2)
+                schema_version = "2.0"
+                
+                # Update study_key_hash tag if v2 was successfully computed
+                study_key_tag = tags_registry.key("grouping", "study_key_hash")
+                client.set_tag(parent_run_id, study_key_tag, study_key_hash_v2)
+                logger.debug(f"Set v2 study_key_hash: {study_key_hash_v2[:16]}...")
+            except Exception as e:
+                logger.debug(f"Could not build v2 study key: {e}, using v1")
+        
+        # Set schema version tag (always set, even if v1)
+        try:
+            schema_version_tag = tags_registry.key("study", "key_schema_version")
+            client.set_tag(parent_run_id, schema_version_tag, schema_version)
+        except Exception as e:
+            logger.warning(f"Could not set schema_version tag: {e}")
+        
+        # Set fingerprint tags (if available)
+        if data_fp:
+            try:
+                data_fp_tag = tags_registry.key("fingerprint", "data")
+                client.set_tag(parent_run_id, data_fp_tag, data_fp)
+            except Exception as e:
+                logger.warning(f"Could not set data fingerprint tag: {e}")
+        
+        if eval_fp:
+            try:
+                eval_fp_tag = tags_registry.key("fingerprint", "eval")
+                client.set_tag(parent_run_id, eval_fp_tag, eval_fp)
+            except Exception as e:
+                logger.warning(f"Could not set eval fingerprint tag: {e}")
+        
+        # Set objective direction tag (with migration support)
+        try:
+            from infrastructure.config.selection import get_objective_direction
+            # Create a selection_config-like dict for the helper
+            selection_config_like = {"objective": hpo_config.get("objective", {})}
+            objective_direction = get_objective_direction(selection_config_like)
+            direction_tag = tags_registry.key("objective", "direction")
+            client.set_tag(parent_run_id, direction_tag, objective_direction)
+        except Exception as e:
+            logger.warning(f"Could not set objective direction tag: {e}")
+            # Fallback: try to get from objective directly
+            try:
+                objective_direction = hpo_config.get("objective", {}).get("direction") or hpo_config.get("objective", {}).get("goal", "maximize")
+                direction_tag = tags_registry.key("objective", "direction")
+                client.set_tag(parent_run_id, direction_tag, objective_direction)
+            except Exception as e2:
+                logger.warning(f"Could not set objective direction tag (fallback): {e2}")
+        
+        # Set artifact.available = "false" initially (will be updated after checkpoint save)
+        try:
+            artifact_tag = tags_registry.key("artifact", "available")
+            client.set_tag(parent_run_id, artifact_tag, "false")
+        except Exception as e:
+            logger.warning(f"Could not set artifact.available tag: {e}")
+        
+        logger.info(
+            f"✓ Set Phase 2 tags on parent run {parent_run_id[:12]}...: "
+            f"schema_version={schema_version}, "
+            f"data_fp={'set' if data_fp else 'missing'}, "
+            f"eval_fp={'set' if eval_fp else 'missing'}, "
+            f"objective_direction={objective_direction}"
+        )
+    except Exception as e:
+        logger.warning(f"Could not set Phase 2 tags: {e}", exc_info=True)
+
+
 def run_local_hpo_sweep(
     dataset_path: str,
     config_dir: Path,
@@ -779,6 +941,28 @@ def run_local_hpo_sweep(
                 logger.debug(
                     f"Could not update .active_study.json marker with study_key_hash: {e}")
 
+            # Set Phase 2 tags (schema_version, fingerprints, artifact.available, objective.direction)
+            try:
+                logger.info(
+                    f"Setting Phase 2 tags on parent run {parent_run_id[:12]}... "
+                    f"(data_config={'present' if data_config else 'missing'}, "
+                    f"train_config={'present' if train_config else 'missing'})"
+                )
+                _set_phase2_hpo_tags(
+                    parent_run_id=parent_run_id,
+                    data_config=data_config,
+                    hpo_config=hpo_config,
+                    train_config=train_config,
+                    backbone=backbone,
+                    config_dir=project_config_dir,
+                )
+                logger.info(f"✓ Successfully completed Phase 2 tag setting for parent run {parent_run_id[:12]}...")
+            except Exception as e:
+                logger.error(
+                    f"✗ Could not set Phase 2 tags on parent run {parent_run_id[:12]}...: {e}",
+                    exc_info=True
+                )
+
             # Cleanup: Tag interrupted runs from previous sessions
             parent_to_children = cleanup_interrupted_runs(
                 parent_run_id=parent_run_id,
@@ -922,7 +1106,27 @@ def run_local_hpo_sweep(
                                 f"Could not get grouping tags from parent run for refit: {e}")
 
                     # Compute trial_key_hash from best trial hyperparameters and study_key_hash
-                    if refit_study_key_hash and study.best_trial:
+                    # CRITICAL: Use the study_key_hash from the parent run (which matches trial runs)
+                    # rather than recomputing, to ensure consistency
+                    trial_study_key_hash = refit_study_key_hash
+                    if parent_run_id:
+                        try:
+                            client = mlflow.tracking.MlflowClient()
+                            parent_run = client.get_run(parent_run_id)
+                            parent_study_key_hash = parent_run.data.tags.get("code.study_key_hash")
+                            if parent_study_key_hash:
+                                trial_study_key_hash = parent_study_key_hash
+                                logger.debug(
+                                    f"[REFIT] Using study_key_hash from parent run for trial_key_hash computation: "
+                                    f"{trial_study_key_hash[:16]}... (matches trial runs)"
+                                )
+                        except Exception as e:
+                            logger.debug(
+                                f"Could not get study_key_hash from parent run: {e}. "
+                                f"Using computed study_key_hash instead."
+                            )
+                    
+                    if trial_study_key_hash and study.best_trial:
                         try:
                             from infrastructure.tracking.mlflow.naming import (
                                 build_hpo_trial_key,
@@ -934,12 +1138,12 @@ def run_local_hpo_sweep(
                                 if k not in ("backbone", "trial_number", "run_id")
                             }
                             trial_key = build_hpo_trial_key(
-                                refit_study_key_hash, hyperparameters)
+                                trial_study_key_hash, hyperparameters)
                             refit_trial_key_hash = build_hpo_trial_key_hash(
                                 trial_key)
                             logger.info(
                                 f"[REFIT] Computed trial_key_hash={refit_trial_key_hash[:16]}... "
-                                f"from study_key_hash and best trial hyperparameters"
+                                f"from study_key_hash={trial_study_key_hash[:16]}... and best trial hyperparameters"
                             )
                         except Exception as e:
                             logger.warning(
@@ -1065,6 +1269,7 @@ def run_local_hpo_sweep(
                                 refit_run_id=refit_run_id,  # Upload to refit run
                             )
                             upload_succeeded = True
+                            # Note: artifact.available tag is updated inside log_best_checkpoint() method
                         except Exception as e:
                             upload_error = e
                             logger.error(
@@ -1077,6 +1282,34 @@ def run_local_hpo_sweep(
                                 "[HPO] Skipping checkpoint logging (mlflow.log_best_checkpoint=false or not set)")
                         upload_succeeded = True  # Skipped intentionally, not a failure
                         upload_error = None
+                        
+                        # Even if checkpoint logging is disabled, check if artifacts exist on disk
+                        # and update artifact.available tag accordingly
+                        try:
+                            from infrastructure.naming.mlflow.tags_registry import load_tags_registry
+                            tags_registry = load_tags_registry(config_dir)
+                            artifact_tag = tags_registry.key("artifact", "available")
+                            client = mlflow.tracking.MlflowClient()
+                            
+                            # Check if refit checkpoint exists on disk
+                            artifact_exists = False
+                            if refit_checkpoint_dir and refit_checkpoint_dir.exists():
+                                # Check if checkpoint directory has model files
+                                checkpoint_files = list(refit_checkpoint_dir.glob("*.bin")) + list(refit_checkpoint_dir.glob("*.safetensors"))
+                                if checkpoint_files:
+                                    artifact_exists = True
+                            
+                            # If artifacts exist on disk, update tag even if MLflow upload was skipped
+                            if artifact_exists and parent_run_id:
+                                client.set_tag(parent_run_id, artifact_tag, "true")
+                                logger.info(
+                                    f"[HPO] Updated {artifact_tag}=true on parent run {parent_run_id[:12]}... "
+                                    f"(artifacts exist on disk, MLflow upload was skipped)"
+                                )
+                        except Exception as tag_error:
+                            logger.debug(
+                                f"[HPO] Could not check/update artifact.available tag: {tag_error}"
+                            )
 
                     # Mark refit run as FINISHED (success) or FAILED (error) after upload attempt
                     # Only terminate if it's still RUNNING (safety check)

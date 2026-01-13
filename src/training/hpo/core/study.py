@@ -212,47 +212,35 @@ class StudyManager:
                         storage_exists = True
                 except Exception as e:
                     logger.debug(f"Drive backup not found for checkpoint: {e}")
-
-            # Use unified decision logic
-            from infrastructure.config.run_decision import should_reuse_existing
-            should_resume = should_reuse_existing(
-                config=combined_config,
-                exists=storage_exists,
-                process_type="hpo"
-            )
-            # Also respect auto_resume config (if auto_resume=False, don't resume even if exists)
-            if should_resume:
-                auto_resume = self.checkpoint_config.get("auto_resume", True)
-                if not auto_resume:
-                    should_resume = False
-                    logger.info(
-                        f"[HPO] auto_resume=false: Creating new study '{study_name}' "
-                        f"(ignoring existing study)"
-                    )
         else:
             # Use legacy storage path resolution
-            storage_path, storage_uri, legacy_should_resume = setup_checkpoint_storage(
+            storage_path, storage_uri, _ = setup_checkpoint_storage(
                 output_dir,
                 self.checkpoint_config,
                 self.backbone,
                 study_name,
                 restore_from_drive=self.restore_from_drive,
             )
-            
-            # Use unified decision logic (legacy path may have already checked existence)
-            from infrastructure.config.run_decision import should_reuse_existing
-            # If legacy function says should_resume, storage likely exists
-            storage_exists = legacy_should_resume or storage_path.exists()
-            should_resume = should_reuse_existing(
-                config=combined_config,
-                exists=storage_exists,
-                process_type="hpo"
-            )
-            # Also respect auto_resume config
-            if should_resume:
-                auto_resume = self.checkpoint_config.get("auto_resume", True)
-                if not auto_resume:
-                    should_resume = False
+            # Check if storage exists (legacy function may have already checked, but we verify)
+            storage_exists = storage_path.exists() if storage_path else False
+
+        # Use unified decision logic
+        from infrastructure.config.run_decision import should_reuse_existing
+        should_resume = should_reuse_existing(
+            config=combined_config,
+            exists=storage_exists,
+            process_type="hpo"
+        )
+        
+        # Also respect auto_resume config (if auto_resume=False, don't resume even if exists)
+        if should_resume and self.checkpoint_config:
+            auto_resume = self.checkpoint_config.get("auto_resume", True)
+            if not auto_resume:
+                should_resume = False
+                logger.info(
+                    f"[HPO] auto_resume=false: Creating new study '{study_name}' "
+                    f"(ignoring existing study)"
+                )
 
         if should_resume:
             return self._load_existing_study(study_name, storage_path, storage_uri)

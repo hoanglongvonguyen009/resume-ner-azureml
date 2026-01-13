@@ -270,3 +270,154 @@ def build_hpo_trial_key_hash(trial_key: str) -> str:
     """
     return _compute_hash_64(trial_key)
 
+
+def compute_data_fingerprint(data_config: Dict[str, Any]) -> str:
+    """
+    Compute data fingerprint (content-based if available, semantic fallback).
+    
+    Priority:
+    1. content_hash or manifest_hash (if available) - pure content identity
+    2. Semantic fields (name/version/split_seed/etc) - fallback
+    
+    Note: If using semantic fallback, there's overlap with study_key_hash v2
+    data_key fields. This is acceptable - fingerprint is for filtering/tagging,
+    study_key_hash is for grouping. Both serve different purposes.
+    
+    Args:
+        data_config: Data configuration dictionary
+        
+    Returns:
+        64-character hex hash (full SHA256)
+    """
+    # Prefer content-based identity
+    content_hash = data_config.get("content_hash") or data_config.get("manifest_hash")
+    if content_hash:
+        return _compute_hash_64(str(content_hash))
+    
+    # Fallback: semantic identity
+    fallback_payload = {
+        "name": data_config.get("name"),
+        "version": data_config.get("version"),
+        "split_seed": data_config.get("split_seed"),
+        "label_mapping": data_config.get("label_mapping", {}),
+        "schema": data_config.get("schema", {}),
+    }
+    return _compute_hash_64(json.dumps(fallback_payload, sort_keys=True, separators=(',', ':')))
+
+
+def compute_eval_fingerprint(eval_config: Dict[str, Any]) -> str:
+    """
+    Compute evaluation fingerprint (content-based, not script name).
+    
+    Hashes: evaluator_version + metric_spec + thresholding + full_eval_config
+    NOT: script filename (too fragile)
+    
+    Args:
+        eval_config: Evaluation configuration dictionary
+        
+    Returns:
+        64-character hex hash (full SHA256)
+    """
+    fingerprint_payload = {
+        "evaluator_version": eval_config.get("evaluator_version", "default"),
+        "metric_spec": eval_config.get("metric", {}),
+        "thresholding": eval_config.get("thresholding", {}),
+        "full_eval_config": eval_config,  # Include full config for stability
+    }
+    return _compute_hash_64(json.dumps(fingerprint_payload, sort_keys=True, separators=(',', ':')))
+
+
+def build_hpo_study_key_v2(
+    data_config: Dict[str, Any],
+    hpo_config: Dict[str, Any],
+    train_config: Dict[str, Any],
+    model: str,
+    *,
+    data_fingerprint: str,  # REQUIRED - actual value, not marker
+    eval_fingerprint: str,  # REQUIRED - actual value, not marker
+    include_code_version: bool = False,
+) -> str:
+    """
+    Build study_key_hash v2 with bound fingerprints.
+    
+    CRITICAL: Fingerprints are actual values in the key, not markers.
+    This prevents grouping runs with different eval/data configs.
+    
+    Changes from v1:
+    - Removed local_path (too fragile, use data_fingerprint tag instead)
+    - Added train_budget (max_steps/epochs) to prevent winner's curse
+    - Added seed_policy
+    - Bound eval_fingerprint and data_fingerprint (actual values)
+    - Explicit objective direction (never assume maximize)
+    - NO benchmark config (that's separate phase)
+    
+    Args:
+        data_config: Data configuration dictionary
+        hpo_config: HPO configuration dictionary
+        train_config: Training configuration dictionary
+        model: Model backbone name
+        data_fingerprint: Actual data fingerprint value (REQUIRED)
+        eval_fingerprint: Actual evaluation fingerprint value (REQUIRED)
+        include_code_version: Whether to include git commit hash
+        
+    Returns:
+        Canonical JSON string representing the study key v2
+    """
+    # Data identity (no local_path, fingerprints bound)
+    data_key = {
+        "name": data_config.get("name", ""),
+        "version": data_config.get("version", ""),
+        "schema": data_config.get("schema", {}),
+        "split_seed": data_config.get("split_seed", "default"),
+        "label_mapping": data_config.get("label_mapping", {}),
+        "data_fingerprint": data_fingerprint,  # BOUND - actual value
+    }
+    
+    # HPO config (explicit direction, NO benchmark)
+    objective = hpo_config.get("objective", {})
+    hpo_key = {
+        "search_space": hpo_config.get("search_space", {}),
+        "objective": {
+            "metric": objective.get("metric", "macro-f1"),
+            "direction": objective.get("direction", "maximize"),  # EXPLICIT
+        },
+        "k_fold": hpo_config.get("k_fold", {}),
+        "sampling": {
+            "algorithm": hpo_config.get("sampling", {}).get("algorithm", "random"),
+        },
+        "early_termination": hpo_config.get("early_termination", {}),
+    }
+    
+    # Training budget (prevents winner's curse)
+    train_key = {
+        "max_steps": train_config.get("max_steps"),
+        "num_epochs": train_config.get("num_epochs"),
+        "seed_policy": train_config.get("seed_policy", "default"),
+    }
+    
+    payload = {
+        "schema_version": "2.0",
+        "data": data_key,
+        "hpo": hpo_key,
+        "training": train_key,
+        "evaluation": {
+            "eval_fingerprint": eval_fingerprint,  # BOUND - actual value
+        },
+        "model": model.lower().strip(),
+        # NO benchmark config - that's separate phase
+    }
+    
+    if include_code_version:
+        # Try to get git commit hash
+        try:
+            import subprocess
+            git_sha = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], 
+                stderr=subprocess.DEVNULL
+            ).decode("utf-8").strip()
+            payload["code_version"] = git_sha
+        except Exception:
+            payload["code_version"] = "unknown"
+    
+    return json.dumps(payload, sort_keys=True, separators=(',', ':'))
+

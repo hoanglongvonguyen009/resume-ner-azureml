@@ -5,9 +5,12 @@ from Optuna studies or from saved outputs on disk.
 """
 
 import json
+import math
 import re
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+
+import numpy as np
 
 from common.shared.logging_utils import get_logger
 
@@ -766,3 +769,745 @@ def find_best_trials_for_backbones(
         f"Summary: Found {len(best_trials)} / {len(backbone_values)} best trials"
     )
     return best_trials
+
+
+def select_champion_per_backbone(
+    backbone: str,
+    hpo_experiment: Dict[str, str],
+    selection_config: Dict[str, Any],
+    mlflow_client: Any,
+    root_dir: Optional[Path] = None,
+    config_dir: Optional[Path] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Select champion (best configuration group winner) per backbone.
+    
+    Groups runs by study_key_hash v2 (comparable configuration groups),
+    then selects best group and best trial within that group.
+    
+    All parameters come from selection_config (centralized config).
+    
+    Requirements enforced:
+    1. Bound fingerprints in study_key_hash v2
+    2. Never mix v1 and v2 runs in same selection (config-driven)
+    3. Explicit objective direction (never assume max, with migration support)
+    4. Handle missing/NaN metrics deterministically
+    5. Minimum trial count guardrail (config-driven)
+    6. Artifact availability constraint (config-driven source)
+    7. Deterministic constraints (top_k <= min_trials)
+    
+    Args:
+        backbone: Model backbone name
+        hpo_experiment: Dict with 'name' and 'id' of HPO experiment
+        selection_config: Selection configuration dictionary
+        mlflow_client: MLflow client instance
+    
+    Returns:
+        {
+            "backbone": "distilbert",
+            "champion": {
+                "run_id": "...",  # PRIMARY: MLflow handle
+                "trial_key_hash": "...",  # Optional: for display
+                "metric": 0.87,
+                "stable_score": 0.86,
+                "study_key_hash": "abc123...",
+                "schema_version": "2.0",
+                "checkpoint_path": Path(...),
+            },
+            "all_groups": {...},
+            "selection_metadata": {...},
+        }
+        or None if no valid champions found
+    """
+    from infrastructure.tracking.mlflow.queries import query_runs_by_tags
+    from infrastructure.naming.mlflow.tags_registry import TagsRegistry
+    from infrastructure.config.selection import (
+        get_objective_direction,
+        get_champion_selection_config,
+    )
+    
+    # Extract config values with defaults and constraint validation
+    champion_config = get_champion_selection_config(selection_config)
+    min_trials_per_group = champion_config["min_trials_per_group"]
+    top_k_for_stable_score = champion_config["top_k_for_stable_score"]
+    require_artifact_available = champion_config["require_artifact_available"]
+    artifact_check_source = champion_config["artifact_check_source"]
+    allow_mixed_schema_groups = champion_config["allow_mixed_schema_groups"]
+    prefer_schema_version = champion_config["prefer_schema_version"]
+    
+    # Get objective direction (with migration support)
+    objective_metric = selection_config.get("objective", {}).get("metric", "macro-f1")
+    objective_direction = get_objective_direction(selection_config)  # Uses migration helper
+    maximize = objective_direction.lower() == "maximize"
+    
+    from infrastructure.naming.mlflow.tags_registry import load_tags_registry
+    from pathlib import Path
+    # Infer config_dir - try current directory first, then parent
+    config_dir = Path.cwd() / "config"
+    if not config_dir.exists():
+        config_dir = Path.cwd().parent / "config"
+    tags_registry = load_tags_registry(config_dir)
+    backbone_tag = tags_registry.key("process", "backbone")
+    stage_tag = tags_registry.key("process", "stage")
+    study_key_tag = tags_registry.key("grouping", "study_key_hash")
+    trial_key_tag = tags_registry.key("grouping", "trial_key_hash")
+    schema_version_tag = tags_registry.key("study", "key_schema_version")
+    artifact_tag = tags_registry.key("artifact", "available")
+    
+    backbone_name = backbone.split("-")[0] if "-" in backbone else backbone
+    
+    # Step 1: Filter runs
+    # NOTE: Since experiments are already per-backbone (e.g., resume_ner_baseline-hpo-distilbert),
+    # we don't strictly need the backbone tag filter. However, we'll try with it first,
+    # and fallback to stage-only if backbone tag is missing (legacy runs).
+    
+    # Try "hpo_trial" first (new format), fallback to "hpo" (legacy format)
+    # Try with backbone tag first
+    required_tags_with_backbone = {
+        backbone_tag: backbone_name,
+        stage_tag: "hpo_trial",
+    }
+    
+    logger.debug(
+        f"Querying runs for {backbone} with tags: {backbone_tag}={backbone_name}, "
+        f"{stage_tag}=hpo_trial"
+    )
+    
+    runs = query_runs_by_tags(
+        client=mlflow_client,
+        experiment_ids=[hpo_experiment["id"]],
+        required_tags=required_tags_with_backbone,
+        max_results=1000,
+    )
+    
+    # If no runs found, try without backbone tag (legacy runs may not have it)
+    if not runs:
+        logger.debug(
+            f"No runs found with backbone tag, trying without backbone filter "
+            f"(experiment is already backbone-specific)"
+        )
+        required_tags_stage_only = {stage_tag: "hpo_trial"}
+        runs = query_runs_by_tags(
+            client=mlflow_client,
+            experiment_ids=[hpo_experiment["id"]],
+            required_tags=required_tags_stage_only,
+            max_results=1000,
+        )
+    
+    # If still no runs, try legacy "hpo" stage tag (with backbone)
+    if not runs:
+        logger.info(
+            f"No runs found with stage='hpo_trial' for {backbone}, "
+            f"trying legacy stage='hpo'"
+        )
+        required_tags_with_backbone = {
+            backbone_tag: backbone_name,
+            stage_tag: "hpo",
+        }
+        runs = query_runs_by_tags(
+            client=mlflow_client,
+            experiment_ids=[hpo_experiment["id"]],
+            required_tags=required_tags_with_backbone,
+            max_results=1000,
+        )
+    
+    # If still no runs, try legacy "hpo" stage tag (without backbone)
+    if not runs:
+        logger.debug(
+            f"No runs found with backbone tag and stage='hpo', "
+            f"trying stage-only filter"
+        )
+        required_tags_stage_only = {stage_tag: "hpo"}
+        runs = query_runs_by_tags(
+            client=mlflow_client,
+            experiment_ids=[hpo_experiment["id"]],
+            required_tags=required_tags_stage_only,
+            max_results=1000,
+        )
+    
+    logger.info(
+        f"Found {len(runs)} runs with stage tag for {backbone} "
+        f"(backbone={backbone_name})"
+    )
+    
+    # Step 1.5: Filter out parent runs (they don't have trial metrics)
+    # Parent runs have mlflow.parentRunId tag missing (they are the parent)
+    # Child runs have mlflow.parentRunId tag set
+    runs_before_parent_filter = len(runs)
+    runs = [r for r in runs if r.data.tags.get("mlflow.parentRunId") is not None]
+    parent_runs_filtered = runs_before_parent_filter - len(runs)
+    if parent_runs_filtered > 0:
+        logger.info(
+            f"Filtered out {parent_runs_filtered} parent run(s) (only child/trial runs have metrics). "
+            f"{len(runs)} child runs remaining."
+        )
+    
+    # Step 2: Artifact availability filter (config-driven source)
+    runs_before_artifact_filter = len(runs)
+    if require_artifact_available:
+        runs = _filter_by_artifact_availability(
+            runs, artifact_check_source, artifact_tag, logger, mlflow_client, schema_version_tag
+        )
+        runs_after_artifact_filter = len(runs)
+        if runs_after_artifact_filter < runs_before_artifact_filter:
+            logger.warning(
+                f"Artifact filter removed {runs_before_artifact_filter - runs_after_artifact_filter} "
+                f"runs for {backbone} ({runs_after_artifact_filter} remaining). "
+                f"Check that runs have '{artifact_tag}' tag set to 'true'."
+            )
+    
+    # Step 3: Partition by study_key_hash AND schema version
+    # CRITICAL: Never mix v1 and v2 runs if allow_mixed_schema_groups is False
+    groups_v1 = {}  # v1 runs
+    groups_v2 = {}  # v2 runs
+    runs_without_study_key = 0
+    
+    for run in runs:
+        study_key_hash = run.data.tags.get(study_key_tag)
+        if not study_key_hash:
+            runs_without_study_key += 1
+            continue  # Skip runs without grouping tag
+        
+        # Check schema version (default to "1.0" if missing for backward compat)
+        schema_version = run.data.tags.get(schema_version_tag, "1.0")
+        
+        # Partition by version (NEVER MIX if allow_mixed_schema_groups is False)
+        if schema_version == "2.0":
+            if study_key_hash not in groups_v2:
+                groups_v2[study_key_hash] = []
+            groups_v2[study_key_hash].append(run)
+        else:
+            # v1 or missing version
+            if study_key_hash not in groups_v1:
+                groups_v1[study_key_hash] = []
+            groups_v1[study_key_hash].append(run)
+    
+    if runs_without_study_key > 0:
+        logger.warning(
+            f"Skipped {runs_without_study_key} runs without {study_key_tag} tag for {backbone}"
+        )
+    
+    logger.info(
+        f"Grouped runs for {backbone}: {len(groups_v1)} v1 group(s), "
+        f"{len(groups_v2)} v2 group(s)"
+    )
+    
+    # Step 4: Select groups based on prefer_schema_version and allow_mixed_schema_groups
+    if allow_mixed_schema_groups:
+        # WARNING: This is dangerous - only allow if explicitly enabled
+        logger.warning(
+            f"allow_mixed_schema_groups=True is enabled for {backbone}. "
+            f"This may compare non-comparable runs. Use with caution."
+        )
+        # Merge groups (dangerous but allowed)
+        groups_to_use = {**groups_v1, **groups_v2}
+        schema_version_used = "mixed"
+    else:
+        # Safe: Prefer v2, fallback to v1 (never mix)
+        if prefer_schema_version == "2.0" or (prefer_schema_version == "auto" and groups_v2):
+            groups_to_use = groups_v2
+            schema_version_used = "2.0"
+        elif prefer_schema_version == "1.0" or (prefer_schema_version == "auto" and not groups_v2):
+            groups_to_use = groups_v1
+            schema_version_used = "1.0"
+        else:
+            groups_to_use = groups_v2 if groups_v2 else groups_v1
+            schema_version_used = "2.0" if groups_v2 else "1.0"
+    
+    if not groups_to_use:
+        logger.warning(
+            f"No valid groups found for {backbone}. "
+            f"Found {len(groups_v1)} v1 group(s) and {len(groups_v2)} v2 group(s), "
+            f"but none matched selection criteria (schema_version preference: {prefer_schema_version})"
+        )
+        return None
+    
+    # Log version usage
+    if groups_v1 and groups_v2 and not allow_mixed_schema_groups:
+        logger.info(
+            f"Found both v1 and v2 runs for {backbone}. "
+            f"Using {schema_version_used} groups only (never mixing versions)."
+        )
+    
+    # Step 5: Compute stable score per group (with all guards)
+    group_scores = {}
+    groups_skipped_min_trials = 0
+    total_groups = len(groups_to_use)
+    
+    for study_key_hash, group_runs in groups_to_use.items():
+        # Extract metrics (handle missing/NaN deterministically)
+        run_metrics = []
+        valid_count = 0
+        invalid_count = 0
+        missing_metric_runs = []
+        invalid_metric_runs = []
+        
+        for run in group_runs:
+            if objective_metric not in run.data.metrics:
+                invalid_count += 1
+                missing_metric_runs.append(run.info.run_id[:12])
+                # Log available metrics for debugging
+                available_metrics = list(run.data.metrics.keys())[:5]  # First 5 metrics
+                logger.debug(
+                    f"Run {run.info.run_id[:12]}... missing {objective_metric}. "
+                    f"Available metrics: {available_metrics}"
+                )
+                continue
+            
+            metric_value = run.data.metrics[objective_metric]
+            
+            # Handle NaN/Inf deterministically
+            if not isinstance(metric_value, (int, float)) or not math.isfinite(metric_value):
+                invalid_count += 1
+                invalid_metric_runs.append(run.info.run_id[:12])
+                logger.debug(
+                    f"Run {run.info.run_id[:12]}... has invalid {objective_metric}={metric_value}"
+                )
+                continue
+            
+            valid_count += 1
+            run_metrics.append((run.info.run_id, metric_value))
+        
+        # Log metric validity with details
+        if invalid_count > 0:
+            logger.warning(
+                f"Group {study_key_hash[:16]}...: "
+                f"{valid_count} valid metrics, {invalid_count} missing/invalid. "
+                f"Missing metric runs: {missing_metric_runs[:3]}{'...' if len(missing_metric_runs) > 3 else ''}"
+            )
+        
+        # Winner's curse guardrail: require minimum trials
+        if len(run_metrics) < min_trials_per_group:
+            groups_skipped_min_trials += 1
+            logger.warning(
+                f"Skipping group {study_key_hash[:16]}... - "
+                f"only {len(run_metrics)} valid trials (minimum: {min_trials_per_group})"
+            )
+            continue
+        
+        # Extract metrics for scoring
+        metrics = [m for _, m in run_metrics]
+        
+        # Best metric (for champion selection within group)
+        best_metric = max(metrics) if maximize else min(metrics)
+        
+        # Stable score: median of top-K (reduces flukes)
+        # CONSTRAINT: top_k is already clamped to <= min_trials_per_group in config helper
+        top_k = min(top_k_for_stable_score, len(metrics))
+        sorted_metrics = sorted(metrics, reverse=maximize)
+        stable_score = float(np.median(sorted_metrics[:top_k])) if top_k > 0 else 0.0
+        
+        group_scores[study_key_hash] = {
+            "stable_score": stable_score,
+            "best_metric": best_metric,
+            "n_trials": len(run_metrics),
+            "n_valid": valid_count,
+            "n_invalid": invalid_count,
+            "run_metrics": run_metrics,  # Lightweight: (run_id, metric) tuples
+        }
+    
+    if not group_scores:
+        logger.warning(
+            f"No eligible groups for {backbone}. "
+            f"Processed {total_groups} group(s), but {groups_skipped_min_trials} were skipped "
+            f"due to insufficient trials (minimum: {min_trials_per_group}). "
+            f"Remaining groups: {total_groups - groups_skipped_min_trials}"
+        )
+        return None
+    
+    logger.info(
+        f"Found {len(group_scores)} eligible group(s) for {backbone} "
+        f"({groups_skipped_min_trials} skipped due to min_trials requirement)"
+    )
+    
+    # Step 6: Select winning group (by stable_score, respecting direction)
+    if maximize:
+        winning_key = max(group_scores.items(), key=lambda x: x[1]["stable_score"])[0]
+    else:
+        winning_key = min(group_scores.items(), key=lambda x: x[1]["stable_score"])[0]
+    
+    winning_group = group_scores[winning_key]
+    
+    # Step 7: Select champion within winning group (by best_metric, respecting direction)
+    if maximize:
+        champion_run_id, champion_metric = max(
+            winning_group["run_metrics"],
+            key=lambda x: x[1]
+        )
+    else:
+        champion_run_id, champion_metric = min(
+            winning_group["run_metrics"],
+            key=lambda x: x[1]
+        )
+    
+    # Fetch full run only when needed
+    champion_run = mlflow_client.get_run(champion_run_id)
+    champion_trial_key = champion_run.data.tags.get(trial_key_tag)
+    
+    # CRITICAL: Find refit run for this champion trial (checkpoints are usually in refit runs)
+    # According to plan: "champion run_id" ≠ "checkpoint run_id" in a refit workflow
+    refit_run_id = None
+    try:
+        refit_of_trial_tag = tags_registry.key("refit", "of_trial_run_id")
+        stage_tag = tags_registry.key("process", "stage")
+        
+        # Strategy 1: Search for refit run using linking tag (most reliable)
+        refit_runs = mlflow_client.search_runs(
+            experiment_ids=[hpo_experiment["id"]],
+            filter_string=f"tags.{refit_of_trial_tag} = '{champion_run_id}'",
+            max_results=10,
+        )
+        
+        # Strategy 2: Fallback - search by trial_key_hash if linking tag doesn't exist
+        # (for existing refit runs created before linking tag was implemented)
+        if not refit_runs and champion_trial_key:
+            logger.debug(
+                f"No refit run found with linking tag for trial {champion_run_id[:12]}... "
+                f"- trying fallback search by trial_key_hash={champion_trial_key[:8]}..."
+            )
+            trial_key_tag = tags_registry.key("grouping", "trial_key_hash")
+            refit_runs = mlflow_client.search_runs(
+                experiment_ids=[hpo_experiment["id"]],
+                filter_string=f"tags.{stage_tag} = 'hpo_refit' AND tags.{trial_key_tag} = '{champion_trial_key}'",
+                max_results=10,
+            )
+        
+        if refit_runs:
+            # If multiple refit runs exist (reruns), pick the latest by start_time
+            refit_runs_sorted = sorted(
+                refit_runs,
+                key=lambda r: r.info.start_time if r.info.start_time else 0,
+                reverse=True
+            )
+            refit_run_id = refit_runs_sorted[0].info.run_id
+            logger.info(
+                f"Found refit run {refit_run_id[:12]}... for champion trial {champion_run_id[:12]}... "
+                f"(selected latest from {len(refit_runs)} refit run(s))"
+            )
+        else:
+            raise ValueError(
+                f"No refit run found for champion trial {champion_run_id[:12]}... "
+                f"(trial_key_hash={champion_trial_key[:8] if champion_trial_key else 'missing'}...). "
+                f"Refit is required to acquire checkpoint deterministically."
+            )
+    except Exception as e:
+        logger.error(
+            f"Could not find refit run for champion trial {champion_run_id[:12]}...: {e}. "
+            f"Failing fast to avoid using trial runs for checkpoint acquisition."
+        )
+        raise
+    
+    # Get checkpoint path (uses single source of truth for local disk lookup)
+    # Refit is mandatory for checkpoint acquisition
+    checkpoint_run = mlflow_client.get_run(refit_run_id)
+    checkpoint_path = _get_checkpoint_path_from_run(
+        checkpoint_run,
+        study_key_hash=winning_key,
+        trial_key_hash=champion_trial_key,
+        root_dir=root_dir,
+        config_dir=config_dir,
+    )
+    
+    return {
+        "backbone": backbone,
+        "champion": {
+            "trial_run_id": champion_run_id,  # Trial run ID (selected by CV metric)
+            "refit_run_id": refit_run_id,  # Refit run ID (used for checkpoint + benchmark)
+            "run_id": refit_run_id or champion_run_id,  # PRIMARY: refit if available, else trial (for backward compat)
+            "trial_key_hash": champion_trial_key,  # Optional: for display
+            "metric": champion_metric,  # CV metric from trial run
+            "stable_score": winning_group["stable_score"],
+            "study_key_hash": winning_key,
+            "schema_version": schema_version_used,  # Track which version was used
+            "checkpoint_path": checkpoint_path,
+        },
+        "all_groups": {
+            k: {
+                "best_metric": v["best_metric"],
+                "stable_score": v["stable_score"],
+                "n_trials": v["n_trials"],
+                "n_valid": v["n_valid"],
+                "n_invalid": v["n_invalid"],
+            }
+            for k, v in group_scores.items()
+        },
+        "selection_metadata": {
+            "objective_direction": objective_direction,
+            "min_trials_required": min_trials_per_group,
+            "top_k_for_stable": top_k_for_stable_score,
+            "artifact_required": require_artifact_available,
+            "artifact_check_source": artifact_check_source,
+            "allow_mixed_schema_groups": allow_mixed_schema_groups,
+            "schema_version_used": schema_version_used,
+        },
+    }
+
+
+def _filter_by_artifact_availability(
+    runs: List[Any],
+    check_source: str,
+    artifact_tag: str,
+    logger,
+    mlflow_client: Any = None,
+    schema_version_tag: str = "code.study.key_schema_version",
+) -> List[Any]:
+    """
+    Filter runs by artifact availability using config-specified source.
+    
+    For child runs (trial runs), also checks parent run for artifact tag
+    since artifact.available is typically set on parent runs.
+    
+    Args:
+        runs: List of MLflow runs
+        check_source: "tag" (uses MLflow tag) or "disk" (checks filesystem)
+        artifact_tag: Tag key for artifact availability
+        logger: Logger instance
+        mlflow_client: Optional MLflow client for checking parent runs
+    """
+    if check_source == "tag":
+        # Use MLflow tag as authoritative source
+        # For legacy runs without the tag, be lenient: if tag is missing (not "false"),
+        # allow the run through with a warning (assumes artifacts might exist)
+        filtered_runs = []
+        runs_without_tag = 0
+        runs_explicitly_false = 0
+        runs_missing_tag = 0
+        
+        for run in runs:
+            # Check if this is a legacy run (no Phase 2 tags)
+            # Legacy runs don't have schema_version tag, so we should be lenient with artifact filter
+            is_legacy_run = run.data.tags.get(schema_version_tag) is None
+            
+            # Check run's own tag first
+            run_tag_value = run.data.tags.get(artifact_tag)
+            artifact_available = False
+            tag_source = "run"
+            
+            if run_tag_value is not None:
+                # Tag exists
+                artifact_available = run_tag_value.lower() == "true"
+                if not artifact_available:
+                    # Tag is explicitly "false"
+                    if is_legacy_run:
+                        # Legacy run with false tag - be lenient (tag might not have been updated)
+                        runs_missing_tag += 1
+                        artifact_available = True
+                        tag_source = "false (legacy, allowing)"
+                        logger.debug(
+                            f"Run {run.info.run_id[:12]}...: artifact.available=false on legacy run "
+                            f"(allowing through - tag may not have been updated)"
+                        )
+                    else:
+                        runs_explicitly_false += 1
+            else:
+                # Tag is missing - check parent run for legacy runs
+                if mlflow_client:
+                    parent_run_id = run.data.tags.get("mlflow.parentRunId")
+                    if parent_run_id:
+                        try:
+                            parent_run = mlflow_client.get_run(parent_run_id)
+                            parent_tag_value = parent_run.data.tags.get(artifact_tag)
+                            if parent_tag_value is not None:
+                                # Parent has tag - use it
+                                artifact_available = parent_tag_value.lower() == "true"
+                                tag_source = "parent"
+                                if artifact_available:
+                                    logger.debug(
+                                        f"Run {run.info.run_id[:12]}...: artifact.available found on parent run"
+                                    )
+                                else:
+                                    # Parent has false tag
+                                    if is_legacy_run:
+                                        # Legacy run - be lenient
+                                        runs_missing_tag += 1
+                                        artifact_available = True
+                                        tag_source = "parent false (legacy, allowing)"
+                                        logger.debug(
+                                            f"Run {run.info.run_id[:12]}...: artifact.available=false on parent "
+                                            f"of legacy run (allowing through)"
+                                        )
+                                    else:
+                                        runs_explicitly_false += 1
+                            else:
+                                # Both run and parent missing tag - legacy run, be lenient
+                                runs_missing_tag += 1
+                                artifact_available = True  # Allow through for legacy runs
+                                tag_source = "missing (legacy, allowing)"
+                                logger.debug(
+                                    f"Run {run.info.run_id[:12]}...: artifact tag missing on run and parent "
+                                    f"(legacy run, allowing through)"
+                                )
+                        except Exception as e:
+                            logger.debug(
+                                f"Could not check parent run {parent_run_id[:12]}... for artifact tag: {e}"
+                            )
+                            # If we can't check parent, be lenient for legacy runs
+                            runs_missing_tag += 1
+                            artifact_available = True
+                            tag_source = "missing (legacy, allowing)"
+                    else:
+                        # No parent run ID - be lenient
+                        runs_missing_tag += 1
+                        artifact_available = True
+                        tag_source = "missing (legacy, allowing)"
+                else:
+                    # No MLflow client - be lenient
+                    runs_missing_tag += 1
+                    artifact_available = True
+                    tag_source = "missing (legacy, allowing)"
+            
+            if not artifact_available:
+                runs_without_tag += 1
+            
+            if artifact_available:
+                filtered_runs.append(run)
+        
+        # Log detailed statistics
+        if runs_explicitly_false > 0:
+            logger.warning(
+                f"Artifact filter: {runs_explicitly_false} run(s) have {artifact_tag}='false' "
+                f"(explicitly marked as unavailable)"
+            )
+        if runs_missing_tag > 0:
+            logger.info(
+                f"Artifact filter: {runs_missing_tag} legacy run(s) missing {artifact_tag} tag "
+                f"(allowing through - artifacts may exist on disk)"
+            )
+        if runs_without_tag > 0 and runs_explicitly_false > 0:
+            logger.warning(
+                f"Artifact filter: {runs_without_tag} run(s) excluded "
+                f"({runs_explicitly_false} explicitly false, {runs_missing_tag} missing/legacy allowed)"
+            )
+        
+        return filtered_runs
+    elif check_source == "disk":
+        # Fallback: check filesystem (requires run_id -> path mapping)
+        # This is a fallback - tag should be primary
+        logger.warning(
+            "Using disk-based artifact check (fallback). "
+            "Consider using 'tag' source for better performance."
+        )
+        # Implementation would check checkpoint files exist
+        # For now, return all runs (disk check would need run_id -> path logic)
+        return runs
+    else:
+        logger.error(f"Unknown artifact_check_source: {check_source}. Using tag-based check.")
+        return [
+            r for r in runs
+            if r.data.tags.get(artifact_tag, "false").lower() == "true"
+        ]
+
+
+def _get_checkpoint_path_from_run(
+    run: Any,
+    study_key_hash: Optional[str] = None,
+    trial_key_hash: Optional[str] = None,
+    root_dir: Optional[Path] = None,
+    config_dir: Optional[Path] = None,
+) -> Optional[Path]:
+    """
+    Extract checkpoint path from MLflow run.
+    
+    Uses single source of truth: find_trial_checkpoint_by_hash() for local disk lookup.
+    
+    Args:
+        run: MLflow run object
+        study_key_hash: Study key hash for local disk lookup
+        trial_key_hash: Trial key hash for local disk lookup
+        root_dir: Project root directory (for local disk lookup)
+        config_dir: Config directory (for local disk lookup)
+    
+    Returns:
+        Path to checkpoint if available locally, else None
+    """
+    # Strategy 1: Try local disk lookup using single source of truth
+    if study_key_hash and trial_key_hash and root_dir and config_dir:
+        try:
+            from evaluation.selection.local_selection_v2 import find_trial_checkpoint_by_hash
+            from common.shared.platform_detection import detect_platform
+            from infrastructure.paths import build_output_path
+            from infrastructure.naming.mlflow.tags_registry import load_tags_registry
+            
+            # Get backbone from run
+            tags_registry = load_tags_registry(config_dir)
+            backbone_tag = tags_registry.key("process", "backbone")
+            backbone = run.data.tags.get(backbone_tag) or run.data.tags.get("code.model", "unknown")
+            backbone_name = backbone.split("-")[0] if "-" in backbone else backbone
+            
+            # Build HPO output directory path
+            environment = detect_platform()
+            hpo_output_dir = build_output_path(
+                root_dir=root_dir,
+                config_dir=config_dir,
+                process_type="hpo",
+                model=backbone_name,
+                environment=environment,
+            )
+            
+            # Use single source of truth for local disk lookup
+            checkpoint_path = find_trial_checkpoint_by_hash(
+                hpo_backbone_dir=hpo_output_dir,
+                study_key_hash=study_key_hash,
+                trial_key_hash=trial_key_hash,
+            )
+            
+            if checkpoint_path and checkpoint_path.exists():
+                return checkpoint_path
+        except Exception:
+            # Silently continue to next strategy
+            pass
+    
+    # Strategy 2: Check checkpoint_path tag (if set)
+    checkpoint_tag = run.data.tags.get("code.checkpoint_path")
+    if checkpoint_tag:
+        checkpoint_path = Path(checkpoint_tag)
+        if checkpoint_path.exists():
+            return checkpoint_path
+    
+    # Strategy 3: Return None (notebook will use acquire_best_model_checkpoint for MLflow)
+    return None
+
+
+def select_champions_for_backbones(
+    backbone_values: List[str],
+    hpo_experiments: Dict[str, Dict[str, str]],  # backbone -> {name, id}
+    selection_config: Dict[str, Any],
+    mlflow_client: Any,
+    root_dir: Optional[Path] = None,
+    config_dir: Optional[Path] = None,
+    **kwargs,  # Pass through to select_champion_per_backbone
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Select champions for multiple backbones.
+    
+    Wrapper around select_champion_per_backbone() for multiple backbones.
+    
+    Args:
+        backbone_values: List of backbone names
+        hpo_experiments: Dict mapping backbone -> experiment info (name, id)
+        selection_config: Selection configuration dictionary
+        mlflow_client: MLflow client instance
+        **kwargs: Additional arguments to pass to select_champion_per_backbone
+    
+    Returns:
+        Dict mapping backbone -> champion selection result
+    """
+    champions = {}
+    for backbone in backbone_values:
+        if backbone not in hpo_experiments:
+            logger.warning(f"No HPO experiment found for {backbone}, skipping")
+            continue
+        
+        champion = select_champion_per_backbone(
+            backbone=backbone,
+            hpo_experiment=hpo_experiments[backbone],
+            selection_config=selection_config,
+            mlflow_client=mlflow_client,
+            root_dir=root_dir,
+            config_dir=config_dir,
+            **kwargs,
+        )
+        if champion:
+            champions[backbone] = champion
+    
+    return champions

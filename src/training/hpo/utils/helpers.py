@@ -116,7 +116,7 @@ def create_study_name(
     checkpoint_config = checkpoint_config or {}
     hpo_config = hpo_config or {}
     checkpoint_enabled = checkpoint_config.get("enabled", False)
-    
+
     # Get run_mode from config if not provided
     if run_mode is None:
         from infrastructure.config.run_mode import get_run_mode
@@ -125,7 +125,7 @@ def create_study_name(
     
     # Check for custom study_name in checkpoint config first, then HPO config
     study_name_template = checkpoint_config.get("study_name") or hpo_config.get("study_name")
-    
+
     if study_name_template:
         study_name = study_name_template.replace("{backbone}", backbone)
         # If force_new and we have root_dir/config_dir, compute variant
@@ -141,7 +141,7 @@ def create_study_name(
             return f"{study_name}_v{variant}" if variant > 1 else study_name
         # If reuse_if_exists, use base name
         return study_name
-    
+
     # Default behavior when no custom study_name is provided
     base_name = f"hpo_{backbone}"
     

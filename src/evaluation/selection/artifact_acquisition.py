@@ -342,7 +342,17 @@ def acquire_best_model_checkpoint(
     Raises:
         ValueError: If all fallback strategies fail
     """
-    run_id = best_run_info["run_id"]
+    # CRITICAL: Use refit_run_id if available (checkpoints are usually in refit runs)
+    # According to plan: "champion run_id" ≠ "checkpoint run_id" in a refit workflow
+    refit_run_id = best_run_info.get("refit_run_id")
+    trial_run_id = best_run_info.get("trial_run_id")
+    if not refit_run_id:
+        raise ValueError(
+            "Refit run ID is required for checkpoint acquisition. "
+            f"Received best_run_info without refit_run_id (trial_run_id={trial_run_id})."
+        )
+    run_id = refit_run_id
+    
     study_key_hash = best_run_info.get("study_key_hash")
     trial_key_hash = best_run_info.get("trial_key_hash")
     backbone = best_run_info.get("backbone", "unknown")
@@ -488,38 +498,83 @@ def acquire_best_model_checkpoint(
 
             import mlflow as mlflow_func
             from mlflow.tracking import MlflowClient
+            from common.shared.logging_utils import get_logger
+            
+            logger = get_logger(__name__)
 
             tracking_uri = mlflow_func.get_tracking_uri()
             is_azure_ml = tracking_uri and "azureml://" in tracking_uri
 
-            # List artifacts to find checkpoint
             client = MlflowClient()
+            
+            # Deterministic: only use the resolved refit run_id
+            run_ids_to_try = [refit_run_id]
+
+            # Validate artifact availability on the refit run before downloading
+            from infrastructure.naming.mlflow.tags_registry import load_tags_registry
+            tags_registry = load_tags_registry(config_dir)
+            artifact_available_tag = tags_registry.key("artifact", "available")
+            refit_run = client.get_run(refit_run_id)
+            artifact_available = refit_run.data.tags.get(artifact_available_tag)
+            if str(artifact_available).lower() not in ("true", "1", "yes"):
+                raise ValueError(
+                    f"Refit run {refit_run_id[:12]}... is missing artifact availability tag "
+                    f"({artifact_available_tag}) or it is not true."
+                )
+            
+            # Try each run until we find a checkpoint
             checkpoint_artifact_path = None
-
-            try:
-                artifacts = client.list_artifacts(run_id=run_id)
-                artifact_paths = [artifact.path for artifact in artifacts]
-
-                # Look for checkpoint in artifact paths
-                for path in artifact_paths:
-                    if "checkpoint" in path.lower():
-                        if path == "checkpoint" or path == "checkpoint/":
-                            checkpoint_artifact_path = path
-                            break
-                        elif checkpoint_artifact_path is None:
-                            checkpoint_artifact_path = path
-
-                if checkpoint_artifact_path is None:
-                    checkpoint_artifact_path = "checkpoint"
-            except Exception:
-                checkpoint_artifact_path = "checkpoint"
-
-            # Download artifacts
-            local_path = client.download_artifacts(
-                run_id=run_id,
-                path=checkpoint_artifact_path,
-                dst_path=str(checkpoint_dir)
-            )
+            local_path = None
+            
+            for candidate_run_id in run_ids_to_try:
+                try:
+                    # List artifacts to find checkpoint
+                    artifacts = client.list_artifacts(run_id=candidate_run_id)
+                    artifact_paths = [artifact.path for artifact in artifacts]
+                    
+                    # Check if this run has checkpoint artifacts
+                    checkpoint_artifacts = [p for p in artifact_paths if "checkpoint" in p.lower()]
+                    if not checkpoint_artifacts:
+                        logger.debug(
+                            f"[ACQUISITION] Run {candidate_run_id[:12]}... has no checkpoint artifacts, skipping"
+                        )
+                        continue
+                    
+                    # Look for checkpoint in artifact paths
+                    for path in artifact_paths:
+                        if "checkpoint" in path.lower():
+                            if path == "checkpoint" or path == "checkpoint/":
+                                checkpoint_artifact_path = path
+                                break
+                            elif checkpoint_artifact_path is None:
+                                checkpoint_artifact_path = path
+                    
+                    if checkpoint_artifact_path is None:
+                        checkpoint_artifact_path = "checkpoint"
+                    
+                    # Download artifacts
+                    local_path = client.download_artifacts(
+                        run_id=candidate_run_id,
+                        path=checkpoint_artifact_path,
+                        dst_path=str(checkpoint_dir)
+                    )
+                    
+                    logger.info(
+                        f"[ACQUISITION] Successfully downloaded checkpoint from run {candidate_run_id[:12]}..."
+                    )
+                    break  # Success - exit loop
+                    
+                except Exception as e:
+                    logger.debug(
+                        f"[ACQUISITION] Failed to download from run {candidate_run_id[:12]}...: {e}"
+                    )
+                    continue  # Try next run
+            
+            if local_path is None:
+                raise ValueError(
+                    f"Could not download checkpoint from any run. "
+                    f"Tried {len(run_ids_to_try)} run(s): {[r[:12] + '...' for r in run_ids_to_try]}"
+                )
 
             downloaded_path = Path(local_path)
 

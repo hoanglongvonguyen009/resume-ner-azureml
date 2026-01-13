@@ -14,7 +14,35 @@ run:
 # Objective metric configuration
 objective:
   metric: "macro-f1"
-  goal: "maximize"
+  # MIGRATION: Renamed from "goal" to "direction" for consistency
+  # Code will accept both during migration period (warns if "goal" is used)
+  direction: "maximize"  # "maximize" or "minimize"
+  goal: "maximize"  # Legacy - will be deprecated
+
+# Champion Selection Configuration (Phase 2)
+champion_selection:
+  # Winner's curse guardrail: minimum trials per group
+  min_trials_per_group: 1  # Lowered for testing (default: 3)
+  
+  # Stable score computation: median of top-K trials
+  # Eligibility: a group is eligible if n_trials >= min_trials_per_group
+  # Scoring: top_k_for_stable_score is effectively clamped to n_trials at runtime
+  top_k_for_stable_score: 1  # For smoke/max_trials=1 this is effectively "use the single trial"
+  
+  # Artifact availability on TRIAL runs:
+  # In a refit workflow, trial runs typically do NOT hold the final checkpoint.
+  # Checkpoint presence is enforced on the refit run instead, after mapping trial_run_id → refit_run_id.
+  require_artifact_available: false
+  
+  # Artifact availability source (authoritative check)
+  artifact_check_source: "tag"  # "tag" (uses artifact.available tag) or "disk" (checks filesystem)
+  
+  # Schema version handling
+  prefer_schema_version: "auto"  # "2.0" or "1.0" or "auto" (auto = prefer v2, fallback to v1)
+  
+  # CRITICAL: Prevent mixing v1 and v2 runs in same selection
+  # If false, v1 and v2 runs are partitioned separately (never compared)
+  allow_mixed_schema_groups: false  # Default: false (strict separation)
 
 # Composite scoring configuration
 scoring:
