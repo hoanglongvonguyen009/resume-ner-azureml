@@ -41,11 +41,7 @@ def find_best_model_from_mlflow(
     """
     client = MlflowClient()
 
-    # Validate inputs
-    if benchmark_experiment is None:
-        error_msg = "benchmark_experiment is None. Make sure benchmark runs have been executed and logged to MLflow."
-        logger.error(error_msg)
-        return None
+    # benchmark_experiment is typed as non-optional, so no None check needed
 
     if not hpo_experiments:
         error_msg = "No HPO experiments found. Make sure HPO runs have been executed and logged to MLflow."

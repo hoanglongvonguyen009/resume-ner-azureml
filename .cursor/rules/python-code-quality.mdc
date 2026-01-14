@@ -1,0 +1,24 @@
+---
+name: python-code-quality
+description: Follow clean code principles for readability, maintainability, and Python conventions.
+globs:
+  - "src/**/*.py"
+  - "tests/**/*.py"
+alwaysApply: true
+---
+
+## Code Quality Rules
+
+- **Avoid hard-coded numbers**: Use named constants for magic numbers (e.g., `SALES_TAX_RATE = 0.08` instead of `price * 0.08`).
+
+- **Use meaningful, descriptive names**: Names should explain purpose without needing comments (e.g., `elapsed_days = 12` instead of `d = 12`).
+
+- **Use comments sparingly**: Code should be clear enough to read without comments. Only comment to explain *why* something unusual is happening, not *what* the code does.
+
+- **Document complex interfaces**: For complex functions or classes, use structured docstrings with **Args**, **Returns**, and **Raises** sections. This creates a clear "contract" so users don't need to read implementation logic. See `@python-type-safety.mdc` for type hints that complement docstrings.
+
+- **Follow Python conventions**: Use `snake_case` for functions and variables, `PascalCase` for classes. Follow PEP 8 style guidelines.
+
+- **Encapsulate nested conditionals**: Deeply nested `if/else` blocks are hard to read. Extract the logic into a helper function with a descriptive name (e.g., `if should_grant_access(user):` instead of nested conditionals).
+
+- **Single Responsibility**: See `@python-reuse-first.mdc` for SRP guidance on when to split functions/modules.

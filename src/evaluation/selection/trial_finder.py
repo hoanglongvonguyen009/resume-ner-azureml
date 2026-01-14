@@ -8,7 +8,7 @@ import json
 import math
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -345,8 +345,7 @@ def find_best_trial_from_study(
                     study_key = build_hpo_study_key(
                         data_config=data_config,
                         hpo_config=hpo_config,
-                        backbone=backbone_name,
-                        benchmark_config=None,  # Not needed for trial lookup
+                        model=backbone_name,
                     )
                     study_key_hash = build_hpo_study_key_hash(study_key)
                 except Exception:
@@ -384,7 +383,7 @@ def find_best_trial_from_study(
                     study_key = build_hpo_study_key(
                         data_config=data_config,
                         hpo_config=hpo_config,
-                        backbone=backbone_name,
+                        model=backbone_name,
                         benchmark_config=None,
                     )
                     study_key_hash = build_hpo_study_key_hash(study_key)
@@ -395,20 +394,17 @@ def find_best_trial_from_study(
             if study_key_hash:
                 try:
                     from infrastructure.paths.parse import find_trial_by_hash
-                    from common.shared.platform_detection import detect_platform
                     # Find project root and config_dir from hpo_backbone_dir
                     # hpo_backbone_dir is typically: outputs/hpo/{storage_env}/{model}
                     # So we need to go up to project root
                     # outputs/hpo/{storage_env}/{model} -> project_root
                     project_root = hpo_backbone_dir.parent.parent.parent
                     config_dir = project_root / "config"
-                    storage_env = detect_platform()
 
                     v2_trial_dir = find_trial_by_hash(
                         root_dir=project_root,
                         config_dir=config_dir,
                         model=backbone_name,
-                        storage_env=storage_env,
                         study_key_hash=study_key_hash,
                         trial_key_hash=computed_trial_key_hash,
                     )
@@ -641,9 +637,11 @@ def find_best_trials_for_backbones(
                     if study_db_path.exists():
                         try:
                             from training.hpo.core.optuna_integration import import_optuna
-                            optuna, _, _, _ = import_optuna()
+                            optuna_module_imported, _, _, _ = import_optuna()  # type: ignore[no-untyped-call]
+                            optuna = optuna_module_imported
                         except ImportError:
-                            import optuna
+                            import optuna as optuna_module_fallback
+                            optuna = optuna_module_fallback
 
                         try:
                             study = optuna.load_study(
@@ -965,8 +963,8 @@ def select_champion_per_backbone(
     
     # Step 3: Partition by study_key_hash AND schema version
     # CRITICAL: Never mix v1 and v2 runs if allow_mixed_schema_groups is False
-    groups_v1 = {}  # v1 runs
-    groups_v2 = {}  # v2 runs
+    groups_v1: Dict[str, List[Any]] = {}  # v1 runs
+    groups_v2: Dict[str, List[Any]] = {}  # v2 runs
     runs_without_study_key = 0
     
     for run in runs:
@@ -1153,14 +1151,24 @@ def select_champion_per_backbone(
     winning_group = group_scores[winning_key]
     
     # Step 7: Select champion within winning group (by best_metric, respecting direction)
+    run_metrics_raw = winning_group["run_metrics"]
+    if not isinstance(run_metrics_raw, list):
+        logger.warning(f"Winning group has invalid run_metrics type for {backbone}")
+        return None
+    # run_metrics is List[Tuple[str, int | float]] but we treat it as List[Tuple[str, float]]
+    run_metrics_list = run_metrics_raw
+    if not run_metrics_list:
+        logger.warning(f"Winning group has no run metrics for {backbone}")
+        return None
+    
     if maximize:
         champion_run_id, champion_metric = max(
-            winning_group["run_metrics"],
+            run_metrics_list,
             key=lambda x: x[1]
         )
     else:
         champion_run_id, champion_metric = min(
-            winning_group["run_metrics"],
+            run_metrics_list,
             key=lambda x: x[1]
         )
     
@@ -1341,7 +1349,7 @@ def _filter_by_artifact_availability(
     runs: List[Any],
     check_source: str,
     artifact_tag: str,
-    logger,
+    logger: Any,
     mlflow_client: Any = None,
     schema_version_tag: str = "code.study.key_schema_version",
 ) -> List[Any]:
@@ -1492,15 +1500,9 @@ def _get_checkpoint_path_from_run(
             backbone = run.data.tags.get(backbone_tag) or run.data.tags.get("code.model", "unknown")
             backbone_name = backbone.split("-")[0] if "-" in backbone else backbone
             
-            # Build HPO output directory path
+            # Build HPO output directory path manually (outputs/hpo/{environment}/{backbone_name})
             environment = detect_platform()
-            hpo_output_dir = build_output_path(
-                root_dir=root_dir,
-                config_dir=config_dir,
-                process_type="hpo",
-                model=backbone_name,
-                environment=environment,
-            )
+            hpo_output_dir = root_dir / "outputs" / "hpo" / environment / backbone_name
             
             # Use single source of truth for local disk lookup
             checkpoint_path = find_trial_checkpoint_by_hash(
@@ -1533,7 +1535,7 @@ def select_champions_for_backbones(
     mlflow_client: Any,
     root_dir: Optional[Path] = None,
     config_dir: Optional[Path] = None,
-    **kwargs,  # Pass through to select_champion_per_backbone
+    **kwargs: Any,  # Pass through to select_champion_per_backbone
 ) -> Dict[str, Dict[str, Any]]:
     """
     Select champions for multiple backbones.

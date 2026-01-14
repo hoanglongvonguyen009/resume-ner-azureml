@@ -41,7 +41,8 @@ def validate_artifact(
     elif artifact_kind == ArtifactKind.METRICS:
         return _validate_metrics(path, strict)
     else:
-        return False, f"Unknown artifact kind: {artifact_kind}"
+        # All enum values are covered above, but mypy needs explicit else for exhaustiveness
+        return False, f"Unknown artifact kind: {artifact_kind}"  # type: ignore[unreachable]
 
 
 def _validate_checkpoint(path: Path, strict: bool) -> tuple[bool, Optional[str]]:
@@ -256,5 +257,6 @@ def get_required_files(artifact_kind: ArtifactKind) -> List[str]:
     elif artifact_kind == ArtifactKind.METRICS:
         return ["metrics.json"]  # Or similar
     else:
-        return []
+        # All enum values are covered above, but mypy needs explicit else for exhaustiveness
+        return []  # type: ignore[unreachable]
 

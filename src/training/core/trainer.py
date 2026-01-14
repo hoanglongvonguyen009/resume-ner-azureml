@@ -2,7 +2,7 @@
 
 import sys
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple, Union
 
 import torch
 from torch.utils.data import DataLoader, DistributedSampler
@@ -147,7 +147,7 @@ def create_optimizer_and_scheduler(
     model: torch.nn.Module,
     config: Dict[str, Any],
     total_steps: int,
-) -> tuple:
+) -> Tuple[torch.optim.Optimizer, Any, float]:
     """
     Create optimizer and learning rate scheduler.
 
@@ -182,7 +182,7 @@ def run_training_loop(
     model: torch.nn.Module,
     train_loader: DataLoader,
     optimizer: torch.optim.Optimizer,
-    scheduler,
+    scheduler: Any,  # transformers.optimization.LambdaLR or similar
     epochs: int,
     max_grad_norm: float,
     context: RunContext,
@@ -208,7 +208,7 @@ def run_training_loop(
             and hasattr(train_loader, "sampler")
             and hasattr(train_loader.sampler, "set_epoch")
         ):
-            train_loader.sampler.set_epoch(epoch)  # type: ignore[attr-defined]
+            train_loader.sampler.set_epoch(epoch)
 
         for batch in train_loader:
             batch = {k: v.to(device) for k, v in batch.items()}
@@ -261,7 +261,7 @@ def train_model(
     output_dir: Path,
     context: RunContext | None = None,
     tracker: Optional[Any] = None,
-) -> Dict[str, float]:
+) -> Dict[str, Union[float, str, Dict[str, Dict[str, float]]]]:
     """
     Train a token classification model and return evaluation metrics.
 
@@ -440,6 +440,7 @@ def train_model(
     )
 
     # Evaluate only if validation loader exists and on main process.
+    metrics: Dict[str, Union[float, str, Dict[str, Dict[str, float]]]]
     if val_loader is not None and context.is_main_process():
         metrics = evaluate_model(model, val_loader, context.device, id2label)
     elif val_loader is not None:
@@ -465,6 +466,15 @@ def train_model(
                 data_config = config.get("data", {})
                 random_seed = config.get("training", {}).get(
                     "seed") or random.randint(0, 2**31 - 1)
+                
+                # Determine data strategy from training configuration
+                data_strategy: Optional[str] = None
+                if use_all_data:
+                    data_strategy = "all_data"
+                elif fold_idx is not None:
+                    data_strategy = f"fold_{fold_idx}"
+                elif val_loader is not None:
+                    data_strategy = "train_val_split"
 
                 tracker.log_training_parameters(
                     config=config,
@@ -551,11 +561,11 @@ def train_model(
                     print(f"  [Training] MLflow run detected: {target_run_id[:12]}...", file=sys.stderr, flush=True)
                     
                     checkpoint_dir = output_dir / "checkpoint"
-                    metrics_json_path = output_dir / "metrics.json" if (output_dir / "metrics.json").exists() else None
+                    metrics_json_path_artifact: Optional[Path] = output_dir / "metrics.json" if (output_dir / "metrics.json").exists() else None
                     
                     results = upload_training_artifacts(
                         checkpoint_dir=checkpoint_dir,
-                        metrics_json_path=metrics_json_path,
+                        metrics_json_path=metrics_json_path_artifact,
                         run_id=target_run_id,
                         config_dir=config_dir,
                     )

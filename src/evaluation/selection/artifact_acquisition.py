@@ -247,8 +247,8 @@ def _get_azure_ml_info(config_dir: Path, root_dir: Path, tracking_uri: str) -> t
         from common.shared.mlflow_setup import _load_env_file
         import re
 
-        config_dir_path = Path(config_dir) if isinstance(
-            config_dir, str) else config_dir
+        # config_dir is already typed as Path, so no conversion needed
+        config_dir_path = config_dir
 
         # Get workspace name from config
         try:

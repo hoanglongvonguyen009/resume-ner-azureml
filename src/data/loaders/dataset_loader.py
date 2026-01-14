@@ -3,7 +3,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Dict, Any, List, Tuple, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Tuple, Optional, TYPE_CHECKING, cast
 
 from sklearn.model_selection import train_test_split
 
@@ -68,14 +68,14 @@ def build_label_list(data_config: Dict[str, Any]) -> List[str]:
 def _compute_entity_presence_labels(
     dataset: List[Dict[str, Any]],
     entity_types: Optional[List[str]] = None,
-) -> List[tuple]:
+) -> List[Tuple[str, ...]]:
     """
     Compute per-document entity presence labels for stratification.
 
     Each label is a tuple of entity types present in the document. This helps
     keep rare entity types represented in each split/fold.
     """
-    labels: List[tuple] = []
+    labels: List[Tuple[str, ...]] = []
     for sample in dataset:
         annotations = sample.get("annotations", []) or []
         present = []
@@ -227,14 +227,15 @@ def normalize_text_for_tokenization(raw_text: Any) -> str:
         # Try common text field names
         for key in ["text", "content", "sentence", "input"]:
             if key in raw_text and isinstance(raw_text[key], str):
-                return raw_text[key]
+                # mypy may treat dict values as Any; cast after isinstance check
+                return cast(str, raw_text[key])
         # Fall back to JSON serialization
         try:
-            result = json.dumps(raw_text, ensure_ascii=False)
-            return str(result) if not isinstance(result, str) else result
+            json_result: str = json.dumps(raw_text, ensure_ascii=False)
+            return json_result
         except Exception:
-            result = str(raw_text)
-            return str(result) if not isinstance(result, str) else result
+            fallback = str(raw_text)
+            return fallback
 
     # Handle other types - convert to string
     try:
@@ -279,7 +280,7 @@ def encode_annotations_to_labels(
 
 # Import Dataset lazily - only when ResumeNERDataset is actually instantiated
 # This allows build_label_list to be imported without requiring torch
-def _get_dataset_class():
+def _get_dataset_class() -> "Dataset":
     """Lazy import of Dataset class."""
     from torch.utils.data import Dataset
     return Dataset
@@ -294,10 +295,10 @@ class ResumeNERDataset:
     def __init__(
         self,
         samples: List[Dict[str, Any]],
-        tokenizer,
+        tokenizer: Any,
         max_length: int,
         label2id: Dict[str, int],
-    ):
+    ) -> None:
         # Validate samples are dictionaries
         validated_samples = []
         for i, sample in enumerate(samples):
@@ -312,10 +313,10 @@ class ResumeNERDataset:
         self.max_length = max_length
         self.label2id = label2id
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Dict[str, "torch.Tensor"]:
         """
         Encode a single sample.
 
@@ -371,19 +372,6 @@ class ResumeNERDataset:
             annotations = []
 
         supports_offsets = bool(getattr(self.tokenizer, "is_fast", False))
-
-        # Final validation: ensure text is exactly a plain Python str (not a subclass)
-        if type(text) is not str:
-            text = str(text)
-
-        # Handle case where normalize_text_for_tokenization might return a list/tuple
-        # The tokenizer expects a single string, not a sequence
-        if isinstance(text, (list, tuple)):
-            # If text is a list/tuple, join it into a string
-            text = " ".join(str(t) for t in text if t is not None)
-        elif not isinstance(text, str):
-            # Force conversion to string for any other type
-            text = str(text)
 
         # Additional validation: ensure text is valid UTF-8
         # Handle surrogate characters and other invalid UTF-8 by cleaning them
@@ -449,5 +437,6 @@ class ResumeNERDataset:
 
         encoded = {k: v.squeeze(0) for k, v in encoded.items()}
         import torch
+
         encoded["labels"] = torch.tensor(labels, dtype=torch.long)
         return encoded

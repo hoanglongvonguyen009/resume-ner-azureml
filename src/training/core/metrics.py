@@ -1,6 +1,6 @@
 """Metric calculation utilities."""
 
-from typing import Dict, List
+from typing import Dict, List, Any, Union
 
 from seqeval.metrics import f1_score, classification_report
 
@@ -113,7 +113,7 @@ def compute_metrics(
     all_labels: List[List[str]],
     all_preds: List[List[str]],
     avg_loss: float,
-) -> Dict:
+) -> Dict[str, Union[float, str, Dict[str, Dict[str, float]]]]:
     """
     Compute all evaluation metrics.
 
@@ -129,7 +129,7 @@ def compute_metrics(
     token_macro_f1 = compute_token_macro_f1(all_labels, all_preds)
     per_entity = compute_per_entity_metrics(all_labels, all_preds)
 
-    result = {
+    result: Dict[str, Union[float, str, Dict[str, Dict[str, float]]]] = {
         "macro-f1": float(token_macro_f1),
         "macro-f1-span": float(span_f1),
         "loss": float(avg_loss),

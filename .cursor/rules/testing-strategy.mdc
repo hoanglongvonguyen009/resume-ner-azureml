@@ -1,0 +1,15 @@
+---
+name: testing-strategy
+description: Keep tests stable by focusing on contracts and workflows, not internal wiring.
+globs:
+  - "tests/**/*.py"
+alwaysApply: true
+---
+
+## Testing rules
+
+- Prefer testing **public APIs and workflows** (e.g., `run_*_workflow`) instead of internal helpers.
+- Avoid over-specific assertions that break on harmless refactors (e.g., exact log strings, full dict equality when only a few fields matter).
+- When refactoring internals, keep workflow function signatures and behavior stable so most tests stay valid.
+- Before deleting or rewriting a test, check if it can be adapted to the new contract instead.
+- For every change or new module, run the **relevant existing tests** (at least those covering the touched area, plus a fast smoke suite when reasonable). If tests fail, either fix the regression or clearly document in the PR why the failure is acceptable temporarily and how it will be addressed.

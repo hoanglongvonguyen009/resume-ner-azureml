@@ -1,6 +1,7 @@
 """Model initialization utilities."""
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
+
 from pathlib import Path
 
 import torch
@@ -16,7 +17,7 @@ def create_model_and_tokenizer(
     id2label: Dict[int, str],
     device: torch.device | None = None,
     checkpoint_path: Optional[str] = None,
-) -> tuple:
+) -> Tuple[AutoModelForTokenClassification, AutoTokenizer, torch.device]:
     """
     Create model and tokenizer from configuration or checkpoint.
 

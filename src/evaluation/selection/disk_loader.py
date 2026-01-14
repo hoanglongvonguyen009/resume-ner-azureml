@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from common.shared.logging_utils import get_logger
 from infrastructure.paths import parse_hpo_path_v2, is_v2_path
@@ -123,7 +123,7 @@ def load_best_trial_from_disk(
     if best_trial_dir is None:
         # Group by trial base (e.g., trial_0_20251223_123456_fold0, trial_0_20251223_123456_fold1 -> trial_0_20251223_123456)
         # Handles both old format (trial_N_foldX) and new format (trial_N_RUNID_foldX)
-        trial_groups = {}
+        trial_groups: Dict[str, List[Dict[str, Any]]] = {}
         # Use the same trial_dirs collection we built earlier
         for trial_dir in trial_dirs:
 

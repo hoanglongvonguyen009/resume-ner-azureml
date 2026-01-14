@@ -101,9 +101,10 @@ def load_study_from_disk(
     try:
         from training.hpo.core.optuna_integration import import_optuna
 
-        optuna, _, _, _ = import_optuna()
+        optuna, _, _, _ = import_optuna()  # type: ignore[no-untyped-call]
     except ImportError:
-        import optuna
+        # Fallback: direct import for environments without integration helper
+        import optuna  # type: ignore[no-redef]
 
     try:
         storage_uri = f"sqlite:///{study_db_path.resolve()}"

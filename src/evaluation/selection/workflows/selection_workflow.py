@@ -159,6 +159,13 @@ def run_selection_workflow(
                 if study_hash and trial_hash:
                     hpo_trial_pairs.add((study_hash, trial_hash))
             
+            hpo_refit_pairs = set()
+            for run in hpo_refit_runs:
+                study_hash = run.data.tags.get(study_key_tag)
+                trial_hash = run.data.tags.get(trial_key_tag)
+                if study_hash and trial_hash:
+                    hpo_refit_pairs.add((study_hash, trial_hash))
+            
             matching_pairs = benchmark_pairs & hpo_trial_pairs
             
             error_msg = (
@@ -210,7 +217,7 @@ def run_selection_workflow(
         
         # Step 3: Save to cache
         tracking_uri = mlflow.get_tracking_uri()
-        inputs_summary = {}
+        inputs_summary: Dict[str, Any] = {}
         
         save_best_model_cache(
             root_dir=root_dir,
@@ -250,12 +257,12 @@ def run_selection_workflow(
     
     # Fallback match: (backbone, study_key_hash, trial_key_hash)
     if best_model_checkpoint_path is None:
-        backbone = best_model.get("backbone")
-        study_key_hash = best_model.get("study_key_hash")
-        trial_key_hash = best_model.get("trial_key_hash")
+        fallback_backbone: Optional[str] = best_model.get("backbone")
+        study_key_hash: Optional[str] = best_model.get("study_key_hash")
+        trial_key_hash: Optional[str] = best_model.get("trial_key_hash")
         
-        if backbone and study_key_hash and trial_key_hash:
-            key = (backbone, study_key_hash, trial_key_hash)
+        if fallback_backbone and study_key_hash and trial_key_hash:
+            key = (fallback_backbone, study_key_hash, trial_key_hash)
             if key in benchmarked_champions_by_keys:
                 cached = benchmarked_champions_by_keys[key]
                 checkpoint_path = cached["checkpoint_path"]

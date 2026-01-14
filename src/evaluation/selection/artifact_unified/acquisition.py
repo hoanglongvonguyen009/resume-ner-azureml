@@ -27,6 +27,8 @@ from evaluation.selection.artifact_unified.types import (
     ArtifactResult,
     ArtifactSource,
     AvailabilityStatus,
+    ArtifactLocation,
+    RunSelectorResult,
 )
 from evaluation.selection.artifact_unified.validation import validate_artifact
 from infrastructure.paths import resolve_output_path
@@ -273,11 +275,11 @@ def acquire_artifact(
 
 
 def _acquire_from_location(
-    location: Any,  # ArtifactLocation
+    location: ArtifactLocation,
     request: ArtifactRequest,
     root_dir: Path,
     config_dir: Path,
-    run_selector_result: Any,  # RunSelectorResult
+    run_selector_result: RunSelectorResult,
     acquisition_config: Dict[str, Any],
     mlflow_client: MlflowClient,
     restore_from_drive: Optional[Callable[[Path, bool], bool]] = None,
@@ -396,6 +398,9 @@ def _acquire_from_location(
     
     elif location.source == ArtifactSource.MLFLOW:
         # Download from MLflow
+        if run_selector_result.artifact_run_id is None:
+            logger.error("Cannot download from MLflow: artifact_run_id is None")
+            return None
         return _download_from_mlflow(
             run_id=run_selector_result.artifact_run_id,
             request=request,
@@ -403,8 +408,9 @@ def _acquire_from_location(
             acquisition_config=acquisition_config,
             mlflow_client=mlflow_client,
         )
-    
-    return None
+    # All ArtifactSource enum values are handled above (LOCAL, DRIVE, MLFLOW)
+    # This should never be reached, but kept for defensive programming
+    raise ValueError(f"Unsupported artifact source: {location.source}")
 
 
 def _build_artifact_destination(

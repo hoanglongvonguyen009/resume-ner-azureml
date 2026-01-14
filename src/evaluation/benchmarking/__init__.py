@@ -19,7 +19,10 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+from typing import Any, Callable
+
+
+def __getattr__(name: str) -> Callable[..., Any]:
     """Lazy import for CLI functions that require torch."""
     if name == "benchmark_model":
         from .cli import benchmark_model

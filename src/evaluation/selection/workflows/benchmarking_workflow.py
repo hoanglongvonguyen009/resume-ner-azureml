@@ -107,6 +107,9 @@ def run_benchmarking_workflow(
     run_mode = get_benchmark_run_mode(benchmark_config, hpo_config)
     environment = detect_platform()
     
+    # benchmark_experiment is guaranteed to be set at this point
+    assert benchmark_experiment is not None, "benchmark_experiment should be set by now"
+    
     champions_to_benchmark = filter_missing_benchmarks(
         champions=champions,
         benchmark_experiment=benchmark_experiment,

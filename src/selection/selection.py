@@ -170,18 +170,18 @@ def select_best_configuration(
         trial, value = get_best_trial_from_sweep(
             ml_client, sweep_job, objective_metric, goal
         )
-        if trial is None:
+        if trial is None or value is None:
             continue
 
         if best_value is None:
             best_value = value
             best_trial = trial
             best_backbone = backbone
-        elif goal == "maximize" and value > best_value:
+        elif goal == "maximize" and best_value is not None and value is not None and value > best_value:
             best_value = value
             best_trial = trial
             best_backbone = backbone
-        elif goal == "minimize" and value < best_value:
+        elif goal == "minimize" and best_value is not None and value is not None and value < best_value:
             best_value = value
             best_trial = trial
             best_backbone = backbone

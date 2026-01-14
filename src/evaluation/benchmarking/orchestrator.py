@@ -466,9 +466,9 @@ def find_checkpoint_in_trial_dir(trial_dir: Path) -> Optional[Path]:
 
 def compute_grouping_tags(
     trial_info: Dict[str, Any],
-    data_config: dict,
-    hpo_config: dict,
-    benchmark_config: Optional[dict] = None,
+    data_config: Dict[str, Any],
+    hpo_config: Dict[str, Any],
+    benchmark_config: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """
     Compute grouping tags (study_key_hash, trial_key_hash, study_family_hash) for a trial.
@@ -589,11 +589,11 @@ def benchmark_champions(
     test_data_path: Path,
     root_dir: Path,
     environment: str,
-    data_config: dict,
-    hpo_config: dict,
-    benchmark_config: Optional[dict] = None,
+    data_config: Dict[str, Any],
+    hpo_config: Dict[str, Any],
+    benchmark_config: Optional[Dict[str, Any]] = None,
     benchmark_experiment: Optional[Dict[str, str]] = None,
-    benchmark_batch_sizes: List[int] = None,
+    benchmark_batch_sizes: Optional[List[int]] = None,
     benchmark_iterations: int = 100,
     benchmark_warmup: int = 10,
     benchmark_max_length: int = 512,
@@ -692,10 +692,10 @@ def benchmark_best_trials(
     test_data_path: Path,
     root_dir: Path,
     environment: str,
-    data_config: dict,
-    hpo_config: dict,
-    benchmark_config: Optional[dict] = None,
-    benchmark_batch_sizes: List[int] = None,
+    data_config: Dict[str, Any],
+    hpo_config: Dict[str, Any],
+    benchmark_config: Optional[Dict[str, Any]] = None,
+    benchmark_batch_sizes: Optional[List[int]] = None,
     benchmark_iterations: int = 100,
     benchmark_warmup: int = 10,
     benchmark_max_length: int = 512,
@@ -746,6 +746,7 @@ def benchmark_best_trials(
         is_champion = trial_info.get("_is_champion", False)
         
         # Use checkpoint_dir directly if available (champion mode)
+        checkpoint_dir: Optional[Path] = None
         if "checkpoint_dir" in trial_info and trial_info["checkpoint_dir"]:
             checkpoint_dir = Path(trial_info["checkpoint_dir"])
         elif not is_champion and "trial_dir" in trial_info:
@@ -766,6 +767,9 @@ def benchmark_best_trials(
         else:
             logger.warning(f"No checkpoint_dir or trial_dir for {backbone}")
             continue
+        
+        # At this point, checkpoint_dir must be a Path (not None)
+        assert checkpoint_dir is not None, "checkpoint_dir should be set by this point"
 
         backbone_name = backbone.split("-")[0] if "-" in backbone else backbone
 
@@ -877,7 +881,7 @@ def benchmark_best_trials(
         else:
             # File is local - check and restore from Drive if needed
             if ensure_restored_from_drive and ensure_restored_from_drive(
-                benchmark_output, is_directory=False
+                benchmark_output, False
             ):
                 logger.info(
                     f"Restored benchmark results from Drive - "
@@ -1058,7 +1062,7 @@ def benchmark_best_trials(
             # Note: On Colab, benchmark_output is already in Drive (via resolve_output_path_for_colab)
             # No need to backup again unless it's a local path
             if backup_enabled and backup_to_drive and not str(benchmark_output).startswith("/content/drive"):
-                backup_to_drive(benchmark_output, is_directory=False)
+                backup_to_drive(benchmark_output, False)
                 logger.info("Backed up benchmark results to Drive")
             elif str(benchmark_output).startswith("/content/drive"):
                 logger.info(

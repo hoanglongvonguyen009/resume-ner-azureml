@@ -1,6 +1,6 @@
 """Model evaluation utilities."""
 
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import torch
 from torch.utils.data import DataLoader
@@ -51,7 +51,7 @@ def evaluate_model(
     dataloader: DataLoader,
     device: torch.device,
     id2label: Dict[int, str],
-) -> Dict[str, float]:
+) -> Dict[str, Union[float, str, Dict[str, Dict[str, float]]]]:
     """
     Evaluate model and compute metrics.
 

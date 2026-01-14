@@ -102,16 +102,17 @@ def load_study_from_disk(
     if not study_db_path.exists():
         return None
 
+    # Import optuna module
     try:
         from training.hpo.core.optuna_integration import import_optuna
 
-        optuna, _, _, _ = import_optuna()
+        optuna_for_load, _, _, _ = import_optuna()  # type: ignore[no-untyped-call]
     except ImportError:
-        import optuna
+        import optuna as optuna_for_load  # type: ignore[no-redef]
 
     try:
         storage_uri = f"sqlite:///{study_db_path.resolve()}"
-        study = optuna.load_study(
+        study = optuna_for_load.load_study(
             study_name=study_folder.name, storage=storage_uri)
         return study
     except Exception as e:

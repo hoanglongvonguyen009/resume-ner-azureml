@@ -1,0 +1,84 @@
+[tool.mypy]
+python_version = "3.10"
+
+# src/ layout: tell mypy where your code lives
+mypy_path = ["src"]
+explicit_package_bases = true
+
+# Start by checking only src/ during rollout; add "tests" later in the plan
+files = ["src"]
+
+# Start strict, but relax via overrides if needed (see below)
+strict = true
+
+# High-signal flags that keep the config healthy
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+show_error_context = true
+
+# Exclude things we never want to type-check (adjust as needed)
+exclude = "(^|/)(\\.venv|\\.git|\\.mypy_cache|mlruns|outputs|tmp|aml_logs)/"
+
+# Per-module overrides (pyproject.toml style)
+[[tool.mypy.overrides]]
+module = ["torch", "torch.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["transformers", "transformers.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["mlflow", "mlflow.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["azureml", "azureml.*", "azure.ai.ml", "azure.ai.ml.*", "azure.core.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["optuna", "optuna.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["seqeval", "seqeval.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["sklearn", "sklearn.*"]
+ignore_missing_imports = true
+
+# Temporarily relax noisy infra areas while rolling out typing folder-by-folder
+[[tool.mypy.overrides]]
+module = [
+    "infrastructure.platform.adapters.logging_adapter",
+    "orchestration.jobs.tracking.index.file_locking",
+    "infrastructure.tracking.mlflow.types",
+    "training.hpo.execution.azureml.sweeps",
+    "infrastructure.naming.experiments",
+    "infrastructure.tracking.mlflow.queries",
+    "common.shared.yaml_utils",
+    "infrastructure.config.run_mode",
+    "infrastructure.platform.azureml",
+    "orchestration.jobs.tracking.naming.hpo_keys",
+    "infrastructure.fingerprints.compute",
+    "infrastructure.naming.mlflow.hpo_keys",
+    "orchestration.jobs.tracking.naming.refit_keys",
+]
+ignore_errors = true
+
+# Broader temporary relaxations to keep evaluation-focused rollout manageable
+[[tool.mypy.overrides]]
+module = ["infrastructure.*", "orchestration.*", "training.*", "deployment.*", "common.shared.*"]
+ignore_errors = true
+
+# Example: temporarily relax a noisy area during rollout
+# [[tool.mypy.overrides]]
+# module = ["training.hpo.*"]
+# ignore_errors = true  # or selectively disable some strictness flags
+

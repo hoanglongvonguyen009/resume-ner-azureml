@@ -312,6 +312,7 @@ def find_best_trial_from_study(
 
         # Compute trial_key_hash from Optuna trial hyperparameters
         computed_trial_key_hash = None
+        study_key_hash: Optional[str] = None
         if hpo_config and data_config:
             try:
                 from infrastructure.tracking.mlflow.naming import (
@@ -325,7 +326,7 @@ def find_best_trial_from_study(
                 study_key = build_hpo_study_key(
                     data_config=data_config,
                     hpo_config=hpo_config,
-                    backbone=backbone_name,
+                    model=backbone_name,
                     benchmark_config=None,  # Not needed for trial lookup
                 )
                 study_key_hash = build_hpo_study_key_hash(study_key)
@@ -353,41 +354,42 @@ def find_best_trial_from_study(
         # Support v2 paths (trial-{hash}) only
         if computed_trial_key_hash:
             # Try v2 path lookup first if we have study_key_hash
-            study_key_hash = None
-            if hpo_config and data_config:
-                try:
-                    from infrastructure.tracking.mlflow.naming import (
-                        build_hpo_study_key,
-                        build_hpo_study_key_hash,
-                    )
-                    study_key = build_hpo_study_key(
-                        data_config=data_config,
-                        hpo_config=hpo_config,
-                        backbone=backbone_name,
-                        benchmark_config=None,
-                    )
-                    study_key_hash = build_hpo_study_key_hash(study_key)
-                except Exception:
-                    pass
+            # study_key_hash may already be set from the try block above (line 331)
+            # If not, try to compute it again
+            if study_key_hash is None:
+                if hpo_config and data_config:
+                    try:
+                        from infrastructure.tracking.mlflow.naming import (
+                            build_hpo_study_key,
+                            build_hpo_study_key_hash,
+                        )
+                        study_key = build_hpo_study_key(
+                            data_config=data_config,
+                            hpo_config=hpo_config,
+                            model=backbone_name,
+                            benchmark_config=None,
+                        )
+                        study_key_hash = build_hpo_study_key_hash(study_key)
+                    except Exception:
+                        study_key_hash = None
+                else:
+                    study_key_hash = None
 
             # Try v2 path lookup using find_trial_by_hash
             if study_key_hash:
                 try:
                     from infrastructure.paths.parse import find_trial_by_hash
-                    from common.shared.platform_detection import detect_platform
                     # Find project root and config_dir from hpo_backbone_dir
                     # hpo_backbone_dir is typically: outputs/hpo/{storage_env}/{model}
                     # So we need to go up to project root
                     # outputs/hpo/{storage_env}/{model} -> project_root
                     project_root = hpo_backbone_dir.parent.parent.parent
                     config_dir = project_root / "config"
-                    storage_env = detect_platform()
 
                     v2_trial_dir = find_trial_by_hash(
                         root_dir=project_root,
                         config_dir=config_dir,
                         model=backbone_name,
-                        storage_env=storage_env,
                         study_key_hash=study_key_hash,
                         trial_key_hash=computed_trial_key_hash,
                     )
@@ -572,14 +574,15 @@ def find_best_trials_for_backbones(
                 if study_folder:
                     study_db_path = study_folder / "study.db"
                     if study_db_path.exists():
+                        # Import optuna module
                         try:
                             from training.hpo.core.optuna_integration import import_optuna
-                            optuna, _, _, _ = import_optuna()
+                            optuna_for_study, _, _, _ = import_optuna()  # type: ignore[no-untyped-call]
                         except ImportError:
-                            import optuna
+                            import optuna as optuna_for_study  # type: ignore[no-redef]
 
                         try:
-                            study = optuna.load_study(
+                            study = optuna_for_study.load_study(
                                 study_name=study_folder.name,
                                 storage=f"sqlite:///{study_db_path.resolve()}",
                             )

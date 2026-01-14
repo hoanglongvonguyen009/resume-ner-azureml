@@ -10,6 +10,7 @@ import sys
 import warnings
 import importlib
 from types import ModuleType
+from typing import Any
 from importlib.abc import MetaPathFinder, Loader
 from importlib.util import spec_from_loader
 
@@ -20,14 +21,14 @@ __path__ = []
 class SelectionSubmoduleFinder(MetaPathFinder):
     """Custom finder for selection.* submodules."""
     
-    def find_spec(self, name, path, target=None):
+    def find_spec(self, name: str, path: Any, target: Any = None) -> Any:
         if name.startswith('selection.') and name != 'selection':
             # Redirect to evaluation.selection.*
             submodule_name = name.replace('selection.', 'evaluation.selection.', 1)
             try:
                 # Try to import the actual module
                 spec = importlib.util.find_spec(submodule_name)
-                if spec is not None:
+                if spec is not None and spec.loader is not None:
                     # Create a loader that loads from evaluation.selection
                     loader = importlib.util.LazyLoader(spec.loader)
                     return spec_from_loader(name, loader)

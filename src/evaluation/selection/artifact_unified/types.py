@@ -74,7 +74,7 @@ class ArtifactResult:
     error: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)  # Acquisition metadata
     
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate result consistency."""
         if self.success and not self.path:
             raise ValueError("Successful result must have a path")
@@ -95,7 +95,7 @@ class RunSelectorResult:
     artifact_run_id: Optional[str] = None  # Which run to use for artifact acquisition (refit if available, else trial)
     metadata: Dict[str, Any] = field(default_factory=dict)  # Selection metadata
     
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Set artifact_run_id based on refit availability."""
         if not self.artifact_run_id:
             # Default: prefer refit, fallback to trial

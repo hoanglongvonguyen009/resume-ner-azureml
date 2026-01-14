@@ -11,11 +11,11 @@ from sklearn.model_selection import KFold, StratifiedKFold
 def _entity_presence_labels(
     dataset: List[Any],
     entity_types: Optional[Iterable[str]] = None,
-) -> List[tuple]:
+) -> List[Tuple[str, ...]]:
     """
     Build stratification labels per document based on entity presence.
     """
-    labels: List[tuple] = []
+    labels: List[Tuple[str, ...]] = []
     for sample in dataset:
         annotations = sample.get("annotations", []) if isinstance(sample, dict) else []
         present = []
@@ -30,7 +30,7 @@ def _entity_presence_labels(
     return labels
 
 
-def _can_stratify(labels: List[tuple], k: int) -> bool:
+def _can_stratify(labels: List[Tuple[str, ...]], k: int) -> bool:
     """
     Determine if stratification is feasible given labels and fold count.
     """
@@ -214,7 +214,7 @@ def validate_splits(
     summary: Dict[int, Dict[str, int]] = {}
 
     for fold_idx, (_, val_idx) in enumerate(splits):
-        counts = Counter()
+        counts: Counter[str] = Counter()
         for idx in val_idx:
             sample = dataset[idx]
             for ann in sample.get("annotations", []) or []:
@@ -224,14 +224,14 @@ def validate_splits(
                 if entity_types and ent not in entity_types:
                     continue
                 counts[ent] += 1
-        summary[fold_idx] = dict(counts)
+        summary[fold_idx] = {k: v for k, v in counts.items()}
 
     # Print a quick summary to aid debugging
-    for fold_idx, counts in summary.items():
+    for fold_idx, fold_counts in summary.items():
         missing = []
         if entity_types:
-            missing = [e for e in entity_types if counts.get(e, 0) == 0]
-        print(f"[CV] Fold {fold_idx}: {counts} | Missing: {missing}")
+            missing = [e for e in entity_types if fold_counts.get(e, 0) == 0]
+        print(f"[CV] Fold {fold_idx}: {fold_counts} | Missing: {missing}")
 
     return summary
 

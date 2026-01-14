@@ -41,7 +41,9 @@ def resolve_test_data_path(
     
     # Priority 2: data_config local_path
     if data_config.get("local_path"):
-        local_path_str = data_config.get("local_path", "../dataset")
+        local_path_value = data_config.get("local_path", "../dataset")
+        # Ensure we always treat local_path as a string for path operations
+        local_path_str = str(local_path_value)
         dataset_path = (config_dir / local_path_str).resolve()
         
         # Handle seed subdirectory for dataset_tiny

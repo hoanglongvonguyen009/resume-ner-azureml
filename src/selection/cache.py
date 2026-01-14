@@ -179,7 +179,8 @@ def load_cached_best_model(
             print(f"  Run ID: {run_id[:12]}...")
             print(f"  Backbone: {best_model.get('backbone', 'unknown')}")
             logger.info(f"Using cached best model selection: run_id={run_id[:12]}...")
-            return cache_data
+            from typing import cast
+            return cast(Dict[str, Any], cache_data)
             
         except Exception as e:
             print(f"  ⚠ Could not validate MLflow run: {e}")

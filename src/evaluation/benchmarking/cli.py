@@ -35,7 +35,7 @@ from pathlib import Path
 _script_dir = Path(__file__).parent.parent.parent  # Go up to src/
 if str(_script_dir) not in sys.path:
     sys.path.insert(0, str(_script_dir))
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 # Import only when CLI is actually used (not at module level)
 # This allows the module to be imported without torch being available
@@ -49,7 +49,7 @@ def benchmark_model(
     warmup_iterations: int = 10,
     device: Optional[str] = None,
     max_length: int = 512,
-) -> Dict:
+) -> Dict[str, Any]:
     """Benchmark model inference performance across different batch sizes."""
     # Use absolute imports to support both module import and direct script execution
     from evaluation.benchmarking.data_loader import load_test_texts
@@ -75,7 +75,7 @@ def benchmark_model(
     model, tokenizer, device_obj = load_model_from_checkpoint(checkpoint_dir, device)
     print(f"Model ready on device: {device_obj}", flush=True)
     
-    results = {}
+    results: Dict[str, Any] = {}
     
     for batch_size in batch_sizes:
         print(f"\nBenchmarking batch size {batch_size}...", flush=True)

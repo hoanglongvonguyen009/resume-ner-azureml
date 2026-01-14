@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 
 def find_best_model_from_mlflow(
-    benchmark_experiment: Dict[str, str],
+    benchmark_experiment: Optional[Dict[str, str]],
     hpo_experiments: Dict[str, Dict[str, str]],
     tags_config: Union[TagsRegistry, Dict[str, Any]],
     selection_config: Dict[str, Any],
@@ -158,7 +158,7 @@ def find_best_model_from_mlflow(
             f"Found {len(trial_runs)} trial runs and {len(refit_runs)} refit runs in {exp_info['name']}")
 
         # Helper function to add run to lookup, handling duplicates
-        def add_to_lookup(lookup: Dict, run: Any, run_type: str) -> None:
+        def add_to_lookup(lookup: Dict[Tuple[str, str], Any], run: Any, run_type: str) -> None:
             study_hash = run.data.tags.get(study_key_tag)
             trial_hash = run.data.tags.get(trial_key_tag)
             
@@ -279,8 +279,9 @@ def find_best_model_from_mlflow(
         benchmark_run = representative_run
 
         # Look up matching trial run (for metrics - has macro-f1)
-        key = (study_hash, trial_hash)
-        trial_run = trial_lookup.get(key)
+        # Create 2-tuple key for lookup (separate from 3-tuple used for grouping)
+        lookup_key: Tuple[str, str] = (study_hash, trial_hash)
+        trial_run = trial_lookup.get(lookup_key)
 
         if trial_run is None:
             continue
@@ -291,7 +292,7 @@ def find_best_model_from_mlflow(
             continue
 
         # Look up matching refit run (for artifacts - has checkpoint)
-        refit_run = refit_lookup.get(key)
+        refit_run = refit_lookup.get(lookup_key)
         artifact_run = refit_run if refit_run is not None else trial_run
 
         # Get backbone from trial run (prefer params, fallback to tags)

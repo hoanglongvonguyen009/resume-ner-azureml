@@ -174,6 +174,8 @@ def _discover_by_hash_in_roots(
     validate: bool,
 ) -> Optional[ArtifactLocation]:
     """Discover artifact by hash in configurable search roots."""
+    if not request.study_key_hash or not request.trial_key_hash:
+        return None
     study8 = request.study_key_hash[:8] if len(request.study_key_hash) >= 8 else request.study_key_hash
     trial8 = request.trial_key_hash[:8] if len(request.trial_key_hash) >= 8 else request.trial_key_hash
     artifact_dir_name = f"{request.artifact_kind.value}_{study8}_{trial8}"
@@ -293,14 +295,12 @@ def _discover_in_hpo_output(
     try:
         from evaluation.selection.local_selection_v2 import find_trial_checkpoint_by_hash
         
-        hpo_output_dir = build_output_path(
-            root_dir=root_dir,
-            config_dir=config_dir,
-            process_type="hpo",
-            model=backbone_name,
-            environment=environment,
-        )
+        # Build HPO output directory path manually (outputs/hpo/{environment}/{backbone_name})
+        hpo_output_dir = root_dir / "outputs" / "hpo" / environment / backbone_name
         
+        if request.study_key_hash is None or request.trial_key_hash is None:
+            return None
+
         found_path = find_trial_checkpoint_by_hash(
             hpo_backbone_dir=hpo_output_dir,
             study_key_hash=request.study_key_hash,

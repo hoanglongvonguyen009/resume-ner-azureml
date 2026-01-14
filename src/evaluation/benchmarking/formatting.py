@@ -27,10 +27,10 @@ lifecycle:
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 
-def format_results_table(results: Dict) -> str:
+def format_results_table(results: Dict[str, Any]) -> str:
     """
     Format benchmark results as a human-readable table.
 
@@ -97,13 +97,13 @@ def compare_models(
     lines = ["Model Comparison", "=" * 80]
     
     # Find common batch sizes
-    batch_sizes = set()
-    for results in all_results:
-        for key in results.keys():
+    batch_size_keys: Set[str] = set()
+    for result in all_results:
+        for key in result.keys():
             if key.startswith("batch_"):
-                batch_sizes.add(key)
+                batch_size_keys.add(key)
     
-    batch_sizes = sorted(batch_sizes, key=lambda x: int(x.replace("batch_", "")))
+    batch_sizes = sorted(batch_size_keys, key=lambda x: int(x.replace("batch_", "")))
     
     # Header
     header = f"{'Batch Size':<12}"

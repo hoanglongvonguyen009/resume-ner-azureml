@@ -136,7 +136,7 @@ def acquire_best_model_checkpoint(
         in_colab=in_colab,
     )
     
-    if not result.success:
+    if not result.success or result.path is None:
         # Generate helpful error message (similar to original)
         error_msg = (
             f"\n[ERROR] Could not acquire checkpoint for run {trial_run_id[:8]}...\n"
@@ -175,5 +175,6 @@ def acquire_best_model_checkpoint(
             print(f"⚠ Drive backup error: {e}")
             print(f"  Checkpoint is still available locally at: {result.path}")
     
-    return result.path
+    # At this point, result.path is non-None (guarded above)
+    return Path(result.path)
 

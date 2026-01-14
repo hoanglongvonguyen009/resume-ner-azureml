@@ -162,15 +162,15 @@ def select_best_configuration(
     objective_metric = hpo_config["objective"]["metric"]
     goal = hpo_config["objective"]["goal"]
 
-    best_trial = None
-    best_value = None
-    best_backbone = None
+    best_trial: Optional[Job] = None
+    best_value: Optional[float] = None
+    best_backbone: Optional[str] = None
 
     for backbone, sweep_job in hpo_completed_jobs.items():
         trial, value = get_best_trial_from_sweep(
             ml_client, sweep_job, objective_metric, goal
         )
-        if trial is None:
+        if trial is None or value is None:
             continue
 
         if best_value is None:

@@ -10,6 +10,8 @@ This module contains the core training logic including:
 - Training utilities (utils.py)
 """
 
+from typing import Any
+
 # Import non-torch dependencies first (can be imported eagerly)
 from .cv_utils import create_kfold_splits, load_fold_splits, get_fold_data
 
@@ -30,7 +32,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Lazy import for torch-dependent modules."""
     if name == "train_model":
         from .trainer import train_model

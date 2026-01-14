@@ -42,7 +42,7 @@ from training.hpo.core.study import extract_best_config_from_study
 
 logger = get_logger(__name__)
 
-def _import_optuna():
+def _import_optuna() -> Any:
     """Lazy import optuna - only import when actually needed for local execution."""
     try:
         import optuna
@@ -65,8 +65,8 @@ __all__ = [
 
 def select_best_configuration_across_studies(
     studies: Optional[Dict[str, Any]] = None,
-    hpo_config: Dict[str, Any] = None,
-    dataset_version: str = None,
+    hpo_config: Optional[Dict[str, Any]] = None,
+    dataset_version: Optional[str] = None,
     hpo_output_dir: Optional[Path] = None,
     accuracy_threshold: Optional[float] = None,
     use_relative_threshold: bool = True,
@@ -95,6 +95,10 @@ def select_best_configuration_across_studies(
     """
     # If no studies but hpo_output_dir provided, use disk-based selection
     if (studies is None or len(studies) == 0) and hpo_output_dir is not None:
+        if hpo_config is None:
+            raise ValueError("hpo_config is required for disk-based selection")
+        if dataset_version is None:
+            raise ValueError("dataset_version is required for disk-based selection")
         return select_best_from_disk(
             hpo_output_dir=hpo_output_dir,
             hpo_config=hpo_config,
@@ -105,6 +109,11 @@ def select_best_configuration_across_studies(
         )
 
     # Otherwise, use Optuna-based selection (enhanced with accuracy-speed tradeoff)
+    if hpo_config is None:
+        raise ValueError("hpo_config is required when studies are provided")
+    if dataset_version is None:
+        raise ValueError("dataset_version is required when studies are provided")
+    
     optuna = _import_optuna()
 
     objective_metric = hpo_config["objective"]["metric"]
@@ -114,14 +123,16 @@ def select_best_configuration_across_studies(
     selection_config = hpo_config.get("selection", {})
     if accuracy_threshold is None:
         accuracy_threshold = selection_config.get("accuracy_threshold")
-    if use_relative_threshold is None:
-        use_relative_threshold = selection_config.get(
-            "use_relative_threshold", True)
+    # use_relative_threshold has a default value (True), so only override if config specifies False
+    if selection_config.get("use_relative_threshold") is False:
+        use_relative_threshold = False
     if min_accuracy_gain is None:
         min_accuracy_gain = selection_config.get("min_accuracy_gain")
 
     # Collect all candidates with their metrics and speed scores
     candidates = []
+    if studies is None:
+        raise ValueError("studies cannot be None when using Optuna-based selection")
     for backbone, study in studies.items():
         if study.best_trial is None:
             continue
@@ -173,6 +184,8 @@ def select_best_configuration_across_studies(
         })
 
     if not candidates:
+        if studies is None:
+            raise ValueError("studies cannot be None")
         error_parts = [
             f"No valid trials found in any study.",
             f"Looking for metric '{objective_metric}' with goal '{goal}'.",
@@ -227,9 +240,9 @@ def select_best_from_disk(
     selection_config = hpo_config.get("selection", {})
     if accuracy_threshold is None:
         accuracy_threshold = selection_config.get("accuracy_threshold")
-    if use_relative_threshold is None:
-        use_relative_threshold = selection_config.get(
-            "use_relative_threshold", True)
+    # use_relative_threshold has a default value (True), so only override if config specifies False
+    if selection_config.get("use_relative_threshold") is False:
+        use_relative_threshold = False
     if min_accuracy_gain is None:
         min_accuracy_gain = selection_config.get("min_accuracy_gain")
 

@@ -71,11 +71,12 @@ def find_study_folder_by_config(
         try:
             with open(active_study_file, "r") as f:
                 active_info = json.load(f)
-            study_path = Path(active_info.get("path", ""))
+            study_path: Optional[Path] = Path(active_info.get("path", ""))
 
             # Sanity check: ensure path is inside backbone_dir (avoid stale pointers)
             try:
-                study_path.relative_to(backbone_dir)
+                if study_path is not None:
+                    study_path.relative_to(backbone_dir)
             except ValueError:
                 study_path = None
 
@@ -327,7 +328,7 @@ def write_active_study_marker(
     study_folder: Path,
     study_name: str,
     study_key_hash: Optional[str] = None
-):
+) -> None:
     """
     Write .active_study.json marker file for fast lookup.
 
