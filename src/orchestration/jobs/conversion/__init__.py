@@ -1,6 +1,6 @@
-"""Conversion job modules."""
-
 from __future__ import annotations
+
+"""Conversion job modules."""
 
 from deployment.conversion.orchestration import execute_conversion
 

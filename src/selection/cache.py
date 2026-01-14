@@ -1,6 +1,6 @@
-"""Cache management for best model selection with validation."""
-
 from __future__ import annotations
+
+"""Cache management for best model selection with validation."""
 
 import hashlib
 import json

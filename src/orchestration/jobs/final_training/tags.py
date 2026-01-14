@@ -1,6 +1,6 @@
-"""Lineage tag setting utilities for final training."""
-
 from __future__ import annotations
+
+"""Lineage tag setting utilities for final training."""
 
 from pathlib import Path
 from typing import Any, Dict, Optional

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: artifact_unified_discovery
@@ -30,8 +32,6 @@ lifecycle:
 This module provides discovery functions that check for artifact availability
 in different sources (local disk, Google Drive, MLflow) without downloading.
 """
-from __future__ import annotations
-
 import json
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional

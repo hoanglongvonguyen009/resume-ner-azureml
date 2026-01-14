@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: artifact_unified_validation
@@ -30,8 +32,6 @@ lifecycle:
 This module provides validation functions for different artifact kinds.
 Each artifact kind has its own validation requirements.
 """
-from __future__ import annotations
-
 from pathlib import Path
 from typing import List, Optional
 

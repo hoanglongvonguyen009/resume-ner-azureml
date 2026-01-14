@@ -1,6 +1,6 @@
-"""File utility functions for validation and verification."""
-
 from __future__ import annotations
+
+"""File utility functions for validation and verification."""
 
 from pathlib import Path
 
@@ -31,4 +31,20 @@ def verify_output_file(
             f"Please ensure the previous step completed successfully."
         )
     return file_path
+
+
+def get_file_mtime(file_path: Path) -> float:
+    """
+    Get modification time of a file, or 0.0 if file doesn't exist.
+    
+    Args:
+        file_path: Path to the file.
+    
+    Returns:
+        Modification time as float, or 0.0 if file doesn't exist or error occurs.
+    """
+    try:
+        return file_path.stat().st_mtime
+    except (OSError, FileNotFoundError):
+        return 0.0
 

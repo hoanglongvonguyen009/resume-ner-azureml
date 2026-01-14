@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 """Final training job modules - backward compatibility facade.
 
 This module re-exports from training_exec module for backward compatibility.
 """
-
-from __future__ import annotations
 
 import warnings
 

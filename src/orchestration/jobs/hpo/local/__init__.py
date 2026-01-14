@@ -1,6 +1,6 @@
-"""Local HPO execution modules."""
-
 from __future__ import annotations
+
+"""Local HPO execution modules."""
 
 # Re-export commonly used items for convenience
 from .trial.execution import TrialExecutor, run_training_trial

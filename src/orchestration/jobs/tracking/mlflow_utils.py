@@ -1,10 +1,10 @@
+from __future__ import annotations
+
 """Shared MLflow utility functions.
 
 This module re-exports utility functions for backward compatibility.
 New code should import directly from orchestration.jobs.tracking.utils.*
 """
-
-from __future__ import annotations
 
 # Re-export for backward compatibility
 from orchestration.jobs.tracking.utils.mlflow_utils import (

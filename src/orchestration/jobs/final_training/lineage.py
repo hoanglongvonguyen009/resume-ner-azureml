@@ -1,6 +1,6 @@
-"""Lineage extraction utilities for final training."""
-
 from __future__ import annotations
+
+"""Lineage extraction utilities for final training."""
 
 from typing import Any, Dict
 

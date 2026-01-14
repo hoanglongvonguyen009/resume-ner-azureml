@@ -1,10 +1,10 @@
+from __future__ import annotations
+
 """MLflow experiment discovery utilities.
 
 This module provides functions to discover HPO and benchmark experiments
 from MLflow, serving as a single source of truth for experiment discovery.
 """
-
-from __future__ import annotations
 
 from typing import Any, Dict, Optional
 

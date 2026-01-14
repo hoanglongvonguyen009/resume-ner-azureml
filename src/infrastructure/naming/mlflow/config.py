@@ -31,18 +31,12 @@ from typing import Any, Dict, Optional
 
 from common.shared.yaml_utils import load_yaml
 from common.shared.logging_utils import get_logger
+from common.shared.file_utils import get_file_mtime
 
 logger = get_logger(__name__)
 
 # Module-level cache for loaded config (with mtime check)
 _config_cache: Dict[tuple, tuple] = {}  # (config_dir, mtime) -> config
-
-def _get_config_mtime(config_path: Path) -> float:
-    """Get modification time of config file, or 0 if doesn't exist."""
-    try:
-        return config_path.stat().st_mtime
-    except (OSError, FileNotFoundError):
-        return 0.0
 
 def load_mlflow_config(config_dir: Optional[Path] = None) -> Dict[str, Any]:
     """
@@ -60,7 +54,7 @@ def load_mlflow_config(config_dir: Optional[Path] = None) -> Dict[str, Any]:
         config_dir = Path.cwd() / "config"
     
     config_path = config_dir / "mlflow.yaml"
-    mtime = _get_config_mtime(config_path)
+    mtime = get_file_mtime(config_path)
     cache_key = str(config_dir)
     
     # Check cache

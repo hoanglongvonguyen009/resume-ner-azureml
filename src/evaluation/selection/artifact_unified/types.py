@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 """Artifact types and request/result dataclasses for unified artifact acquisition.
 
 This module defines the core types used throughout the unified artifact acquisition system.
 """
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path

@@ -1,10 +1,10 @@
+from __future__ import annotations
+
 """MLflow configuration loader for systematic naming settings.
 
 This module re-exports configuration functions for backward compatibility.
 New code should import directly from orchestration.jobs.tracking.config.*
 """
-
-from __future__ import annotations
 
 # Re-export for backward compatibility
 # Config loader remains in orchestration/jobs/tracking/config/loader.py

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: run_decision
@@ -35,8 +37,6 @@ Used by:
 - Best Model Selection: Cache reuse
 - Benchmarking: Independent run.mode configuration
 """
-
-from __future__ import annotations
 
 from typing import Any, Dict, Literal, Optional
 

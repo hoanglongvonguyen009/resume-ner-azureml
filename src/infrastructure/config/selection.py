@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: selection_config
@@ -29,8 +31,6 @@ lifecycle:
 Provides utilities for extracting and validating selection configuration,
 including champion selection settings and objective direction (with migration support).
 """
-
-from __future__ import annotations
 
 import warnings
 from typing import Any, Dict

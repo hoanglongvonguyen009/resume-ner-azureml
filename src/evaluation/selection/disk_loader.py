@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: disk_loader
@@ -26,8 +28,6 @@ lifecycle:
 """
 
 """Load trial data from disk-based HPO outputs."""
-
-from __future__ import annotations
 
 import json
 from pathlib import Path

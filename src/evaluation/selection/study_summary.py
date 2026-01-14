@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: study_summary
@@ -31,8 +33,6 @@ lifecycle:
 This module provides functions to load Optuna studies, extract trial information,
 and format summaries for display in notebooks or logs.
 """
-
-from __future__ import annotations
 
 import json
 from pathlib import Path

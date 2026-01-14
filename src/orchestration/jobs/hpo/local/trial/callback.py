@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 """Trial callback utilities for HPO.
 
 Creates callbacks for displaying trial completion information.
 """
-
-from __future__ import annotations
 
 from typing import Any, Optional
 

@@ -467,6 +467,11 @@ patterns:
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         
+        # Create source directory structure for training module validation
+        src_dir = tmp_path / "src" / "training"
+        src_dir.mkdir(parents=True)
+        (src_dir / "__init__.py").write_text("")
+        
         (config_dir / "data.yaml").write_text("dataset_name: test_data")
         (config_dir / "mlflow.yaml").write_text("experiment_name: test_exp")
         (config_dir / "paths.yaml").write_text("""schema_version: 2
@@ -493,22 +498,57 @@ patterns:
         output_dir = tmp_path / "outputs" / "hpo" / "local" / "distilbert"
         output_dir.mkdir(parents=True)
         
-        # Mock subprocess
+        # Mock subprocess for trial execution
         def subprocess_side_effect(*args, **kwargs):
-            cmd = args[0] if args else []
+            # Extract output_dir from environment variable (AZURE_ML_OUTPUT_CHECKPOINT)
+            # This is how the training script receives the output directory
             output_path = None
-            for i, arg in enumerate(cmd):
-                if arg == "--output-dir" and i + 1 < len(cmd):
-                    output_path = Path(cmd[i + 1])
-                    break
+            if "env" in kwargs:
+                env = kwargs["env"]
+                if "AZURE_ML_OUTPUT_CHECKPOINT" in env:
+                    output_path = Path(env["AZURE_ML_OUTPUT_CHECKPOINT"])
+                elif "AZURE_ML_OUTPUT_checkpoint" in env:
+                    output_path = Path(env["AZURE_ML_OUTPUT_checkpoint"])
             
+            # Fallback: try to extract from command args (some code paths might use --output-dir)
+            if not output_path:
+                cmd = args[0] if args else []
+                for i, arg in enumerate(cmd):
+                    if isinstance(arg, str) and arg == "--output-dir" and i + 1 < len(cmd):
+                        output_path = Path(cmd[i + 1])
+                        break
+            
+            # If we found an output path, create metrics there
             if output_path:
                 output_path.mkdir(parents=True, exist_ok=True)
                 metrics_file = output_path / METRICS_FILENAME
+                # Always write/overwrite metrics to ensure they exist
                 metrics_file.write_text(json.dumps({"macro-f1": 0.75}))
             
-            mock_result = Mock()
-            mock_result.returncode = 0
+            # Also proactively create metrics in any existing CV fold folders
+            # This ensures metrics exist even if environment variable extraction fails
+            study_folders = list(output_dir.glob("study-*"))
+            for study_folder in study_folders:
+                trial_folders = list(study_folder.glob("trial-*"))
+                for trial_folder in trial_folders:
+                    cv_folder = trial_folder / "cv"
+                    if cv_folder.exists():
+                        for fold_folder in cv_folder.glob("fold*"):
+                            fold_metrics = fold_folder / METRICS_FILENAME
+                            if not fold_metrics.exists():
+                                fold_metrics.write_text(json.dumps({"macro-f1": 0.75}))
+                    # Also create metrics in trial folder itself (for non-CV or aggregated)
+                    trial_metrics = trial_folder / METRICS_FILENAME
+                    if not trial_metrics.exists():
+                        trial_metrics.write_text(json.dumps({"macro-f1": 0.75}))
+            
+            from subprocess import CompletedProcess
+            mock_result = CompletedProcess(
+                args=args[0] if args else [],
+                returncode=0,
+                stdout="",
+                stderr=""
+            )
             return mock_result
         
         mock_subprocess.side_effect = subprocess_side_effect

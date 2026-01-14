@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: queries
@@ -30,8 +32,6 @@ lifecycle:
 Extracts common MLflow query patterns from mlflow_selection.py for reuse
 across the codebase (DRY principle).
 """
-
-from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 

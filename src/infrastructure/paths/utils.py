@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: paths_utils
@@ -22,8 +24,6 @@ lifecycle:
 """
 
 """Path utility functions."""
-
-from __future__ import annotations
 
 from pathlib import Path
 

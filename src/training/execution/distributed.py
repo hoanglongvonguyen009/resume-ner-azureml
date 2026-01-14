@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: distributed
@@ -35,8 +37,6 @@ factory to resolve a context from YAML-driven distributed config plus
 hardware detection. DDP-specific wiring can be added here later without
 touching business logic.
 """
-
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Optional, Tuple

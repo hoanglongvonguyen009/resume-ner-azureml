@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: study
@@ -29,8 +31,6 @@ lifecycle:
 
 Handles study creation, resume, state management, and configuration extraction.
 """
-
-from __future__ import annotations
 
 import os
 from pathlib import Path

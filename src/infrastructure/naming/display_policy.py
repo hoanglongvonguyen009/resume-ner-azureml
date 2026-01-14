@@ -37,18 +37,12 @@ from core.tokens import is_token_allowed, is_token_known
 from .context import NamingContext
 from .context_tokens import build_token_values
 from common.shared.yaml_utils import load_yaml
+from common.shared.file_utils import get_file_mtime
 
 logger = logging.getLogger(__name__)
 
 # Cache for loaded policy: (config_dir, mtime) -> policy
 _policy_cache: Dict[tuple, tuple] = {}  # (key, mtime) -> policy
-
-def _get_policy_mtime(policy_path: Path) -> float:
-    """Get modification time of policy file, or 0 if doesn't exist."""
-    try:
-        return policy_path.stat().st_mtime
-    except (OSError, FileNotFoundError):
-        return 0.0
 
 def load_naming_policy(
     config_dir: Optional[Path] = None,
@@ -68,7 +62,7 @@ def load_naming_policy(
         config_dir = Path.cwd() / "config"
 
     policy_path = config_dir / "naming.yaml"
-    mtime = _get_policy_mtime(policy_path)
+    mtime = get_file_mtime(policy_path)
     
     # Create cache key
     cache_key = str(config_dir)

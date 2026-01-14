@@ -1,10 +1,10 @@
+from __future__ import annotations
+
 """Configuration selection utilities.
 
 This module provides functionality for selecting the best configuration from HPO results,
 supporting both local (Optuna) and Azure ML selection methods.
 """
-
-from __future__ import annotations
 
 from .disk_loader import load_benchmark_speed_score, load_best_trial_from_disk
 from .local_selection import (

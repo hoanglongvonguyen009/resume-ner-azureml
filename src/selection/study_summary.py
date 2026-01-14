@@ -1,10 +1,10 @@
+from __future__ import annotations
+
 """Utilities for displaying and summarizing HPO study results.
 
 This module provides functions to load Optuna studies, extract trial information,
 and format summaries for display in notebooks or logs.
 """
-
-from __future__ import annotations
 
 import json
 from pathlib import Path

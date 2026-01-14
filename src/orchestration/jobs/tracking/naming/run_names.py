@@ -1,6 +1,6 @@
-"""Human-readable run name generation."""
-
 from __future__ import annotations
+
+"""Human-readable run name generation."""
 
 from datetime import datetime
 import logging

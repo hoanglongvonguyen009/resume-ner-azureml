@@ -1,6 +1,6 @@
-"""Run name version reservation and commit."""
-
 from __future__ import annotations
+
+"""Run name version reservation and commit."""
 
 import sys
 from datetime import datetime

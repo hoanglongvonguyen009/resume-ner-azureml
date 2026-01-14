@@ -1,6 +1,6 @@
-"""Run key building and hashing utilities."""
-
 from __future__ import annotations
+
+"""Run key building and hashing utilities."""
 
 import hashlib
 

@@ -1,6 +1,6 @@
-"""Refit training for local HPO."""
-
 from __future__ import annotations
+
+"""Refit training for local HPO."""
 
 from .executor import run_refit_training
 

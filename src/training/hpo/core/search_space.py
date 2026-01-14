@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: search_space
@@ -28,8 +30,6 @@ lifecycle:
 
 Provides unified translation between HPO config format and both Optuna and Azure ML formats.
 """
-
-from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 

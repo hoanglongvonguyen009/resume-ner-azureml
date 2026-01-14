@@ -1,10 +1,10 @@
+from __future__ import annotations
+
 """MLflow naming utilities: run keys, hashing, tag building, and sanitization.
 
 This module re-exports all naming functions for backward compatibility.
 New code should import directly from orchestration.jobs.tracking.naming.*
 """
-
-from __future__ import annotations
 
 # Re-export all naming functions for backward compatibility
 from infrastructure.naming.mlflow.run_keys import (

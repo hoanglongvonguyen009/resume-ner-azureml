@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 """Interrupted run cleanup utilities for HPO.
 
 Handles tagging of interrupted runs from previous sessions.
 """
-
-from __future__ import annotations
 
 import os
 import re

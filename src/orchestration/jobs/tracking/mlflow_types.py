@@ -1,6 +1,6 @@
-"""Structured types for MLflow run information and lookup reports."""
-
 from __future__ import annotations
+
+"""Structured types for MLflow run information and lookup reports."""
 
 from dataclasses import dataclass
 from typing import List, Optional

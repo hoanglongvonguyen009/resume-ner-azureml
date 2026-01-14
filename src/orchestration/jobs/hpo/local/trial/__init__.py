@@ -1,6 +1,6 @@
-"""Trial execution and management for local HPO."""
-
 from __future__ import annotations
+
+"""Trial execution and management for local HPO."""
 
 # Import execution first (it uses lazy import for metrics internally)
 from .execution import TrialExecutor, run_training_trial

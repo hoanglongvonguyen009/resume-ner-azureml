@@ -33,6 +33,7 @@ from typing import Any, Dict, Optional
 
 from common.shared.yaml_utils import load_yaml
 from common.shared.logging_utils import get_logger
+from common.shared.dict_utils import deep_merge
 
 logger = get_logger(__name__)
 
@@ -171,25 +172,6 @@ def _get_default_tag_keys() -> Dict[str, Any]:
         },
     }
 
-def _deep_merge(defaults: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Deep merge two dictionaries, with overrides taking precedence.
-    
-    Args:
-        defaults: Default dictionary
-        overrides: Override dictionary (takes precedence)
-        
-    Returns:
-        Merged dictionary
-    """
-    result = defaults.copy()
-    for key, value in overrides.items():
-        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-            result[key] = _deep_merge(result[key], value)
-        else:
-            result[key] = value
-    return result
-
 def load_tags_registry(config_dir: Optional[Path] = None) -> TagsRegistry:
     """
     Load tags registry from config/tags.yaml with caching and fallback to defaults.
@@ -235,7 +217,7 @@ def load_tags_registry(config_dir: Optional[Path] = None) -> TagsRegistry:
         )
 
     # Merge loaded data with defaults (loaded data takes precedence)
-    merged_data = _deep_merge(defaults, loaded_data)
+    merged_data = deep_merge(defaults, loaded_data)
 
     # Ensure schema_version exists
     if "schema_version" not in merged_data:

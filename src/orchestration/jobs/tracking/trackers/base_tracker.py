@@ -1,6 +1,6 @@
-"""Base tracker class with common functionality."""
-
 from __future__ import annotations
+
+"""Base tracker class with common functionality."""
 
 import mlflow
 from common.shared.logging_utils import get_logger

@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 """Checkpoint cleanup utilities for HPO trials.
 
 Manages checkpoint lifecycle: tracking, best trial detection, and cleanup.
 """
-
-from __future__ import annotations
 
 import shutil
 from pathlib import Path

@@ -1,6 +1,6 @@
-"""Load trial data from disk-based HPO outputs."""
-
 from __future__ import annotations
+
+"""Load trial data from disk-based HPO outputs."""
 
 import json
 from pathlib import Path

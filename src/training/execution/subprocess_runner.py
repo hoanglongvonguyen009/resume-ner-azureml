@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: subprocess_runner
@@ -32,8 +34,6 @@ This module provides unified functions for building training commands,
 setting up execution environments, and running training subprocesses.
 Used by HPO trials, refit training, and final training execution.
 """
-
-from __future__ import annotations
 
 import os
 import subprocess

@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 """Trial metrics utilities for local HPO.
 
 This module provides backward compatibility by re-exporting from the new location.
 """
-
-from __future__ import annotations
 
 # Use lazy imports to avoid circular import issues
 # Import the module first, then assign attributes

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: artifact_unified_selectors
@@ -31,8 +33,6 @@ lifecycle:
 This module provides the single source of truth for trial→refit run mapping.
 All artifact acquisition should use this module to determine which run to use.
 """
-from __future__ import annotations
-
 from typing import Any, Dict, Optional
 
 from mlflow.tracking import MlflowClient

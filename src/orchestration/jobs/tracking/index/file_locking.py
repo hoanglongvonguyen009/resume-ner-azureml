@@ -1,6 +1,6 @@
-"""Cross-platform file locking utilities."""
-
 from __future__ import annotations
+
+"""Cross-platform file locking utilities."""
 
 import os
 import time

@@ -1,6 +1,6 @@
-"""MLflow tracker for sweep stage."""
-
 from __future__ import annotations
+
+"""MLflow tracker for sweep stage."""
 
 from contextlib import contextmanager
 from pathlib import Path

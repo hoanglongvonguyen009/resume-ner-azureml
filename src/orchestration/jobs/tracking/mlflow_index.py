@@ -1,10 +1,10 @@
+from __future__ import annotations
+
 """Local MLflow index cache for fast, backend-independent run retrieval.
 
 This module re-exports all index functions for backward compatibility.
 New code should import directly from orchestration.jobs.tracking.index.*
 """
-
-from __future__ import annotations
 
 # Re-export all index functions for backward compatibility
 from orchestration.jobs.tracking.index.run_index import (

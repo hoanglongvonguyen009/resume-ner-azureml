@@ -1,10 +1,10 @@
+from __future__ import annotations
+
 """MLflow utility functions for helpers and general utilities.
 
 This module re-exports utility functions for backward compatibility.
 New code should import directly from infrastructure.tracking.mlflow.*
 """
-
-from __future__ import annotations
 
 # Re-export all utility functions from new consolidated location
 # Lazy import to avoid pytest collection issues

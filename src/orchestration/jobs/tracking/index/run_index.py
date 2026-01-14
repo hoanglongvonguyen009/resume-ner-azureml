@@ -1,6 +1,6 @@
-"""Run ID index management (run_key_hash → run_id mapping)."""
-
 from __future__ import annotations
+
+"""Run ID index management (run_key_hash → run_id mapping)."""
 
 import sys
 from datetime import datetime

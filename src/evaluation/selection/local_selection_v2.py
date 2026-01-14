@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: local_selection_v2
@@ -42,8 +44,6 @@ when hpo_config is provided, maintaining backward compatibility while providing 
 improved behavior. This module can be used directly for new code that needs the
 improved functionality.
 """
-
-from __future__ import annotations
 
 import json
 import re

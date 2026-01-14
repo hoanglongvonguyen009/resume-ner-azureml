@@ -1,6 +1,6 @@
-"""Cross-validation for local HPO."""
-
 from __future__ import annotations
+
+"""Cross-validation for local HPO."""
 
 from .orchestrator import run_training_trial_with_cv
 

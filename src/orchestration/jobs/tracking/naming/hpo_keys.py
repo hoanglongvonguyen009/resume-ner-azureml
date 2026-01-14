@@ -1,6 +1,6 @@
-"""HPO-specific key building (study, trial, family)."""
-
 from __future__ import annotations
+
+"""HPO-specific key building (study, trial, family)."""
 
 import hashlib
 import json

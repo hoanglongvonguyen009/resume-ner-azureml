@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Hyperparameter Optimization (HPO) utilities.
 
 DEPRECATED: This module is maintained for backward compatibility only.
@@ -10,8 +12,6 @@ Example:
     # New (preferred):
     from hpo import run_local_hpo_sweep
 """
-
-from __future__ import annotations
 
 import warnings
 

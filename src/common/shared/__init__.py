@@ -1,6 +1,7 @@
 """Shared utilities used across orchestration and training runtime."""
 
-from .file_utils import verify_output_file
+from .file_utils import verify_output_file, get_file_mtime
+from .dict_utils import deep_merge
 from .logging_utils import get_logger, get_script_logger
 from .argument_parsing import (
     add_config_dir_argument,
@@ -25,6 +26,8 @@ from .mlflow_setup import (
 
 __all__ = [
     "verify_output_file",
+    "get_file_mtime",
+    "deep_merge",
     "get_logger",
     "get_script_logger",
     "add_config_dir_argument",

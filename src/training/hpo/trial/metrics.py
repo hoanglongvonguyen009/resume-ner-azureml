@@ -1,6 +1,6 @@
-"""Trial metrics reading and storage utilities."""
-
 from __future__ import annotations
+
+"""Trial metrics reading and storage utilities."""
 
 import json
 from pathlib import Path

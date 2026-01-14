@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: optuna_integration
@@ -24,8 +26,6 @@ lifecycle:
 """
 
 """Optuna integration utilities for local HPO."""
-
-from __future__ import annotations
 
 import logging
 from typing import Any, Callable, Dict, Optional, Tuple

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: setup
@@ -28,8 +30,6 @@ lifecycle:
 
 This module provides functions for setting up MLflow tracking for different stages.
 """
-
-from __future__ import annotations
 
 from typing import Optional
 

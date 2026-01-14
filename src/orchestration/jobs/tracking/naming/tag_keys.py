@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Centralized tag key definitions and helpers.
 
 This module provides a single source of truth for all tag key mappings,
@@ -7,13 +9,11 @@ All tag key values come from config/tags.yaml via TagsRegistry.
 This module only defines the structure (section, name) mappings.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Optional, Tuple
 
 from orchestration.jobs.tracking.naming.tags import get_tag_key
-from orchestration.jobs.tracking.naming.tags_registry import (
+from infrastructure.naming.mlflow.tags_registry import (
     TagKeyError,
     load_tags_registry,
 )

@@ -1,6 +1,6 @@
-"""MLflow-based best model selection from benchmark and training runs."""
-
 from __future__ import annotations
+
+"""MLflow-based best model selection from benchmark and training runs."""
 
 from typing import Any, Dict, Optional, Tuple, Union
 

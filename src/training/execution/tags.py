@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: tags
@@ -26,8 +28,6 @@ lifecycle:
 """
 
 """Lineage tag setting utilities for final training."""
-
-from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, Optional

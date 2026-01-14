@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: lineage
@@ -23,8 +25,6 @@ lifecycle:
 """
 
 """Lineage extraction utilities for final training."""
-
-from __future__ import annotations
 
 from typing import Any, Dict
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Improved best configuration selection from local Optuna HPO studies.
 
 This module provides config-aware study folder discovery and CV-based trial selection.
@@ -13,8 +15,6 @@ when hpo_config is provided, maintaining backward compatibility while providing 
 improved behavior. This module can be used directly for new code that needs the
 improved functionality.
 """
-
-from __future__ import annotations
 
 import json
 import re

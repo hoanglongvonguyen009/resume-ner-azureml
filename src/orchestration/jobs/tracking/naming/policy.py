@@ -1,6 +1,6 @@
-"""Naming policy loader and formatter for run names."""
-
 from __future__ import annotations
+
+"""Naming policy loader and formatter for run names."""
 
 import logging
 import re

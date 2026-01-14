@@ -34,19 +34,12 @@ from typing import Any, Dict, Optional
 from core.placeholders import extract_placeholders
 from core.tokens import is_token_allowed, is_token_known
 from common.shared.yaml_utils import load_yaml
+from common.shared.file_utils import get_file_mtime
 
 logger = logging.getLogger(__name__)
 
 # Cache for loaded configs: (config_dir, storage_env, mtime) -> config
 _config_cache: Dict[tuple, tuple] = {}  # (key, mtime) -> config
-
-
-def _get_config_mtime(config_path: Path) -> float:
-    """Get modification time of config file, or 0 if doesn't exist."""
-    try:
-        return config_path.stat().st_mtime
-    except (OSError, FileNotFoundError):
-        return 0.0
 
 
 def load_paths_config(config_dir: Path, storage_env: Optional[str] = None) -> Dict[str, Any]:
@@ -63,7 +56,7 @@ def load_paths_config(config_dir: Path, storage_env: Optional[str] = None) -> Di
         Dictionary containing paths configuration, or defaults if file doesn't exist.
     """
     paths_config_path = config_dir / "paths.yaml"
-    mtime = _get_config_mtime(paths_config_path)
+    mtime = get_file_mtime(paths_config_path)
     
     # Create cache key
     cache_key = (str(config_dir), storage_env or "")

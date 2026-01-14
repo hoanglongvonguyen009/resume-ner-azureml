@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Model conversion module for converting models to ONNX format.
 
 This module provides:
@@ -8,8 +10,6 @@ This module provides:
 - Azure ML job creation utilities
 - CLI argument parsing
 """
-
-from __future__ import annotations
 
 from .orchestration import execute_conversion
 

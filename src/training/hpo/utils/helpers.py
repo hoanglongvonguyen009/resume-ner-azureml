@@ -1,6 +1,6 @@
-"""Helper functions for HPO sweep orchestration."""
-
 from __future__ import annotations
+
+"""Helper functions for HPO sweep orchestration."""
 
 from datetime import datetime
 from pathlib import Path

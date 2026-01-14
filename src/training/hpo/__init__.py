@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 """Hyperparameter Optimization (HPO) module.
 
 This module provides HPO functionality for both local (Optuna) and Azure ML execution.
 """
-
-from __future__ import annotations
 
 # Core exports
 from .core import (

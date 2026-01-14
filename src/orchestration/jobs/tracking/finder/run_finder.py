@@ -1,6 +1,6 @@
-"""MLflow run finder with priority-based retrieval and strict mode."""
-
 from __future__ import annotations
+
+"""MLflow run finder with priority-based retrieval and strict mode."""
 
 from pathlib import Path
 from typing import Optional

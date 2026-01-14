@@ -1,6 +1,6 @@
-"""Refit protocol fingerprint computation."""
-
 from __future__ import annotations
+
+"""Refit protocol fingerprint computation."""
 
 import json
 from typing import Any, Dict, Optional

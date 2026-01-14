@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: cache
@@ -27,8 +29,6 @@ lifecycle:
 """
 
 """Cache management for best model selection with validation."""
-
-from __future__ import annotations
 
 import hashlib
 import json

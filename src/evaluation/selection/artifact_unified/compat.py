@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: artifact_unified_compat
@@ -29,8 +31,6 @@ lifecycle:
 This module provides compatibility functions that wrap the unified acquisition system
 to maintain backward compatibility with existing code.
 """
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 

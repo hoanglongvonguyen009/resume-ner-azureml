@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: hash_utils
@@ -36,8 +38,6 @@ Priority order:
 2. Compute from configs (when tags don't exist)
 3. Fallback (warn and continue if both fail)
 """
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any, Dict, Optional
 

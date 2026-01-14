@@ -13,3 +13,10 @@ alwaysApply: true
 - When refactoring internals, keep workflow function signatures and behavior stable so most tests stay valid.
 - Before deleting or rewriting a test, check if it can be adapted to the new contract instead.
 - For every change or new module, run the **relevant existing tests** (at least those covering the touched area, plus a fast smoke suite when reasonable). If tests fail, either fix the regression or clearly document in the PR why the failure is acceptable temporarily and how it will be addressed.
+
+## Refactoring and consolidation
+
+- **When modules are consolidated** (e.g., duplicate implementations merged): Update test imports to use the consolidated module, but keep tests focused on the public API. Tests should verify behavior, not implementation details.
+- **When utilities are extracted** (e.g., `get_file_mtime()`, `deep_merge()` moved to `common/shared`): Test the modules that use these utilities through their public APIs, not the utilities directly (unless they're part of a public API). Internal refactoring should not require new tests for extracted helpers.
+- **When code is refactored to use shared utilities**: Existing tests should continue to pass if they test public APIs. If tests break due to import path changes, update imports rather than rewriting tests.
+- **When internal helpers are moved**: Tests should remain valid if they test public contracts. Only update tests if the public API changes, not when internal implementation details change.

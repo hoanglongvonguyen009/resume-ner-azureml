@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: mlflow_setup
@@ -30,8 +32,6 @@ lifecycle:
 This module provides functions for creating MLflow runs and setting up
 MLflow tracking for training subprocesses.
 """
-
-from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, Optional

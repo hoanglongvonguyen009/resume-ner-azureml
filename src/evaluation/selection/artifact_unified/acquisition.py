@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: artifact_unified_acquisition
@@ -31,8 +33,6 @@ lifecycle:
 This module provides the unified API for artifact acquisition across all stages.
 It orchestrates discovery, validation, and download from multiple sources.
 """
-from __future__ import annotations
-
 import shutil
 import tarfile
 from pathlib import Path

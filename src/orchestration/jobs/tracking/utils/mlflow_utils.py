@@ -1,10 +1,10 @@
+from __future__ import annotations
+
 """Shared MLflow utility functions.
 
 This module re-exports MLflow utilities from tracking.mlflow for backward compatibility.
 The functions have been moved to tracking.mlflow as part of the MLflow utilities consolidation.
 """
-
-from __future__ import annotations
 
 # Re-export get_mlflow_run_url from infrastructure.tracking.mlflow.urls for backward compatibility
 # The function has been moved to tracking.mlflow.urls as part of the MLflow utilities consolidation.

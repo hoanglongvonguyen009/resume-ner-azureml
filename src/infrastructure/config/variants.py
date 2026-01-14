@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: variants
@@ -34,8 +36,6 @@ Generalizes existing variant logic from training.py to support:
 
 This module follows DRY principles by reusing existing code patterns.
 """
-
-from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional

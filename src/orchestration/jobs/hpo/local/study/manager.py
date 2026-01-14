@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 """Optuna study management utilities for HPO.
 
 Handles study creation, resume, and state management.
 """
-
-from __future__ import annotations
 
 import os
 from pathlib import Path

@@ -1,6 +1,6 @@
-"""Optuna integration utilities for local HPO."""
-
 from __future__ import annotations
+
+"""Optuna integration utilities for local HPO."""
 
 import logging
 from typing import Any, Callable, Dict, Optional, Tuple

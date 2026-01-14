@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: checkpoint_cleanup
@@ -28,8 +30,6 @@ lifecycle:
 
 Manages checkpoint lifecycle: tracking, best trial detection, and cleanup.
 """
-
-from __future__ import annotations
 
 import shutil
 from pathlib import Path

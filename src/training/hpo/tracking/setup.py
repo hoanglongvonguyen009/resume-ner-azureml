@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 """MLflow run setup utilities for HPO.
 
 Handles MLflow run name creation, context setup, and version commit.
 """
-
-from __future__ import annotations
 
 import os
 import re

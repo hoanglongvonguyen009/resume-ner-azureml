@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 @meta
 name: mlflow_selection
@@ -27,8 +29,6 @@ lifecycle:
 """
 
 """MLflow-based best model selection from benchmark and training runs."""
-
-from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple, Union
 

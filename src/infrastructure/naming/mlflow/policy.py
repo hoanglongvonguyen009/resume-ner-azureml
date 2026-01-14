@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 """Naming policy loader and formatter for run names.
 
 This module provides backward compatibility by re-exporting from the old location.
 """
-
-from __future__ import annotations
 
 # Import the entire module first to avoid circular import issues
 import orchestration.jobs.tracking.naming.policy as _policy_module

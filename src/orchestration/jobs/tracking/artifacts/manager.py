@@ -1,6 +1,6 @@
-"""Artifact upload and checkpoint archive management."""
-
 from __future__ import annotations
+
+"""Artifact upload and checkpoint archive management."""
 
 import os
 import tarfile
