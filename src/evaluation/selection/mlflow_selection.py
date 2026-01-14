@@ -90,6 +90,13 @@ def find_best_model_from_mlflow(
     logger.info(f"  Objective metric: {objective_metric}")
     logger.info(
         f"  Composite weights: F1={f1_weight:.2f}, Latency={latency_weight:.2f}")
+    
+    # Log latency aggregation strategy from config
+    latency_aggregation = selection_config.get("benchmark", {}).get("latency_aggregation", "latest")
+    config_source = "config file" if "latency_aggregation" in selection_config.get("benchmark", {}) else "default"
+    logger.info(
+        f"  Latency aggregation: {latency_aggregation} (from {config_source}, "
+        f"applied when multiple benchmark runs exist with same benchmark_key)")
 
     # Step 1: Query benchmark runs
     logger.info("Querying benchmark runs...")
@@ -186,18 +193,90 @@ def find_best_model_from_mlflow(
         logger.warning("No trial runs found in HPO experiments")
         return None
 
-    # Step 3: Join benchmark runs with trial runs (for metrics) and refit runs (for artifacts)
-    logger.info("Joining benchmark runs with trial runs and refit runs...")
-    candidates = []
+    # Step 2.5: Group benchmark runs by (study_key_hash, trial_key_hash, benchmark_key)
+    # This deduplicates multiple benchmark runs with same config
+    from collections import defaultdict
 
+    benchmark_groups = defaultdict(list)
     for benchmark_run in valid_benchmark_runs:
         study_hash = benchmark_run.data.tags[study_key_tag]
         trial_hash = benchmark_run.data.tags[trial_key_tag]
+        
+        # Get benchmark_key from tag (primary) or construct fallback
+        benchmark_key = benchmark_run.data.tags.get("benchmark_key")
+        if not benchmark_key:
+            # Fallback: use trial_key_hash as key (backward compatibility)
+            # This groups all runs without benchmark_key tag together
+            benchmark_key = f"legacy_{trial_hash}"
+            logger.debug(
+                f"Benchmark run {benchmark_run.info.run_id[:12]}... missing benchmark_key tag, "
+                f"using fallback key"
+            )
+        
+        key = (study_hash, trial_hash, benchmark_key)
+        benchmark_groups[key].append(benchmark_run)
 
-        # Get latency from benchmark run
-        latency_ms = benchmark_run.data.metrics.get("latency_batch_1_ms")
-        if latency_ms is None:
+    logger.info(
+        f"Grouped {len(valid_benchmark_runs)} benchmark runs into {len(benchmark_groups)} unique groups "
+        f"(by study_key_hash, trial_key_hash, benchmark_key)"
+    )
+
+    # Step 3: Join benchmark groups with trial runs and refit runs
+    candidates = []
+
+    # Get latency aggregation strategy from config
+    latency_aggregation = selection_config.get("benchmark", {}).get("latency_aggregation", "latest")
+    # Options: "latest" (use most recent), "median" (use median latency), "mean" (use mean latency)
+
+    for (study_hash, trial_hash, benchmark_key), benchmark_runs in benchmark_groups.items():
+        # Aggregate latency across multiple runs with same benchmark_key
+        latencies = [
+            r.data.metrics.get("latency_batch_1_ms")
+            for r in benchmark_runs
+            if r.data.metrics.get("latency_batch_1_ms") is not None
+        ]
+        
+        if not latencies:
+            logger.warning(
+                f"No valid latency found for group (study={study_hash[:8]}..., "
+                f"trial={trial_hash[:8]}..., benchmark_key={benchmark_key[:16]}...)"
+            )
             continue
+        
+        # Select representative benchmark run based on aggregation strategy
+        if latency_aggregation == "median":
+            import statistics
+            target_latency = statistics.median(latencies)
+            # Use run with latency closest to median
+            representative_run = min(
+                benchmark_runs,
+                key=lambda r: abs(r.data.metrics.get("latency_batch_1_ms", float('inf')) - target_latency)
+            )
+            aggregated_latency = target_latency
+        elif latency_aggregation == "mean":
+            aggregated_latency = sum(latencies) / len(latencies)
+            # Use run with latency closest to mean
+            representative_run = min(
+                benchmark_runs,
+                key=lambda r: abs(r.data.metrics.get("latency_batch_1_ms", float('inf')) - aggregated_latency)
+            )
+        else:  # "latest" (default)
+            # Use most recent run
+            representative_run = max(
+                benchmark_runs,
+                key=lambda r: r.info.start_time if r.info.start_time else 0
+            )
+            aggregated_latency = representative_run.data.metrics.get("latency_batch_1_ms")
+        
+        if len(benchmark_runs) > 1:
+            logger.debug(
+                f"Aggregated {len(benchmark_runs)} benchmark runs for group "
+                f"(study={study_hash[:8]}..., trial={trial_hash[:8]}...): "
+                f"latencies={[f'{l:.1f}ms' for l in latencies]}, "
+                f"aggregated={aggregated_latency:.1f}ms (strategy={latency_aggregation})"
+            )
+        
+        benchmark_run = representative_run
 
         # Look up matching trial run (for metrics - has macro-f1)
         key = (study_hash, trial_hash)
@@ -228,10 +307,12 @@ def find_best_model_from_mlflow(
             "artifact_run": artifact_run,
             "refit_run": refit_run,
             "f1_score": float(f1_score),
-            "latency_ms": float(latency_ms),
+            "latency_ms": float(aggregated_latency),  # Use aggregated latency
             "backbone": backbone,
             "study_key_hash": study_hash,
             "trial_key_hash": trial_hash,
+            "benchmark_key": benchmark_key,  # Include for debugging
+            "benchmark_runs_count": len(benchmark_runs),  # Include for debugging
         })
 
     logger.info(

@@ -327,22 +327,20 @@ def test_full_workflow_e2e(
         return mock_result
     
     with patch('benchmarking.utils.subprocess.run', side_effect=benchmark_subprocess_side_effect):
-        from evaluation.benchmarking import benchmark_best_trials
+        from evaluation.benchmarking.orchestrator import benchmark_champions
         
-        best_trials = {
+        # Create champions dict matching new architecture
+        champions = {
             "distilbert": {
-                "trial_dir": str(trial_dir),
-                "study_name": study_dir.name,
-                "trial_name": trial_dir.name,
-                "accuracy": 0.75,
-                "hyperparameters": {
-                    "learning_rate": 4.71e-05,
-                    "batch_size": 4,
-                    "dropout": 0.109404,
-                    "weight_decay": 0.001721,
+                "champion": {
+                    "run_id": "trial-run-123",
+                    "trial_key_hash": trial_meta["trial_key_hash"],
+                    "study_key_hash": trial_meta["study_key_hash"],
+                    "metric": 0.75,
+                    "checkpoint_path": str(trial_dir / "refit" / "checkpoint"),
                 },
-                "study_key_hash": trial_meta["study_key_hash"],
-                "trial_key_hash": trial_meta["trial_key_hash"],
+                "all_groups": {},
+                "selection_metadata": {},
             }
         }
         
@@ -358,8 +356,8 @@ def test_full_workflow_e2e(
         from tracking.mlflow.trackers.benchmark_tracker import MLflowBenchmarkTracker
         benchmark_tracker = MLflowBenchmarkTracker(f"{EXPERIMENT_NAME}-benchmark")
         
-        benchmark_results = benchmark_best_trials(
-            best_trials=best_trials,
+        benchmark_results = benchmark_champions(
+            champions=champions,
             test_data_path=test_data_path,
             root_dir=ROOT_DIR,
             environment=environment,
@@ -458,7 +456,7 @@ def test_full_workflow_e2e(
     
     # Mock find_best_model_from_mlflow
     monkeypatch.setattr(
-        "orchestration.jobs.selection.mlflow_selection.find_best_model_from_mlflow",
+        "evaluation.selection.mlflow_selection.find_best_model_from_mlflow",
         lambda *args, **kwargs: fake_best_model,
     )
     
@@ -469,7 +467,6 @@ def test_full_workflow_e2e(
         hpo_experiments=hpo_experiments,
         tags_config=tags_config,
         selection_config=selection_config,
-        use_python_filtering=True,
     )
     assert best_model is fake_best_model
     
@@ -480,7 +477,7 @@ def test_full_workflow_e2e(
     (fake_checkpoint_dir / "config.json").write_text("{}")
     
     monkeypatch.setattr(
-        "orchestration.jobs.selection.artifact_acquisition.acquire_best_model_checkpoint",
+        "evaluation.selection.artifact_acquisition.acquire_best_model_checkpoint",
         lambda *args, **kwargs: fake_checkpoint_dir,
     )
     

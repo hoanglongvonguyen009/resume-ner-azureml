@@ -57,6 +57,7 @@ def run_benchmarking(
     hpo_refit_run_id: Optional[str] = None,
     hpo_sweep_run_id: Optional[str] = None,
     benchmark_config_hash: Optional[str] = None,
+    benchmark_key: Optional[str] = None,
 ) -> bool:
     """
     Run benchmarking on a model checkpoint.
@@ -82,6 +83,7 @@ def run_benchmarking(
         hpo_refit_run_id: Optional HPO refit run ID (refit run, artifact parent).
         hpo_sweep_run_id: Optional HPO sweep run ID (HPO parent, optional).
         benchmark_config_hash: Optional benchmark configuration hash for run naming.
+        benchmark_key: Optional stable benchmark key (includes config hash) for idempotency.
 
     Returns:
         True if successful, False otherwise.
@@ -259,6 +261,7 @@ def run_benchmarking(
                 hpo_trial_run_id=hpo_trial_run_id,
                 hpo_refit_run_id=hpo_refit_run_id,
                 hpo_sweep_run_id=hpo_sweep_run_id,
+                benchmark_key=benchmark_key,
             ):
                 tracker.log_benchmark_results(
                     batch_sizes=batch_sizes,

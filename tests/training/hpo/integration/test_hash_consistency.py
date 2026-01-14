@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from unittest.mock import Mock, patch, MagicMock
 
-from infrastructure.tracking.mlflow.naming import (
+from infrastructure.naming.mlflow.hpo_keys import (
     build_hpo_study_key_v2,
     build_hpo_study_key_hash,
     build_hpo_trial_key,
@@ -328,7 +328,7 @@ class TestParentTrialHashMismatch:
         parent_study_key_hash_v2 = build_hpo_study_key_hash(study_key_v2)
 
         # Trial run computes v1 hash (old behavior)
-        from infrastructure.tracking.mlflow.naming import (
+        from infrastructure.naming.mlflow.hpo_keys import (
             build_hpo_study_key,
         )
         study_key_v1 = build_hpo_study_key(

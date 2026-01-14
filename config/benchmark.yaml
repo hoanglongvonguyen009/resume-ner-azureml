@@ -5,6 +5,11 @@ run:
   # Run mode determines overall behavior:
   # - reuse_if_exists: Reuse existing benchmark results if found (default)
   # - force_new: Always create new benchmark run (ignores existing)
+  # 
+  # Idempotency check:
+  # - Uses benchmark_key (includes champion_run_id, data_fp, eval_fp, benchmark_config_hash)
+  # - Skips benchmarking if finished run exists with matching benchmark_key
+  # - Falls back to trial_key_hash + study_key_hash for backward compatibility
   # Note: HPO no longer uses run.mode - benchmark mode is independent
   mode: force_new
 

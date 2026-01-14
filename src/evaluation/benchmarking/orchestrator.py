@@ -139,14 +139,17 @@ def benchmark_already_exists(
     """
     # Check MLflow first (authoritative)
     if mlflow_client:
-        if _benchmark_exists_in_mlflow(
-            benchmark_key, 
-            benchmark_experiment, 
-            mlflow_client,
-            trial_key_hash=trial_key_hash,
-            study_key_hash=study_key_hash,
-        ):
-            return True
+        try:
+            if _benchmark_exists_in_mlflow(
+                benchmark_key, 
+                benchmark_experiment, 
+                mlflow_client,
+                trial_key_hash=trial_key_hash,
+                study_key_hash=study_key_hash,
+            ):
+                return True
+        except Exception as e:
+            logger.debug(f"MLflow check failed: {e}, falling back to disk check")
     
     # Fallback to disk
     if _benchmark_exists_on_disk(benchmark_key, root_dir, environment):
@@ -159,29 +162,46 @@ def _benchmark_exists_in_mlflow(
     benchmark_key: str,
     benchmark_experiment: Dict[str, str],
     mlflow_client: Any,
-    trial_key_hash: Optional[str] = None,
-    study_key_hash: Optional[str] = None,
+    trial_key_hash: Optional[str] = None,  # Fallback only
+    study_key_hash: Optional[str] = None,  # Fallback only
 ) -> bool:
     """
-    Check if benchmark run exists in MLflow with matching key.
+    Check if benchmark run exists in MLflow with matching benchmark_key.
     
-    Uses trial_key_hash and study_key_hash tags (more reliable than benchmark_key tag
-    which may not be set on all runs).
+    Priority:
+    1. benchmark_key tag (PRIMARY - includes config hash)
+    2. trial_key_hash + study_key_hash (FALLBACK - backward compatibility)
     
     Args:
-        benchmark_key: Stable benchmark key (for logging/debugging)
+        benchmark_key: Stable benchmark key (includes config hash)
         benchmark_experiment: Benchmark experiment info (name, id)
         mlflow_client: MLflow client instance
-        trial_key_hash: Optional trial key hash to search for
-        study_key_hash: Optional study key hash to search for
+        trial_key_hash: Optional trial key hash (fallback only)
+        study_key_hash: Optional study key hash (fallback only)
         
     Returns:
         True if benchmark run exists and is finished, False otherwise
     """
+    # PRIMARY: Check by benchmark_key tag (most reliable - includes config hash)
     try:
-        # Try using trial_key_hash and study_key_hash (more reliable)
-        if trial_key_hash and study_key_hash:
-            # Try to get tag keys from registry (with fallback to hardcoded keys)
+        runs = mlflow_client.search_runs(
+            experiment_ids=[benchmark_experiment["id"]],
+            filter_string=f"tags.benchmark_key = '{benchmark_key}'",
+            max_results=10,
+        )
+        finished_runs = [r for r in runs if r.info.status == "FINISHED"]
+        if finished_runs:
+            logger.debug(
+                f"Found {len(finished_runs)} finished benchmark run(s) with benchmark_key={benchmark_key[:32]}..."
+            )
+            return True
+    except Exception as e:
+        logger.debug(f"benchmark_key tag search failed: {e}")
+    
+    # FALLBACK: Check by trial_key_hash + study_key_hash (backward compatibility)
+    # Only use this if benchmark_key tag is not set (older runs)
+    if trial_key_hash and study_key_hash:
+        try:
             trial_key_tag = "code.grouping.trial_key_hash"
             study_key_tag = "code.grouping.study_key_hash"
             
@@ -201,23 +221,18 @@ def _benchmark_exists_in_mlflow(
                 max_results=10,
             )
             
-            # Check if any finished run exists
             finished_runs = [r for r in runs if r.info.status == "FINISHED"]
             if finished_runs:
-                logger.debug(f"Found {len(finished_runs)} finished benchmark run(s) for trial_key_hash={trial_key_hash[:16]}...")
+                logger.warning(
+                    f"Found {len(finished_runs)} finished benchmark run(s) by hash (fallback). "
+                    f"Consider setting benchmark_key tag for more reliable idempotency. "
+                    f"trial_key_hash={trial_key_hash[:16]}..."
+                )
                 return True
-        
-        # Fallback: try benchmark_key tag (may not be set on older runs)
-        runs = mlflow_client.search_runs(
-            experiment_ids=[benchmark_experiment["id"]],
-            filter_string=f"tags.benchmark_key = '{benchmark_key}'",
-            max_results=1,
-        )
-        
-        return len(runs) > 0 and runs[0].info.status == "FINISHED"
-    except Exception as e:
-        logger.debug(f"Could not check MLflow for benchmark key {benchmark_key[:32]}...: {e}")
-        return False
+        except Exception as e:
+            logger.debug(f"Hash-based fallback search failed: {e}")
+    
+    return False
 
 
 def _benchmark_exists_on_disk(
@@ -989,6 +1004,30 @@ def benchmark_best_trials(
             f"sweep={hpo_sweep_run_id[:12] if hpo_sweep_run_id else None}..."
         )
 
+        # Build benchmark_key for idempotency (includes config hash)
+        benchmark_key = None
+        if benchmark_config and hpo_refit_run_id:
+            try:
+                # Compute fingerprints from configs
+                data_fingerprint = compute_data_fingerprint(data_config) if data_config else ""
+                eval_fingerprint = compute_eval_fingerprint(hpo_config) if hpo_config else ""
+                
+                # Use refit_run_id as champion_run_id (artifact parent)
+                champion_run_id = hpo_refit_run_id
+                
+                # Build stable benchmark key
+                benchmark_key = build_benchmark_key(
+                    champion_run_id=champion_run_id,
+                    data_fingerprint=data_fingerprint,
+                    eval_fingerprint=eval_fingerprint,
+                    benchmark_config=benchmark_config,
+                )
+                logger.debug(
+                    f"[BENCHMARK] Built benchmark_key={benchmark_key[:32]}... for idempotency"
+                )
+            except Exception as e:
+                logger.warning(f"Could not build benchmark_key: {e}")
+
         success = run_benchmarking(
             checkpoint_dir=checkpoint_dir,
             test_data_path=test_data_path,
@@ -1009,6 +1048,7 @@ def benchmark_best_trials(
             hpo_refit_run_id=hpo_refit_run_id,
             hpo_sweep_run_id=hpo_sweep_run_id,
             benchmark_config_hash=benchmark_config_hash,
+            benchmark_key=benchmark_key,
         )
 
         if success:

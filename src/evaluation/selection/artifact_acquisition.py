@@ -3,6 +3,9 @@ Artifact acquisition utilities for best model selection.
 
 This module provides robust checkpoint acquisition with local-first priority,
 checkpoint validation, and graceful handling of Azure ML compatibility issues.
+
+NOTE: This module now uses the unified artifact acquisition system under the hood.
+The API remains the same for backward compatibility.
 """
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
@@ -12,10 +15,16 @@ import mlflow
 import json
 import shutil
 
+# Import unified acquisition system
+from evaluation.selection.artifact_unified.compat import acquire_best_model_checkpoint as _acquire_best_model_checkpoint_unified
+
 
 def _extract_tar_gz(tar_path: Path, extract_to: Optional[Path] = None) -> Path:
     """
     Extract a tar.gz file and return the path to the extracted directory.
+    
+    NOTE: This function is kept for backward compatibility.
+    The unified artifact acquisition system has its own implementation.
 
     Args:
         tar_path: Path to the tar.gz file
@@ -51,6 +60,9 @@ def _extract_tar_gz(tar_path: Path, extract_to: Optional[Path] = None) -> Path:
 def _validate_checkpoint(checkpoint_path: Path) -> bool:
     """
     Validate checkpoint integrity by checking for essential files.
+    
+    NOTE: This function is kept for backward compatibility.
+    The unified artifact acquisition system uses artifact-kind-specific validation.
 
     Args:
         checkpoint_path: Path to checkpoint directory
@@ -318,7 +330,10 @@ def acquire_best_model_checkpoint(
     in_colab: bool = False,
 ) -> Path:
     """
-    Acquire checkpoint using local-first fallback strategy.
+    Acquire checkpoint using unified acquisition system (backward compatibility wrapper).
+
+    This function now uses the unified artifact acquisition system under the hood.
+    The API remains the same for backward compatibility.
 
     Priority order (from config):
     1. Local disk (by config + backbone) - PREFERRED to avoid Azure ML issues
@@ -342,439 +357,15 @@ def acquire_best_model_checkpoint(
     Raises:
         ValueError: If all fallback strategies fail
     """
-    # CRITICAL: Use refit_run_id if available (checkpoints are usually in refit runs)
-    # According to plan: "champion run_id" ≠ "checkpoint run_id" in a refit workflow
-    refit_run_id = best_run_info.get("refit_run_id")
-    trial_run_id = best_run_info.get("trial_run_id")
-    if not refit_run_id:
-        raise ValueError(
-            "Refit run ID is required for checkpoint acquisition. "
-            f"Received best_run_info without refit_run_id (trial_run_id={trial_run_id})."
-        )
-    run_id = refit_run_id
-    
-    study_key_hash = best_run_info.get("study_key_hash")
-    trial_key_hash = best_run_info.get("trial_key_hash")
-    backbone = best_run_info.get("backbone", "unknown")
-    experiment_name = best_run_info.get("experiment_name")
-    
-    # Fallback: Get experiment name from MLflow run if not provided
-    if not experiment_name or experiment_name == "unknown":
-        try:
-            from mlflow.tracking import MlflowClient
-            from common.shared.logging_utils import get_logger
-            client = MlflowClient()
-            run = client.get_run(run_id)
-            experiment = client.get_experiment(run.info.experiment_id)
-            experiment_name = experiment.name if experiment else "unknown"
-        except Exception as e:
-            from common.shared.logging_utils import get_logger
-            logger = get_logger(__name__)
-            logger.debug(f"Could not retrieve experiment name from MLflow run: {e}")
-            experiment_name = "unknown"
-
-    priority = acquisition_config["priority"]
-    checkpoint_path = None
-
-    # Strategy 1: Local disk selection (using hashes from best_model)
-    if "local" in priority and checkpoint_path is None:
-        try:
-            from evaluation.selection.local_selection_v2 import find_trial_checkpoint_by_hash
-            from common.shared.logging_utils import get_logger
-            
-            logger = get_logger(__name__)
-
-            if study_key_hash and trial_key_hash:
-                hpo_output_dir = root_dir / "outputs" / "hpo" / platform / backbone
-                logger.info(f"[ACQUISITION] Strategy 1: Checking local disk for checkpoint: {hpo_output_dir} (study={study_key_hash[:8]}..., trial={trial_key_hash[:8]}...)")
-                
-                found_path = find_trial_checkpoint_by_hash(
-                    hpo_backbone_dir=hpo_output_dir,
-                    study_key_hash=study_key_hash,
-                    trial_key_hash=trial_key_hash,
-                )
-
-                if found_path:
-                    found_path = Path(found_path)
-                    logger.info(f"[ACQUISITION] ✓ Found local checkpoint at: {found_path}")
-
-                    if acquisition_config["local"].get("validate", True):
-                        if _validate_checkpoint(found_path):
-                            # Copy to best_model_selection directory for consistency
-                            target_path = _build_checkpoint_dir(
-                                root_dir, config_dir, platform, backbone, run_id,
-                                study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
-                            )
-                            if found_path != target_path:
-                                target_path.mkdir(parents=True, exist_ok=True)
-                                if target_path.exists():
-                                    shutil.rmtree(target_path)
-                                shutil.copytree(found_path, target_path)
-                                logger.info(f"[ACQUISITION] Copied local checkpoint to: {target_path}")
-                            checkpoint_path = target_path
-                        else:
-                            logger.warning(f"[ACQUISITION] Local checkpoint found but validation failed: {found_path}")
-                    else:
-                        if found_path.exists():
-                            # Copy to best_model_selection directory for consistency
-                            target_path = _build_checkpoint_dir(
-                                root_dir, config_dir, platform, backbone, run_id,
-                                study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
-                            )
-                            if found_path != target_path:
-                                target_path.mkdir(parents=True, exist_ok=True)
-                                if target_path.exists():
-                                    shutil.rmtree(target_path)
-                                shutil.copytree(found_path, target_path)
-                                logger.info(f"[ACQUISITION] Copied local checkpoint to: {target_path}")
-                            checkpoint_path = target_path
-                else:
-                    logger.info(f"[ACQUISITION] No local checkpoint found at: {hpo_output_dir}")
-            else:
-                logger.warning(f"[ACQUISITION] Missing hashes for local lookup (study_key_hash={study_key_hash is not None}, trial_key_hash={trial_key_hash is not None})")
-
-        except ImportError as e:
-            from common.shared.logging_utils import get_logger
-            logger = get_logger(__name__)
-            logger.warning(f"[ACQUISITION] Could not import find_trial_checkpoint_by_hash: {e}")
-        except Exception as e:
-            from common.shared.logging_utils import get_logger
-            logger = get_logger(__name__)
-            logger.warning(f"[ACQUISITION] Error during local checkpoint lookup: {e}", exc_info=True)
-
-    # Strategy 2: Drive restore (Colab only) - optimized to scan Drive metadata and restore only checkpoint
-    if "drive" in priority and restore_from_drive and in_colab and acquisition_config["drive"]["enabled"] and checkpoint_path is None:
-        try:
-            if study_key_hash and trial_key_hash and drive_store:
-                # OPTIMIZATION: Scan Drive directly to find checkpoint path
-                # This avoids restoring the entire HPO directory structure
-                hpo_output_dir = root_dir / "outputs" / "hpo" / platform / backbone
-
-                # Compute Drive path for HPO directory
-                try:
-                    drive_hpo_dir = drive_store.drive_path_for(hpo_output_dir)
-                except ValueError:
-                    drive_hpo_dir = None
-
-                if drive_hpo_dir and drive_hpo_dir.exists():
-                    drive_checkpoint_path = _find_checkpoint_in_drive_by_hash(
-                        drive_hpo_dir, study_key_hash, trial_key_hash
-                    )
-
-                    if drive_checkpoint_path and drive_checkpoint_path.exists():
-                        # Found checkpoint in Drive! Copy to best_model_selection cache dir
-                        local_checkpoint_path = _build_checkpoint_dir(
-                            root_dir, config_dir, platform, backbone, run_id,
-                            study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
-                        )
-
-                        # Direct copy from Drive path to local destination
-                        local_checkpoint_path.mkdir(
-                            parents=True, exist_ok=True)
-                        if local_checkpoint_path.exists():
-                            shutil.rmtree(local_checkpoint_path)
-                        shutil.copytree(drive_checkpoint_path,
-                                        local_checkpoint_path)
-
-                        # Validate restored checkpoint
-                        if acquisition_config["drive"].get("validate", True):
-                            if _validate_checkpoint(local_checkpoint_path):
-                                checkpoint_path = local_checkpoint_path
-                        else:
-                            if local_checkpoint_path.exists():
-                                checkpoint_path = local_checkpoint_path
-
-            # Fallback: Try best_model_selection directory structure (if checkpoint was manually moved)
-            if checkpoint_path is None:
-                local_checkpoint_path = _build_checkpoint_dir(
-                    root_dir, config_dir, platform, backbone, run_id,
-                    study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
-                )
-
-                if restore_from_drive(local_checkpoint_path, is_directory=True):
-                    if acquisition_config["drive"].get("validate", True):
-                        if _validate_checkpoint(local_checkpoint_path):
-                            checkpoint_path = local_checkpoint_path
-                    else:
-                        if local_checkpoint_path.exists():
-                            checkpoint_path = local_checkpoint_path
-
-        except Exception:
-            pass
-
-    # Strategy 3: MLflow download
-    if "mlflow" in priority and acquisition_config["mlflow"]["enabled"] and checkpoint_path is None:
-        from common.shared.logging_utils import get_logger
-        logger = get_logger(__name__)
-        logger.info(f"[ACQUISITION] Strategy 3: Downloading checkpoint from MLflow (run {run_id[:12]}...)")
-        try:
-            checkpoint_dir = _build_checkpoint_dir(
-                root_dir, config_dir, platform, backbone, run_id,
-                study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
-            )
-            checkpoint_dir.mkdir(parents=True, exist_ok=True)
-
-            import mlflow as mlflow_func
-            from mlflow.tracking import MlflowClient
-            from common.shared.logging_utils import get_logger
-            
-            logger = get_logger(__name__)
-
-            tracking_uri = mlflow_func.get_tracking_uri()
-            is_azure_ml = tracking_uri and "azureml://" in tracking_uri
-
-            client = MlflowClient()
-            
-            # Deterministic: only use the resolved refit run_id
-            run_ids_to_try = [refit_run_id]
-
-            # Check artifact availability tag (informational, not blocking)
-            # If tag is missing or false, we'll still attempt download but log a warning
-            from infrastructure.naming.mlflow.tags_registry import load_tags_registry
-            tags_registry = load_tags_registry(config_dir)
-            artifact_available_tag = tags_registry.key("artifact", "available")
-            refit_run = client.get_run(refit_run_id)
-            artifact_available = refit_run.data.tags.get(artifact_available_tag)
-            require_tag = acquisition_config["mlflow"].get("require_artifact_tag", False)
-            
-            if str(artifact_available).lower() not in ("true", "1", "yes"):
-                if require_tag:
-                    # Strict mode: fail if tag is missing or false
-                    raise ValueError(
-                        f"Refit run {refit_run_id[:12]}... is missing artifact availability tag "
-                        f"({artifact_available_tag}) or it is not true. "
-                        f"Set require_artifact_tag: false in mlflow config to allow download without tag."
-                    )
-                else:
-                    # Lenient mode: warn but continue
-                    logger.warning(
-                        f"[ACQUISITION] Refit run {refit_run_id[:12]}... is missing artifact availability tag "
-                        f"({artifact_available_tag}) or it is not true. "
-                        f"Attempting download anyway - will fail if artifact doesn't exist."
-                    )
-            
-            # Try each run until we find a checkpoint
-            checkpoint_artifact_path = None
-            local_path = None
-            
-            for candidate_run_id in run_ids_to_try:
-                try:
-                    # List artifacts to find checkpoint
-                    artifacts = client.list_artifacts(run_id=candidate_run_id)
-                    artifact_paths = [artifact.path for artifact in artifacts]
-                    
-                    # Check if this run has checkpoint artifacts
-                    checkpoint_artifacts = [
-                        p for p in artifact_paths 
-                        if "checkpoint" in p.lower() or "best_trial" in p.lower()
-                    ]
-                    if not checkpoint_artifacts:
-                        logger.debug(
-                            f"[ACQUISITION] Run {candidate_run_id[:12]}... has no checkpoint artifacts. "
-                            f"Available artifacts: {artifact_paths[:10]}"
-                        )
-                        continue
-                    
-                    # Look for checkpoint in artifact paths (priority order)
-                    # 1. "best_trial_checkpoint.tar.gz" or "best_trial_checkpoint" (preferred)
-                    # 2. "checkpoint" or "checkpoint/" (fallback)
-                    # 3. Any path containing "checkpoint" or "best_trial"
-                    for path in artifact_paths:
-                        path_lower = path.lower()
-                        if "best_trial_checkpoint" in path_lower:
-                            checkpoint_artifact_path = path
-                            break
-                        elif path == "checkpoint" or path == "checkpoint/":
-                            if checkpoint_artifact_path is None:
-                                checkpoint_artifact_path = path
-                        elif "checkpoint" in path_lower and checkpoint_artifact_path is None:
-                            checkpoint_artifact_path = path
-                    
-                    if checkpoint_artifact_path is None:
-                        # Last resort: try common artifact names
-                        for fallback_path in ["best_trial_checkpoint.tar.gz", "best_trial_checkpoint", "checkpoint"]:
-                            if fallback_path in artifact_paths:
-                                checkpoint_artifact_path = fallback_path
-                                break
-                        if checkpoint_artifact_path is None:
-                            checkpoint_artifact_path = "best_trial_checkpoint.tar.gz"  # Default to what's typically uploaded
-                    
-                    # Download artifacts
-                    local_path = client.download_artifacts(
-                        run_id=candidate_run_id,
-                        path=checkpoint_artifact_path,
-                        dst_path=str(checkpoint_dir)
-                    )
-                    
-                    logger.info(
-                        f"[ACQUISITION] Successfully downloaded checkpoint from run {candidate_run_id[:12]}..."
-                    )
-                    break  # Success - exit loop
-                    
-                except Exception as e:
-                    logger.debug(
-                        f"[ACQUISITION] Failed to download from run {candidate_run_id[:12]}...: {e}"
-                    )
-                    continue  # Try next run
-            
-            if local_path is None:
-                raise ValueError(
-                    f"Could not download checkpoint from any run. "
-                    f"Tried {len(run_ids_to_try)} run(s): {[r[:12] + '...' for r in run_ids_to_try]}"
-                )
-
-            downloaded_path = Path(local_path)
-
-            # Check for and extract tar.gz files
-            if downloaded_path.is_file() and downloaded_path.suffixes == ['.tar', '.gz']:
-                downloaded_path = _extract_tar_gz(downloaded_path)
-            elif downloaded_path.is_dir():
-                tar_files = list(downloaded_path.glob("*.tar.gz")) + \
-                    list(downloaded_path.glob("*.tgz"))
-                if tar_files:
-                    downloaded_path = _extract_tar_gz(
-                        tar_files[0], extract_to=downloaded_path)
-
-            # Find checkpoint in downloaded/extracted directory
-            if downloaded_path.is_dir():
-                found_checkpoint = _find_checkpoint_in_directory(
-                    downloaded_path)
-                if found_checkpoint:
-                    # Resolve and validate the found checkpoint path exists
-                    found_checkpoint = Path(found_checkpoint).resolve()
-                    if found_checkpoint.exists() and found_checkpoint.is_dir():
-                        downloaded_path = found_checkpoint
-                    else:
-                        raise ValueError(
-                            f"Found checkpoint path does not exist: {found_checkpoint}\n"
-                            f"This may indicate an issue with the MLflow artifact structure."
-                        )
-                else:
-                    # Validate the directory itself
-                    if not _validate_checkpoint(downloaded_path):
-                        raise ValueError(
-                            "Downloaded checkpoint failed validation - no valid checkpoint files found")
-
-            # Resolve path to absolute
-            downloaded_path = Path(downloaded_path).resolve()
-
-            # Ensure the checkpoint path exists and is valid
-            if not downloaded_path.exists():
-                raise ValueError(
-                    f"Downloaded checkpoint path does not exist: {downloaded_path}\n"
-                    f"This may indicate an issue with the MLflow artifact structure."
-                )
-
-            if not downloaded_path.is_dir():
-                raise ValueError(
-                    f"Downloaded checkpoint path is not a directory: {downloaded_path}"
-                )
-
-            # Final validation
-            if acquisition_config["mlflow"].get("validate", True):
-                if not _validate_checkpoint(downloaded_path):
-                    raise ValueError("Downloaded checkpoint failed validation")
-
-            checkpoint_path = downloaded_path
-
-        except Exception as e:
-            # Log the error instead of silently swallowing it
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(
-                f"Failed to download checkpoint from MLflow: {e}", exc_info=True)
-            # Don't set checkpoint_path - let fallback strategies try
-            checkpoint_path = None
-
-    # All strategies failed - check for manually placed checkpoint
-    if checkpoint_path is None:
-        checkpoint_dir = _build_checkpoint_dir(
-            root_dir, config_dir, platform, backbone, run_id,
-            study_key_hash=study_key_hash, trial_key_hash=trial_key_hash
-        )
-        manual_checkpoint_path = checkpoint_dir / "checkpoint"
-
-        if manual_checkpoint_path.exists() and any(manual_checkpoint_path.iterdir()):
-            if _validate_checkpoint(manual_checkpoint_path):
-                checkpoint_path = manual_checkpoint_path
-
-    # Backup to Drive if in Colab and checkpoint was successfully acquired
-    # Follow the same pattern as final training: backup directly without copying first
-    if checkpoint_path and in_colab and drive_store and acquisition_config.get("drive", {}).get("enabled", False):
-        try:
-            checkpoint_path = Path(checkpoint_path).resolve()
-
-            # Validate checkpoint exists before attempting backup
-            if not checkpoint_path.exists():
-                print(f"⚠ Checkpoint path does not exist: {checkpoint_path}")
-                print(
-                    f"  Skipping Drive backup - checkpoint may have been moved or deleted")
-            elif not checkpoint_path.is_dir():
-                print(
-                    f"⚠ Checkpoint path is not a directory: {checkpoint_path}")
-                print(f"  Skipping Drive backup")
-            else:
-                # Backup to Drive (same pattern as final training)
-                print(f"\n📦 Backing up best model checkpoint to Google Drive...")
-                result = drive_store.backup(checkpoint_path, expect="dir")
-                if result.ok:
-                    print(f"✓ Successfully backed up checkpoint to Google Drive")
-                    print(f"  Drive path: {result.dst}")
-                else:
-                    print(f"⚠ Drive backup failed: {result.reason}")
-                    if result.error:
-                        print(f"  Error: {result.error}")
-                    print(
-                        f"  Checkpoint is still available locally at: {checkpoint_path}")
-
-        except Exception as e:
-            print(f"⚠ Drive backup error: {e}")
-            print(
-                f"  Checkpoint is still available locally at: {checkpoint_path}")
-            import traceback
-            traceback.print_exc()
-
-    if checkpoint_path:
-        return checkpoint_path
-
-    # Generate error message
-    tracking_uri = mlflow.get_tracking_uri() or ""
-    is_azure_ml = "azureml://" in tracking_uri
-
-    error_msg = (
-        f"\n[ERROR] Could not acquire checkpoint for run {run_id[:8]}...\n"
-        f"   Experiment: {experiment_name}\n"
-        f"   Backbone: {backbone}\n"
-        f"\n[TRIED] Strategies attempted:\n"
-        f"   1. Local disk selection (by config + backbone)\n"
-        f"   2. Drive restore (Colab only)\n"
-        f"   3. MLflow download\n"
-        f"\n[SOLUTIONS] In order of preference:\n"
-        f"\n1. **Use Local Disk** (if checkpoint exists locally):\n"
-        f"   - Ensure checkpoint is at: \"{root_dir / 'outputs' / 'hpo' / platform / backbone}\"\n"
-        f"   - Verify 'local' is first in artifact_acquisition.yaml priority\n"
-        f"   - Re-run this cell\n"
+    # Use unified acquisition system
+    return _acquire_best_model_checkpoint_unified(
+        best_run_info=best_run_info,
+        root_dir=root_dir,
+        config_dir=config_dir,
+        acquisition_config=acquisition_config,
+        selection_config=selection_config,
+        platform=platform,
+        restore_from_drive=restore_from_drive,
+        drive_store=drive_store,
+        in_colab=in_colab,
     )
-
-    if is_azure_ml:
-        error_msg += (
-            f"\n2. **Manual download from Azure ML Studio**:\n"
-            f"   - Go to: https://ml.azure.com\n"
-            f"   - Navigate to: Experiments → {experiment_name} → Run {run_id[:8]}...\n"
-            f"   - Download the 'best_trial_checkpoint' artifact (or 'checkpoint' if available)\n"
-            f"   - Extract if it's a .tar.gz file\n"
-            f"   - Place the checkpoint folder at: \"{manual_checkpoint_path}\"\n"
-            f"   - Re-run this cell\n"
-        )
-    else:
-        error_msg += (
-            f"\n2. **Manual download from MLflow UI**:\n"
-            f"   - Go to MLflow tracking UI (check tracking URI: {tracking_uri})\n"
-            f"   - Navigate to: Experiment '{experiment_name}' → Run {run_id[:8]}...\n"
-            f"   - Download the 'best_trial_checkpoint' artifact (or 'checkpoint' if available)\n"
-            f"   - Extract if it's a .tar.gz file\n"
-            f"   - Place the checkpoint folder at: \"{manual_checkpoint_path}\"\n"
-            f"   - Re-run this cell\n"
-        )
-
-    raise ValueError(error_msg)

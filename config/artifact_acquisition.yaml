@@ -1,11 +1,46 @@
 # Artifact Acquisition Configuration
-# Controls how checkpoints are acquired from different sources
+# Controls how artifacts are acquired from different sources
 
+# Search roots for local discovery (checked in order)
+# These directories are searched when discovering artifacts on local disk
+# Priority: run-id-based cache first, then hash-based paths
+search_roots:
+  - "artifacts"  # Where benchmarking saves checkpoints
+  - "best_model_selection"  # Where best model selection saves checkpoints
+  # Future: can add "conversion", "final_training", etc.
+
+# Global priority (used if per-artifact-kind priority not specified)
 priority:
   - "local"
   - "drive"
   - "mlflow"
 
+# Per-artifact-kind priority (overrides global priority)
+# Each artifact kind can have its own priority order
+artifact_kinds:
+  checkpoint:
+    priority:
+      - "local"
+      - "drive"
+      - "mlflow"
+  metadata:
+    priority:
+      - "local"
+      - "mlflow"
+  config:
+    priority:
+      - "local"
+      - "mlflow"
+  logs:
+    priority:
+      - "local"
+      - "mlflow"
+  metrics:
+    priority:
+      - "local"
+      - "mlflow"
+
+# Source-specific configuration
 local:
   match_strategy: "tags"  # "tags" | "metadata_run_id" | "spec_fp"
   require_exact_match: true

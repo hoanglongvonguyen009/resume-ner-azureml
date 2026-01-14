@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 from typing import Dict, Any
 
-from selection.mlflow_selection import find_best_model_from_mlflow
+from evaluation.selection.mlflow_selection import find_best_model_from_mlflow
 
 
 class TestMLflowSelectionConfigUsage:
@@ -36,7 +36,6 @@ class TestMLflowSelectionConfigUsage:
             hpo_experiments=mock_hpo_experiments,
             tags_config=mock_tags_config,
             selection_config=sample_selection_config,
-            use_python_filtering=True,
         )
         
         # Verify client was called (function attempted to query)
@@ -75,7 +74,6 @@ class TestMLflowSelectionConfigUsage:
             hpo_experiments=mock_hpo_experiments,
             tags_config=mock_tags_config,
             selection_config=sample_selection_config,
-            use_python_filtering=True,
         )
         
         # Verify function was called (weights are used internally)
@@ -116,7 +114,6 @@ class TestMLflowSelectionConfigUsage:
             hpo_experiments=mock_hpo_experiments,
             tags_config=mock_tags_config,
             selection_config=sample_selection_config,
-            use_python_filtering=True,
         )
         
         # Verify search_runs was called
@@ -152,7 +149,6 @@ class TestMLflowSelectionConfigUsage:
             hpo_experiments=mock_hpo_experiments,
             tags_config=mock_tags_config,
             selection_config=custom_selection_config,
-            use_python_filtering=True,
         )
         
         # Verify function was called
@@ -216,7 +212,6 @@ class TestMLflowSelectionConfigUsage:
             hpo_experiments=mock_hpo_experiments,
             tags_config=mock_tags_config,
             selection_config=sample_selection_config,
-            use_python_filtering=True,
         )
         
         # Verify function was called
@@ -259,7 +254,6 @@ class TestMLflowSelectionConfigUsage:
             hpo_experiments=mock_hpo_experiments,
             tags_config=mock_tags_config,
             selection_config=sample_selection_config,
-            use_python_filtering=True,
         )
         
         # Verify function was called
@@ -298,7 +292,6 @@ class TestMLflowSelectionConfigUsage:
             hpo_experiments=mock_hpo_experiments,
             tags_config=mock_tags_config,
             selection_config=custom_selection_config,
-            use_python_filtering=True,
         )
         
         # Verify function was called

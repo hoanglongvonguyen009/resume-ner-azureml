@@ -174,13 +174,13 @@ def test_best_config_selection_e2e(tmp_path, monkeypatch):
 
     # Patch find_best_model_from_mlflow to avoid seeding real MLflow experiments
     monkeypatch.setattr(
-        "orchestration.jobs.selection.mlflow_selection.find_best_model_from_mlflow",
+        "evaluation.selection.mlflow_selection.find_best_model_from_mlflow",
         lambda *args, **kwargs: fake_best_model,
     )
 
     # Patch artifact acquisition to return our fake checkpoint
     monkeypatch.setattr(
-        "orchestration.jobs.selection.artifact_acquisition.acquire_best_model_checkpoint",
+        "evaluation.selection.artifact_acquisition.acquire_best_model_checkpoint",
         lambda *args, **kwargs: fake_checkpoint_dir,
     )
 
@@ -221,7 +221,6 @@ def test_best_config_selection_e2e(tmp_path, monkeypatch):
         hpo_experiments=hpo_experiments,
         tags_config=tags_config,
         selection_config=selection_config,
-        use_python_filtering=True,
     )
     assert best_model is fake_best_model
 

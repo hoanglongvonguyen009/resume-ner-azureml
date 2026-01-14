@@ -4,8 +4,8 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from selection.cache import compute_selection_cache_key
-from selection.mlflow_selection import find_best_model_from_mlflow
+from evaluation.selection.cache import compute_selection_cache_key
+from evaluation.selection.mlflow_selection import find_best_model_from_mlflow
 
 
 class TestSelectionConfigEdgeCases:
@@ -201,7 +201,6 @@ class TestSelectionConfigEdgeCases:
             hpo_experiments=mock_hpo_experiments,
             tags_config=mock_tags_config,
             selection_config=sample_selection_config,
-            use_python_filtering=True,
         )
         
         # Should return None because no valid benchmark runs (filtered out at line 115-116)
@@ -232,7 +231,6 @@ class TestSelectionConfigEdgeCases:
             hpo_experiments=mock_hpo_experiments,
             tags_config=mock_tags_config,
             selection_config=config,
-            use_python_filtering=True,
         )
         
         # Function should execute (empty list means no filtering)

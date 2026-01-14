@@ -82,6 +82,7 @@ class MLflowBenchmarkTracker(BaseTracker):
         hpo_trial_run_id: Optional[str] = None,
         hpo_refit_run_id: Optional[str] = None,
         hpo_sweep_run_id: Optional[str] = None,
+        benchmark_key: Optional[str] = None,
     ):
         """
         Start a MLflow run for benchmarking.
@@ -106,6 +107,7 @@ class MLflowBenchmarkTracker(BaseTracker):
             hpo_trial_run_id: Optional HPO trial run ID (CV trial run, lineage parent).
             hpo_refit_run_id: Optional HPO refit run ID (refit run, artifact parent).
             hpo_sweep_run_id: Optional HPO sweep run ID (HPO parent, optional).
+            benchmark_key: Optional stable benchmark key (includes config hash) for idempotency.
 
         Yields:
             RunHandle with run information.
@@ -255,6 +257,9 @@ class MLflowBenchmarkTracker(BaseTracker):
                 tags["mlflow.runType"] = "benchmark"
                 # Set run name as tag (MLflow version compatibility)
                 tags["mlflow.runName"] = run_name
+                # Set benchmark_key tag for idempotency (PRIMARY check)
+                if benchmark_key:
+                    tags["benchmark_key"] = benchmark_key
                 mlflow.set_tags(tags)
 
                 # Commit reserved version if auto-increment was used

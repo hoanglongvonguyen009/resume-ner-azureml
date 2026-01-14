@@ -70,8 +70,9 @@ from infrastructure.config.loader import (
     create_config_metadata,
 )
 from hpo import run_local_hpo_sweep
-from evaluation.benchmarking import benchmark_best_trials
-from evaluation.selection.trial_finder import find_best_trials_for_backbones
+from evaluation.benchmarking.orchestrator import benchmark_champions
+from evaluation.selection.trial_finder import select_champions_for_backbones
+from evaluation.selection.workflows.benchmarking_workflow import run_benchmarking_workflow
 from common.shared.platform_detection import detect_platform
 
 
@@ -653,7 +654,7 @@ class TestNotebookE2E_Core:
         
         mock_subprocess.side_effect = benchmark_subprocess_side_effect
         
-        # Find best trials
+        # Create champions dict matching new architecture
         hpo_config = configs["hpo"]
         data_config = configs["data"]
         
@@ -668,22 +669,18 @@ class TestNotebookE2E_Core:
             study_key_hash = study_dir.name.replace("study-", "") if study_dir.name.startswith("study-") else None
             trial_key_hash = trial_dir.name.replace("trial-", "") if trial_dir.name.startswith("trial-") else None
         
-        # Create best_trials dict matching expected structure
-        # Include hyperparameters for compute_grouping_tags
-        best_trials = {
+        # Create champions dict matching new architecture (from select_champions_for_backbones)
+        champions = {
             "distilbert": {
-                "trial_dir": str(trial_dir),
-                "study_name": study_dir.name,
-                "trial_name": trial_dir.name,
-                "accuracy": 0.75,
-                "hyperparameters": {
-                    "learning_rate": 4.71e-05,
-                    "batch_size": 4,
-                    "dropout": 0.109404,
-                    "weight_decay": 0.001721,
+                "champion": {
+                    "run_id": "trial-run-123",
+                    "trial_key_hash": trial_key_hash,
+                    "study_key_hash": study_key_hash,
+                    "metric": 0.75,
+                    "checkpoint_path": str(checkpoint_dir),
                 },
-                "study_key_hash": study_key_hash,
-                "trial_key_hash": trial_key_hash,
+                "all_groups": {},
+                "selection_metadata": {},
             }
         }
         
@@ -703,8 +700,8 @@ class TestNotebookE2E_Core:
         from tracking.mlflow.trackers.benchmark_tracker import MLflowBenchmarkTracker
         benchmark_tracker = MLflowBenchmarkTracker("test-benchmark-experiment")
         
-        benchmark_results = benchmark_best_trials(
-            best_trials=best_trials,
+        benchmark_results = benchmark_champions(
+            champions=champions,
             test_data_path=test_data_path,
             root_dir=ROOT_DIR,
             environment=environment,

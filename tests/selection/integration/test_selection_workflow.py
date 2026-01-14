@@ -5,8 +5,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 from common.shared.yaml_utils import load_yaml
 
-from selection.mlflow_selection import find_best_model_from_mlflow
-from selection.cache import (
+from evaluation.selection.mlflow_selection import find_best_model_from_mlflow
+from evaluation.selection.cache import (
     load_cached_best_model,
     compute_selection_cache_key,
 )
@@ -15,7 +15,7 @@ from selection.cache import (
 class TestSelectionWorkflow:
     """Test end-to-end selection workflow with config loading."""
 
-    @patch("orchestration.jobs.selection.mlflow_selection.MlflowClient")
+    @patch("evaluation.selection.mlflow_selection.MlflowClient")
     def test_workflow_loads_config_and_uses_all_options(
         self,
         mock_client_class,
@@ -73,7 +73,6 @@ benchmark:
             hpo_experiments=mock_hpo_experiments,
             tags_config=mock_tags_config,
             selection_config=selection_config,
-            use_python_filtering=True,
         )
         
         # Verify function was called with config options
@@ -86,7 +85,7 @@ benchmark:
         assert normalize_weights is True
         assert required_metrics == ["latency_batch_1_ms"]
 
-    @patch("orchestration.jobs.selection.mlflow_selection.MlflowClient")
+    @patch("evaluation.selection.mlflow_selection.MlflowClient")
     def test_workflow_custom_config_values(
         self,
         mock_client_class,
@@ -138,7 +137,6 @@ benchmark:
             hpo_experiments=mock_hpo_experiments,
             tags_config=mock_tags_config,
             selection_config=selection_config,
-            use_python_filtering=True,
         )
         
         # Verify custom values were used
@@ -186,8 +184,8 @@ benchmark:
         
         assert cache_key != cache_key2
 
-    @patch("orchestration.jobs.selection.cache.get_cache_file_path")
-    @patch("orchestration.jobs.selection.cache.load_json")
+    @patch("evaluation.selection.cache.get_cache_file_path")
+    @patch("evaluation.selection.cache.load_json")
     def test_workflow_cache_loading_with_config(
         self,
         mock_load_json,
@@ -226,7 +224,7 @@ benchmark:
         mock_load_json.return_value = cache_data
         
         # Mock MLflow client
-        with patch("orchestration.jobs.selection.cache.MlflowClient") as mock_client_class:
+        with patch("evaluation.selection.cache.MlflowClient") as mock_client_class:
             mock_client = Mock()
             mock_client_class.return_value = mock_client
             mock_run = Mock()

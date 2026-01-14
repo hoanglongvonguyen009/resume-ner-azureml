@@ -39,22 +39,24 @@ This plan merges multiple related refactoring efforts into a unified, step-by-st
 - Removed unused fallbacks and redundant logic (DRY cleanup)
 - Artifact acquisition now checks local disk first (as configured)
 
-**⏳ Phase 1.7: Unified Artifact Acquisition (SSOT)** - PENDING (BLOCKED on Phase 1.6 ✅)
-- Artifact-identity-driven acquisition (not stage-driven)
-- Refit-aware run selection (trial→refit mapping in one place)
-- Configurable priority per artifact_kind
-- Declared vs probe availability checks
-- Artifact-kind-specific validation
-- Model loading kept separate (domain-specific)
+**✅ Phase 1.7: Unified Artifact Acquisition (SSOT)** - COMPLETED
+- Artifact-identity-driven acquisition (not stage-driven) ✅
+- Refit-aware run selection (trial→refit mapping in one place) ✅
+- Configurable priority per artifact_kind ✅
+- Declared vs probe availability checks ✅
+- Artifact-kind-specific validation ✅
+- Model loading kept separate (domain-specific) ✅
+- Configurable output directory per use case (benchmarking vs best model selection) ✅
 
-**⏳ Phase 2: Champion Selection** - PENDING (BLOCKED on Phase 1.6 ✅, Phase 1.7 recommended)
-- study_key_hash v2 with bound fingerprints - **READY TO IMPLEMENT** (foundation complete)
-- Champion selection with safety requirements - **READY TO IMPLEMENT**
-- MLflow query patterns extraction - **READY TO IMPLEMENT**
+**✅ Phase 2: Champion Selection** - COMPLETED
+- study_key_hash v2 with bound fingerprints ✅
+- Champion selection with safety requirements ✅
+- MLflow query patterns extraction ✅
 
-**⏳ Phase 3: Idempotent Benchmarking** - PENDING (DEPENDS on Phase 2)
-- Benchmark idempotency not yet implemented
-- Stable benchmark keys using champion run_id + fingerprints - **READY TO IMPLEMENT** (after Phase 2)
+**✅ Phase 3: Idempotent Benchmarking** - COMPLETED
+- Benchmark idempotency implemented ✅
+- Stable benchmark keys using champion run_id + fingerprints ✅
+- Run mode support for benchmarking ✅
 
 ### Why Merge?
 
@@ -71,9 +73,9 @@ This plan merges multiple related refactoring efforts into a unified, step-by-st
 - Phase 1: HPO run mode + variant generation (foundation) ✅ **COMPLETED**
 - Phase 1.5: Unified run decision logic ✅ **COMPLETED**
 - Phase 1.6: Hash consistency & single source of truth ✅ **COMPLETED**
-- Phase 1.7: Unified artifact acquisition (SSOT for all artifact operations) ⏳ **PENDING**
-- Phase 2: Deterministic best trial retrieval (uses HPO variants + consistent hashes) ⏳ **PENDING**
-- Phase 3: Idempotent benchmarking (uses both HPO + retrieval) ⏳ **PENDING**
+- Phase 1.7: Unified artifact acquisition (SSOT for all artifact operations) ✅ **COMPLETED**
+- Phase 2: Deterministic best trial retrieval (uses HPO variants + consistent hashes) ✅ **COMPLETED**
+- Phase 3: Idempotent benchmarking (uses both HPO + retrieval) ✅ **COMPLETED**
 - Extract shared utilities following DRY principles ✅ **COMPLETED**
 - Reuse existing code where possible ✅ **COMPLETED**
 
@@ -90,9 +92,9 @@ This plan merges multiple related refactoring efforts into a unified, step-by-st
 - **G2**: HPO study versioning with explicit study_name (simplified approach) ✅ **COMPLETED**
 - **G1.5**: Unified run decision logic (single source of truth for reuse vs. create new) ✅ **COMPLETED**
 - **G1.6**: Hash consistency & SSOT (MLflow tags as source of truth, consistent computation) ✅ **COMPLETED**
-- **G1.7**: Unified artifact acquisition (artifact-identity-driven, refit-aware, configurable per kind) ⏳ **PENDING**
-- **G3**: Deterministic champion selection per backbone (MLflow-first, safe grouping) ⏳ **PENDING**
-- **G4**: Idempotent benchmarking with stable keys ⏳ **PENDING**
+- **G1.7**: Unified artifact acquisition (artifact-identity-driven, refit-aware, configurable per kind) ✅ **COMPLETED**
+- **G3**: Deterministic champion selection per backbone (MLflow-first, safe grouping) ✅ **COMPLETED**
+- **G4**: Idempotent benchmarking with stable keys ✅ **COMPLETED**
 - **G5**: Reuse existing code (DRY) - no unnecessary duplication ✅ **COMPLETED**
 
 ### Success Criteria
@@ -106,11 +108,11 @@ This plan merges multiple related refactoring efforts into a unified, step-by-st
 - [x] Artifact acquisition checks local disk first (respects priority config)
 - [x] All existing tests pass
 - [x] No code duplication (shared utilities used)
-- [ ] Unified artifact acquisition module (artifact-identity-driven, refit-aware)
-- [ ] Trial→refit mapping centralized in run selector (SSOT)
-- [ ] Artifact-kind-specific validation and priority configuration
-- [ ] `select_champion_per_backbone()` with MLflow-first priority and all safety requirements
-- [ ] Benchmarking skips already-benchmarked trials
+- [x] Unified artifact acquisition module (artifact-identity-driven, refit-aware)
+- [x] Trial→refit mapping centralized in run selector (SSOT)
+- [x] Artifact-kind-specific validation and priority configuration
+- [x] `select_champion_per_backbone()` with MLflow-first priority and all safety requirements
+- [x] Benchmarking skips already-benchmarked trials
 
 ## DRY Analysis: Reusable Modules
 
@@ -1819,66 +1821,98 @@ else:
 - ✅ Step 1.6.8: Remove unused fallbacks and redundant logic (DRY cleanup)
 - ✅ All indentation errors fixed, code compiles successfully
 
-### Phase 1.7: Unified Artifact Acquisition (SSOT) - READY TO START
-**Prerequisites:** ✅ Phase 1.6 complete - hash consistency foundation in place
-
-**Goal:** Single source of truth for artifact acquisition across all stages
-
-**Key Principles:**
-- Artifact-identity-driven (not stage-driven)
-- Refit-aware run selection (trial→refit mapping in one place)
-- Configurable priority per artifact_kind
-- Declared vs probe availability checks
-- Artifact-kind-specific validation
-- Model loading kept separate (domain-specific)
-
-**Steps:**
-- [ ] Step 1.7.1: Create artifact types and request/result dataclasses
-- [ ] Step 1.7.2: Implement run selector with trial→refit mapping (SSOT)
-- [ ] Step 1.7.3: Implement artifact-kind-specific validation
-- [ ] Step 1.7.4: Implement discovery for local/drive/mlflow
-- [ ] Step 1.7.5: Implement main acquisition orchestration
-- [ ] Step 1.7.6: Update config to support per-artifact-kind priority
-- [ ] Step 1.7.7: Refactor existing modules to use unified API
-- [ ] Step 1.7.8: Remove duplicate acquisition/validation code
+### Phase 1.7: Unified Artifact Acquisition (SSOT) - ✅ COMPLETED
 **Prerequisites:** ✅ Phase 1.6 complete - hash consistency foundation in place
 
 **Goal:** Single source of truth for artifact acquisition across all stages (benchmarking, best config selection, final training, model conversion)
 
 **Key Principles:**
-- **Artifact-identity-driven** (not stage-driven) - use `artifact_kind` instead of `stage`
-- **Refit-aware run selection** - trial→refit mapping in exactly one place (`selectors.py`)
-- **Configurable priority per artifact_kind** - different sources for different artifact types
-- **Declared vs probe availability** - distinguish tag-based vs verified existence
-- **Artifact-kind-specific validation** - different required files per artifact type
-- **Model loading kept separate** - domain-specific logic stays in training/benchmarking modules
+- **Artifact-identity-driven** (not stage-driven) - use `artifact_kind` instead of `stage` ✅
+- **Refit-aware run selection** - trial→refit mapping in exactly one place (`selectors.py`) ✅
+- **Configurable priority per artifact_kind** - different sources for different artifact types ✅
+- **Declared vs probe availability** - distinguish tag-based vs verified existence ✅
+- **Artifact-kind-specific validation** - different required files per artifact type ✅
+- **Model loading kept separate** - domain-specific logic stays in training/benchmarking modules ✅
+- **Configurable output directory** - per use case (benchmarking vs best model selection) ✅
 
 **Steps:**
-- [ ] Step 1.7.1: Create artifact types and request/result dataclasses (`types.py`)
-- [ ] Step 1.7.2: Implement run selector with trial→refit mapping (SSOT in `selectors.py`)
-- [ ] Step 1.7.3: Implement artifact-kind-specific validation (`validation.py`)
-- [ ] Step 1.7.4: Implement discovery for local/drive/mlflow (`discovery.py`)
-- [ ] Step 1.7.5: Implement main acquisition orchestration (`acquisition.py`)
-- [ ] Step 1.7.6: Update config to support per-artifact-kind priority
-- [ ] Step 1.7.7: Refactor existing modules to use unified API
-- [ ] Step 1.7.8: Remove duplicate acquisition/validation code
+- [x] Step 1.7.1: Create artifact types and request/result dataclasses (`types.py`)
+- [x] Step 1.7.2: Implement run selector with trial→refit mapping (SSOT in `selectors.py`)
+- [x] Step 1.7.3: Implement artifact-kind-specific validation (`validation.py`)
+- [x] Step 1.7.4: Implement discovery for local/drive/mlflow (`discovery.py`)
+- [x] Step 1.7.5: Implement main acquisition orchestration (`acquisition.py`)
+- [x] Step 1.7.6: Update config to support per-artifact-kind priority
+- [x] Step 1.7.7: Refactor existing modules to use unified API
+- [x] Step 1.7.8: Remove duplicate acquisition/validation code
 
-### Phase 2: Deterministic Retrieval (Champion Selection) - READY TO START
-**Prerequisites:** ✅ Phase 1.6 complete - hash consistency foundation in place
-- [ ] Step 2.0: Update selection configuration (centralized config with all requirements)
-- [ ] Step 2.1: Upgrade study_key_hash to v2 (bound fingerprints)
-- [ ] Step 2.2: Extract MLflow query patterns (DRY)
-- [ ] Step 2.3: Implement champion selection with all safety requirements (config-driven)
-- [ ] Step 2.4: Update HPO tracking to set new tags (schema_version, fingerprints, artifact.available)
-- [ ] Step 2.5: Update notebooks (explicit champion selection)
+**Key Files Created:**
+- ✅ `src/evaluation/selection/artifact_unified/types.py` - Artifact types and dataclasses
+- ✅ `src/evaluation/selection/artifact_unified/selectors.py` - Run selector with trial→refit mapping
+- ✅ `src/evaluation/selection/artifact_unified/validation.py` - Artifact-kind-specific validation
+- ✅ `src/evaluation/selection/artifact_unified/discovery.py` - Discovery for local/drive/mlflow
+- ✅ `src/evaluation/selection/artifact_unified/acquisition.py` - Main acquisition orchestration
+- ✅ `src/evaluation/selection/artifact_unified/compat.py` - Backward compatibility wrapper
+- ✅ `src/evaluation/selection/artifact_unified/__init__.py` - Package initialization
 
-### Phase 3: Idempotent Benchmarking (Uses Champions)
-- [ ] Step 3.1: Build stable benchmark keys (using champion run_id + fingerprints)
-- [ ] Step 3.2: Add idempotency check (MLflow + disk)
-- [ ] Step 3.3: Add run mode inheritance (uses run_mode.py)
-- [ ] Step 3.4: Update benchmarking to use champions (not all variants)
-- [ ] Step 3.5: Update notebooks (complete 3-step flow)
-- [ ] Step 3.6: Refit-aware checkpoint reuse between steps
+**Key Files Modified:**
+- ✅ `config/artifact_acquisition.yaml` - Added `artifact_kinds` section with per-kind priority
+- ✅ `src/evaluation/selection/artifact_acquisition.py` - Refactored to use unified system
+- ✅ `src/selection/artifact_acquisition.py` - Refactored to use unified system
+- ✅ `notebooks/02_best_config_selection.ipynb` - Updated to use `evaluation.selection.*` consistently, fixed output directory for benchmarking
+
+**Key Features Implemented:**
+- ✅ Artifact-identity-driven acquisition (CHECKPOINT, METADATA, CONFIG, LOGS, METRICS)
+- ✅ Centralized trial→refit mapping in `selectors.py` (SSOT)
+- ✅ Per-artifact-kind priority configuration
+- ✅ Artifact-kind-specific validation (different required files per type)
+- ✅ Configurable output directory via `output_base_dir` in config
+- ✅ Backward compatibility maintained via `compat.py` wrapper
+- ✅ Fixed dataclass field order issue in `RunSelectorResult`
+
+### Phase 2: Deterministic Retrieval (Champion Selection) - ✅ COMPLETED
+**Prerequisites:** ✅ Phase 1.6 complete - hash consistency foundation in place, ✅ Phase 1.7 complete - unified artifact acquisition available
+
+- [x] Step 2.0: Update selection configuration (centralized config with all requirements)
+- [x] Step 2.1: Upgrade study_key_hash to v2 (bound fingerprints)
+- [x] Step 2.2: Extract MLflow query patterns (DRY) - `src/infrastructure/tracking/mlflow/queries.py`
+- [x] Step 2.3: Implement champion selection with all safety requirements (config-driven) - `select_champion_per_backbone()` in `trial_finder.py`
+- [x] Step 2.4: Update HPO tracking to set new tags (schema_version, fingerprints, artifact.available)
+- [x] Step 2.5: Update notebooks (explicit champion selection) - `notebooks/02_best_config_selection.ipynb` uses `select_champions_for_backbones()`
+
+**Key Files:**
+- ✅ `src/evaluation/selection/trial_finder.py` - `select_champion_per_backbone()` and `select_champions_for_backbones()`
+- ✅ `src/infrastructure/tracking/mlflow/queries.py` - MLflow query patterns extracted
+- ✅ `src/infrastructure/config/selection.py` - `get_objective_direction()` and `get_champion_selection_config()`
+
+**Key Features Implemented:**
+- ✅ Champion selection with all safety requirements (min_trials_per_group, artifact filtering, v1/v2 schema handling)
+- ✅ Config-driven parameters (all settings from `best_model_selection.yaml`)
+- ✅ MLflow-first priority with fallback support
+- ✅ Explicit objective direction (never assumes maximize)
+- ✅ Stable score computation (median of top-K trials)
+- ✅ Notebook integration (`notebooks/02_best_config_selection.ipynb` uses `select_champions_for_backbones()`)
+
+### Phase 3: Idempotent Benchmarking (Uses Champions) - ✅ COMPLETED
+
+- [x] Step 3.1: Build stable benchmark keys (using champion run_id + fingerprints) - `build_benchmark_key()` in `orchestrator.py`
+- [x] Step 3.2: Add idempotency check (MLflow + disk) - `benchmark_already_exists()` and `filter_missing_benchmarks()` in `orchestrator.py`
+- [x] Step 3.3: Add run mode support (uses run_mode.py) - `get_benchmark_run_mode()` in `orchestrator.py`
+- [x] Step 3.4: Update benchmarking to use champions (not all variants) - `benchmark_champions()` in `orchestrator.py`
+- [x] Step 3.5: Update notebooks (complete 3-step flow) - `notebooks/02_best_config_selection.ipynb` uses full flow
+- [x] Step 3.6: Refit-aware checkpoint reuse between steps - **COMPLETED** ✅
+
+**Key Files:**
+- ✅ `src/evaluation/benchmarking/orchestrator.py` - `build_benchmark_key()`, `benchmark_already_exists()`, `filter_missing_benchmarks()`, `benchmark_champions()`, `get_benchmark_run_mode()`
+- ✅ `notebooks/02_best_config_selection.ipynb` - Uses champion selection, idempotent benchmarking, and checkpoint reuse
+
+**Key Features Implemented:**
+- ✅ Stable benchmark keys using champion run_id + fingerprints (ensures idempotency)
+- ✅ Idempotency check (MLflow + disk) via `benchmark_already_exists()`
+- ✅ Run mode support (`get_benchmark_run_mode()` uses `run_mode.py` utility)
+- ✅ Champions-only benchmarking (not all variants) via `benchmark_champions()`
+- ✅ Automatic filtering of already-benchmarked champions via `filter_missing_benchmarks()`
+- ✅ Complete 3-step flow in notebook: select champions → filter missing → benchmark
+- ✅ Refit-aware checkpoint reuse between benchmarking and best model selection (Step 3.6)
 
 ### Phase 4: Performance & Efficiency Optimizations
 - [ ] Step 4.1: MLflow query optimization (batch, cache, efficient filters) - **HIGH PRIORITY**
@@ -2534,11 +2568,12 @@ Based on critical feedback and current pain points:
 
 ### Immediate Next Steps (Phase 2)
 
-With Phase 1.6 complete, the foundation is in place for Phase 2:
+With Phase 1.6 and Phase 1.7 complete, the foundation is in place for Phase 2:
 
 1. **Leverage existing hash utilities**: `hash_utils.py` provides `compute_study_key_hash_v2()` which can be extended for bound fingerprints
 2. **Use existing SSOT pattern**: All hash retrieval now follows the SSOT pattern established in Phase 1.6
 3. **Build on consistent eval_config**: `derive_eval_config()` utility ensures consistent eval config derivation
+4. **Use unified artifact acquisition**: Phase 1.7 provides artifact-identity-driven acquisition with refit-aware run selection
 
 ### Key Files Created/Modified in Phase 1.6
 
@@ -2550,6 +2585,20 @@ With Phase 1.6 complete, the foundation is in place for Phase 2:
 - ✅ `src/evaluation/selection/artifact_acquisition.py` - Fixed to respect priority config (local → drive → MLflow)
 - ✅ `notebooks/02_best_config_selection.ipynb` - Removed redundant checks, follows DRY principle
 
+### Key Files Created/Modified in Phase 1.7
+
+- ✅ `src/evaluation/selection/artifact_unified/types.py` (NEW) - Artifact types and dataclasses
+- ✅ `src/evaluation/selection/artifact_unified/selectors.py` (NEW) - Run selector with trial→refit mapping (SSOT)
+- ✅ `src/evaluation/selection/artifact_unified/validation.py` (NEW) - Artifact-kind-specific validation
+- ✅ `src/evaluation/selection/artifact_unified/discovery.py` (NEW) - Discovery for local/drive/mlflow
+- ✅ `src/evaluation/selection/artifact_unified/acquisition.py` (NEW) - Main acquisition orchestration
+- ✅ `src/evaluation/selection/artifact_unified/compat.py` (NEW) - Backward compatibility wrapper
+- ✅ `src/evaluation/selection/artifact_unified/__init__.py` (NEW) - Package initialization
+- ✅ `config/artifact_acquisition.yaml` - Added `artifact_kinds` section with per-kind priority
+- ✅ `src/evaluation/selection/artifact_acquisition.py` - Refactored to use unified system (compatibility wrapper)
+- ✅ `src/selection/artifact_acquisition.py` - Refactored to use unified system (compatibility wrapper)
+- ✅ `notebooks/02_best_config_selection.ipynb` - Updated to use `evaluation.selection.*` consistently, fixed output directory for benchmarking
+
 ### Phase 2 Prerequisites Met
 
 - ✅ Hash consistency foundation in place
@@ -2557,6 +2606,8 @@ With Phase 1.6 complete, the foundation is in place for Phase 2:
 - ✅ Centralized hash utilities available
 - ✅ Consistent eval_config derivation utility
 - ✅ Artifact acquisition respects priority config
+- ✅ Unified artifact acquisition system available (Phase 1.7)
+- ✅ Refit-aware run selection centralized (Phase 1.7)
 - ✅ All code compiles without errors
 
 ### Phase 3.6 Prerequisites

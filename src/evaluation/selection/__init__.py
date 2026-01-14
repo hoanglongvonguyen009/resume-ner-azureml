@@ -24,6 +24,11 @@ from .trial_finder import (
     find_best_trials_for_backbones,
     find_study_folder_in_backbone_dir,
 )
+from .experiment_discovery import (
+    discover_hpo_experiments,
+    discover_benchmark_experiment,
+    discover_all_experiments,
+)
 from .study_summary import (
     extract_cv_statistics,
     get_trial_hash_info,
@@ -69,6 +74,10 @@ __all__ = [
     "find_trial_hash_info_for_study",
     "format_study_summary_line",
     "print_study_summaries",
+    # Experiment discovery
+    "discover_hpo_experiments",
+    "discover_benchmark_experiment",
+    "discover_all_experiments",
 ]
 
 

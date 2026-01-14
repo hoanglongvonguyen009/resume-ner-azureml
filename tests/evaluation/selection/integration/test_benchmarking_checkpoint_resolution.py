@@ -45,8 +45,10 @@ def mock_hpo_output_structure(temp_dir):
     study_dir = temp_dir / "outputs" / "hpo" / "local" / "distilbert" / "study-abc123"
     study_dir.mkdir(parents=True)
     
-    # Create trial folder
-    trial_dir = study_dir / "trial-xyz789"
+    # Create trial folder (using first 8 chars of trial_key_hash: "trial-hash-xyz789" -> "trial-ha")
+    # The test looks for trial-{trial_hash8} where trial_hash8 = trial_key_hash[:8]
+    trial_hash8 = "trial-hash-xyz789"[:8]  # "trial-ha"
+    trial_dir = study_dir / f"trial-{trial_hash8}"
     trial_dir.mkdir()
     
     # Create checkpoint in refit subdirectory

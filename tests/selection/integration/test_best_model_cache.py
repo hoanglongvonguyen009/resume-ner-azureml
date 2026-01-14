@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from selection.cache import (
+from evaluation.selection.cache import (
     load_cached_best_model,
     save_best_model_cache,
     compute_selection_cache_key,

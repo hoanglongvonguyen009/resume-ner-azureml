@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from selection.artifact_acquisition import acquire_best_model_checkpoint
+from evaluation.selection.artifact_acquisition import acquire_best_model_checkpoint
 
 
 class TestArtifactAcquisitionConfig:

@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 import json
 
-from selection.cache import (
+from evaluation.selection.cache import (
     load_cached_best_model,
     compute_selection_cache_key,
     save_best_model_cache,
@@ -262,7 +262,7 @@ class TestSelectionCacheConfig:
         
         # Cache data with matching cache key
         cache_data = mock_cache_data.copy()
-        from selection.cache import compute_selection_cache_key
+        from evaluation.selection.cache import compute_selection_cache_key
         current_cache_key = compute_selection_cache_key(
             experiment_name="test_experiment",
             selection_config=selection_config,

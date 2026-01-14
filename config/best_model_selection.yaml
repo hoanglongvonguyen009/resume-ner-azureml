@@ -54,4 +54,13 @@ scoring:
 benchmark:
   required_metrics:
     - "latency_batch_1_ms"
+  
+  # Latency aggregation strategy when multiple benchmark runs exist with same benchmark_key
+  # Options:
+  #   - "latest": Use most recent benchmark run (default, simple)
+  #   - "median": Use median latency across all runs (most robust against outliers)
+  #   - "mean": Use mean latency across all runs (balanced)
+  # 
+  # This prevents "best latency ever" bias when same trial is benchmarked multiple times
+  latency_aggregation: "latest"  # "latest" | "median" | "mean"
 
