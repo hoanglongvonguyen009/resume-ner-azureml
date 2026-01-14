@@ -817,11 +817,9 @@ def benchmark_best_trials(
         benchmark_config_hash = None
         if benchmark_config:
             try:
-                import hashlib
-                import json
+                from common.shared.hash_utils import compute_json_hash
                 # Normalize and hash benchmark_config for stable identity
-                normalized_config = json.dumps(benchmark_config, sort_keys=True, separators=(',', ':'))
-                benchmark_config_hash = hashlib.sha256(normalized_config.encode('utf-8')).hexdigest()
+                benchmark_config_hash = compute_json_hash(benchmark_config, length=64)
             except Exception as e:
                 logger.debug(f"Could not compute benchmark_config_hash: {e}")
 

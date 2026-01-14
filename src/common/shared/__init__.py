@@ -23,6 +23,12 @@ from .mlflow_setup import (
     setup_mlflow_from_config,
     create_ml_client_from_config,
 )
+from .hash_utils import (
+    compute_hash_64,
+    compute_hash_16,
+    compute_json_hash,
+    compute_selection_cache_key,
+)
 
 __all__ = [
     "verify_output_file",
@@ -45,5 +51,9 @@ __all__ = [
     "setup_mlflow_cross_platform",
     "setup_mlflow_from_config",
     "create_ml_client_from_config",
+    "compute_hash_64",
+    "compute_hash_16",
+    "compute_json_hash",
+    "compute_selection_cache_key",
 ]
 

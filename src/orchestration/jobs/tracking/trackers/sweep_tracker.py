@@ -229,7 +229,7 @@ class MLflowSweepTracker(BaseTracker):
             config_dir = Path.cwd() / "config"
 
         # Mark parent run as sweep job for Azure ML UI
-        from orchestration.jobs.tracking.naming.tag_keys import (
+        from infrastructure.naming.mlflow.tag_keys import (
             get_azureml_run_type,
             get_azureml_sweep,
             get_mlflow_run_type,
@@ -419,7 +419,7 @@ class MLflowSweepTracker(BaseTracker):
 
                 # Set refit_planned tag if refit is enabled
                 if hpo_config and hpo_config.get("refit", {}).get("enabled", False):
-                    from orchestration.jobs.tracking.naming.tag_keys import get_hpo_refit_planned
+                    from infrastructure.naming.mlflow.tag_keys import get_hpo_refit_planned
                     refit_planned_tag = get_hpo_refit_planned(config_dir)
                     mlflow.set_tag(refit_planned_tag, "true")
             else:
@@ -478,7 +478,7 @@ class MLflowSweepTracker(BaseTracker):
         # Strategy 2: Check alternative tag keys
         # Try registry keys first, then fallback to legacy
         config_dir = None  # Could be inferred from context if available
-        from orchestration.jobs.tracking.naming.tag_keys import (
+        from infrastructure.naming.mlflow.tag_keys import (
             get_hpo_trial_number,
             get_legacy_trial_number,
         )
@@ -633,7 +633,7 @@ class MLflowSweepTracker(BaseTracker):
                     root_dir_for_config = output_dir.parent.parent if output_dir.parent.name == "outputs" else output_dir.parent.parent.parent
                     config_dir = root_dir_for_config / "config" if root_dir_for_config else None
                 
-                from orchestration.jobs.tracking.naming.tag_keys import (
+                from infrastructure.naming.mlflow.tag_keys import (
                     get_hpo_best_trial_number,
                     get_hpo_best_trial_run_id,
                 )

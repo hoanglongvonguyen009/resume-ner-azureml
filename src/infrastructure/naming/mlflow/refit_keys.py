@@ -29,7 +29,7 @@ lifecycle:
 import json
 from typing import Any, Dict, Optional
 
-from .hpo_keys import _compute_hash_64
+from common.shared.hash_utils import compute_hash_64
 
 def compute_refit_protocol_fp(
     data_config: Dict[str, Any],
@@ -75,4 +75,4 @@ def compute_refit_protocol_fp(
         })
 
     payload_str = json.dumps(payload, sort_keys=True, separators=(',', ':'))
-    return _compute_hash_64(payload_str)
+    return compute_hash_64(payload_str)

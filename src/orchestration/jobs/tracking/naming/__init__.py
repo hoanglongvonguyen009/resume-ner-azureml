@@ -1,6 +1,6 @@
 """MLflow naming utilities: run keys, names, tags, and hashing."""
 
-from orchestration.jobs.tracking.naming.run_keys import (
+from infrastructure.naming.mlflow.run_keys import (
     build_mlflow_run_key,
     build_mlflow_run_key_hash,
     build_counter_key,
@@ -12,7 +12,7 @@ from orchestration.jobs.tracking.naming.tags import (
     build_mlflow_tags,
     sanitize_tag_value,
 )
-from orchestration.jobs.tracking.naming.hpo_keys import (
+from infrastructure.naming.mlflow.hpo_keys import (
     build_hpo_study_key,
     build_hpo_study_key_hash,
     build_hpo_study_family_key,
@@ -20,7 +20,7 @@ from orchestration.jobs.tracking.naming.hpo_keys import (
     build_hpo_trial_key,
     build_hpo_trial_key_hash,
 )
-from orchestration.jobs.tracking.naming.refit_keys import (
+from infrastructure.naming.mlflow.refit_keys import (
     compute_refit_protocol_fp,
 )
 from orchestration.jobs.tracking.naming.policy import (
@@ -49,7 +49,7 @@ __all__ = [
 ]
 
 
-from orchestration.jobs.tracking.naming.run_keys import (
+from infrastructure.naming.mlflow.run_keys import (
     build_mlflow_run_key,
     build_mlflow_run_key_hash,
     build_counter_key,
@@ -61,7 +61,7 @@ from orchestration.jobs.tracking.naming.tags import (
     build_mlflow_tags,
     sanitize_tag_value,
 )
-from orchestration.jobs.tracking.naming.hpo_keys import (
+from infrastructure.naming.mlflow.hpo_keys import (
     build_hpo_study_key,
     build_hpo_study_key_hash,
     build_hpo_study_family_key,
@@ -69,7 +69,7 @@ from orchestration.jobs.tracking.naming.hpo_keys import (
     build_hpo_trial_key,
     build_hpo_trial_key_hash,
 )
-from orchestration.jobs.tracking.naming.refit_keys import (
+from infrastructure.naming.mlflow.refit_keys import (
     compute_refit_protocol_fp,
 )
 

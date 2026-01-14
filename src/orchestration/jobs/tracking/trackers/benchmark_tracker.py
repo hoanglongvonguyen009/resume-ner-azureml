@@ -189,7 +189,7 @@ class MLflowBenchmarkTracker(BaseTracker):
                 # Use pre-computed lineage_parent_run_id and parent_kind from before run creation
 
                 # Get tag keys from registry (using centralized helpers)
-                from orchestration.jobs.tracking.naming.tag_keys import (
+                from infrastructure.naming.mlflow.tag_keys import (
                     get_lineage_hpo_refit_run_id,
                     get_lineage_hpo_sweep_run_id,
                     get_lineage_hpo_trial_run_id,

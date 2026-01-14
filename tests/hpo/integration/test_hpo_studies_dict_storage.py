@@ -9,8 +9,6 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 from typing import Dict, Any
 
-from training.hpo import run_local_hpo_sweep
-
 
 @pytest.fixture
 def hpo_config_multiple_backbones():
@@ -71,10 +69,13 @@ class TestHPOStudiesDictStorage:
         # This test validates the notebook loop logic for populating hpo_studies,
         # not the internals of run_local_hpo_sweep. To keep it robust against
         # HPO path refactors (v2-only study folders, etc.), we mock the sweep.
+        # Patch at the actual implementation location before importing
         with patch(
             "training.hpo.execution.local.sweep.run_local_hpo_sweep",
             side_effect=lambda *args, **kwargs: Mock(),
         ):
+            # Import after patching to ensure the patch is in place
+            from training.hpo import run_local_hpo_sweep
             for backbone in backbone_values:
                 study = run_local_hpo_sweep(
                     dataset_path="dummy",

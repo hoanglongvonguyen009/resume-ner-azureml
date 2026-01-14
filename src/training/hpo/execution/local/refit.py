@@ -635,8 +635,8 @@ def _link_refit_to_trial_run(
                             f"[REFIT] Trying fallback by trial number: searching for trial {trial_number} "
                             f"among {len(child_runs)} child runs..."
                         )
-                        from infrastructure.naming.mlflow.tag_keys import get_trial_number
-                        trial_number_tag = get_trial_number(config_dir)
+                        from infrastructure.naming.mlflow.tag_keys import get_hpo_trial_number
+                        trial_number_tag = get_hpo_trial_number(config_dir)
                         
                         for child_run in child_runs:
                             child_trial_num = child_run.data.tags.get(trial_number_tag)

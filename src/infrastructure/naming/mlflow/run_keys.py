@@ -25,9 +25,9 @@ lifecycle:
 """
 
 """Run key building and hashing utilities."""
-import hashlib
 
 from ..context import NamingContext
+from common.shared.hash_utils import compute_hash_64
 
 def build_mlflow_run_key(context: NamingContext) -> str:
     """
@@ -102,7 +102,7 @@ def build_mlflow_run_key_hash(run_key: str) -> str:
     Returns:
         SHA256 hash hex string (always 64 characters).
     """
-    return hashlib.sha256(run_key.encode('utf-8')).hexdigest()
+    return compute_hash_64(run_key)
 
 def build_counter_key(
     project_name: str,

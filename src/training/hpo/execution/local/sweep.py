@@ -282,13 +282,17 @@ def create_local_hpo_objective(
                         build_hpo_trial_key,
                         build_hpo_trial_key_hash,
                     )
+                    from common.shared.platform_detection import detect_platform
+                    # Normalize study_key_hash to string before using it in hash computation.
+                    # In production this is already a string, but in tests it may be a Mock.
+                    normalized_study_key_hash_for_computation = str(study_key_hash) if study_key_hash is not None else None
                     # Extract hyperparameters (exclude metadata fields)
                     hyperparameters = {
                         k: v for k, v in trial_params.items()
                         if k not in ("backbone", "trial_number", "run_id")
                     }
                     trial_key = build_hpo_trial_key(
-                        study_key_hash, hyperparameters)
+                        normalized_study_key_hash_for_computation, hyperparameters)
                     trial_key_hash = build_hpo_trial_key_hash(trial_key)
                     # Use token expansion for consistency
                     from infrastructure.naming.context_tokens import build_token_values
@@ -309,9 +313,14 @@ def create_local_hpo_objective(
                     # Create trial_meta.json for easy lookup
                     import json
                     study_folder_name = output_base_dir.name
+                    # Normalize hash values to strings for JSON serialization robustness.
+                    # In production these are already strings, but in tests they
+                    # may be Mock objects that can't be serialized.
+                    normalized_study_key_hash = str(study_key_hash) if study_key_hash is not None else None
+                    normalized_trial_key_hash = str(trial_key_hash) if trial_key_hash is not None else None
                     trial_meta = {
-                        "study_key_hash": study_key_hash,
-                        "trial_key_hash": trial_key_hash,
+                        "study_key_hash": normalized_study_key_hash,
+                        "trial_key_hash": normalized_trial_key_hash,
                         "trial_number": trial.number,
                         "study_name": study_folder_name,
                         # run_id is stored as a simple string token for robustness.

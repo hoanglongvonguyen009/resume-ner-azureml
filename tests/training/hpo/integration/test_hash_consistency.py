@@ -24,40 +24,63 @@ from infrastructure.naming.mlflow.hpo_keys import (
 from infrastructure.naming.mlflow.tags_registry import load_tags_registry
 
 
+@pytest.fixture
+def sample_configs():
+    """Sample configurations for testing (shared across test classes)."""
+    return {
+        "data_config": {
+            "name": "test_dataset",
+            "version": "1.0",
+            "local_path": "/tmp/data",
+            "schema": {"labels": ["PER", "ORG"]},
+            "split_seed": 42,
+        },
+        "hpo_config": {
+            "search_space": {
+                "learning_rate": {"type": "loguniform", "low": 1e-5, "high": 1e-3},
+                "batch_size": {"type": "choice", "choices": [4, 8, 16]},
+            },
+            "objective": {"metric": "macro-f1", "direction": "maximize"},
+            "k_fold": {"enabled": True, "n_splits": 2},
+            "sampling": {"algorithm": "random"},
+        },
+        "train_config": {
+            "max_steps": 1000,
+            "num_epochs": 3,
+            "seed_policy": "fixed",
+            "eval": {
+                "evaluator_version": "v1",
+                "metric": {"name": "macro-f1"},
+            },
+        },
+        "backbone": "distilbert-base-uncased",
+    }
+
+
+@pytest.fixture
+def config_dir(tmp_path):
+    """Create a temporary config directory (shared across test classes)."""
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    # Create minimal tags.yaml
+    tags_yaml = config_dir / "tags.yaml"
+    tags_yaml.write_text("""
+grouping:
+  study_key_hash: "code.study_key_hash"
+  trial_key_hash: "code.trial_key_hash"
+process:
+  stage: "code.stage"
+fingerprint:
+  data: "code.fingerprint.data"
+  eval: "code.fingerprint.eval"
+refit:
+  of_trial_run_id: "code.refit.of_trial_run_id"
+""")
+    return config_dir
+
+
 class TestHashConsistency:
     """Test hash computation consistency across run types."""
-
-    @pytest.fixture
-    def sample_configs(self):
-        """Sample configurations for testing."""
-        return {
-            "data_config": {
-                "name": "test_dataset",
-                "version": "1.0",
-                "local_path": "/tmp/data",
-                "schema": {"labels": ["PER", "ORG"]},
-                "split_seed": 42,
-            },
-            "hpo_config": {
-                "search_space": {
-                    "learning_rate": {"type": "loguniform", "low": 1e-5, "high": 1e-3},
-                    "batch_size": {"type": "choice", "choices": [4, 8, 16]},
-                },
-                "objective": {"metric": "macro-f1", "direction": "maximize"},
-                "k_fold": {"enabled": True, "n_splits": 2},
-                "sampling": {"algorithm": "random"},
-            },
-            "train_config": {
-                "max_steps": 1000,
-                "num_epochs": 3,
-                "seed_policy": "fixed",
-                "eval": {
-                    "evaluator_version": "v1",
-                    "metric": {"name": "macro-f1"},
-                },
-            },
-            "backbone": "distilbert-base-uncased",
-        }
 
     def test_v2_hash_computation_always_succeeds(self, sample_configs):
         """Test that v2 hash computation always succeeds with fallbacks."""
@@ -207,27 +230,6 @@ class TestHashConsistency:
 
 class TestRunTagConsistency:
     """Test that tags are set consistently across run types."""
-
-    @pytest.fixture
-    def config_dir(self, tmp_path):
-        """Create a temporary config directory."""
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        # Create minimal tags.yaml
-        tags_yaml = config_dir / "tags.yaml"
-        tags_yaml.write_text("""
-grouping:
-  study_key_hash: "code.study_key_hash"
-  trial_key_hash: "code.trial_key_hash"
-process:
-  stage: "code.stage"
-fingerprint:
-  data: "code.fingerprint.data"
-  eval: "code.fingerprint.eval"
-refit:
-  of_trial_run_id: "code.refit.of_trial_run_id"
-""")
-        return config_dir
 
     def test_parent_run_has_v2_tags(self, config_dir, sample_configs):
         """Test that parent run gets v2 study_key_hash tag."""

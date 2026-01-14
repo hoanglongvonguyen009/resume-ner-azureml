@@ -27,21 +27,10 @@ lifecycle:
 """
 
 """HPO-specific key building (study, trial, family)."""
-import hashlib
 import json
 from typing import Any, Dict, Optional
 
-def _compute_hash_64(data: str) -> str:
-    """
-    Compute full SHA256 hash (64 hex characters).
-
-    Args:
-        data: String to hash.
-
-    Returns:
-        64-character hex hash.
-    """
-    return hashlib.sha256(data.encode('utf-8')).hexdigest()
+from common.shared.hash_utils import compute_hash_64
 
 def _normalize_hyperparameters(params: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -156,7 +145,7 @@ def build_hpo_study_key_hash(study_key: str) -> str:
     Returns:
         64-character hex hash.
     """
-    return _compute_hash_64(study_key)
+    return compute_hash_64(study_key)
 
 def build_hpo_study_family_key(
     data_config: Dict[str, Any],
@@ -227,7 +216,7 @@ def build_hpo_study_family_hash(study_family_key: str) -> str:
     Returns:
         64-character hex hash.
     """
-    return _compute_hash_64(study_family_key)
+    return compute_hash_64(study_family_key)
 
 def build_hpo_trial_key(
     study_key_hash: str,
@@ -268,7 +257,7 @@ def build_hpo_trial_key_hash(trial_key: str) -> str:
     Returns:
         64-character hex hash.
     """
-    return _compute_hash_64(trial_key)
+    return compute_hash_64(trial_key)
 
 
 def compute_data_fingerprint(data_config: Dict[str, Any]) -> str:
@@ -292,7 +281,7 @@ def compute_data_fingerprint(data_config: Dict[str, Any]) -> str:
     # Prefer content-based identity
     content_hash = data_config.get("content_hash") or data_config.get("manifest_hash")
     if content_hash:
-        return _compute_hash_64(str(content_hash))
+        return compute_hash_64(str(content_hash))
     
     # Fallback: semantic identity
     fallback_payload = {
@@ -302,7 +291,7 @@ def compute_data_fingerprint(data_config: Dict[str, Any]) -> str:
         "label_mapping": data_config.get("label_mapping", {}),
         "schema": data_config.get("schema", {}),
     }
-    return _compute_hash_64(json.dumps(fallback_payload, sort_keys=True, separators=(',', ':')))
+    return compute_hash_64(json.dumps(fallback_payload, sort_keys=True, separators=(',', ':')))
 
 
 def compute_eval_fingerprint(eval_config: Dict[str, Any]) -> str:
@@ -324,7 +313,7 @@ def compute_eval_fingerprint(eval_config: Dict[str, Any]) -> str:
         "thresholding": eval_config.get("thresholding", {}),
         "full_eval_config": eval_config,  # Include full config for stability
     }
-    return _compute_hash_64(json.dumps(fingerprint_payload, sort_keys=True, separators=(',', ':')))
+    return compute_hash_64(json.dumps(fingerprint_payload, sort_keys=True, separators=(',', ':')))
 
 
 def build_hpo_study_key_v2(

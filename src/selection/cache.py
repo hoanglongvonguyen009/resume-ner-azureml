@@ -2,8 +2,6 @@ from __future__ import annotations
 
 """Cache management for best model selection with validation."""
 
-import hashlib
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -12,51 +10,11 @@ from mlflow.tracking import MlflowClient
 
 from infrastructure.paths import get_cache_file_path, save_cache_with_dual_strategy
 from common.shared.json_cache import load_json
+from common.shared.hash_utils import compute_selection_cache_key, compute_json_hash
 
 from common.shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
-
-
-def compute_selection_cache_key(
-    experiment_name: str,
-    selection_config: Dict[str, Any],
-    tags_config: Dict[str, Any],
-    benchmark_experiment_id: str,
-    tracking_uri: Optional[str] = None,
-) -> str:
-    """
-    Compute cache key (fingerprint) for best model selection.
-    
-    Includes all factors that affect selection result:
-    - experiment_name
-    - selection_config (weights, metrics, filters)
-    - tags_config (tag keys)
-    - benchmark_experiment_id
-    - tracking_uri (optional, for workspace isolation)
-    
-    Args:
-        experiment_name: Name of the experiment.
-        selection_config: Selection configuration dict.
-        tags_config: Tags configuration dict.
-        benchmark_experiment_id: MLflow experiment ID for benchmark runs.
-        tracking_uri: Optional MLflow tracking URI.
-    
-    Returns:
-        16-character hex fingerprint.
-    """
-    cache_data = {
-        "experiment_name": experiment_name,
-        "selection_config": selection_config,
-        "tags_config": tags_config,
-        "benchmark_experiment_id": benchmark_experiment_id,
-    }
-    if tracking_uri:
-        cache_data["tracking_uri"] = tracking_uri
-    
-    # Sort keys for deterministic JSON
-    cache_json = json.dumps(cache_data, sort_keys=True, default=str)
-    return hashlib.sha256(cache_json.encode('utf-8')).hexdigest()[:16]
 
 
 def load_cached_best_model(
@@ -233,12 +191,8 @@ def save_best_model_cache(
     )
     
     # Compute config hashes for reference
-    selection_config_hash = hashlib.sha256(
-        json.dumps(selection_config, sort_keys=True, default=str).encode()
-    ).hexdigest()[:16]
-    tags_config_hash = hashlib.sha256(
-        json.dumps(tags_config, sort_keys=True, default=str).encode()
-    ).hexdigest()[:16]
+    selection_config_hash = compute_json_hash(selection_config, length=16)
+    tags_config_hash = compute_json_hash(tags_config, length=16)
     
     # Prepare cache payload
     backbone = best_model.get("backbone", "unknown")
