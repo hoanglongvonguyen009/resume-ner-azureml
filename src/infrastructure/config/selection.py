@@ -1,3 +1,29 @@
+"""
+@meta
+name: selection_config
+type: utility
+domain: config
+responsibility:
+  - Centralized selection config utilities
+  - Extract and validate selection configuration
+  - Champion selection settings and objective direction (with migration support)
+inputs:
+  - Selection configuration dictionaries
+outputs:
+  - Extracted configuration values
+  - Validated settings
+tags:
+  - utility
+  - config
+  - selection
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Centralized selection config utilities.
 
 Provides utilities for extracting and validating selection configuration,

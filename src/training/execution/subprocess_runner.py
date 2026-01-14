@@ -1,3 +1,31 @@
+"""
+@meta
+name: subprocess_runner
+type: utility
+domain: training
+responsibility:
+  - Subprocess execution infrastructure for training runs
+  - Build training commands and set up execution environments
+  - Run training subprocesses for HPO trials, refit, and final training
+inputs:
+  - Training options
+  - MLflow configuration
+  - Fold configuration (for CV)
+outputs:
+  - Subprocess execution results
+tags:
+  - utility
+  - training
+  - subprocess
+  - execution
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Subprocess execution infrastructure for training runs.
 
 This module provides unified functions for building training commands,

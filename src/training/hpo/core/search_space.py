@@ -1,3 +1,29 @@
+"""
+@meta
+name: search_space
+type: utility
+domain: hpo
+responsibility:
+  - Search space translation utilities for HPO configurations
+  - Translate between HPO config format and Optuna/Azure ML formats
+inputs:
+  - HPO configuration dictionaries
+  - Optuna trial objects
+outputs:
+  - Translated hyperparameter dictionaries
+tags:
+  - utility
+  - hpo
+  - optuna
+  - azureml
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Search space translation utilities for HPO configurations.
 
 Provides unified translation between HPO config format and both Optuna and Azure ML formats.

@@ -1,10 +1,36 @@
+"""
+@meta
+name: test_config_loader
+type: test
+scope: integration
+domain: testing
+responsibility:
+  - Configuration loading for HPO pipeline tests
+  - Load and cache test configuration from YAML files
+covers:
+  - Test configuration loading
+  - Config caching
+excludes:
+  - Unit tests
+tags:
+  - test
+  - integration
+  - config
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Configuration loading for HPO pipeline tests.
 
 This module is responsible solely for loading and caching test configuration
 from YAML files. It provides no business logic or presentation functionality.
 """
 
-import yaml
+import yaml  # type: ignore[import-untyped]  # types-PyYAML not installed
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -57,9 +83,11 @@ def load_hpo_test_config(
         )
     
     with config_path.open("r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+        config_raw: Any = yaml.safe_load(f)
+        config: Dict[str, Any] = config_raw if isinstance(config_raw, dict) else {}
     
-    return config.get("hpo_pipeline_tests", {})
+    result: Dict[str, Any] = config.get("hpo_pipeline_tests", {})
+    return result if isinstance(result, dict) else {}
 
 
 def get_test_config(root_dir: Optional[Path] = None) -> Dict[str, Any]:

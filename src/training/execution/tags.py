@@ -1,3 +1,30 @@
+"""
+@meta
+name: tags
+type: utility
+domain: training
+responsibility:
+  - Apply lineage tags to final training MLflow runs
+  - Link final training runs back to HPO origins
+inputs:
+  - MLflow experiment name
+  - Naming context
+  - Lineage dictionary
+outputs:
+  - Tagged MLflow runs
+tags:
+  - utility
+  - training
+  - mlflow
+  - tags
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Lineage tag setting utilities for final training."""
 
 from __future__ import annotations

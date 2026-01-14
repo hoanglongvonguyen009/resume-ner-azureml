@@ -1,3 +1,29 @@
+"""
+@meta
+name: extractors
+type: utility
+domain: deployment
+responsibility:
+  - Text extraction from PDF and image files
+  - Detect file types and validate files
+  - Extract text using various extractors (pymupdf, pdfplumber, easyocr, pytesseract)
+inputs:
+  - File uploads
+  - File content bytes
+outputs:
+  - Extracted text
+tags:
+  - utility
+  - api
+  - text-extraction
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Text extraction from PDF and image files."""
 
 import io

@@ -1,3 +1,30 @@
+"""
+@meta
+name: hpo_test_helpers
+type: test
+scope: integration
+domain: testing
+responsibility:
+  - Backward compatibility module for HPO pipeline testing
+  - Re-export functions and constants from refactored modules
+covers:
+  - Config loading
+  - Result formatting
+  - Dataset validation
+excludes:
+  - Unit tests
+tags:
+  - test
+  - integration
+  - compatibility
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Backward compatibility module for HPO pipeline testing.
 
 This module re-exports functions and constants from the refactored modules

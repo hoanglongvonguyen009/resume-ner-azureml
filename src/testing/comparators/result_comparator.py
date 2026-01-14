@@ -1,3 +1,29 @@
+"""
+@meta
+name: result_comparator
+type: test
+scope: integration
+domain: testing
+responsibility:
+  - Result comparison for HPO pipeline tests
+  - Compare test results and compute comparison metrics
+covers:
+  - Test result comparison
+  - Comparison metrics
+excludes:
+  - Unit tests
+tags:
+  - test
+  - integration
+  - comparison
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Result comparison for HPO pipeline tests.
 
 This module is responsible solely for comparing test results and computing

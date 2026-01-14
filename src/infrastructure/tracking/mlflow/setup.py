@@ -1,3 +1,29 @@
+"""
+@meta
+name: setup
+type: utility
+domain: tracking
+responsibility:
+  - MLflow experiment setup utilities
+  - Set up MLflow tracking for different stages
+inputs:
+  - Experiment names
+  - Tracking URIs
+outputs:
+  - Configured MLflow tracking
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - setup
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """MLflow experiment setup utilities.
 
 This module provides functions for setting up MLflow tracking for different stages.

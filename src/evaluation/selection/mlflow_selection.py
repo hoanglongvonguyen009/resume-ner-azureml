@@ -1,3 +1,31 @@
+"""
+@meta
+name: mlflow_selection
+type: utility
+domain: selection
+responsibility:
+  - MLflow-based best model selection
+  - Join benchmark runs with training (refit) runs
+  - Compute normalized composite scores
+inputs:
+  - Benchmark experiment
+  - HPO experiments
+  - Tags configuration
+  - Selection configuration
+outputs:
+  - Best model selection result
+tags:
+  - utility
+  - selection
+  - mlflow
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """MLflow-based best model selection from benchmark and training runs."""
 
 from __future__ import annotations
@@ -10,6 +38,10 @@ from common.shared.logging_utils import get_logger
 from infrastructure.naming.mlflow.tags_registry import TagsRegistry
 
 logger = get_logger(__name__)
+
+# MLflow query limits
+DEFAULT_MLFLOW_MAX_RESULTS = 2000  # Default limit for MLflow run queries
+LARGE_MLFLOW_MAX_RESULTS = 5000  # Large limit for comprehensive queries
 
 
 def find_best_model_from_mlflow(
@@ -104,7 +136,7 @@ def find_best_model_from_mlflow(
     all_benchmark_runs = client.search_runs(
         experiment_ids=[benchmark_experiment["id"]],
         filter_string="",
-        max_results=2000,
+        max_results=DEFAULT_MLFLOW_MAX_RESULTS,
     )
 
     # Filter for finished runs in Python (more reliable than MLflow filter on Azure ML)
@@ -139,7 +171,7 @@ def find_best_model_from_mlflow(
         all_hpo_runs = client.search_runs(
             experiment_ids=[exp_info["id"]],
             filter_string="",
-            max_results=5000,
+            max_results=LARGE_MLFLOW_MAX_RESULTS,
         )
 
         # Filter for finished runs in Python

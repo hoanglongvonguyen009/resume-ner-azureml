@@ -1,3 +1,28 @@
+"""
+@meta
+name: health_routes
+type: utility
+domain: deployment
+responsibility:
+  - Health and model information endpoints
+  - Health check and model info endpoints
+inputs:
+  - API requests
+outputs:
+  - Health and model information responses
+tags:
+  - utility
+  - api
+  - routes
+  - health
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Health and model information endpoints."""
 
 from fastapi import HTTPException, status

@@ -1,3 +1,30 @@
+"""
+@meta
+name: inference
+type: utility
+domain: deployment
+responsibility:
+  - ONNX inference engine for NER predictions
+  - Facade for model loading, inference execution, and entity decoding
+inputs:
+  - ONNX model paths
+  - Checkpoint directories
+  - Input texts
+outputs:
+  - Entity predictions
+tags:
+  - utility
+  - api
+  - inference
+  - onnx
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """ONNX inference engine for NER predictions."""
 
 from pathlib import Path

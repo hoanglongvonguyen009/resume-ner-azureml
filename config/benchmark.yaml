@@ -11,7 +11,7 @@ run:
   # - Skips benchmarking if finished run exists with matching benchmark_key
   # - Falls back to trial_key_hash + study_key_hash for backward compatibility
   # Note: HPO no longer uses run.mode - benchmark mode is independent
-  mode: force_new
+  mode: reuse_if_exists
 
 benchmarking:
   # Batch sizes to test during benchmarking

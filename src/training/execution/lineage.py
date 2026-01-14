@@ -1,3 +1,27 @@
+"""
+@meta
+name: lineage
+type: utility
+domain: training
+responsibility:
+  - Extract lineage information from best model selection
+  - Normalize HPO lineage tags for final training
+inputs:
+  - Best model dictionary from selection
+outputs:
+  - Normalized lineage dictionary
+tags:
+  - utility
+  - training
+  - lineage
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Lineage extraction utilities for final training."""
 
 from __future__ import annotations

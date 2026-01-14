@@ -1,3 +1,27 @@
+"""
+@meta
+name: exception_handlers
+type: utility
+domain: deployment
+responsibility:
+  - Exception handlers for FastAPI application
+  - Register exception handlers for API errors
+inputs:
+  - FastAPI application instance
+outputs:
+  - Registered exception handlers
+tags:
+  - utility
+  - api
+  - exceptions
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Exception handlers for FastAPI application."""
 
 from fastapi import FastAPI

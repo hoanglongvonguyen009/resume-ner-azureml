@@ -1,3 +1,31 @@
+"""
+@meta
+name: trainer
+type: utility
+domain: training
+responsibility:
+  - Training loop utilities
+  - Prepare data loaders and training infrastructure
+  - Execute training loops with DDP support
+inputs:
+  - Training configuration
+  - Datasets and tokenizers
+  - Model configurations
+outputs:
+  - Trained models
+  - Training metrics
+tags:
+  - utility
+  - training
+  - ddp
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Training loop utilities."""
 
 import sys

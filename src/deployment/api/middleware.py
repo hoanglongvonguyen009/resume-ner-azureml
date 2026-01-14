@@ -1,3 +1,27 @@
+"""
+@meta
+name: middleware
+type: utility
+domain: deployment
+responsibility:
+  - Custom middleware for the API
+  - Request logging and timing
+inputs:
+  - FastAPI requests
+outputs:
+  - Logged requests with timing headers
+tags:
+  - utility
+  - api
+  - middleware
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Custom middleware for the API."""
 
 import time

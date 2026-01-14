@@ -1,3 +1,30 @@
+"""
+@meta
+name: artifact_unified_validation
+type: utility
+domain: selection
+responsibility:
+  - Artifact-kind-specific validation
+  - Validate checkpoints, metadata, configs, logs, and metrics
+  - Check essential files for each artifact kind
+inputs:
+  - Artifact kind
+  - Artifact paths
+outputs:
+  - Validation results (is_valid, error_message)
+tags:
+  - utility
+  - selection
+  - artifacts
+  - validation
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Artifact-kind-specific validation.
 
 This module provides validation functions for different artifact kinds.

@@ -1,3 +1,28 @@
+"""
+@meta
+name: api_app
+type: script
+domain: deployment
+responsibility:
+  - FastAPI application for NER predictions
+  - Main entry point for the API service
+  - Register routes, middleware, and exception handlers
+inputs:
+  - API configuration
+outputs:
+  - FastAPI application instance
+tags:
+  - entrypoint
+  - api
+  - fastapi
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """FastAPI application for NER predictions."""
 
 from fastapi import FastAPI

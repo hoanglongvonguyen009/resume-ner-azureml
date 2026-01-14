@@ -1,3 +1,29 @@
+"""
+@meta
+name: result_aggregator
+type: test
+scope: integration
+domain: testing
+responsibility:
+  - Result aggregation for HPO pipeline tests
+  - Aggregate and transform test results
+covers:
+  - Test result aggregation
+  - Result transformation
+excludes:
+  - Unit tests
+tags:
+  - test
+  - integration
+  - aggregation
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Result aggregation for HPO pipeline tests.
 
 This module is responsible solely for aggregating and transforming test results.

@@ -1,3 +1,32 @@
+"""
+@meta
+name: local_selection_v2
+type: utility
+domain: selection
+responsibility:
+  - Improved best configuration selection from local Optuna HPO studies
+  - Config-aware study folder discovery
+  - CV-based trial selection with deterministic fold ordering
+inputs:
+  - HPO output directories
+  - HPO configuration
+  - Backbone names
+outputs:
+  - Best trial information
+  - Study folder paths
+tags:
+  - utility
+  - selection
+  - hpo
+  - optuna
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Improved best configuration selection from local Optuna HPO studies.
 
 This module provides config-aware study folder discovery and CV-based trial selection.
@@ -21,6 +50,9 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+# Sentinel value for fold index when fold number cannot be extracted
+_INVALID_FOLD_INDEX = 10**9
+
 
 def parse_version_from_name(name: str) -> Optional[Tuple[int, int, int]]:
     """
@@ -43,7 +75,7 @@ def parse_version_from_name(name: str) -> Optional[Tuple[int, int, int]]:
 def fold_index(name: str) -> int:
     """Extract numeric fold index from folder name (e.g., 'fold0' -> 0, 'fold10' -> 10)."""
     m = re.search(r'fold(\d+)', name)
-    return int(m.group(1)) if m else 10**9
+    return int(m.group(1)) if m else _INVALID_FOLD_INDEX
 
 
 def find_study_folder_by_config(

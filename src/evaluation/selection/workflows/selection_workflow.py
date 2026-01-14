@@ -1,3 +1,31 @@
+"""
+@meta
+name: selection_workflow
+type: utility
+domain: selection
+responsibility:
+  - Orchestrate best model selection from MLflow
+  - Coordinate checkpoint acquisition with fallback strategies
+  - Cache selection results for idempotency
+inputs:
+  - MLflow benchmark and HPO experiments
+  - Selection configuration
+  - Artifact acquisition configuration
+outputs:
+  - Best model metadata
+  - Checkpoint directory path
+tags:
+  - workflow
+  - mlflow
+  - selection
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Best model selection workflow."""
 
 from pathlib import Path
@@ -13,6 +41,9 @@ from evaluation.selection.workflows.utils import validate_checkpoint_for_reuse
 from common.shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
+
+# Constants
+MAX_MLFLOW_SEARCH_RESULTS = 100  # Maximum results to fetch from MLflow search
 
 
 def run_selection_workflow(
@@ -118,7 +149,7 @@ def run_selection_workflow(
             benchmark_runs = client.search_runs(
                 experiment_ids=[benchmark_experiment["id"]],
                 filter_string="",
-                max_results=100,
+                max_results=MAX_MLFLOW_SEARCH_RESULTS,
             )
             finished_benchmark_runs = [r for r in benchmark_runs if r.info.status == "FINISHED"]
             
@@ -132,7 +163,7 @@ def run_selection_workflow(
                 hpo_runs = client.search_runs(
                     experiment_ids=[exp_info["id"]],
                     filter_string="",
-                    max_results=100,
+                    max_results=MAX_MLFLOW_SEARCH_RESULTS,
                 )
                 finished_hpo_runs = [r for r in hpo_runs if r.info.status == "FINISHED"]
                 hpo_run_counts[backbone] = len(finished_hpo_runs)
@@ -270,9 +301,9 @@ def run_selection_workflow(
                 
                 if validate_checkpoint_for_reuse(checkpoint_path, refit_run_id):
                     best_model_checkpoint_path = checkpoint_path
-                    reuse_reason = f"keys=(backbone={backbone}, study={study_key_hash[:8]}..., trial={trial_key_hash[:8]}...)"
+                    reuse_reason = f"keys=(backbone={fallback_backbone}, study={study_key_hash[:8]}..., trial={trial_key_hash[:8]}...)"
                 else:
-                    logger.warning(f"Checkpoint validation failed for {backbone}/{study_key_hash[:8]}..., will re-acquire")
+                    logger.warning(f"Checkpoint validation failed for {fallback_backbone}/{study_key_hash[:8]}..., will re-acquire")
     
     # Use cached checkpoint or acquire new one
     if best_model_checkpoint_path:

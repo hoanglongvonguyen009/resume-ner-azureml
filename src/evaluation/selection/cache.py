@@ -1,3 +1,31 @@
+"""
+@meta
+name: cache
+type: utility
+domain: selection
+responsibility:
+  - Cache management for best model selection
+  - Cache key computation and validation
+  - Cache loading and saving with dual strategy
+inputs:
+  - Selection configuration
+  - Tags configuration
+  - MLflow experiment info
+outputs:
+  - Cached best model selection
+  - Cache files (timestamped, latest, index)
+tags:
+  - utility
+  - selection
+  - caching
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Cache management for best model selection with validation."""
 
 from __future__ import annotations

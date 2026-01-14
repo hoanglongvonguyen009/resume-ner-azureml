@@ -1,3 +1,28 @@
+"""
+@meta
+name: cv_utils
+type: utility
+domain: training
+responsibility:
+  - Cross-validation utilities for k-fold splitting and management
+  - Generate fold splits and manage CV data
+inputs:
+  - Datasets
+  - CV configuration
+outputs:
+  - Fold splits and fold data
+tags:
+  - utility
+  - training
+  - cross-validation
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Cross-validation utilities for k-fold splitting and management."""
 
 import json

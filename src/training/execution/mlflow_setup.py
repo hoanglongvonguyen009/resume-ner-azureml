@@ -1,3 +1,30 @@
+"""
+@meta
+name: mlflow_setup
+type: utility
+domain: training
+responsibility:
+  - Create MLflow runs for training execution
+  - Set up MLflow tracking for training subprocesses
+  - Manage MLflow run lifecycle
+inputs:
+  - Experiment names
+  - Run names and tags
+  - Parent run IDs (for child runs)
+outputs:
+  - MLflow run IDs and run objects
+tags:
+  - utility
+  - training
+  - mlflow
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """MLflow setup utilities for training execution.
 
 This module provides functions for creating MLflow runs and setting up

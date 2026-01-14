@@ -1,3 +1,29 @@
+"""
+@meta
+name: artifact_unified_compat
+type: utility
+domain: selection
+responsibility:
+  - Backward compatibility wrapper for existing artifact acquisition API
+  - Wrap unified acquisition system for legacy code
+inputs:
+  - Best run information
+  - Acquisition and selection configuration
+outputs:
+  - Checkpoint paths
+tags:
+  - utility
+  - selection
+  - artifacts
+  - compatibility
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Backward compatibility wrapper for existing artifact acquisition API.
 
 This module provides compatibility functions that wrap the unified acquisition system

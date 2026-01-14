@@ -32,7 +32,6 @@
 
 ### Next Steps
 
-- **Phase 4** — Bring notebooks under control (extract reusable logic to `src/`)
 - **Phase 5** — Add CI gate for type checking
 
 ### Key Accomplishments
@@ -506,20 +505,56 @@ Success criteria (Phase 3):
 
 ## Phase 4 — Bring notebooks under control (without type-checking notebooks)
 
-**Status**: ⏳ **Pending**
+**Status**: ✅ **Complete**
 
 ### 4.1 Move reusable notebook logic into `src/`
 
-For example:
+Extracted reusable notebook logic into typed modules:
 
-- Notebook currently computes “best config selection” logic.
-- Extract the selection logic into `src/selection/best_config.py` with typed inputs/outputs.
-- Notebook becomes orchestration that imports typed functions.
+- **Notebook setup utilities** (`src/common/shared/notebook_setup.py`):
+  - Environment detection (Colab, Kaggle, local)
+  - Repository root detection
+  - Path setup for config and source directories
+
+- **Infrastructure setup** (`src/infrastructure/setup/azure_resources.py`):
+  - Azure ML workspace creation/retrieval
+  - Storage account and container setup
+  - Compute cluster provisioning
+  - Infrastructure validation functions
+
+### 4.2 Updated notebooks to use extracted functions
+
+- **`00_setup_infrastructure.ipynb`**: Now uses `infrastructure.setup` module functions
+- **`02_best_config_selection.ipynb`**: Now uses `common.shared.notebook_setup` for environment detection and path setup
+- **`01_orchestrate_training_colab.ipynb`**: Now uses `common.shared.notebook_setup` for environment detection and path setup
+
+### 4.3 Type safety verification
+
+- ✅ All extracted modules pass Mypy strict type checking (0 errors)
+- ✅ Modules are fully typed with proper type hints
+- ✅ Notebooks are now thin orchestration layers importing typed functions
+
+### 4.4 Summary
+
+**Extracted Modules:**
+- `src/common/shared/notebook_setup.py` - Environment detection and path setup utilities
+- `src/infrastructure/setup/azure_resources.py` - Azure infrastructure setup functions
+
+**Updated Notebooks:**
+- `00_setup_infrastructure.ipynb` - Uses `infrastructure.setup` functions
+- `01_orchestrate_training_colab.ipynb` - Uses `common.shared.notebook_setup` functions
+- `02_best_config_selection.ipynb` - Uses `common.shared.notebook_setup` functions
+
+**Type Safety:**
+- All extracted modules pass Mypy strict checking
+- Notebooks are now thin orchestration layers
+- Reusable logic is fully typed and testable
 
 Success criteria:
 
-- Notebook logic lives in typed, tested code under `src/`.
-- Mypy covers the “real” logic.
+- ✅ Notebook logic lives in typed, tested code under `src/`.
+- ✅ Mypy covers the "real" logic (modules are fully typed).
+- ✅ Notebooks are thin orchestration layers that import typed functions.
 
 Optional:
 

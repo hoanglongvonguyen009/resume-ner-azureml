@@ -1,3 +1,27 @@
+"""
+@meta
+name: metrics
+type: utility
+domain: training
+responsibility:
+  - Metric calculation utilities
+  - Compute F1 scores and classification metrics
+inputs:
+  - True and predicted labels
+outputs:
+  - F1 scores and classification reports
+tags:
+  - utility
+  - training
+  - metrics
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Metric calculation utilities."""
 
 from typing import Dict, List, Any, Union

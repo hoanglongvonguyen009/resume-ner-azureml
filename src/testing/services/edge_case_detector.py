@@ -1,3 +1,31 @@
+"""
+@meta
+name: edge_case_detector
+type: test
+scope: integration
+domain: testing
+responsibility:
+  - Edge case detection service for HPO pipeline tests
+  - Detect edge cases in test configuration
+covers:
+  - Minimal k-fold validation
+  - Small validation sets
+  - Batch size issues
+excludes:
+  - Unit tests
+  - Presentation logic
+tags:
+  - test
+  - integration
+  - edge-cases
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Edge case detection service for HPO pipeline tests.
 
 This module is responsible solely for detecting edge cases in test configuration.
@@ -39,7 +67,7 @@ def detect_edge_cases(
     Returns:
         Dictionary with edge case detection results
     """
-    results = {
+    results: Dict[str, Any] = {
         "dataset_path": str(dataset_path),
         "edge_cases": {},
         "overall_success": False,

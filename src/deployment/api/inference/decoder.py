@@ -1,3 +1,30 @@
+"""
+@meta
+name: entity_decoder
+type: utility
+domain: deployment
+responsibility:
+  - Entity decoding from token predictions
+  - Convert token predictions to entity spans
+inputs:
+  - Model logits
+  - Token sequences
+  - Offset mappings
+outputs:
+  - Decoded entity lists
+tags:
+  - utility
+  - api
+  - inference
+  - decoding
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Entity decoding from token predictions."""
 
 import logging

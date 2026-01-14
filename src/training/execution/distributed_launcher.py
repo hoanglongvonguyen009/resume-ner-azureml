@@ -1,3 +1,30 @@
+"""
+@meta
+name: distributed_launcher
+type: utility
+domain: training
+responsibility:
+  - Launch training in single-process or DDP mode
+  - Set up distributed training environment
+  - Coordinate DDP worker processes
+inputs:
+  - Training configuration
+  - Command-line arguments
+outputs:
+  - Training execution (DDP or single-process)
+tags:
+  - utility
+  - training
+  - distributed
+  - ddp
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Distributed training launcher for DDP setup."""
 
 import os

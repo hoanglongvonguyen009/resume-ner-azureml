@@ -1,3 +1,28 @@
+"""
+@meta
+name: checkpoint_loader
+type: utility
+domain: training
+responsibility:
+  - Checkpoint path resolution and validation utilities
+  - Validate checkpoint directories and resolve paths
+inputs:
+  - Checkpoint paths
+  - Training configuration
+outputs:
+  - Resolved and validated checkpoint paths
+tags:
+  - utility
+  - training
+  - checkpoint
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Checkpoint path resolution and validation utilities."""
 
 import os

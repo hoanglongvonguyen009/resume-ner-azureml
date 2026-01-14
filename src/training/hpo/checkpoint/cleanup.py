@@ -1,3 +1,29 @@
+"""
+@meta
+name: checkpoint_cleanup
+type: utility
+domain: hpo
+responsibility:
+  - Checkpoint cleanup utilities for HPO trials
+  - Manage checkpoint lifecycle: tracking, best trial detection, cleanup
+inputs:
+  - HPO output directories
+  - HPO configuration
+  - Trial information
+outputs:
+  - Cleaned checkpoint directories
+tags:
+  - utility
+  - hpo
+  - checkpoint
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Checkpoint cleanup utilities for HPO trials.
 
 Manages checkpoint lifecycle: tracking, best trial detection, and cleanup.

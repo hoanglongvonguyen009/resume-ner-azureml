@@ -1,3 +1,26 @@
+"""
+@meta
+name: response_converters
+type: utility
+domain: deployment
+responsibility:
+  - Convert between internal entity representations and API response models
+inputs:
+  - Entity dictionaries
+outputs:
+  - Entity response models
+tags:
+  - utility
+  - api
+  - response
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Utilities for converting between internal entity representations and API response models."""
 
 from typing import List, Dict, Any

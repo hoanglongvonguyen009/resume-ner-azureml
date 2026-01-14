@@ -1,3 +1,30 @@
+"""
+@meta
+name: evaluator
+type: utility
+domain: training
+responsibility:
+  - Model evaluation utilities
+  - Extract predictions and labels from model outputs
+  - Evaluate models on validation/test sets
+inputs:
+  - Model outputs (logits, labels, masks)
+  - Data loaders
+outputs:
+  - Evaluation metrics
+  - Predictions and labels
+tags:
+  - utility
+  - training
+  - evaluation
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Model evaluation utilities."""
 
 from typing import Dict, List, Union

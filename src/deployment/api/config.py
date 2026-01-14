@@ -1,3 +1,28 @@
+"""
+@meta
+name: api_config
+type: utility
+domain: deployment
+responsibility:
+  - API configuration settings
+  - Load configuration from environment variables
+  - Validate configuration
+inputs:
+  - Environment variables
+outputs:
+  - APIConfig class with settings
+tags:
+  - utility
+  - api
+  - config
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """API configuration settings."""
 
 import os

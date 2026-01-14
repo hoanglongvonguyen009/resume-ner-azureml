@@ -1,3 +1,29 @@
+"""
+@meta
+name: logging_utils
+type: test
+scope: integration
+domain: testing
+responsibility:
+  - Logging utilities for test scripts
+  - Capture stdout/stderr and write to both console and log files
+covers:
+  - Test logging
+  - Output capture
+excludes:
+  - Unit tests
+tags:
+  - test
+  - integration
+  - logging
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Logging utilities for test scripts.
 
 This module provides shared logging functionality for capturing stdout/stderr
@@ -7,6 +33,7 @@ and writing to both console and log files.
 import logging
 import sys
 from datetime import datetime
+from io import TextIOWrapper
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -24,9 +51,9 @@ class TeeOutput:
         self.log_file = log_file
         self.original_stdout = sys.stdout
         self.original_stderr = sys.stderr
-        self.file_handle = open(log_file, "a", encoding="utf-8")
+        self.file_handle: Optional[TextIOWrapper] = open(log_file, "a", encoding="utf-8")
 
-    def write(self, message: str):
+    def write(self, message: str) -> None:
         """Write to both console and log file."""
         # Write to original stdout (console)
         self.original_stdout.write(message)
@@ -40,7 +67,7 @@ class TeeOutput:
                 # File handle may be closed during interpreter shutdown
                 pass
 
-    def flush(self):
+    def flush(self) -> None:
         """Flush both outputs."""
         self.original_stdout.flush()
         if self.file_handle is not None:
@@ -50,7 +77,7 @@ class TeeOutput:
                 # File handle may be closed during interpreter shutdown
                 pass
 
-    def close(self):
+    def close(self) -> None:
         """Close the log file and restore original stdout/stderr."""
         if self.file_handle:
             try:

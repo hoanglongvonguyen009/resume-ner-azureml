@@ -122,7 +122,7 @@ def run_random_seed_variants(
     Returns:
         Dictionary mapping seed numbers to their HPO results
     """
-    results = {}
+    results: Dict[int, Dict[str, Any]] = {}
 
     if not seeds:
         return results
@@ -173,7 +173,7 @@ def run_deterministic_hpo_multiple_backbones(
     Returns:
         Dictionary mapping backbone names to their HPO results
     """
-    results = {}
+    results: Dict[str, Dict[str, Any] | None] = {}
     for backbone in backbones:
         backbone_output = output_dir / f"deterministic_{backbone}"
         mlflow_experiment = f"test-hpo-deterministic-{backbone}"
@@ -218,7 +218,7 @@ def run_random_seed_variants_multiple_backbones(
     """
     all_results = {}
     for backbone in backbones:
-        backbone_results = test_random_seed_variants(
+        backbone_results = run_random_seed_variants(
             dataset_base_path=dataset_base_path,
             seeds=seeds,
             config_dir=config_dir,
@@ -381,7 +381,7 @@ def run_all_tests(
     edge_case_results = None
 
     if not skip_deterministic:
-        deterministic_results = test_deterministic_hpo(
+        deterministic_results = run_deterministic_hpo(
             dataset_path=deterministic_dataset,
             config_dir=config_dir,
             hpo_config=hpo_config,
@@ -391,7 +391,7 @@ def run_all_tests(
         )
 
     if not skip_random:
-        random_seed_results = test_random_seed_variants(
+        random_seed_results = run_random_seed_variants(
             dataset_base_path=deterministic_dataset,
             seeds=random_seeds,
             config_dir=config_dir,
@@ -402,17 +402,17 @@ def run_all_tests(
         )
 
     if not skip_kfold:
-        kfold_results = test_kfold_validation(
+        kfold_results = run_kfold_validation(
             dataset_path=deterministic_dataset,
             hpo_config=hpo_config,
         )
 
     if not skip_edge_cases:
-        k_too_large_results = test_edge_case_k_too_large(
+        k_too_large_results = run_edge_case_k_too_large(
             dataset_path=deterministic_dataset,
         )
 
-        edge_case_results = test_edge_cases_suite(
+        edge_case_results = run_edge_cases_suite(
             dataset_path=deterministic_dataset,
             hpo_config=hpo_config,
             train_config=train_config,

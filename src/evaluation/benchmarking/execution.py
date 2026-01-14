@@ -33,6 +33,10 @@ if TYPE_CHECKING:
     import torch
     from transformers import AutoModelForTokenClassification, AutoTokenizer
 
+# Progress reporting intervals
+WARMUP_PROGRESS_INTERVAL = 10  # Show progress every N warmup iterations
+BATCH_PROGRESS_INTERVAL = 20  # Show progress every N batch iterations
+
 
 def run_single_inference(
     model: "AutoModelForTokenClassification",
@@ -113,8 +117,8 @@ def run_warmup_iterations(
         inputs = {k: v.to(device) for k, v in inputs.items()}
         with torch.no_grad():
             _ = model(**inputs)
-        # Show progress every 10 iterations
-        if (i + 1) % 10 == 0 or (i + 1) == count:
+        # Show progress every N iterations
+        if (i + 1) % WARMUP_PROGRESS_INTERVAL == 0 or (i + 1) == count:
             print(f" {i + 1}/{count}", flush=True, end="")
     print(" done.", flush=True)
 
@@ -166,8 +170,8 @@ def run_batch_inference(
         latency_ms = (end - start) * 1000
         latencies.append(latency_ms)
         
-        # Show progress every 20 iterations
-        if (i + 1) % 20 == 0 or (i + 1) == num_iterations:
+        # Show progress every N iterations
+        if (i + 1) % BATCH_PROGRESS_INTERVAL == 0 or (i + 1) == num_iterations:
             print(f" {i + 1}/{num_iterations}", flush=True, end="")
     print(" done.", flush=True)
     

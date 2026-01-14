@@ -1,4 +1,33 @@
 """
+@meta
+name: artifact_acquisition
+type: utility
+domain: selection
+responsibility:
+  - Checkpoint acquisition for best model selection
+  - Local-first artifact loading with MLflow fallback
+  - Checkpoint validation and extraction
+inputs:
+  - Best model selection results
+  - MLflow run information
+  - Local disk paths
+outputs:
+  - Checkpoint directories
+  - Extracted model artifacts
+tags:
+  - utility
+  - selection
+  - artifacts
+  - mlflow
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""
 Artifact acquisition utilities for best model selection.
 
 This module provides robust checkpoint acquisition with local-first priority,

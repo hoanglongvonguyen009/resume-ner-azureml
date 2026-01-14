@@ -1,3 +1,31 @@
+"""
+@meta
+name: variants
+type: utility
+domain: config
+responsibility:
+  - Shared variant computation for both final_training and hpo
+  - Compute next available variant numbers
+  - Find existing variants for any process type
+inputs:
+  - Root and config directories
+  - Process type and model information
+  - Fingerprints (for final_training) or base names (for hpo)
+outputs:
+  - Next variant numbers
+  - Existing variant lists
+tags:
+  - utility
+  - config
+  - variants
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Shared variant computation for both final_training and hpo.
 
 Generalizes existing variant logic from training.py to support:

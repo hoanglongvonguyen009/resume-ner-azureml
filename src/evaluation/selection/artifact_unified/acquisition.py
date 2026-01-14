@@ -1,3 +1,31 @@
+"""
+@meta
+name: artifact_unified_acquisition
+type: utility
+domain: selection
+responsibility:
+  - Unified artifact acquisition orchestration
+  - Coordinate discovery, validation, and download from multiple sources
+  - Support local, drive, and MLflow sources
+inputs:
+  - Artifact requests
+  - MLflow client
+  - Root and config directories
+outputs:
+  - Artifact results with validated paths
+tags:
+  - utility
+  - selection
+  - artifacts
+  - mlflow
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Main artifact acquisition orchestration.
 
 This module provides the unified API for artifact acquisition across all stages.
@@ -417,7 +445,7 @@ def _build_artifact_destination(
     request: ArtifactRequest,
     root_dir: Path,
     config_dir: Path,
-    run_selector_result: Any,  # RunSelectorResult
+    run_selector_result: RunSelectorResult,
 ) -> Path:
     """
     Build destination path for acquired artifact.
@@ -457,6 +485,9 @@ def _build_artifact_destination(
     
     # Fallback: use run_id
     run_id = run_selector_result.artifact_run_id
+    if not run_id:
+        # Last resort: use request.run_id
+        run_id = request.run_id
     return base_dir / f"{request.artifact_kind.value}_{run_id[:8]}"
 
 

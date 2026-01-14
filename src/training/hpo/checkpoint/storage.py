@@ -1,3 +1,29 @@
+"""
+@meta
+name: checkpoint_storage
+type: utility
+domain: hpo
+responsibility:
+  - Checkpoint manager for HPO study persistence
+  - Resolve checkpoint storage paths with platform awareness
+inputs:
+  - Output directories
+  - Checkpoint configuration
+  - Backbone names
+outputs:
+  - Resolved checkpoint storage paths
+tags:
+  - utility
+  - hpo
+  - checkpoint
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Checkpoint manager for HPO study persistence."""
 
 from pathlib import Path

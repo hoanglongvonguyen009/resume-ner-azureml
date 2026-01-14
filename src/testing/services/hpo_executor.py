@@ -1,3 +1,30 @@
+"""
+@meta
+name: hpo_executor
+type: test
+scope: integration
+domain: testing
+responsibility:
+  - HPO execution service for HPO pipeline tests
+  - Execute HPO sweeps and return structured results
+covers:
+  - HPO sweep execution
+  - Trial execution and results
+excludes:
+  - Unit tests
+  - Presentation logic
+tags:
+  - test
+  - integration
+  - hpo
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """HPO execution service for HPO pipeline tests.
 
 This module is responsible solely for executing HPO sweeps and returning
@@ -41,7 +68,7 @@ def run_hpo_sweep_for_dataset(
     Returns:
         Dictionary with results summary (trials, best_trial, errors, etc.)
     """
-    results = {
+    results: Dict[str, Any] = {
         "dataset_path": str(dataset_path),
         "backbone": backbone,
         "trials_completed": 0,

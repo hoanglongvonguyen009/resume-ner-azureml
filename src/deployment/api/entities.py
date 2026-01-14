@@ -1,3 +1,29 @@
+"""
+@meta
+name: entities
+type: utility
+domain: deployment
+responsibility:
+  - Entity processing utilities
+  - Merge adjacent entities of the same type
+  - Filter entities by confidence threshold
+inputs:
+  - Entity lists
+  - Confidence thresholds
+outputs:
+  - Processed entity lists
+tags:
+  - utility
+  - api
+  - entities
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Entity processing utilities."""
 
 from typing import List, Dict, Any

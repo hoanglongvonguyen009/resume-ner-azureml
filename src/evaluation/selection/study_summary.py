@@ -1,3 +1,31 @@
+"""
+@meta
+name: study_summary
+type: utility
+domain: selection
+responsibility:
+  - Display and summarize HPO study results
+  - Load Optuna studies from disk
+  - Format study summaries for display
+inputs:
+  - Optuna study objects
+  - HPO output directories
+  - Study metadata
+outputs:
+  - Formatted study summary strings
+tags:
+  - utility
+  - selection
+  - hpo
+  - display
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Utilities for displaying and summarizing HPO study results.
 
 This module provides functions to load Optuna studies, extract trial information,

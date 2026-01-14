@@ -1,3 +1,30 @@
+"""
+@meta
+name: environment_setup
+type: test
+scope: integration
+domain: testing
+responsibility:
+  - Environment setup for HPO pipeline tests
+  - Load configurations, resolve paths, initialize MLflow tracking
+covers:
+  - Test environment setup
+  - Config loading
+  - MLflow initialization
+excludes:
+  - Unit tests
+tags:
+  - test
+  - integration
+  - setup
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Environment setup for HPO pipeline tests.
 
 This module is responsible solely for loading configurations, resolving paths,
@@ -9,7 +36,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import mlflow
-import yaml
+import yaml  # type: ignore[import-untyped]  # types-PyYAML not installed
 
 from testing.fixtures.config.test_config_loader import get_test_config
 
@@ -123,7 +150,7 @@ def initialize_mlflow(root_dir: Path) -> str:
     mlflow_base = output_section.get("mlflow_dir", "mlruns")
     mlflow_dir = root_dir / mlflow_base
     mlflow_dir.mkdir(exist_ok=True)
-    mlflow_tracking_uri = mlflow_dir.as_uri()
+    mlflow_tracking_uri: str = mlflow_dir.as_uri()
     mlflow.set_tracking_uri(mlflow_tracking_uri)
     return mlflow_tracking_uri
 

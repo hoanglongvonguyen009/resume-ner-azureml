@@ -1,3 +1,30 @@
+"""
+@meta
+name: disk_loader
+type: utility
+domain: selection
+responsibility:
+  - Load trial data from disk-based HPO outputs
+  - Read metrics.json files from trial directories
+  - Extract benchmark speed scores
+inputs:
+  - HPO output directories
+  - Trial directories
+outputs:
+  - Best trial information
+  - Benchmark speed scores
+tags:
+  - utility
+  - selection
+  - disk-io
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Load trial data from disk-based HPO outputs."""
 
 from __future__ import annotations

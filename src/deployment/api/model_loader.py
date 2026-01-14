@@ -1,3 +1,28 @@
+"""
+@meta
+name: model_loader
+type: utility
+domain: deployment
+responsibility:
+  - Model loading and initialization
+  - Global model instance management
+inputs:
+  - ONNX model paths
+  - Checkpoint directories
+outputs:
+  - Initialized inference engines
+tags:
+  - utility
+  - api
+  - model-loading
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Model loading and initialization."""
 
 from pathlib import Path

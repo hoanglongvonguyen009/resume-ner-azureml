@@ -1,3 +1,30 @@
+"""
+@meta
+name: queries
+type: utility
+domain: tracking
+responsibility:
+  - MLflow query patterns for reusable querying logic
+  - Extract common MLflow query patterns for reuse
+inputs:
+  - MLflow client
+  - Experiment IDs
+  - Tag filters
+outputs:
+  - Filtered MLflow runs
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - queries
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """MLflow query patterns for reusable querying logic.
 
 Extracts common MLflow query patterns from mlflow_selection.py for reuse

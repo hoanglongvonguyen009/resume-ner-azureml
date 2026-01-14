@@ -1,3 +1,29 @@
+"""
+@meta
+name: run_decision
+type: utility
+domain: config
+responsibility:
+  - Unified run decision logic for all process types
+  - Determine whether to reuse existing or create new runs
+  - Single source of truth for run.mode-based decisions
+inputs:
+  - Configuration dictionaries
+  - Existence and completeness flags
+outputs:
+  - Reuse decision boolean
+tags:
+  - utility
+  - config
+  - decision
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Unified run decision logic for all process types.
 
 Single source of truth for determining whether to reuse existing

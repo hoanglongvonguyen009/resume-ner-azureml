@@ -1,3 +1,30 @@
+"""
+@meta
+name: dataset_validator
+type: test
+scope: integration
+domain: testing
+responsibility:
+  - Dataset validation for HPO pipeline tests
+  - Validate dataset existence and structure
+covers:
+  - Dataset existence checks
+  - Dataset structure validation
+excludes:
+  - Unit tests
+  - Presentation logic
+tags:
+  - test
+  - integration
+  - validation
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Dataset validation for HPO pipeline tests.
 
 This module is responsible solely for validating dataset existence and structure.

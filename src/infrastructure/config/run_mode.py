@@ -1,3 +1,28 @@
+"""
+@meta
+name: run_mode
+type: utility
+domain: config
+responsibility:
+  - Unified run mode extraction utility
+  - Extract run.mode from configuration with consistent defaults
+  - Single source of truth for run mode extraction
+inputs:
+  - Configuration dictionaries
+outputs:
+  - Run mode strings (reuse_if_exists, force_new, resume_if_incomplete)
+tags:
+  - utility
+  - config
+  - run-mode
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Unified run mode extraction utility.
 
 Single source of truth for run.mode extraction across all stages:

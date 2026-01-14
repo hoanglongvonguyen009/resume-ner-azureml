@@ -1,3 +1,30 @@
+"""
+@meta
+name: prediction_routes
+type: utility
+domain: deployment
+responsibility:
+  - Prediction endpoints for NER API
+  - Handle text and file prediction requests
+  - Support single and batch predictions
+inputs:
+  - Text requests
+  - File uploads
+outputs:
+  - Prediction responses with entities
+tags:
+  - utility
+  - api
+  - routes
+  - predictions
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Prediction endpoints for NER API."""
 
 import time

@@ -1,3 +1,31 @@
+"""
+@meta
+name: hash_utils
+type: utility
+domain: tracking
+responsibility:
+  - Centralized hash retrieval and computation utilities
+  - Single source of truth for hash retrieval and computation
+  - Retrieve hashes from tags (SSOT) or compute from configs
+inputs:
+  - MLflow run IDs
+  - MLflow client
+  - Configuration dictionaries
+outputs:
+  - Study and trial key hashes
+tags:
+  - utility
+  - tracking
+  - mlflow
+  - hashing
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Centralized hash retrieval and computation utilities.
 
 This module provides a single source of truth for hash retrieval and computation,

@@ -1,3 +1,29 @@
+"""
+@meta
+name: model
+type: utility
+domain: training
+responsibility:
+  - Model initialization utilities
+  - Create models and tokenizers from configuration or checkpoints
+inputs:
+  - Training configuration
+  - Label mappings
+  - Optional checkpoint paths
+outputs:
+  - Model and tokenizer instances
+tags:
+  - utility
+  - training
+  - model
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Model initialization utilities."""
 
 from typing import Dict, Any, Optional, Tuple

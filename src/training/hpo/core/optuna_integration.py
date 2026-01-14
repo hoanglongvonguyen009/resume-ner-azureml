@@ -1,3 +1,28 @@
+"""
+@meta
+name: optuna_integration
+type: utility
+domain: hpo
+responsibility:
+  - Optuna integration utilities for local HPO
+  - Lazy import of Optuna modules
+  - Create Optuna pruners from config
+inputs:
+  - HPO configuration
+outputs:
+  - Optuna modules and pruners
+tags:
+  - utility
+  - hpo
+  - optuna
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Optuna integration utilities for local HPO."""
 
 from __future__ import annotations

@@ -1,3 +1,31 @@
+"""
+@meta
+name: artifact_unified_selectors
+type: utility
+domain: selection
+responsibility:
+  - Run selector with trial→refit mapping (SSOT)
+  - Determine which MLflow run to use for artifact acquisition
+  - Map trial runs to refit runs
+inputs:
+  - Trial run IDs
+  - MLflow client
+  - Experiment IDs
+outputs:
+  - Run selector results with artifact run IDs
+tags:
+  - utility
+  - selection
+  - artifacts
+  - mlflow
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Run selector with trial→refit mapping (SSOT).
 
 This module provides the single source of truth for trial→refit run mapping.
@@ -9,10 +37,16 @@ from typing import Any, Dict, Optional
 
 from mlflow.tracking import MlflowClient
 
+from pathlib import Path
+from typing import Optional
+
 from common.shared.logging_utils import get_logger
-from evaluation.selection.artifact_unified.types import RunSelectorResult
+from evaluation.selection.artifact_unified.types import ArtifactRequest, RunSelectorResult
 
 logger = get_logger(__name__)
+
+# MLflow query limits
+SMALL_MLFLOW_MAX_RESULTS = 10  # Small limit for targeted queries
 
 
 def select_artifact_run(
@@ -80,7 +114,7 @@ def select_artifact_run(
                         f"tags.{trial_key_tag} = '{trial_key_hash}' "
                         f"AND tags.{stage_tag} = 'hpo_refit'"
                     ),
-                    max_results=10,
+                    max_results=SMALL_MLFLOW_MAX_RESULTS,
                 )
                 if refit_runs:
                     logger.debug(
@@ -96,7 +130,7 @@ def select_artifact_run(
                 refit_runs = mlflow_client.search_runs(
                     experiment_ids=[experiment_id],
                     filter_string=f"tags.{refit_of_trial_tag} = '{trial_run_id}'",
-                    max_results=10,
+                    max_results=SMALL_MLFLOW_MAX_RESULTS,
                 )
                 if refit_runs:
                     logger.debug(
@@ -150,10 +184,10 @@ def select_artifact_run(
 
 
 def select_artifact_run_from_request(
-    request: Any,  # ArtifactRequest
+    request: ArtifactRequest,
     mlflow_client: MlflowClient,
     experiment_id: str,
-    config_dir: Optional[Any] = None,
+    config_dir: Optional[Path] = None,
 ) -> RunSelectorResult:
     """
     Select artifact run from ArtifactRequest.

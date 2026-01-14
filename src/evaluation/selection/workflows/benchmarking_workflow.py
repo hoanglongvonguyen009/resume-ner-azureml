@@ -1,7 +1,38 @@
+"""
+@meta
+name: benchmarking_workflow
+type: utility
+domain: benchmarking
+responsibility:
+  - Orchestrate benchmarking of champion models
+  - Select champions from HPO experiments
+  - Coordinate artifact acquisition and benchmark execution
+inputs:
+  - HPO experiments
+  - Selection and benchmark configuration
+  - Data configuration
+outputs:
+  - Benchmark results per champion
+  - MLflow benchmark runs
+tags:
+  - workflow
+  - benchmarking
+  - mlflow
+ci:
+  runnable: false
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Benchmarking workflow for champions."""
 
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mlflow.tracking import MlflowClient
 
 from evaluation.selection.trial_finder import select_champions_for_backbones
 from evaluation.benchmarking.orchestrator import (
@@ -33,9 +64,9 @@ def run_benchmarking_workflow(
     root_dir: Path,
     config_dir: Path,
     experiment_name: str,
-    mlflow_client: Any,
+    mlflow_client: "MlflowClient",
     benchmark_experiment: Optional[Dict[str, str]] = None,
-    benchmark_tracker: Optional[Any] = None,
+    benchmark_tracker: Optional[Any] = None,  # Type depends on tracker implementation
     backup_enabled: bool = True,
     backup_to_drive: Optional[Callable[[Path, bool], bool]] = None,
     restore_from_drive: Optional[Callable[[Path, bool], bool]] = None,

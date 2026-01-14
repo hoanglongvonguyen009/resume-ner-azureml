@@ -1,3 +1,26 @@
+"""
+@meta
+name: paths_utils
+type: utility
+domain: paths
+responsibility:
+  - Path utility functions
+  - Find project root directory
+inputs:
+  - Configuration directory paths
+outputs:
+  - Project root directory paths
+tags:
+  - utility
+  - paths
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Path utility functions."""
 
 from __future__ import annotations

@@ -1,3 +1,28 @@
+"""
+@meta
+name: startup
+type: utility
+domain: deployment
+responsibility:
+  - FastAPI startup and shutdown events
+  - Initialize model on startup
+  - Cleanup on shutdown
+inputs:
+  - FastAPI application instance
+outputs:
+  - Initialized application state
+tags:
+  - utility
+  - api
+  - lifecycle
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """FastAPI startup and shutdown events."""
 
 from fastapi import FastAPI

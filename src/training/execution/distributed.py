@@ -1,3 +1,29 @@
+"""
+@meta
+name: distributed
+type: utility
+domain: training
+responsibility:
+  - Distributed training helpers and run context abstractions
+  - Environment and context management for training
+  - Hardware detection and DDP setup
+inputs:
+  - Distributed configuration
+  - Hardware environment
+outputs:
+  - Run context objects (SingleProcessContext, DDPContext)
+tags:
+  - utility
+  - training
+  - distributed
+ci:
+  runnable: true
+  needs_gpu: true
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Distributed training helpers and run context abstractions.
 
 This module is intentionally focused on environment and context management

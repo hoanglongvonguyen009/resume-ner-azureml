@@ -29,6 +29,7 @@ dependencies:
     - sentencepiece>=0.1.99  # Required for DeBERTa slow tokenizer (use_fast=False)
     - mlflow==3.5.0  # For experiment tracking (compatible with azureml-mlflow 1.61.0)
     - azureml-mlflow  # Azure ML MLflow integration
+    - optuna>=3.0.0  # Hyperparameter optimization framework
     - onnxruntime  # For Phase 2 inference (ONNX model serving)
     - onnx>=1.16.0  # Required for ONNX export/validation + onnxruntime quantization tooling
     - onnxscript>=0.1.0  # Required by PyTorch's ONNX export (torch.onnx.export) in PyTorch 2.6+

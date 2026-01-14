@@ -1,3 +1,30 @@
+"""
+@meta
+name: kfold_validator
+type: test
+scope: integration
+domain: testing
+responsibility:
+  - K-fold cross-validation validation service for HPO pipeline tests
+  - Validate k-fold CV splits
+covers:
+  - K-fold split creation
+  - Split validation
+excludes:
+  - Unit tests
+  - Presentation logic
+tags:
+  - test
+  - integration
+  - kfold
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """K-fold cross-validation validation service for HPO pipeline tests.
 
 This module is responsible solely for validating k-fold CV splits.
@@ -36,7 +63,7 @@ def validate_kfold_splits(
     Returns:
         Dictionary with validation results
     """
-    results = {
+    results: Dict[str, Any] = {
         "dataset_path": str(dataset_path),
         "k": k,
         "random_seed": random_seed,

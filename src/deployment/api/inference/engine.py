@@ -1,3 +1,31 @@
+"""
+@meta
+name: inference_engine
+type: utility
+domain: deployment
+responsibility:
+  - ONNX model loading and inference execution
+  - Load ONNX models and tokenizers
+  - Execute inference on input texts
+inputs:
+  - ONNX model paths
+  - Checkpoint directories
+  - Input texts
+outputs:
+  - Model logits and predictions
+tags:
+  - utility
+  - api
+  - inference
+  - onnx
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """ONNX model loading and inference execution."""
 
 import time

@@ -1,3 +1,30 @@
+"""
+@meta
+name: study
+type: utility
+domain: hpo
+responsibility:
+  - Optuna study management and extraction utilities
+  - Study creation, resume, and state management
+  - Extract best configuration from studies
+inputs:
+  - Optuna study objects
+  - HPO configuration
+outputs:
+  - Best trial configurations
+  - Study state
+tags:
+  - utility
+  - hpo
+  - optuna
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Optuna study management and extraction utilities for HPO.
 
 Handles study creation, resume, state management, and configuration extraction.

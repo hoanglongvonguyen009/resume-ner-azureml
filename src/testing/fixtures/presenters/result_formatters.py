@@ -1,3 +1,29 @@
+"""
+@meta
+name: result_formatters
+type: test
+scope: integration
+domain: testing
+responsibility:
+  - Presentation and formatting utilities for HPO pipeline tests
+  - Format and print test results
+covers:
+  - Test result formatting
+  - Result presentation
+excludes:
+  - Unit tests
+tags:
+  - test
+  - integration
+  - presentation
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Presentation and formatting utilities for HPO pipeline tests.
 
 This module is responsible solely for formatting and printing test results.
@@ -178,7 +204,7 @@ def print_edge_case_results(results: Dict[str, Any]) -> None:
 
 def format_test_result(
     test_name: str,
-    passed: bool,
+    passed: Optional[bool],
     details: Optional[Dict[str, Any]] = None
 ) -> str:
     """
@@ -192,7 +218,10 @@ def format_test_result(
     Returns:
         Formatted test result string
     """
-    status = "✓ PASS" if passed else "✗ FAIL"
+    if passed is None:
+        status = "? SKIP"
+    else:
+        status = "✓ PASS" if passed else "✗ FAIL"
     result = f"{test_name}: {status}"
     if details:
         for key, value in details.items():

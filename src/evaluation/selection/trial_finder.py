@@ -1,3 +1,31 @@
+"""
+@meta
+name: trial_finder
+type: utility
+domain: selection
+responsibility:
+  - Find best trials from HPO studies or disk
+  - Locate trial directories by hash or number
+  - Extract trial information from Optuna studies
+inputs:
+  - Optuna study objects
+  - HPO output directories
+  - Trial metadata
+outputs:
+  - Best trial information dictionaries
+tags:
+  - utility
+  - selection
+  - hpo
+  - optuna
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Find best trials from HPO studies or disk.
 
 This module provides utilities to locate and extract best trial information
@@ -11,8 +39,15 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
+from mlflow.tracking import MlflowClient
 
 from common.shared.logging_utils import get_logger
+
+# MLflow query limits
+DEFAULT_MLFLOW_MAX_RESULTS = 1000  # Default limit for MLflow run queries
+LARGE_MLFLOW_MAX_RESULTS = 5000  # Large limit for comprehensive queries
+SMALL_MLFLOW_MAX_RESULTS = 10  # Small limit for targeted queries
+SAMPLE_MLFLOW_MAX_RESULTS = 5  # Sample size for diagnostic queries
 
 from training.hpo.core.study import extract_best_config_from_study
 from .disk_loader import load_best_trial_from_disk
@@ -780,7 +815,7 @@ def select_champion_per_backbone(
     backbone: str,
     hpo_experiment: Dict[str, str],
     selection_config: Dict[str, Any],
-    mlflow_client: Any,
+    mlflow_client: MlflowClient,
     root_dir: Optional[Path] = None,
     config_dir: Optional[Path] = None,
 ) -> Optional[Dict[str, Any]]:
@@ -882,7 +917,7 @@ def select_champion_per_backbone(
         client=mlflow_client,
         experiment_ids=[hpo_experiment["id"]],
         required_tags=required_tags_with_backbone,
-        max_results=1000,
+        max_results=DEFAULT_MLFLOW_MAX_RESULTS,
     )
     
     # If no runs found, try without backbone tag (legacy runs may not have it)
@@ -896,7 +931,7 @@ def select_champion_per_backbone(
             client=mlflow_client,
             experiment_ids=[hpo_experiment["id"]],
             required_tags=required_tags_stage_only,
-            max_results=1000,
+            max_results=DEFAULT_MLFLOW_MAX_RESULTS,
         )
     
     # If still no runs, try legacy "hpo" stage tag (with backbone)
@@ -913,7 +948,7 @@ def select_champion_per_backbone(
             client=mlflow_client,
             experiment_ids=[hpo_experiment["id"]],
             required_tags=required_tags_with_backbone,
-            max_results=1000,
+            max_results=DEFAULT_MLFLOW_MAX_RESULTS,
         )
     
     # If still no runs, try legacy "hpo" stage tag (without backbone)
@@ -927,7 +962,7 @@ def select_champion_per_backbone(
             client=mlflow_client,
             experiment_ids=[hpo_experiment["id"]],
             required_tags=required_tags_stage_only,
-            max_results=1000,
+            max_results=DEFAULT_MLFLOW_MAX_RESULTS,
         )
     
     logger.info(
@@ -1192,7 +1227,7 @@ def select_champion_per_backbone(
                 refit_runs = mlflow_client.search_runs(
                     experiment_ids=[hpo_experiment["id"]],
                     filter_string=f"tags.code.trial_key_hash = '{champion_trial_key}' AND tags.code.stage = 'hpo_refit'",
-                    max_results=10,
+                    max_results=SMALL_MLFLOW_MAX_RESULTS,
                 )
                 if refit_runs:
                     logger.debug(
@@ -1210,7 +1245,7 @@ def select_champion_per_backbone(
                 refit_runs = mlflow_client.search_runs(
                     experiment_ids=[hpo_experiment["id"]],
                     filter_string=f"tags.{refit_of_trial_tag} = '{champion_run_id}'",
-                    max_results=10,
+                    max_results=SMALL_MLFLOW_MAX_RESULTS,
                 )
                 if refit_runs:
                     logger.debug(
@@ -1242,7 +1277,7 @@ def select_champion_per_backbone(
                 any_refit_runs = mlflow_client.search_runs(
                     experiment_ids=[hpo_experiment["id"]],
                     filter_string="tags.code.stage = 'hpo_refit'",
-                    max_results=5,  # Just need a sample
+                    max_results=SAMPLE_MLFLOW_MAX_RESULTS,  # Just need a sample
                 )
                 if any_refit_runs:
                     diagnostic_info.append(
@@ -1350,7 +1385,7 @@ def _filter_by_artifact_availability(
     check_source: str,
     artifact_tag: str,
     logger: Any,
-    mlflow_client: Any = None,
+    mlflow_client: Optional[MlflowClient] = None,
     schema_version_tag: str = "code.study.key_schema_version",
 ) -> List[Any]:
     """
@@ -1532,7 +1567,7 @@ def select_champions_for_backbones(
     backbone_values: List[str],
     hpo_experiments: Dict[str, Dict[str, str]],  # backbone -> {name, id}
     selection_config: Dict[str, Any],
-    mlflow_client: Any,
+    mlflow_client: MlflowClient,
     root_dir: Optional[Path] = None,
     config_dir: Optional[Path] = None,
     **kwargs: Any,  # Pass through to select_champion_per_backbone

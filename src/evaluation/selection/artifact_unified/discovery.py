@@ -1,3 +1,30 @@
+"""
+@meta
+name: artifact_unified_discovery
+type: utility
+domain: selection
+responsibility:
+  - Artifact discovery for local/drive/mlflow sources
+  - Check artifact availability without downloading
+  - Prioritize sources (local > drive > mlflow)
+inputs:
+  - Artifact requests
+  - Root and config directories
+outputs:
+  - Artifact locations with availability status
+tags:
+  - utility
+  - selection
+  - artifacts
+  - discovery
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Artifact discovery for local/drive/mlflow sources.
 
 This module provides discovery functions that check for artifact availability
@@ -19,6 +46,7 @@ from evaluation.selection.artifact_unified.types import (
     ArtifactRequest,
     ArtifactSource,
     AvailabilityStatus,
+    RunSelectorResult,
 )
 from evaluation.selection.artifact_unified.validation import validate_artifact
 from infrastructure.paths import build_output_path, resolve_output_path
@@ -421,7 +449,7 @@ def discover_artifact_mlflow(
     request: ArtifactRequest,
     mlflow_client: MlflowClient,
     experiment_id: str,
-    run_selector_result: Any,  # RunSelectorResult
+    run_selector_result: RunSelectorResult,
     validate: bool = False,  # MLflow discovery doesn't validate (just checks tag)
 ) -> Optional[ArtifactLocation]:
     """
@@ -438,6 +466,9 @@ def discover_artifact_mlflow(
         ArtifactLocation if available, None otherwise
     """
     artifact_run_id = run_selector_result.artifact_run_id
+    
+    if not artifact_run_id:
+        return None
     
     try:
         run = mlflow_client.get_run(artifact_run_id)
