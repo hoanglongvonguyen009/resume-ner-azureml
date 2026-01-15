@@ -38,6 +38,7 @@ from evaluation.selection.mlflow_selection import find_best_model_from_mlflow
 from evaluation.selection.cache import load_cached_best_model, save_best_model_cache
 from evaluation.selection.artifact_acquisition import acquire_best_model_checkpoint
 from evaluation.selection.workflows.utils import validate_checkpoint_for_reuse
+from infrastructure.tracking.mlflow.queries import query_runs_by_tags
 from common.shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -145,13 +146,14 @@ def run_selection_workflow(
             study_key_tag = tags_registry.key("grouping", "study_key_hash")
             trial_key_tag = tags_registry.key("grouping", "trial_key_hash")
             
-            # Check benchmark experiment
-            benchmark_runs = client.search_runs(
+            # Check benchmark experiment (use queries SSOT)
+            finished_benchmark_runs = query_runs_by_tags(
+                client=client,
                 experiment_ids=[benchmark_experiment["id"]],
+                required_tags={},  # No tag filtering for diagnostics
                 filter_string="",
                 max_results=MAX_MLFLOW_SEARCH_RESULTS,
             )
-            finished_benchmark_runs = [r for r in benchmark_runs if r.info.status == "FINISHED"]
             
             # Check HPO experiments
             hpo_run_counts = {}
@@ -160,12 +162,14 @@ def run_selection_workflow(
             stage_tag = tags_registry.key("process", "stage")
             
             for backbone, exp_info in hpo_experiments.items():
-                hpo_runs = client.search_runs(
+                # Use queries SSOT for diagnostics
+                finished_hpo_runs = query_runs_by_tags(
+                    client=client,
                     experiment_ids=[exp_info["id"]],
+                    required_tags={},  # No tag filtering for diagnostics
                     filter_string="",
                     max_results=MAX_MLFLOW_SEARCH_RESULTS,
                 )
-                finished_hpo_runs = [r for r in hpo_runs if r.info.status == "FINISHED"]
                 hpo_run_counts[backbone] = len(finished_hpo_runs)
                 
                 for run in finished_hpo_runs:

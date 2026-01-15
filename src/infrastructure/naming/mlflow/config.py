@@ -7,7 +7,9 @@ type: utility
 domain: naming
 responsibility:
   - Load MLflow configuration from YAML with caching
-  - Provide naming configuration accessors
+  - Provide naming-related configuration accessors (tags/run_name/index)
+  - Validate and apply defaults for naming and index sections
+  - Does NOT talk to MLflow tracking servers or construct run names/tags directly
 inputs:
   - Configuration directories
 outputs:

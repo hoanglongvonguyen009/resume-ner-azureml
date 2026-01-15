@@ -7,7 +7,9 @@ type: utility
 domain: naming
 responsibility:
   - Build HPO-specific keys (study, trial, family)
+  - Normalize hyperparameters for deterministic hashing
   - Compute deterministic hashes for HPO grouping
+  - Does NOT interact with Optuna/MLflow clients or perform I/O
 inputs:
   - Configuration dictionaries
   - Hyperparameters

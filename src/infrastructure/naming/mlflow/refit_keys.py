@@ -8,6 +8,7 @@ domain: naming
 responsibility:
   - Compute refit protocol fingerprints
   - Capture refit/eval protocol for reproducibility
+  - Does NOT schedule refit jobs or talk to MLflow/Optuna
 inputs:
   - Data and training configurations
 outputs:

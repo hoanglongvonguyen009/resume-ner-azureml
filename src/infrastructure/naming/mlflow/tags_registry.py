@@ -7,8 +7,9 @@ type: utility
 domain: naming
 responsibility:
   - Manage centralized MLflow tag key registry
-  - Load tag keys from config/tags.yaml
+  - Load tag keys from config/tags.yaml with caching and defaults
   - Provide tag key accessors with validation
+  - Does NOT log to MLflow or construct tag dictionaries for runs
 inputs:
   - Configuration directories
 outputs:

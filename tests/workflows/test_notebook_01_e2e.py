@@ -402,7 +402,7 @@ class TestNotebookE2E_Core:
         configs = load_all_configs(experiment_config)
         
         # Get stage-specific HPO config
-        from naming import get_stage_config
+        from infrastructure.naming.experiments import get_stage_config
         from common.shared.yaml_utils import load_yaml
         
         hpo_stage_config = get_stage_config(experiment_config, STAGE_HPO)

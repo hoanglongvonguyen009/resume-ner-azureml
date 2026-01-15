@@ -6,8 +6,10 @@ name: naming_mlflow_tags
 type: utility
 domain: naming
 responsibility:
-  - Build MLflow tags from naming contexts
-  - Construct tag dictionaries for MLflow runs
+  - Build MLflow tag dictionaries from naming contexts and registry
+  - Centralize tag key lookup and value sanitization
+  - Respect naming-related config (length limits, project name)
+  - Does NOT start MLflow runs, log metrics, or mutate tracking state
 inputs:
   - Naming contexts
   - Configuration directories

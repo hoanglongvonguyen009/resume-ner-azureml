@@ -7,7 +7,10 @@ type: utility
 domain: naming
 responsibility:
   - Load naming policy from YAML with caching
-  - Format display names using policy patterns
+  - Validate naming policy schema and placeholders
+  - Format and validate display/run names using policy patterns
+  - Parse parent_training_id into structured components
+  - Does NOT call MLflow APIs or perform tracking-side effects
 inputs:
   - Naming contexts
   - Configuration directories

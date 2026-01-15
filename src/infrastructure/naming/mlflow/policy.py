@@ -1,5 +1,31 @@
 from __future__ import annotations
 
+"""
+@meta
+name: naming_mlflow_policy_compat
+type: utility
+domain: naming
+responsibility:
+  - Provide backward-compatible re-exports for naming policy helpers
+  - Bridge legacy orchestration naming.policy module to infrastructure.naming
+  - Does NOT introduce new business logic (delegates to orchestration module)
+inputs:
+  - None (module-level compatibility only)
+outputs:
+  - Re-exported naming policy functions
+tags:
+  - utility
+  - naming
+  - policy
+  - compatibility
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: legacy
+"""
+
 """Naming policy loader and formatter for run names.
 
 This module provides backward compatibility by re-exporting from the old location.

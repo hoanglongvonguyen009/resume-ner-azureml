@@ -353,7 +353,7 @@ def test_full_workflow_e2e(
         benchmark_warmup = benchmark_settings.get("warmup_iterations", 10)
         benchmark_max_length = benchmark_settings.get("max_length", 512)
         
-        from tracking.mlflow.trackers.benchmark_tracker import MLflowBenchmarkTracker
+        from infrastructure.tracking.mlflow.trackers.benchmark_tracker import MLflowBenchmarkTracker
         benchmark_tracker = MLflowBenchmarkTracker(f"{EXPERIMENT_NAME}-benchmark")
         
         benchmark_results = benchmark_champions(

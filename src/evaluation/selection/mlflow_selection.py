@@ -6,9 +6,10 @@ name: mlflow_selection
 type: utility
 domain: selection
 responsibility:
-  - MLflow-based best model selection
+  - MLflow-based best model selection (SSOT for local selection)
   - Join benchmark runs with training (refit) runs
   - Compute normalized composite scores
+  - Uses infrastructure.tracking.mlflow.queries for all MLflow queries
 inputs:
   - Benchmark experiment
   - HPO experiments
@@ -28,7 +29,19 @@ lifecycle:
   status: active
 """
 
-"""MLflow-based best model selection from benchmark and training runs."""
+"""MLflow-based best model selection from benchmark and training runs.
+
+**Single Source of Truth (SSOT)** for local MLflow-based best model selection.
+This module provides the core selection logic that joins benchmark runs with
+training (refit) runs and computes composite scores.
+
+**Layering**:
+- This module uses `infrastructure.tracking.mlflow.queries` for all MLflow queries (SSOT for query patterns).
+- AzureML-focused selection modules (`selection.selection`, `evaluation.selection.selection`)
+  are thin wrappers that translate AzureML sweep jobs into normalized inputs for this core.
+- Workflows (`evaluation.selection.workflows.selection_workflow`) orchestrate caching and
+  artifact acquisition around this core selection function.
+"""
 
 from typing import Any, Dict, Optional, Tuple, Union
 
@@ -36,6 +49,7 @@ from mlflow.tracking import MlflowClient
 
 from common.shared.logging_utils import get_logger
 from infrastructure.naming.mlflow.tags_registry import TagsRegistry
+from infrastructure.tracking.mlflow.queries import query_runs_by_tags
 
 logger = get_logger(__name__)
 
@@ -130,18 +144,17 @@ def find_best_model_from_mlflow(
         f"  Latency aggregation: {latency_aggregation} (from {config_source}, "
         f"applied when multiple benchmark runs exist with same benchmark_key)")
 
-    # Step 1: Query benchmark runs
+    # Step 1: Query benchmark runs (use queries SSOT)
     logger.info("Querying benchmark runs...")
 
-    all_benchmark_runs = client.search_runs(
+    # Use queries SSOT - query_runs_by_tags already filters for FINISHED runs
+    benchmark_runs = query_runs_by_tags(
+        client=client,
         experiment_ids=[benchmark_experiment["id"]],
+        required_tags={},  # No tag filtering at this stage, filter by metrics/tags below
         filter_string="",
         max_results=DEFAULT_MLFLOW_MAX_RESULTS,
     )
-
-    # Filter for finished runs in Python (more reliable than MLflow filter on Azure ML)
-    benchmark_runs = [
-        run for run in all_benchmark_runs if run.info.status == "FINISHED"]
     logger.info(f"Found {len(benchmark_runs)} finished benchmark runs")
 
     # Filter benchmark runs with required metrics and grouping tags
@@ -168,15 +181,14 @@ def find_best_model_from_mlflow(
     refit_lookup: Dict[Tuple[str, str], Any] = {}
 
     for backbone, exp_info in hpo_experiments.items():
-        all_hpo_runs = client.search_runs(
+        # Use queries SSOT - query_runs_by_tags already filters for FINISHED runs
+        finished_runs = query_runs_by_tags(
+            client=client,
             experiment_ids=[exp_info["id"]],
+            required_tags={},  # No tag filtering at this stage, filter by stage below
             filter_string="",
             max_results=LARGE_MLFLOW_MAX_RESULTS,
         )
-
-        # Filter for finished runs in Python
-        finished_runs = [
-            r for r in all_hpo_runs if r.info.status == "FINISHED"]
 
         # Filter for trial runs (stage = "hpo") - these have macro-f1 metric
         trial_runs = [

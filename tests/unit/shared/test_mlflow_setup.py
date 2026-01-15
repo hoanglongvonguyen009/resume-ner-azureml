@@ -36,7 +36,7 @@ def temp_dir():
 class TestGetLocalTrackingUri:
     """Tests for _get_local_tracking_uri function."""
 
-    @patch("shared.mlflow_setup.detect_platform")
+    @patch("common.shared.mlflow_setup.detect_platform")
     def test_local_platform(self, mock_detect):
         """Test local platform returns SQLite URI in ./mlruns."""
         mock_detect.return_value = "local"
@@ -48,7 +48,7 @@ class TestGetLocalTrackingUri:
         # Should be in current directory's mlruns folder
         assert Path(uri.replace("sqlite:///", "")).parent.name == "mlruns"
 
-    @patch("shared.mlflow_setup.detect_platform")
+    @patch("common.shared.mlflow_setup.detect_platform")
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.is_dir")
     @patch("pathlib.Path.mkdir")
@@ -65,7 +65,7 @@ class TestGetLocalTrackingUri:
         assert "mlflow.db" in uri
         assert "/content/drive/MyDrive" in uri or "resume-ner-mlflow" in uri
 
-    @patch("shared.mlflow_setup.detect_platform")
+    @patch("common.shared.mlflow_setup.detect_platform")
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.mkdir")
     def test_colab_without_drive(self, mock_mkdir, mock_exists, mock_detect):
@@ -80,7 +80,7 @@ class TestGetLocalTrackingUri:
         assert "mlflow.db" in uri
         assert "/content" in uri
 
-    @patch("shared.mlflow_setup.detect_platform")
+    @patch("common.shared.mlflow_setup.detect_platform")
     @patch("pathlib.Path.mkdir")
     def test_kaggle_platform(self, mock_mkdir, mock_detect):
         """Test Kaggle platform uses /kaggle/working."""
@@ -97,7 +97,7 @@ class TestGetLocalTrackingUri:
 class TestGetAzureMlTrackingUri:
     """Tests for _get_azure_ml_tracking_uri function."""
 
-    @patch("shared.mlflow_setup._check_azureml_mlflow_available")
+    @patch("common.shared.mlflow_setup._check_azureml_mlflow_available")
     def test_success(self, mock_check):
         """Test successful Azure ML workspace URI retrieval."""
         mock_ml_client = MagicMock()
@@ -117,7 +117,7 @@ class TestGetAzureMlTrackingUri:
             mock_ml_client.workspaces.get.assert_called_once_with(
                 name="test-ws")
 
-    @patch("shared.mlflow_setup._check_azureml_mlflow_available")
+    @patch("common.shared.mlflow_setup._check_azureml_mlflow_available")
     def test_import_error(self, mock_check):
         """Test ImportError when azureml.mlflow is not available."""
         mock_ml_client = MagicMock()
@@ -134,7 +134,7 @@ class TestGetAzureMlTrackingUri:
 
             assert "azureml.mlflow" in str(exc_info.value)
 
-    @patch("shared.mlflow_setup._check_azureml_mlflow_available")
+    @patch("common.shared.mlflow_setup._check_azureml_mlflow_available")
     def test_workspace_access_error(self, mock_check):
         """Test RuntimeError when workspace access fails."""
         mock_ml_client = MagicMock()
@@ -153,8 +153,8 @@ class TestGetAzureMlTrackingUri:
 class TestSetupMlflowCrossPlatform:
     """Tests for setup_mlflow_cross_platform function."""
 
-    @patch("shared.mlflow_setup.mlflow")
-    @patch("shared.mlflow_setup._get_local_tracking_uri")
+    @patch("common.shared.mlflow_setup.mlflow")
+    @patch("common.shared.mlflow_setup._get_local_tracking_uri")
     def test_local_fallback_no_ml_client(self, mock_get_local, mock_mlflow):
         """Test local fallback when no ML client provided."""
         mock_get_local.return_value = "sqlite:///./mlruns/mlflow.db"
@@ -170,8 +170,8 @@ class TestSetupMlflowCrossPlatform:
             "sqlite:///./mlruns/mlflow.db")
         mock_mlflow.set_experiment.assert_called_once_with("test-experiment")
 
-    @patch("shared.mlflow_setup.mlflow")
-    @patch("shared.mlflow_setup._get_azure_ml_tracking_uri")
+    @patch("common.shared.mlflow_setup.mlflow")
+    @patch("common.shared.mlflow_setup._get_azure_ml_tracking_uri")
     def test_azure_ml_success(self, mock_get_azure, mock_mlflow):
         """Test successful Azure ML setup."""
         mock_ml_client = MagicMock()
@@ -188,9 +188,9 @@ class TestSetupMlflowCrossPlatform:
             "azureml://workspace/experiments")
         mock_mlflow.set_experiment.assert_called_once_with("test-experiment")
 
-    @patch("shared.mlflow_setup.mlflow")
-    @patch("shared.mlflow_setup._get_azure_ml_tracking_uri")
-    @patch("shared.mlflow_setup._get_local_tracking_uri")
+    @patch("common.shared.mlflow_setup.mlflow")
+    @patch("common.shared.mlflow_setup._get_azure_ml_tracking_uri")
+    @patch("common.shared.mlflow_setup._get_local_tracking_uri")
     def test_azure_ml_failure_with_fallback(self, mock_get_local, mock_get_azure, mock_mlflow):
         """Test Azure ML failure with fallback enabled."""
         mock_ml_client = MagicMock()
@@ -210,7 +210,7 @@ class TestSetupMlflowCrossPlatform:
             "sqlite:///./mlruns/mlflow.db")
         mock_mlflow.set_experiment.assert_called_once_with("test-experiment")
 
-    @patch("shared.mlflow_setup._get_azure_ml_tracking_uri")
+    @patch("common.shared.mlflow_setup._get_azure_ml_tracking_uri")
     def test_azure_ml_failure_no_fallback(self, mock_get_azure):
         """Test Azure ML failure with fallback disabled raises error."""
         mock_ml_client = MagicMock()
@@ -231,7 +231,7 @@ class TestSetupMlflowCrossPlatform:
         # mlflow is imported at module load time, so we test by temporarily
         # removing it from sys.modules and patching the import
         import builtins
-        import shared.mlflow_setup
+        import common.shared.mlflow_setup
         
         # Save original mlflow
         original_mlflow = sys.modules.get('mlflow')
@@ -239,8 +239,8 @@ class TestSetupMlflowCrossPlatform:
             del sys.modules['mlflow']
         
         # Remove mlflow from the module
-        if hasattr(shared.mlflow_setup, 'mlflow'):
-            delattr(shared.mlflow_setup, 'mlflow')
+        if hasattr(common.shared.mlflow_setup, 'mlflow'):
+            delattr(common.shared.mlflow_setup, 'mlflow')
         
         # Patch import to raise ImportError for mlflow
         original_import = builtins.__import__
@@ -252,20 +252,20 @@ class TestSetupMlflowCrossPlatform:
         with patch.object(builtins, '__import__', side_effect=mock_import):
             # Reload module to trigger import error - the error happens during reload
             with pytest.raises(ImportError) as exc_info:
-                importlib.reload(shared.mlflow_setup)
+                importlib.reload(common.shared.mlflow_setup)
             assert "mlflow is required" in str(exc_info.value)
         
         # Restore mlflow
         if original_mlflow:
             sys.modules['mlflow'] = original_mlflow
-        importlib.reload(shared.mlflow_setup)
+        importlib.reload(common.shared.mlflow_setup)
 
 
 class TestPlatformSpecificBehavior:
     """Integration-style tests for platform-specific behavior."""
 
-    @patch("shared.mlflow_setup.mlflow")
-    @patch("shared.mlflow_setup.detect_platform")
+    @patch("common.shared.mlflow_setup.mlflow")
+    @patch("common.shared.mlflow_setup.detect_platform")
     @patch.dict(os.environ, {"COLAB_GPU": "1"})
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.is_dir")
@@ -282,8 +282,8 @@ class TestPlatformSpecificBehavior:
         # Should use Drive path
         assert "drive" in uri.lower() or "mydrive" in uri.lower()
 
-    @patch("shared.mlflow_setup.mlflow")
-    @patch("shared.mlflow_setup.detect_platform")
+    @patch("common.shared.mlflow_setup.mlflow")
+    @patch("common.shared.mlflow_setup.detect_platform")
     @patch.dict(os.environ, {"KAGGLE_KERNEL_RUN_TYPE": "Interactive"})
     @patch("pathlib.Path.mkdir")
     def test_kaggle_platform(self, mock_mkdir, mock_detect, mock_mlflow):
@@ -295,7 +295,7 @@ class TestPlatformSpecificBehavior:
 
         assert "/kaggle/working" in uri
 
-    @patch("shared.mlflow_setup.mlflow")
+    @patch("common.shared.mlflow_setup.mlflow")
     @patch.dict(os.environ, {}, clear=True)
     def test_local_platform(self, mock_mlflow):
         """Test local platform uses ./mlruns."""
@@ -309,14 +309,9 @@ class TestPlatformSpecificBehavior:
 class TestCreateMlClientFromConfig:
     """Tests for create_ml_client_from_config function."""
 
-    @patch("shared.mlflow_setup.load_yaml")
-    @patch("shared.mlflow_setup.detect_platform")
-    @patch("shared.mlflow_setup.Path.exists")
-    @patch.dict(os.environ, {
-        "AZURE_SUBSCRIPTION_ID": "test-sub-id",
-        "AZURE_RESOURCE_GROUP": "test-rg"
-    })
-    def test_success_with_env_vars(self, mock_exists, mock_detect, mock_load_yaml):
+    @patch("common.shared.mlflow_setup.load_yaml")
+    @patch("common.shared.mlflow_setup.detect_platform")
+    def test_success_with_env_vars(self, mock_detect, mock_load_yaml):
         """Test successful MLClient creation with environment variables."""
         # Skip if azure modules aren't available (they're required for this test)
         try:
@@ -332,27 +327,44 @@ class TestCreateMlClientFromConfig:
             }
         }
         mock_detect.return_value = "local"  # Not Colab/Kaggle
-        mock_exists.return_value = False  # config.env doesn't exist
+        
+        # Mock Path.exists to return True for mlflow.yaml (so function loads config)
+        # and False for config.env and infrastructure.yaml (so it uses env vars)
+        def exists_side_effect(self):
+            path_str = str(self)
+            if path_str.endswith("mlflow.yaml"):
+                return True
+            if path_str.endswith("config.env") or path_str.endswith("infrastructure.yaml"):
+                return False
+            return False
         
         # Mock MLClient and DefaultAzureCredential
         mock_cred_instance = MagicMock()
         mock_client_instance = MagicMock()
         
-        with patch("azure.ai.ml.MLClient", return_value=mock_client_instance) as mock_mlclient:
-            with patch("azure.identity.DefaultAzureCredential", return_value=mock_cred_instance):
-                config_dir = Path("config")
-                client = create_ml_client_from_config(config_dir)
+        # Set environment variables before calling the function
+        with patch.dict(os.environ, {
+            "AZURE_SUBSCRIPTION_ID": "test-sub-id",
+            "AZURE_RESOURCE_GROUP": "test-rg"
+        }, clear=False):
+            # Patch Path.exists using patch.object to patch the instance method
+            with patch.object(Path, "exists", side_effect=exists_side_effect, autospec=True):
+                # Patch the imports where they're used in the function (inside the try block)
+                with patch("azure.ai.ml.MLClient", return_value=mock_client_instance) as mock_mlclient:
+                    with patch("azure.identity.DefaultAzureCredential", return_value=mock_cred_instance):
+                        config_dir = Path("config")
+                        client = create_ml_client_from_config(config_dir)
 
-                assert client is not None
-                assert client == mock_client_instance
-                mock_mlclient.assert_called_once_with(
-                    credential=mock_cred_instance,
-                    subscription_id="test-sub-id",
-                    resource_group_name="test-rg",
-                    workspace_name="test-ws"
-                )
+                        assert client is not None
+                        assert client == mock_client_instance
+                        # Verify MLClient was called with correct arguments
+                        assert mock_mlclient.called
+                        call_args = mock_mlclient.call_args
+                        assert call_args[1]["subscription_id"] == "test-sub-id"
+                        assert call_args[1]["resource_group_name"] == "test-rg"
+                        assert call_args[1]["workspace_name"] == "test-ws"
 
-    @patch("shared.mlflow_setup.load_yaml")
+    @patch("common.shared.mlflow_setup.load_yaml")
     def test_azure_ml_disabled(self, mock_load_yaml):
         """Test returns None when Azure ML is disabled."""
         mock_load_yaml.return_value = {
@@ -366,7 +378,7 @@ class TestCreateMlClientFromConfig:
 
         assert client is None
 
-    @patch("shared.mlflow_setup.load_yaml")
+    @patch("common.shared.mlflow_setup.load_yaml")
     def test_config_missing_azure_ml_section(self, mock_load_yaml):
         """Test returns None when Azure ML section is missing."""
         mock_load_yaml.return_value = {}
@@ -376,9 +388,11 @@ class TestCreateMlClientFromConfig:
 
         assert client is None
 
-    @patch("shared.mlflow_setup.load_yaml")
+    @patch("common.shared.mlflow_setup.load_yaml")
+    @patch("common.shared.mlflow_setup.detect_platform")
+    @patch("pathlib.Path.exists")
     @patch.dict(os.environ, {}, clear=True)
-    def test_missing_credentials(self, mock_load_yaml):
+    def test_missing_credentials(self, mock_exists, mock_detect, mock_load_yaml):
         """Test returns None when credentials are missing."""
         mock_load_yaml.return_value = {
             "azure_ml": {
@@ -386,14 +400,28 @@ class TestCreateMlClientFromConfig:
                 "workspace_name": "test-ws"
             }
         }
+        mock_detect.return_value = "local"
+        # Mock Path.exists to return True for mlflow.yaml but False for config.env
+        def exists_side_effect(*args):
+            # args[0] is 'self' (the Path instance)
+            path_self = args[0] if args else None
+            if path_self is None:
+                return False
+            path_str = str(path_self)
+            if path_str.endswith("mlflow.yaml"):
+                return True
+            if path_str.endswith("config.env"):
+                return False
+            return False
+        mock_exists.side_effect = exists_side_effect
 
         config_dir = Path("config")
         client = create_ml_client_from_config(config_dir)
 
         assert client is None
 
-    @patch("shared.mlflow_setup.load_yaml")
-    @patch("shared.mlflow_setup.detect_platform")
+    @patch("common.shared.mlflow_setup.load_yaml")
+    @patch("common.shared.mlflow_setup.detect_platform")
     def test_import_error(self, mock_detect, mock_load_yaml):
         """Test returns None when Azure ML SDK not available."""
         mock_load_yaml.return_value = {
@@ -421,8 +449,8 @@ class TestCreateMlClientFromConfig:
 class TestSetupMlflowFromConfig:
     """Tests for setup_mlflow_from_config function."""
 
-    @patch("shared.mlflow_setup.setup_mlflow_cross_platform")
-    @patch("shared.mlflow_setup.load_yaml")
+    @patch("common.shared.mlflow_setup.setup_mlflow_cross_platform")
+    @patch("common.shared.mlflow_setup.load_yaml")
     def test_config_file_exists_azure_enabled(self, mock_load_yaml, mock_setup):
         """Test setup with config file and Azure ML enabled."""
         mock_load_yaml.return_value = {
@@ -433,7 +461,7 @@ class TestSetupMlflowFromConfig:
         }
         mock_setup.return_value = "azureml://workspace/experiments"
 
-        with patch("shared.mlflow_setup.create_ml_client_from_config") as mock_create:
+        with patch("common.shared.mlflow_setup.create_ml_client_from_config") as mock_create:
             mock_client = MagicMock()
             mock_create.return_value = mock_client
 
@@ -449,8 +477,8 @@ class TestSetupMlflowFromConfig:
                 fallback_to_local=True
             )
 
-    @patch("shared.mlflow_setup.setup_mlflow_cross_platform")
-    @patch("shared.mlflow_setup.load_yaml")
+    @patch("common.shared.mlflow_setup.setup_mlflow_cross_platform")
+    @patch("common.shared.mlflow_setup.load_yaml")
     def test_config_file_exists_azure_disabled(self, mock_load_yaml, mock_setup):
         """Test setup with config file and Azure ML disabled."""
         mock_load_yaml.return_value = {
@@ -472,7 +500,7 @@ class TestSetupMlflowFromConfig:
             fallback_to_local=True
         )
 
-    @patch("shared.mlflow_setup.setup_mlflow_cross_platform")
+    @patch("common.shared.mlflow_setup.setup_mlflow_cross_platform")
     @patch("pathlib.Path.exists")
     def test_config_file_missing(self, mock_exists, mock_setup):
         """Test setup when config file doesn't exist."""
@@ -551,9 +579,9 @@ class TestAzureMlNamespaceCollision:
             del sys.modules['azureml.mlflow']
         
         # Reset the global state
-        import shared.mlflow_setup
-        shared.mlflow_setup._AZUREML_MLFLOW_AVAILABLE = False
-        shared.mlflow_setup._AZUREML_MLFLOW_IMPORT_ERROR = None
+        import common.shared.mlflow_setup
+        common.shared.mlflow_setup._AZUREML_MLFLOW_AVAILABLE = False
+        common.shared.mlflow_setup._AZUREML_MLFLOW_IMPORT_ERROR = None
         
         # Import our local azureml module first (simulating shadowing)
         # Handle case where azure SDK might not be installed

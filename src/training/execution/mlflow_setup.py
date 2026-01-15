@@ -58,16 +58,20 @@ def create_training_mlflow_run(
     """
     Create MLflow run for training execution.
 
+    **Note**: This function assumes MLflow has already been configured by
+    `infrastructure.tracking.mlflow.setup.setup_mlflow()`. It focuses solely
+    on run lifecycle management (creating runs, tags, parent/child relationships).
+
     Args:
-        experiment_name: MLflow experiment name
-        run_name: Run name
-        tags: Optional tags dictionary
-        parent_run_id: Optional parent run ID (for creating as child run)
-        run_id: Optional existing run ID (if run already exists)
-        root_dir: Optional project root directory (for index updating)
-        config_dir: Optional config directory (for index updating)
-        context: Optional naming context (for index updating)
-        tracking_uri: Optional tracking URI
+        experiment_name: MLflow experiment name (must match current experiment).
+        run_name: Run name.
+        tags: Optional tags dictionary.
+        parent_run_id: Optional parent run ID (for creating as child run).
+        run_id: Optional existing run ID (if run already exists).
+        root_dir: Optional project root directory (for index updating).
+        config_dir: Optional config directory (for index updating).
+        context: Optional naming context (for index updating).
+        tracking_uri: Optional tracking URI (if None, uses current MLflow config).
 
     Returns:
         Tuple of (run_id, run_object)
@@ -108,14 +112,12 @@ def create_training_mlflow_run(
         else:
             experiment_id = experiment.experiment_id
     except Exception as e:
-        # Fallback: use mlflow API
-        mlflow.set_experiment(experiment_name)
-        if tracking_uri:
-            mlflow.set_tracking_uri(tracking_uri)
+        # Fallback: verify experiment exists (assumes MLflow already configured)
         experiment = mlflow.get_experiment_by_name(experiment_name)
         if experiment is None:
             raise RuntimeError(
-                f"Could not get or create experiment: {experiment_name}"
+                f"Could not get experiment: {experiment_name}. "
+                f"Ensure MLflow is configured via infrastructure.tracking.mlflow.setup.setup_mlflow()"
             ) from e
         experiment_id = experiment.experiment_id
 
@@ -185,18 +187,22 @@ def setup_mlflow_tracking_env(
     additional_vars: Optional[Dict[str, str]] = None,
 ) -> Dict[str, str]:
     """
-    Set up MLflow tracking environment variables.
+    Set up MLflow tracking environment variables for subprocess execution.
+
+    **Note**: This function assumes MLflow has already been configured by
+    `infrastructure.tracking.mlflow.setup.setup_mlflow()`. It reads the current
+    MLflow configuration and sets environment variables for subprocesses.
 
     Args:
-        experiment_name: MLflow experiment name
-        tracking_uri: Optional tracking URI
-        parent_run_id: Optional parent run ID
-        run_id: Optional run ID
-        trial_number: Optional trial number
-        additional_vars: Optional additional environment variables
+        experiment_name: MLflow experiment name (must match current experiment).
+        tracking_uri: Optional explicit tracking URI. If None, reads from current MLflow config.
+        parent_run_id: Optional parent run ID (for child runs).
+        run_id: Optional run ID (for resuming existing runs).
+        trial_number: Optional trial number (for HPO trials).
+        additional_vars: Optional additional environment variables.
 
     Returns:
-        Dictionary of environment variables
+        Dictionary of environment variables to pass to subprocess.
     """
     import mlflow
 
@@ -205,11 +211,11 @@ def setup_mlflow_tracking_env(
     # Set experiment name
     env_vars["MLFLOW_EXPERIMENT_NAME"] = experiment_name
 
-    # Set tracking URI
+    # Set tracking URI (read from current config if not provided)
     if tracking_uri:
         env_vars["MLFLOW_TRACKING_URI"] = tracking_uri
-        mlflow.set_tracking_uri(tracking_uri)
     else:
+        # Read current tracking URI (assumes MLflow already configured)
         current_uri = mlflow.get_tracking_uri()
         if current_uri:
             env_vars["MLFLOW_TRACKING_URI"] = current_uri

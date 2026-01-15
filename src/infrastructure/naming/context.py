@@ -6,8 +6,10 @@ name: naming_context
 type: utility
 domain: naming
 responsibility:
-  - Define NamingContext dataclass for path generation
+  - Define NamingContext dataclass for naming/path identity
   - Create naming contexts with fingerprint-based identity
+  - Validate context fields for supported process types/environments
+  - Does NOT perform I/O, MLflow calls, or tag/run-name construction
 inputs:
   - Process type and model information
   - Fingerprints and identifiers

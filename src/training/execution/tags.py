@@ -94,11 +94,15 @@ def apply_lineage_tags(
         else:
             # Fallback: Query MLflow directly for the most recent run in the experiment
             # This is useful when the run was created in a subprocess and metadata isn't available yet
+            # NOTE: Using direct client.search_runs() here because:
+            # - We need to get the most recent run (potentially still RUNNING), not just FINISHED
+            # - queries.query_runs_by_tags() filters for FINISHED runs only, which is not suitable here
+            # - This is a simple fallback query, not a complex selection pattern
             try:
                 client = MlflowClient()
                 experiment = client.get_experiment_by_name(experiment_name)
                 if experiment:
-                    # Search for the most recent run in the experiment
+                    # Search for the most recent run in the experiment (any status)
                     runs = client.search_runs(
                         experiment_ids=[experiment.experiment_id],
                         max_results=1,

@@ -6,8 +6,10 @@ name: naming_mlflow_run_keys
 type: utility
 domain: naming
 responsibility:
-  - Build stable run_key identifiers from contexts
-  - Compute run key hashes
+  - Build stable run_key identifiers from NamingContext
+  - Compute run key hashes for tag/storage use
+  - Build counter keys for auto-increment logic
+  - Does NOT call MLflow APIs, create runs, or mutate tracking state
 inputs:
   - Naming contexts
 outputs:

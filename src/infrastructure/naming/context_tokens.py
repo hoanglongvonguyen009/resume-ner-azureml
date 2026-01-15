@@ -6,6 +6,8 @@ domain: naming
 responsibility:
   - Expand NamingContext into token dictionary
   - Generate short hash forms (8 chars) for paths and names
+  - Centralize short-hash slicing for naming/path tokens
+  - Does NOT read configs, talk to MLflow, or perform I/O
 inputs:
   - NamingContext objects
 outputs:

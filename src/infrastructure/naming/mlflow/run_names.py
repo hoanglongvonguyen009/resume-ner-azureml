@@ -6,8 +6,10 @@ name: naming_mlflow_run_names
 type: utility
 domain: naming
 responsibility:
-  - Generate human-readable MLflow run names
-  - Build run names from naming contexts
+  - Generate human-readable MLflow run names from NamingContext
+  - Apply naming policy and auto-increment configuration
+  - Coordinate run key/hash helpers for versioned names
+  - Does NOT start MLflow runs or log metrics/params
 inputs:
   - Naming contexts
   - Configuration directories

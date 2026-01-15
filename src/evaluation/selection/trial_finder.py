@@ -1213,72 +1213,48 @@ def select_champion_per_backbone(
     
     # CRITICAL: Find refit run for this champion trial (checkpoints are usually in refit runs)
     # According to plan: "champion run_id" ≠ "checkpoint run_id" in a refit workflow
+    # Use SSOT for trial→refit mapping
     refit_run_id = None
-    refit_runs = []
     
     try:
-        refit_of_trial_tag = tags_registry.key("refit", "of_trial_run_id")
-        stage_tag = tags_registry.key("process", "stage")
-        trial_key_tag = tags_registry.key("grouping", "trial_key_hash")
+        # Use artifact_unified.selectors SSOT for trial→refit mapping
+        from evaluation.selection.artifact_unified.selectors import select_artifact_run
         
-        # Strategy 1: Search by trial_key_hash + stage (most reliable - uses simpler tag names)
-        if champion_trial_key:
-            try:
-                refit_runs = mlflow_client.search_runs(
-                    experiment_ids=[hpo_experiment["id"]],
-                    filter_string=f"tags.code.trial_key_hash = '{champion_trial_key}' AND tags.code.stage = 'hpo_refit'",
-                    max_results=SMALL_MLFLOW_MAX_RESULTS,
-                )
-                if refit_runs:
-                    logger.debug(
-                        f"Found {len(refit_runs)} refit run(s) using trial_key_hash search"
-                    )
-            except Exception as search_error:
-                logger.warning(
-                    f"Search by trial_key_hash failed: {search_error}"
-                )
-                refit_runs = []
+        run_selector_result = select_artifact_run(
+            trial_run_id=champion_run_id,
+            mlflow_client=mlflow_client,
+            experiment_id=hpo_experiment["id"],
+            trial_key_hash=champion_trial_key,
+            config_dir=config_dir,
+        )
         
-        # Strategy 2: Fallback - search by linking tag if trial_key_hash search failed
-        if not refit_runs:
-            try:
-                refit_runs = mlflow_client.search_runs(
-                    experiment_ids=[hpo_experiment["id"]],
-                    filter_string=f"tags.{refit_of_trial_tag} = '{champion_run_id}'",
-                    max_results=SMALL_MLFLOW_MAX_RESULTS,
-                )
-                if refit_runs:
-                    logger.debug(
-                        f"Found {len(refit_runs)} refit run(s) using linking tag for trial {champion_run_id[:12]}..."
-                    )
-            except Exception as search_error:
-                # Filter string might fail due to Azure ML MLflow limitations (e.g., multiple dots in tag names)
-                logger.debug(
-                    f"Linking tag search failed (may be filter syntax issue): {search_error}"
-                )
-                refit_runs = []
+        refit_run_id = run_selector_result.refit_run_id
         
-        if refit_runs:
-            # If multiple refit runs exist (reruns), pick the latest by start_time
-            refit_runs_sorted = sorted(
-                refit_runs,
-                key=lambda r: r.info.start_time if r.info.start_time else 0,
-                reverse=True
-            )
-            refit_run_id = refit_runs_sorted[0].info.run_id
+        if refit_run_id:
             logger.info(
                 f"Found refit run {refit_run_id[:12]}... for champion trial {champion_run_id[:12]}... "
-                f"(selected latest from {len(refit_runs)} refit run(s))"
+                f"(using SSOT selector: {run_selector_result.metadata.get('selection_strategy', 'unknown')})"
             )
         else:
+            # Refit is required for checkpoint acquisition in champion selection
+            # Provide helpful error message
+            trial_key_tag = tags_registry.key("grouping", "trial_key_hash")
+            refit_of_trial_tag = tags_registry.key("refit", "of_trial_run_id")
+            
             # Diagnostic: Check if ANY refit runs exist in the experiment
             diagnostic_info = []
             try:
-                any_refit_runs = mlflow_client.search_runs(
+                from infrastructure.tracking.mlflow.queries import query_runs_by_tags
+                stage_tag = tags_registry.key("process", "stage")
+                
+                any_refit_runs = query_runs_by_tags(
+                    client=mlflow_client,
                     experiment_ids=[hpo_experiment["id"]],
-                    filter_string="tags.code.stage = 'hpo_refit'",
-                    max_results=SAMPLE_MLFLOW_MAX_RESULTS,  # Just need a sample
+                    required_tags={stage_tag: "hpo_refit"},
+                    filter_string="",
+                    max_results=SAMPLE_MLFLOW_MAX_RESULTS,
                 )
+                
                 if any_refit_runs:
                     diagnostic_info.append(
                         f"Found {len(any_refit_runs)} refit run(s) in experiment, but none matched the champion trial."
@@ -1312,13 +1288,8 @@ def select_champion_per_backbone(
                 f"No refit run found for champion trial {champion_run_id[:12]}... "
                 f"(trial_key_hash={champion_trial_key[:8] if champion_trial_key else 'missing'}...). "
                 f"Refit is required to acquire checkpoint deterministically.\n"
-                f"Tried search strategies:\n"
+                f"Used SSOT selector (evaluation.selection.artifact_unified.selectors.select_artifact_run).\n"
             )
-            if champion_trial_key:
-                error_msg += (
-                    f"  1. Trial key hash: tags.code.trial_key_hash = '{champion_trial_key[:8]}...' AND tags.code.stage = 'hpo_refit'\n"
-                )
-            error_msg += f"  2. Linking tag: tags.{refit_of_trial_tag} = '{champion_run_id[:12]}...'\n"
             if diagnostic_info:
                 error_msg += f"\nDiagnostics:\n" + "\n".join(f"  - {info}" for info in diagnostic_info)
             raise ValueError(error_msg)

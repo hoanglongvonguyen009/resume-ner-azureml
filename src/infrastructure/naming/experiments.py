@@ -6,8 +6,10 @@ name: naming_experiments
 type: utility
 domain: naming
 responsibility:
-  - Build experiment and stage names
-  - Extract stage configurations
+  - Build experiment and stage names (AML / MLflow experiment names)
+  - Extract stage configurations from experiment configs
+  - Provide thin, read-only helpers around experiment structures
+  - Does NOT compute hashes, build MLflow runs, or manage tracking state
 inputs:
   - Experiment configurations
   - Stage identifiers

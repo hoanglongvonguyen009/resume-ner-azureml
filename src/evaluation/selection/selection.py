@@ -26,7 +26,17 @@ lifecycle:
   status: active
 """
 
-"""Best configuration selection from HPO sweep jobs using MLflow."""
+"""Best configuration selection from Azure ML HPO sweep jobs using MLflow.
+
+**AzureML-focused wrapper** for selection logic. This module handles:
+- AzureML-specific MLflow configuration (using SSOT from infrastructure.tracking.mlflow.setup)
+- Translation of AzureML sweep jobs into MLflow run queries
+- Simple best-trial selection based on objective metric
+
+**Note**: For local MLflow-based selection with composite scoring (benchmark + HPO runs),
+use `evaluation.selection.mlflow_selection.find_best_model_from_mlflow()` instead.
+This module is specifically for AzureML sweep job selection.
+"""
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 import mlflow
@@ -45,12 +55,12 @@ def _configure_mlflow(ml_client: "MLClient") -> None:
     """Configure MLflow to use Azure ML workspace tracking URI."""
     # Import Azure SDK locally to avoid requiring it at module load time
     from azure.ai.ml import MLClient
-    from common.shared.mlflow_setup import setup_mlflow_cross_platform
-    # Use setup_mlflow_cross_platform for consistency
-    # We use a placeholder experiment name since setup_mlflow_cross_platform requires it
+    from infrastructure.tracking.mlflow.setup import setup_mlflow
+    # Use SSOT for MLflow setup
+    # We use a placeholder experiment name since setup_mlflow requires it
     # The actual experiment will be set by the caller if needed
     try:
-        setup_mlflow_cross_platform(
+        setup_mlflow(
             experiment_name="placeholder",  # Will be overridden by caller if needed
             ml_client=ml_client,
             fallback_to_local=False,

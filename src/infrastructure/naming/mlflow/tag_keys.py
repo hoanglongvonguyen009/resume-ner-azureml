@@ -7,7 +7,9 @@ type: utility
 domain: naming
 responsibility:
   - Provide centralized tag key definitions
-  - Map tag sections and names to config values
+  - Map tag sections and names to config values via TagsRegistry
+  - Offer convenience accessors for commonly used tag keys
+  - Does NOT build tag dictionaries or log tags to MLflow
 inputs:
   - Configuration directories
 outputs:

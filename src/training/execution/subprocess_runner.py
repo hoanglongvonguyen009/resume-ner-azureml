@@ -235,18 +235,22 @@ def setup_training_environment(
     env["AZURE_ML_OUTPUT_CHECKPOINT"] = str(output_dir)
     env["AZURE_ML_OUTPUT_checkpoint"] = str(output_dir)
 
-    # Set MLflow tracking
-    mlflow.set_experiment(mlflow_config.experiment_name)
-    tracking_uri = mlflow_config.tracking_uri or mlflow.get_tracking_uri()
-    if tracking_uri:
-        env["MLFLOW_TRACKING_URI"] = tracking_uri
-        mlflow.set_tracking_uri(tracking_uri)
-
-        # Set Azure ML artifact upload timeout if using Azure ML
-        if "azureml" in tracking_uri.lower():
-            env["AZUREML_ARTIFACTS_DEFAULT_TIMEOUT"] = "600"
-
+    # Set MLflow tracking (use SSOT for configuration)
+    # Note: This assumes MLflow is already configured, but we ensure it's set up
+    # for subprocess environment variables
+    from infrastructure.tracking.mlflow.setup import setup_mlflow
+    tracking_uri = setup_mlflow(
+        experiment_name=mlflow_config.experiment_name,
+        tracking_uri=mlflow_config.tracking_uri,
+        fallback_to_local=True,
+    )
+    
+    env["MLFLOW_TRACKING_URI"] = tracking_uri
     env["MLFLOW_EXPERIMENT_NAME"] = mlflow_config.experiment_name
+
+    # Set Azure ML artifact upload timeout if using Azure ML
+    if "azureml" in tracking_uri.lower():
+        env["AZUREML_ARTIFACTS_DEFAULT_TIMEOUT"] = "600"
 
     # Set parent run ID and trial number for nested runs
     if mlflow_config.parent_run_id:
