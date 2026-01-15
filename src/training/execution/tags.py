@@ -36,7 +36,7 @@ import mlflow
 from mlflow.tracking import MlflowClient
 
 from infrastructure.tracking.mlflow.finder import find_mlflow_run
-from infrastructure.naming.mlflow.tags import get_tag_key
+from training.execution.tag_helpers import _build_lineage_tags_dict
 
 
 def apply_lineage_tags(
@@ -115,47 +115,20 @@ def apply_lineage_tags(
                 print(f"⚠ Could not query MLflow for recent run: {e}")
         
         if run_id:
-            # Get tag keys from registry (using centralized helpers)
-            from infrastructure.naming.mlflow.tag_keys import (
-                get_lineage_hpo_refit_run_id,
-                get_lineage_hpo_study_key_hash,
-                get_lineage_hpo_sweep_run_id,
-                get_lineage_hpo_trial_key_hash,
-                get_lineage_hpo_trial_run_id,
-                get_lineage_source,
-                get_trained_on_full_data,
-            )
+            # Get training-specific tag key (still needed for this function)
+            from infrastructure.naming.mlflow.tag_keys import get_trained_on_full_data
+
             trained_on_full_data_tag = get_trained_on_full_data(config_dir)
-            lineage_source_tag = get_lineage_source(config_dir)
-            lineage_hpo_study_key_hash_tag = get_lineage_hpo_study_key_hash(config_dir)
-            lineage_hpo_trial_key_hash_tag = get_lineage_hpo_trial_key_hash(config_dir)
-            lineage_hpo_trial_run_id_tag = get_lineage_hpo_trial_run_id(config_dir)
-            lineage_hpo_refit_run_id_tag = get_lineage_hpo_refit_run_id(config_dir)
-            lineage_hpo_sweep_run_id_tag = get_lineage_hpo_sweep_run_id(config_dir)
-            
+
+            # Build lineage tags using shared helper
+            lineage_tags = _build_lineage_tags_dict(lineage, config_dir)
+
             with mlflow.start_run(run_id=run_id):
                 # Set training-specific tags
                 mlflow.set_tag(trained_on_full_data_tag, "true")
-                
-                # Set lineage tags (following benchmark tracker pattern)
-                lineage_tags = {
-                    lineage_source_tag: "hpo_best_selected",
-                }
-                
-                # Add HPO lineage tags if available
-                if lineage.get("hpo_study_key_hash"):
-                    lineage_tags[lineage_hpo_study_key_hash_tag] = lineage["hpo_study_key_hash"]
-                if lineage.get("hpo_trial_key_hash"):
-                    lineage_tags[lineage_hpo_trial_key_hash_tag] = lineage["hpo_trial_key_hash"]
-                if lineage.get("hpo_trial_run_id"):
-                    lineage_tags[lineage_hpo_trial_run_id_tag] = lineage["hpo_trial_run_id"]
-                if lineage.get("hpo_refit_run_id"):
-                    lineage_tags[lineage_hpo_refit_run_id_tag] = lineage["hpo_refit_run_id"]
-                if lineage.get("hpo_sweep_run_id"):
-                    lineage_tags[lineage_hpo_sweep_run_id_tag] = lineage["hpo_sweep_run_id"]
-                
-                # Set all lineage tags at once
-                if len(lineage_tags) > 1:  # More than just "source"
+
+                # Set lineage tags if any are present
+                if lineage_tags:
                     mlflow.set_tags(lineage_tags)
                     print(f"✓ Set lineage tags in MLflow run {run_id[:12]}...")
                     print(f"   Lineage: {list(lineage_tags.keys())}")

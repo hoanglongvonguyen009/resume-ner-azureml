@@ -124,28 +124,110 @@ def add_training_tags_with_lineage(
     if run_name:
         tags["mlflow.runName"] = run_name
 
-    # Add lineage tags if lineage information is present
+    # Add primary grouping tags if lineage information is present
+    # (These are separate from lineage tags for backward compatibility)
     if lineage.get("hpo_study_key_hash"):
-        # Primary grouping tags (for consistency with rest of system)
         tags[tag_keys["study_key_hash"]] = lineage["hpo_study_key_hash"]
-        # Lineage tags (additional, for explicit lineage tracking)
-        tags[tag_keys["lineage_hpo_study_key_hash"]] = lineage["hpo_study_key_hash"]
-        tags[tag_keys["lineage_source"]] = "hpo_best_selected"
 
     if lineage.get("hpo_trial_key_hash"):
         tags[tag_keys["trial_key_hash"]] = lineage["hpo_trial_key_hash"]
-        tags[tag_keys["lineage_hpo_trial_key_hash"]] = lineage["hpo_trial_key_hash"]
 
-    if lineage.get("hpo_trial_run_id"):
-        tags[tag_keys["lineage_hpo_trial_run_id"]] = lineage["hpo_trial_run_id"]
-
-    if lineage.get("hpo_refit_run_id"):
-        tags[tag_keys["lineage_hpo_refit_run_id"]] = lineage["hpo_refit_run_id"]
-
-    if lineage.get("hpo_sweep_run_id"):
-        tags[tag_keys["lineage_hpo_sweep_run_id"]] = lineage["hpo_sweep_run_id"]
+    # Add lineage tags using shared helper
+    lineage_tags = _build_lineage_tags_dict(lineage, config_dir)
+    tags.update(lineage_tags)
 
     return tags
+
+
+def _build_lineage_tags_dict(
+    lineage: Dict[str, Any],
+    config_dir: Optional[Path] = None,
+) -> Dict[str, str]:
+    """
+    Build lineage tags dictionary from lineage dict.
+
+    Returns dictionary with lineage tags (code.lineage.*) if lineage data present.
+    This helper consolidates the lineage tag building logic used in both
+    `add_training_tags_with_lineage()` and `apply_lineage_tags()`.
+
+    Args:
+        lineage: Lineage dictionary from `extract_lineage_from_best_model()`.
+                 Expected keys:
+                 - hpo_study_key_hash (optional)
+                 - hpo_trial_key_hash (optional)
+                 - hpo_trial_run_id (optional)
+                 - hpo_refit_run_id (optional)
+                 - hpo_sweep_run_id (optional)
+        config_dir: Optional config directory (for tag key retrieval).
+
+    Returns:
+        Dictionary with lineage tags. Always includes `code.lineage.source = "hpo_best_selected"`
+        if any lineage data is present. Includes other lineage tags if corresponding
+        keys are present in lineage dict.
+
+    Examples:
+        lineage = {"hpo_study_key_hash": "abc123", "hpo_trial_key_hash": "def456"}
+        lineage_tags = _build_lineage_tags_dict(lineage, config_dir)
+        # Returns: {
+        #     "code.lineage.source": "hpo_best_selected",
+        #     "code.lineage.hpo_study_key_hash": "abc123",
+        #     "code.lineage.hpo_trial_key_hash": "def456",
+        # }
+    """
+    from infrastructure.naming.mlflow.tag_keys import (
+        get_lineage_hpo_refit_run_id,
+        get_lineage_hpo_study_key_hash,
+        get_lineage_hpo_sweep_run_id,
+        get_lineage_hpo_trial_key_hash,
+        get_lineage_hpo_trial_run_id,
+        get_lineage_source,
+    )
+
+    lineage_tags: Dict[str, str] = {}
+
+    # Check if any lineage data is present
+    has_lineage_data = any(
+        lineage.get(key)
+        for key in [
+            "hpo_study_key_hash",
+            "hpo_trial_key_hash",
+            "hpo_trial_run_id",
+            "hpo_refit_run_id",
+            "hpo_sweep_run_id",
+        ]
+    )
+
+    if has_lineage_data:
+        # Always set source tag if any lineage data is present
+        lineage_tags[get_lineage_source(config_dir)] = "hpo_best_selected"
+
+        # Add HPO lineage tags if available
+        if lineage.get("hpo_study_key_hash"):
+            lineage_tags[
+                get_lineage_hpo_study_key_hash(config_dir)
+            ] = lineage["hpo_study_key_hash"]
+
+        if lineage.get("hpo_trial_key_hash"):
+            lineage_tags[
+                get_lineage_hpo_trial_key_hash(config_dir)
+            ] = lineage["hpo_trial_key_hash"]
+
+        if lineage.get("hpo_trial_run_id"):
+            lineage_tags[
+                get_lineage_hpo_trial_run_id(config_dir)
+            ] = lineage["hpo_trial_run_id"]
+
+        if lineage.get("hpo_refit_run_id"):
+            lineage_tags[
+                get_lineage_hpo_refit_run_id(config_dir)
+            ] = lineage["hpo_refit_run_id"]
+
+        if lineage.get("hpo_sweep_run_id"):
+            lineage_tags[
+                get_lineage_hpo_sweep_run_id(config_dir)
+            ] = lineage["hpo_sweep_run_id"]
+
+    return lineage_tags
 
 
 def _get_training_tag_keys(config_dir: Optional[Path] = None) -> Dict[str, str]:
