@@ -118,9 +118,14 @@ def infer_config_dir_from_path(path: Optional[Path]) -> Path:
     a parent directory that contains a "config" subdirectory. This ensures
     config directories are found correctly regardless of directory structure depth.
     
+    When path is None or no config is found in the path's parent chain, it searches
+    from the current working directory up to find the project root (where both
+    config/ and src/ exist), ensuring correct behavior when running from notebooks
+    or subdirectories.
+    
     Args:
         path: Starting path to search from (e.g., output_dir, checkpoint_dir).
-              If None, falls back to cwd/config.
+              If None, searches from current working directory.
     
     Returns:
         Path to config directory. Falls back to Path.cwd() / "config" if not found.
@@ -135,16 +140,29 @@ def infer_config_dir_from_path(path: Optional[Path]) -> Path:
         >>> # Will still find: /workspace/config
         >>> infer_config_dir_from_path(Path("/workspace/outputs/hpo/local/distilbert/study-abc/trial-xyz"))
         Path("/workspace/config")
+        
+        >>> # When running from notebook: /workspace/notebooks/
+        >>> # Will find: /workspace/config (by searching up from cwd)
+        >>> infer_config_dir_from_path(None)
+        Path("/workspace/config")
     """
-    if path is None:
-        return Path.cwd() / "config"
+    # First, try searching from the provided path
+    if path is not None:
+        for parent in path.parents:
+            candidate = parent / "config"
+            if candidate.exists():
+                return candidate
     
-    # Search up the parent chain to find a config directory
-    for parent in path.parents:
+    # If path is None or no config found in path's parent chain,
+    # search from current working directory to find project root
+    # (where both config/ and src/ exist)
+    current = Path.cwd()
+    for parent in [current] + list(current.parents):
         candidate = parent / "config"
-        if candidate.exists():
+        if candidate.exists() and (parent / "src").exists():
+            # Found project root with both config/ and src/
             return candidate
     
-    # Fall back to cwd/config if not found
+    # Last resort: fall back to cwd/config if not found
     return Path.cwd() / "config"
 

@@ -27,6 +27,7 @@ def setup_hpo_mlflow_run(
     hpo_config: Optional[Dict[str, Any]] = None,
     benchmark_config: Optional[Dict[str, Any]] = None,
     study_key_hash: Optional[str] = None,
+    config_dir: Optional[Path] = None,
 ) -> Tuple[Any, str]:
     """
     Set up MLflow run name and context for HPO parent run.
@@ -126,8 +127,11 @@ def setup_hpo_mlflow_run(
         if root_dir is None:
             root_dir = Path.cwd()
 
-        from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
-        config_dir = infer_config_dir_from_path(root_dir) if root_dir else infer_config_dir_from_path(None)
+        # Use provided config_dir if available, otherwise infer from root_dir or output_dir
+        # This avoids DRY violation - caller already has the correct config_dir
+        if config_dir is None:
+            from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+            config_dir = infer_config_dir_from_path(root_dir) if root_dir else infer_config_dir_from_path(output_dir)
 
         mlflow_run_name = build_mlflow_run_name(
             hpo_parent_context,

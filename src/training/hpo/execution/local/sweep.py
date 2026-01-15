@@ -769,6 +769,7 @@ def run_local_hpo_sweep(
         hpo_config=hpo_config,
         benchmark_config=benchmark_config,
         study_key_hash=study_key_hash,  # Pass pre-computed hash to avoid recomputation
+        config_dir=project_config_dir,  # Pass project config_dir to avoid re-inference (DRY)
     )
 
     # Write .active_study.json marker for fast lookup in selection code
