@@ -187,7 +187,7 @@ class TestLogBestCheckpoint:
         # When disabled, log_best_checkpoint should not be called in local_sweeps.py
         # This test verifies the config disables the feature
 
-    @patch("orchestration.jobs.tracking.trackers.sweep_tracker.MLflowSweepTracker.log_best_checkpoint")
+    @patch("infrastructure.tracking.mlflow.trackers.sweep_tracker.MLflowSweepTracker.log_best_checkpoint")
     def test_log_best_checkpoint_conditional_call(self, mock_log_best_checkpoint, tmp_path):
         """Test that log_best_checkpoint is conditionally called based on config."""
         # Simulate the condition check from local_sweeps.py

@@ -637,10 +637,10 @@ class TestRefitCheckpointDuplicationPrevention:
     @patch("training.hpo.execution.local.refit.execute_training_subprocess")
     @patch("training.hpo.execution.local.refit.mlflow")
     @patch("infrastructure.tracking.mlflow.log_artifacts_safe")
-    @patch("infrastructure.tracking.mlflow.trackers.sweep_tracker.upload_checkpoint_archive")
+    @patch("infrastructure.tracking.mlflow.artifacts.uploader.ArtifactUploader.upload_checkpoint")
     def test_refit_prevents_duplication_only_archive_uploaded(
         self,
-        mock_upload_archive,
+        mock_upload_checkpoint,
         mock_log_artifacts,
         mock_mlflow,
         mock_execute,
@@ -670,9 +670,9 @@ class TestRefitCheckpointDuplicationPrevention:
                     "run_id": kwargs.get("run_id", args[2] if len(args) > 2 else None),
                 })
 
-        def track_archive_upload(*args, **kwargs):
+        def track_checkpoint_upload(*args, **kwargs):
             artifact_path = kwargs.get("artifact_path", "best_trial_checkpoint.tar.gz")
-            if "best_trial_checkpoint" in artifact_path:
+            if "best_trial_checkpoint" in artifact_path or kwargs.get("artifact_path") == "best_trial_checkpoint.tar.gz":
                 artifact_uploads.append({
                     "type": "checkpoint_archive",
                     "artifact_path": artifact_path,
@@ -681,7 +681,7 @@ class TestRefitCheckpointDuplicationPrevention:
             return True
 
         mock_log_artifacts.side_effect = track_log_artifacts
-        mock_upload_archive.side_effect = track_archive_upload
+        mock_upload_checkpoint.side_effect = track_checkpoint_upload
 
         # Run refit
         run_refit_training(

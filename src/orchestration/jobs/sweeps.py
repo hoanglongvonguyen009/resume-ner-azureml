@@ -34,41 +34,9 @@ from azure.ai.ml.sweep import (
     SweepJob,
     Objective,
     SweepJobLimits,
-    Choice,
-    Uniform,
-    LogUniform,
 )
 
-def create_search_space(hpo_config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Translate a config-defined search space into Azure ML sweep primitives.
-
-    The input is expected to follow the standard HPO YAML structure used in
-    this project, where each parameter entry specifies a ``type`` and
-    associated bounds or values.
-
-    Args:
-        hpo_config: Configuration dictionary containing a ``search_space`` key.
-
-    Returns:
-        Dictionary mapping parameter names to Azure ML search distributions.
-    """
-    search_space: Dict[str, Any] = {}
-    for name, spec in hpo_config["search_space"].items():
-        p_type = spec["type"]
-        if p_type == "choice":
-            search_space[name] = Choice(values=spec["values"])
-        elif p_type == "uniform":
-            search_space[name] = Uniform(
-                min_value=float(spec["min"]),
-                max_value=float(spec["max"]),
-            )
-        elif p_type == "loguniform":
-            search_space[name] = LogUniform(
-                min_value=float(spec["min"]),
-                max_value=float(spec["max"]),
-            )
-    return search_space
+from training.hpo.core.search_space import create_search_space
 
 def _build_data_input_from_asset(data_asset: Data) -> Input:
     """
