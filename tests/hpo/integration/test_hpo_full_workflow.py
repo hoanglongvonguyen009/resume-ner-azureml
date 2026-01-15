@@ -510,8 +510,9 @@ patterns:
         
         dataset_dir = tmp_path / "dataset"
         dataset_dir.mkdir()
-        (dataset_dir / "train.jsonl").write_text("\n".join([
-            json.dumps({"text": f"Sample {i}", "label": "POS"})
+        # Create train.json (not jsonl) - the dataset loader expects .json for CV splits
+        (dataset_dir / "train.json").write_text(json.dumps([
+            {"text": f"Sample {i}", "label": "POS" if i % 2 == 0 else "NEG"}
             for i in range(10)
         ]))
         
@@ -577,8 +578,22 @@ patterns:
         mock_parent_run = Mock()
         mock_parent_run.info.run_id = "hpo_parent_123"
         mock_parent_run.info.experiment_id = "exp_123"
+        # Mock parent run tags to return actual study_key_hash (needed for CV hash computation)
+        mock_parent_run_data = Mock()
+        # The study_key_hash will be computed early in the sweep, so we need to return it from tags
+        # We'll use a side_effect to return the actual hash when it's set
+        mock_parent_run_tags = {}
+        def get_tag_side_effect(key, default=None):
+            return mock_parent_run_tags.get(key, default)
+        mock_parent_run_data.tags.get = get_tag_side_effect
+        mock_parent_run.data = mock_parent_run_data
         mock_client = Mock()
         mock_client.get_run.return_value = mock_parent_run
+        # Also mock set_tag to capture the study_key_hash when it's set
+        def set_tag_side_effect(run_id, key, value):
+            if key == "code.study_key_hash":
+                mock_parent_run_tags[key] = value
+        mock_client.set_tag.side_effect = set_tag_side_effect
         mock_mlflow.tracking.MlflowClient.return_value = mock_client
         mock_mlflow.start_run.return_value.__enter__ = Mock(return_value=mock_parent_run)
         mock_mlflow.start_run.return_value.__exit__ = Mock(return_value=None)

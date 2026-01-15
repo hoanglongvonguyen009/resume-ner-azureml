@@ -179,13 +179,14 @@ def run_training_trial_with_cv(
                 config_dir=config_dir,  # Use provided config_dir if available
             )
             
-            # Fallback if resolution failed
+            # Standardized fallback: use resolved value, or provided parameter, or infer
             if root_dir is None:
                 root_dir = Path.cwd()
-            if resolved_config_dir is None:
-                resolved_config_dir = root_dir / "config" if root_dir else Path.cwd() / "config"
-            
-            config_dir = resolved_config_dir
+            # Use resolved config_dir, or provided config_dir, or infer as last resort
+            config_dir = resolved_config_dir or config_dir
+            if config_dir is None:
+                from infrastructure.paths.utils import infer_config_dir
+                config_dir = infer_config_dir(path=root_dir) if root_dir else infer_config_dir()
             
             # Create NamingContext for trial
             # For v2 paths, set trial_id to trial-{hash8} format so build_output_path can use it
@@ -214,8 +215,30 @@ def run_training_trial_with_cv(
             )
             
             # Build trial path using v2 pattern
+            # Note: build_output_path() builds from project root, so it will include study folder
+            # We need to verify it creates trial-{hash} folder inside study folder
             trial_base_dir = build_output_path(root_dir, trial_context, config_dir=config_dir)
-            trial_base_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Verify that build_output_path created a trial folder (not just study folder)
+            # If it only returned study folder, we need to append trial folder manually
+            if trial_base_dir.name.startswith("study-") and not trial_base_dir.name.startswith("trial-"):
+                # build_output_path returned study folder, need to append trial folder
+                if trial_id_v2:
+                    trial_base_dir = trial_base_dir / trial_id_v2
+                else:
+                    # Fallback: use trial8 token
+                    trial8 = tokens.get("trial8", "")
+                    if trial8:
+                        trial_base_dir = trial_base_dir / f"trial-{trial8}"
+                    else:
+                        logger.warning(
+                            f"build_output_path returned study folder but trial8 is empty, "
+                            f"cannot create trial folder. Will use fallback."
+                        )
+                        trial_base_dir = None
+            
+            if trial_base_dir:
+                trial_base_dir.mkdir(parents=True, exist_ok=True)
         except Exception as e:
             logger.warning(
                 f"build_output_path() failed: {e}. Will attempt fallback."
@@ -248,8 +271,17 @@ def run_training_trial_with_cv(
                 )
                 tokens = build_token_values(temp_context)
                 trial8 = tokens["trial8"]
-                trial_base_dir = output_dir / f"trial-{trial8}"
-                trial_base_dir.mkdir(parents=True, exist_ok=True)
+                # Only create folder if trial8 is not empty
+                if trial8:
+                    trial_base_dir = output_dir / f"trial-{trial8}"
+                    trial_base_dir.mkdir(parents=True, exist_ok=True)
+                else:
+                    logger.error(
+                        f"ERROR: trial8 token is empty for trial {trial_number} in v2 study folder {study_folder_name}. "
+                        f"trial_key_hash={computed_trial_key_hash[:16] if computed_trial_key_hash else 'None'}... "
+                        f"Cannot create v2 trial folder without hash."
+                    )
+                    raise ValueError(f"Cannot create v2 trial folder without trial8 token (trial_key_hash={computed_trial_key_hash})")
             else:
                 # We're in a v2 study folder but don't have trial_key_hash
                 # This is an error - we can't create v2 trial name without hash
@@ -260,19 +292,19 @@ def run_training_trial_with_cv(
                     f"Attempting to compute trial_key_hash from trial_params..."
                 )
                 try:
-                    from infrastructure.naming.mlflow.hpo_keys import (
-                        build_hpo_trial_key,
-                        build_hpo_trial_key_hash,
-                    )
+                    from infrastructure.tracking.mlflow.hash_utils import compute_trial_key_hash_from_configs
                     if computed_study_key_hash:
                         hyperparameters = {
                             k: v for k, v in trial_params.items()
                             if k not in ("backbone", "trial_number", "run_id")
                         }
-                        trial_key = build_hpo_trial_key(computed_study_key_hash, hyperparameters)
-                        computed_trial_key_hash = build_hpo_trial_key_hash(trial_key)
+                        # Use centralized utility for hash computation
+                        computed_trial_key_hash = compute_trial_key_hash_from_configs(
+                            computed_study_key_hash, hyperparameters, config_dir
+                        )
                         from infrastructure.naming.context_tokens import build_token_values
                         from infrastructure.naming.context import NamingContext
+                        from common.shared.platform_detection import detect_platform
                         temp_context = NamingContext(
                             process_type="hpo",
                             model=backbone.split("-")[0] if "-" in backbone else backbone,
@@ -281,8 +313,17 @@ def run_training_trial_with_cv(
                         )
                         tokens = build_token_values(temp_context)
                         trial8 = tokens["trial8"]
-                        trial_base_dir = output_dir / f"trial-{trial8}"
-                        trial_base_dir.mkdir(parents=True, exist_ok=True)
+                        # Only create folder if trial8 is not empty
+                        if trial8:
+                            trial_base_dir = output_dir / f"trial-{trial8}"
+                            trial_base_dir.mkdir(parents=True, exist_ok=True)
+                        else:
+                            logger.error(
+                                f"ERROR: trial8 token is empty for trial {trial_number} in v2 study folder {study_folder_name}. "
+                                f"trial_key_hash={computed_trial_key_hash[:16] if computed_trial_key_hash else 'None'}... "
+                                f"Cannot create v2 trial folder without hash."
+                            )
+                            raise ValueError(f"Cannot create v2 trial folder without trial8 token (trial_key_hash={computed_trial_key_hash})")
                     else:
                         raise ValueError("Cannot compute trial_key_hash without study_key_hash")
                 except Exception as e:

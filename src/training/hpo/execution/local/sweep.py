@@ -277,64 +277,75 @@ def create_local_hpo_objective(
             trial_key_hash = None
             if study_key_hash:
                 try:
-                    from infrastructure.naming.mlflow.hpo_keys import (
-                        build_hpo_trial_key,
-                        build_hpo_trial_key_hash,
-                    )
+                    from infrastructure.tracking.mlflow.hash_utils import compute_trial_key_hash_from_configs
                     from common.shared.platform_detection import detect_platform
-                    # Normalize study_key_hash to string before using it in hash computation.
-                    # In production this is already a string, but in tests it may be a Mock.
-                    normalized_study_key_hash_for_computation = str(study_key_hash) if study_key_hash is not None else None
                     # Extract hyperparameters (exclude metadata fields)
                     hyperparameters = {
                         k: v for k, v in trial_params.items()
                         if k not in ("backbone", "trial_number", "run_id")
                     }
-                    trial_key = build_hpo_trial_key(
-                        normalized_study_key_hash_for_computation, hyperparameters)
-                    trial_key_hash = build_hpo_trial_key_hash(trial_key)
-                    # Use token expansion for consistency
-                    from infrastructure.naming.context_tokens import build_token_values
-                    from infrastructure.naming.context import NamingContext
-                    temp_context = NamingContext(
-                        process_type="hpo",
-                        model=backbone.split("-")[0] if "-" in backbone else backbone,
-                        environment=detect_platform(),
-                        trial_key_hash=trial_key_hash
+                    # Use centralized utility for hash computation
+                    trial_key_hash = compute_trial_key_hash_from_configs(
+                        study_key_hash, hyperparameters, config_dir
                     )
-                    tokens = build_token_values(temp_context)
-                    trial8 = tokens["trial8"]
+                    # Only create trial folder if we have a valid trial_key_hash
+                    if trial_key_hash:
+                        # Use token expansion for consistency
+                        from infrastructure.naming.context_tokens import build_token_values
+                        from infrastructure.naming.context import NamingContext
+                        temp_context = NamingContext(
+                            process_type="hpo",
+                            model=backbone.split("-")[0] if "-" in backbone else backbone,
+                            environment=detect_platform(),
+                            trial_key_hash=trial_key_hash
+                        )
+                        tokens = build_token_values(temp_context)
+                        trial8 = tokens["trial8"]
+                        
+                        # Only create folder if trial8 is not empty
+                        if trial8:
+                            # Create trial-{hash} folder in study folder
+                            trial_output_dir = output_base_dir / f"trial-{trial8}"
+                            trial_output_dir.mkdir(parents=True, exist_ok=True)
+                            
+                            # Create trial_meta.json for easy lookup
+                            import json
+                            study_folder_name = output_base_dir.name
+                            # Normalize hash values to strings for JSON serialization robustness.
+                            # In production these are already strings, but in tests they
+                            # may be Mock objects that can't be serialized.
+                            normalized_study_key_hash = str(study_key_hash) if study_key_hash is not None else None
+                            normalized_trial_key_hash = str(trial_key_hash) if trial_key_hash is not None else None
+                            trial_meta = {
+                                "study_key_hash": normalized_study_key_hash,
+                                "trial_key_hash": normalized_trial_key_hash,
+                                "trial_number": trial.number,
+                                "study_name": study_folder_name,
+                                # run_id is stored as a simple string token for robustness.
+                                # In production this is already a string, but in tests it
+                                # may be a Mock – we normalise it via captured_run_id above.
+                                "run_id": captured_run_id,
+                                "created_at": datetime.now().isoformat(),
+                            }
+                            trial_meta_path = trial_output_dir / "trial_meta.json"
+                            with open(trial_meta_path, "w") as f:
+                                json.dump(trial_meta, f, indent=2)
 
-                    # Create trial-{hash} folder in study folder
-                    trial_output_dir = output_base_dir / f"trial-{trial8}"
-                    trial_output_dir.mkdir(parents=True, exist_ok=True)
-
-                    # Create trial_meta.json for easy lookup
-                    import json
-                    study_folder_name = output_base_dir.name
-                    # Normalize hash values to strings for JSON serialization robustness.
-                    # In production these are already strings, but in tests they
-                    # may be Mock objects that can't be serialized.
-                    normalized_study_key_hash = str(study_key_hash) if study_key_hash is not None else None
-                    normalized_trial_key_hash = str(trial_key_hash) if trial_key_hash is not None else None
-                    trial_meta = {
-                        "study_key_hash": normalized_study_key_hash,
-                        "trial_key_hash": normalized_trial_key_hash,
-                        "trial_number": trial.number,
-                        "study_name": study_folder_name,
-                        # run_id is stored as a simple string token for robustness.
-                        # In production this is already a string, but in tests it
-                        # may be a Mock – we normalise it via captured_run_id above.
-                        "run_id": captured_run_id,
-                        "created_at": datetime.now().isoformat(),
-                    }
-                    trial_meta_path = trial_output_dir / "trial_meta.json"
-                    with open(trial_meta_path, "w") as f:
-                        json.dump(trial_meta, f, indent=2)
-
-                    logger.debug(
-                        f"Created v2 trial folder for non-CV trial {trial.number}: {trial_output_dir.name}"
-                    )
+                            logger.debug(
+                                f"Created v2 trial folder for non-CV trial {trial.number}: {trial_output_dir.name}"
+                            )
+                        else:
+                            logger.warning(
+                                f"trial8 token is empty for trial {trial.number}, "
+                                f"skipping v2 trial folder creation. Using study folder."
+                            )
+                            trial_output_dir = output_base_dir
+                    else:
+                        logger.warning(
+                            f"Could not compute trial_key_hash for trial {trial.number}, "
+                            f"skipping v2 trial folder creation. Using study folder."
+                        )
+                        trial_output_dir = output_base_dir
                 except Exception as e:
                     logger.warning(
                         f"Could not create v2 trial folder for non-CV trial {trial.number}: {e}. "
@@ -456,7 +467,8 @@ def _set_phase2_hpo_tags(
         from infrastructure.naming.mlflow.tags_registry import load_tags_registry
         
         client = mlflow.tracking.MlflowClient()
-        # Use provided config_dir or infer from current directory
+        # Use provided config_dir parameter (trust caller, don't re-infer)
+        # Only infer if explicitly None and cannot be derived
         if config_dir is None:
             from infrastructure.paths.utils import infer_config_dir
             config_dir = infer_config_dir()
@@ -482,26 +494,22 @@ def _set_phase2_hpo_tags(
         except Exception as e:
             logger.debug(f"Could not compute eval fingerprint: {e}")
         
-        # Try to build v2 study key (if fingerprints are available)
+        # Use centralized utility to compute v2 study key hash (if fingerprints are available)
         if data_fp and eval_fp and data_config:
             try:
-                study_key_v2 = build_hpo_study_key_v2(
-                    data_config=data_config,
-                    hpo_config=hpo_config,
-                    train_config=train_config,
-                    model=backbone,
-                    data_fingerprint=data_fp,
-                    eval_fingerprint=eval_fp,
+                from infrastructure.tracking.mlflow.hash_utils import compute_study_key_hash_v2
+                study_key_hash_v2 = compute_study_key_hash_v2(
+                    data_config, hpo_config, train_config, backbone, config_dir
                 )
-                study_key_hash_v2 = build_hpo_study_key_hash(study_key_v2)
-                schema_version = "2.0"
-                
-                # Update study_key_hash tag if v2 was successfully computed
-                study_key_tag = tags_registry.key("grouping", "study_key_hash")
-                client.set_tag(parent_run_id, study_key_tag, study_key_hash_v2)
-                logger.debug(f"Set v2 study_key_hash: {study_key_hash_v2[:16]}...")
+                if study_key_hash_v2:
+                    schema_version = "2.0"
+                    
+                    # Update study_key_hash tag if v2 was successfully computed
+                    study_key_tag = tags_registry.key("grouping", "study_key_hash")
+                    client.set_tag(parent_run_id, study_key_tag, study_key_hash_v2)
+                    logger.debug(f"Set v2 study_key_hash: {study_key_hash_v2[:16]}...")
             except Exception as e:
-                logger.debug(f"Could not build v2 study key: {e}, using v1")
+                logger.debug(f"Could not compute v2 study key hash: {e}, using v1")
         
         # Set schema version tag (always set, even if v1)
         try:
@@ -646,6 +654,21 @@ def run_local_hpo_sweep(
             missing.append("train_config")
         logger.warning(f"✗ Cannot compute v2 study_key_hash early - missing: {', '.join(missing)}")
 
+    # Derive k_folds from hpo_config if not provided explicitly
+    # This allows config-driven CV setup: k_fold.enabled + k_fold.n_splits
+    if k_folds is None:
+        k_fold_config = hpo_config.get("k_fold", {})
+        if k_fold_config.get("enabled", False):
+            k_folds = k_fold_config.get("n_splits")
+            if k_folds is not None:
+                logger.debug(
+                    f"[HPO Setup] Derived k_folds={k_folds} from hpo_config.k_fold.enabled=True, n_splits={k_folds}"
+                )
+            else:
+                logger.warning(
+                    f"[HPO Setup] k_fold.enabled=True but n_splits not specified, CV will be disabled"
+                )
+
     # Use resolve_project_paths() to consolidate path resolution
     # (needed for variant computation in create_study_name)
     from infrastructure.paths.utils import resolve_project_paths
@@ -675,16 +698,19 @@ def run_local_hpo_sweep(
             # Use resolve_project_paths() to consolidate path resolution
             from infrastructure.paths.utils import resolve_project_paths
             
-            root_dir, config_dir = resolve_project_paths(
+            root_dir, resolved_config_dir = resolve_project_paths(
                 output_dir=output_dir,
                 config_dir=project_config_dir,  # Use provided project_config_dir
             )
             
-            # Fallback if resolution failed
+            # Standardized fallback: use resolved value, or provided parameter, or infer
             if root_dir is None:
                 root_dir = Path.cwd()
+            # Use resolved config_dir, or provided project_config_dir, or infer as last resort
+            config_dir = resolved_config_dir or project_config_dir
             if config_dir is None:
-                config_dir = root_dir / "config" if root_dir else Path.cwd() / "config"
+                from infrastructure.paths.utils import infer_config_dir
+                config_dir = infer_config_dir(path=root_dir) if root_dir else infer_config_dir()
             hpo_base = resolve_output_path(root_dir, config_dir, "hpo")
             paths_config = load_paths_config(config_dir)
             storage_env = detect_platform()
@@ -921,6 +947,7 @@ def run_local_hpo_sweep(
                 hpo_parent_context=hpo_parent_context,
                 mlflow_run_name=mlflow_run_name,
                 output_dir=output_dir,
+                config_dir=project_config_dir,  # Pass project config_dir to avoid re-inference
             )
 
             # Update .active_study.json marker with study_key_hash from MLflow run
@@ -977,6 +1004,7 @@ def run_local_hpo_sweep(
                 mlflow_run_name=mlflow_run_name,
                 output_dir=output_dir,
                 hpo_config=hpo_config,
+                config_dir=project_config_dir,  # Pass project config_dir to avoid re-inference
             )
             # Extract child_runs_map for reuse in log_final_metrics
             child_runs_map = None
@@ -1069,12 +1097,15 @@ def run_local_hpo_sweep(
                     from infrastructure.paths.utils import resolve_project_paths
                     
                     client = mlflow.tracking.MlflowClient()
-                    # Use resolve_project_paths() for consistency
-                    _, config_dir_for_refit = resolve_project_paths(output_dir=output_dir, config_dir=None)
-                    # Fallback if inference failed
+                    # Use project_config_dir (already available) instead of re-inferring
+                    # Use resolve_project_paths() for consistency, but trust provided project_config_dir
+                    _, config_dir_for_refit = resolve_project_paths(
+                        output_dir=output_dir, 
+                        config_dir=project_config_dir  # Use provided project_config_dir
+                    )
+                    # Fallback to project_config_dir if resolution failed
                     if config_dir_for_refit is None:
-                        from infrastructure.paths.utils import infer_config_dir
-                        config_dir_for_refit = infer_config_dir(path=output_dir)
+                        config_dir_for_refit = project_config_dir
                     
                     # Priority 1: Retrieve study_key_hash from parent run tags (SSOT)
                     refit_study_key_hash = None
