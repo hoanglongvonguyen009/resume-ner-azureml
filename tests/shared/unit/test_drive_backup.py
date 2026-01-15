@@ -370,12 +370,13 @@ class TestEnsureLocalOptions:
 class TestColabMounting:
     """Test Colab-specific mounting functions."""
 
-    @patch("storage.drive.Path")
+    @patch("infrastructure.storage.drive.Path")
     def test_mount_colab_drive_success(self, mock_path):
         """Test successful Drive mounting."""
         mock_drive = MagicMock()
         mock_path_instance = MagicMock()
-        mock_path_instance.__truediv__ = MagicMock(return_value=Path("/content/drive/MyDrive"))
+        expected_result = MagicMock()
+        mock_path_instance.__truediv__ = MagicMock(return_value=expected_result)
         mock_path.return_value = mock_path_instance
         
         with patch.dict("sys.modules", {"google.colab": MagicMock(drive=mock_drive)}):
@@ -383,14 +384,15 @@ class TestColabMounting:
             
             mock_drive.mount.assert_called_once_with("/content/drive")
             mock_path.assert_called_once_with("/content/drive")
+            assert result == expected_result
 
     def test_mount_colab_drive_import_error(self):
         """Test mount_colab_drive raises ImportError when not in Colab."""
         with pytest.raises(ImportError, match="google.colab.drive not available"):
             mount_colab_drive()
 
-    @patch("storage.drive.mount_colab_drive")
-    @patch("paths.get_drive_backup_base")
+    @patch("infrastructure.storage.drive.mount_colab_drive")
+    @patch("infrastructure.paths.get_drive_backup_base")
     def test_create_colab_store_success(self, mock_get_base, mock_mount, tmp_path):
         """Test creating store for Colab environment."""
         root_dir = tmp_path / "project"
@@ -408,7 +410,7 @@ class TestColabMounting:
         assert store.root_dir == root_dir
         assert store.backup_root == mock_drive_root / "resume-ner-checkpoints"
 
-    @patch("storage.drive.mount_colab_drive")
+    @patch("infrastructure.storage.drive.mount_colab_drive")
     def test_create_colab_store_mount_fails(self, mock_mount, tmp_path):
         """Test create_colab_store returns None when mount fails."""
         root_dir = tmp_path / "project"
@@ -422,8 +424,8 @@ class TestColabMounting:
         
         assert store is None
 
-    @patch("storage.drive.mount_colab_drive")
-    @patch("paths.get_drive_backup_base")
+    @patch("infrastructure.storage.drive.mount_colab_drive")
+    @patch("infrastructure.paths.get_drive_backup_base")
     def test_create_colab_store_default_path(self, mock_get_base, mock_mount, tmp_path):
         """Test create_colab_store uses default path when config not found."""
         root_dir = tmp_path / "project"

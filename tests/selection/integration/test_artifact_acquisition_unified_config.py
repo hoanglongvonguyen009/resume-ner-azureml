@@ -330,8 +330,8 @@ class TestConfigOptionCombinations:
         assert "enabled" in acquisition_config["drive"]
         assert "require_artifact_tag" in acquisition_config["mlflow"]
 
-    @patch("evaluation.selection.artifact_unified.discovery.discover_artifact_local")
-    @patch("evaluation.selection.artifact_unified.selectors.select_artifact_run_from_request")
+    @patch("evaluation.selection.artifact_unified.acquisition.discover_artifact_local")
+    @patch("evaluation.selection.artifact_unified.acquisition.select_artifact_run_from_request")
     def test_config_with_disabled_sources(
         self,
         mock_select_run,

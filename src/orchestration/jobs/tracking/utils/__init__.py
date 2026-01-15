@@ -4,6 +4,11 @@ from __future__ import annotations
 
 This module re-exports utility functions for backward compatibility.
 New code should import directly from infrastructure.tracking.mlflow.*
+
+This is a backward compatibility layer. All functions are re-exported from:
+- infrastructure.tracking.mlflow.runs (create_child_run)
+- infrastructure.tracking.mlflow.urls (get_mlflow_run_url)
+- infrastructure.tracking.mlflow.utils (retry_with_backoff)
 """
 
 # Re-export all utility functions from new consolidated location

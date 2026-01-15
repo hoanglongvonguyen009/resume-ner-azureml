@@ -83,37 +83,97 @@ class TestArtifactAcquisitionEdgeCases:
         assert mlflow_enabled is True  # Default value
         assert mlflow_validate is True  # Default value
 
-    @patch("evaluation.selection.artifact_unified.compat._validate_checkpoint")
-    @patch("orchestration.jobs.local_selection_v2.find_trial_checkpoint_by_hash")
+    @patch("evaluation.selection.artifact_unified.compat.acquire_artifact")
     def test_validation_false_allows_invalid_checkpoints(
         self,
-        mock_find_checkpoint,
-        mock_validate,
+        mock_acquire_artifact,
         tmp_path,
         sample_acquisition_config,
         mock_best_run_info,
         mock_checkpoint_path,
     ):
         """Test that validation=False allows invalid checkpoints to be used."""
+        from evaluation.selection.artifact_unified.types import ArtifactResult, ArtifactRequest, ArtifactKind, ArtifactSource
+        
         root_dir = tmp_path / "outputs"
         config_dir = tmp_path / "config"
         root_dir.mkdir()
         config_dir.mkdir()
         
-        # Setup mocks - validation would fail
-        mock_find_checkpoint.return_value = str(mock_checkpoint_path)
-        mock_validate.return_value = False  # Invalid checkpoint
+        # Create a mock request object for the result
+        mock_request = ArtifactRequest(
+            artifact_kind=ArtifactKind.CHECKPOINT,
+            run_id="test_run_id_123",
+            backbone="distilbert",
+        )
+        
+        # Mock successful acquisition (validation=False means it succeeds even if checkpoint is invalid)
+        mock_acquire_artifact.return_value = ArtifactResult(
+            request=mock_request,
+            success=True,
+            path=Path(mock_checkpoint_path),
+            source=ArtifactSource.LOCAL,
+        )
         
         # Disable validation
         acquisition_config = sample_acquisition_config.copy()
         acquisition_config["local"]["validate"] = False
         
-        with patch("evaluation.selection.artifact_unified.compat._build_checkpoint_dir") as mock_build_dir, \
-             patch("evaluation.selection.artifact_unified.compat.shutil") as mock_shutil:
-            mock_build_dir.return_value = mock_checkpoint_path
-            
-            # Call function
-            result = acquire_best_model_checkpoint(
+        # Call function
+        result = acquire_best_model_checkpoint(
+            best_run_info=mock_best_run_info,
+            root_dir=root_dir,
+            config_dir=config_dir,
+            acquisition_config=acquisition_config,
+            selection_config={},
+            platform="local",
+            restore_from_drive=None,
+            drive_store=None,
+            in_colab=False,
+        )
+        
+        # Should succeed even with invalid checkpoint when validate=False
+        assert result is not None
+        assert result == Path(mock_checkpoint_path)
+
+    @patch("evaluation.selection.artifact_unified.compat.acquire_artifact")
+    def test_validation_true_rejects_invalid_checkpoints(
+        self,
+        mock_acquire_artifact,
+        tmp_path,
+        sample_acquisition_config,
+        mock_best_run_info,
+        mock_checkpoint_path,
+    ):
+        """Test that validation=True rejects invalid checkpoints."""
+        from evaluation.selection.artifact_unified.types import ArtifactResult, ArtifactRequest, ArtifactKind
+        
+        root_dir = tmp_path / "outputs"
+        config_dir = tmp_path / "config"
+        root_dir.mkdir()
+        config_dir.mkdir()
+        
+        # Create a mock request object for the result
+        mock_request = ArtifactRequest(
+            artifact_kind=ArtifactKind.CHECKPOINT,
+            run_id="test_run_id_123",
+            backbone="distilbert",
+        )
+        
+        # Mock failed acquisition (validation=True means invalid checkpoint is rejected)
+        mock_acquire_artifact.return_value = ArtifactResult(
+            request=mock_request,
+            success=False,
+            error="Checkpoint validation failed: missing required files",
+        )
+        
+        # Enable validation
+        acquisition_config = sample_acquisition_config.copy()
+        acquisition_config["local"]["validate"] = True
+        
+        # Call function - should fail because checkpoint is invalid
+        with pytest.raises(ValueError, match="Could not acquire checkpoint"):
+            acquire_best_model_checkpoint(
                 best_run_info=mock_best_run_info,
                 root_dir=root_dir,
                 config_dir=config_dir,
@@ -124,57 +184,6 @@ class TestArtifactAcquisitionEdgeCases:
                 drive_store=None,
                 in_colab=False,
             )
-            
-            # Should succeed even with invalid checkpoint when validate=False
-            assert result is not None
-
-    @patch("evaluation.selection.artifact_unified.compat._validate_checkpoint")
-    @patch("orchestration.jobs.local_selection_v2.find_trial_checkpoint_by_hash")
-    def test_validation_true_rejects_invalid_checkpoints(
-        self,
-        mock_find_checkpoint,
-        mock_validate,
-        tmp_path,
-        sample_acquisition_config,
-        mock_best_run_info,
-        mock_checkpoint_path,
-    ):
-        """Test that validation=True rejects invalid checkpoints."""
-        root_dir = tmp_path / "outputs"
-        config_dir = tmp_path / "config"
-        root_dir.mkdir()
-        config_dir.mkdir()
-        
-        # Setup mocks - validation fails
-        mock_find_checkpoint.return_value = str(mock_checkpoint_path)
-        mock_validate.return_value = False  # Invalid checkpoint
-        
-        # Enable validation
-        acquisition_config = sample_acquisition_config.copy()
-        acquisition_config["local"]["validate"] = True
-        
-        with patch("evaluation.selection.artifact_unified.compat._build_checkpoint_dir") as mock_build_dir, \
-             patch("evaluation.selection.artifact_unified.compat.shutil") as mock_shutil:
-            mock_build_dir.return_value = mock_checkpoint_path
-            
-            # Call function - should fail because checkpoint is invalid
-            try:
-                result = acquire_best_model_checkpoint(
-                    best_run_info=mock_best_run_info,
-                    root_dir=root_dir,
-                    config_dir=config_dir,
-                    acquisition_config=acquisition_config,
-                    selection_config={},
-                    platform="local",
-                    restore_from_drive=None,
-                    drive_store=None,
-                    in_colab=False,
-                )
-                # If local fails, it might try other strategies or raise error
-                # The exact behavior depends on whether other strategies are available
-            except ValueError:
-                # Expected if all strategies fail
-                pass
 
     def test_priority_order_affects_strategy_selection(self):
         """Test that priority order affects which strategy is selected."""

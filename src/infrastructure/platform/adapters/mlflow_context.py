@@ -167,7 +167,7 @@ class LocalMLflowContextManager(MLflowContextManager):
             print(
                 f"  [MLflow] Creating child run with parent: {parent_run_id[:12]}... (trial {trial_number})")
             # Use shared child run creation function
-            from orchestration.jobs.tracking.mlflow_helpers import create_child_run  # TODO: Move to tracking.mlflow
+            from infrastructure.tracking.mlflow.runs import create_child_run
             return create_child_run(
                 parent_run_id=parent_run_id,
                 trial_number=trial_number,

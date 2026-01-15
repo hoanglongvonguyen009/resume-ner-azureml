@@ -102,12 +102,8 @@ from infrastructure.metadata import (
     get_latest_entry,
 )
 
-# MLflow utils - moved to tracking/mlflow/setup.py (check if exists, otherwise keep here)
-try:
-    from infrastructure.tracking.mlflow.setup import setup_mlflow_for_stage
-except ImportError:
-    # Fallback to local implementation if not in tracking module
-    from .mlflow_utils import setup_mlflow_for_stage
+# MLflow utils - moved to tracking/mlflow/setup.py
+from infrastructure.tracking.mlflow.setup import setup_mlflow_for_stage
 
 # Benchmarking - moved to evaluation.benchmarking module
 # Use lazy import via __getattr__ to avoid circular dependencies during module initialization

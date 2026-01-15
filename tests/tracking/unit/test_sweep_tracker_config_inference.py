@@ -14,6 +14,15 @@ import pytest
 from infrastructure.tracking.mlflow.trackers.sweep_tracker import MLflowSweepTracker
 
 
+def _make_mlflow_run(*, run_id: str, experiment_id: str = "exp-1", tags: dict[str, str] | None = None) -> MagicMock:
+    run = MagicMock()
+    run.info.run_id = run_id
+    run.info.experiment_id = experiment_id
+    run.info.run_name = f"run-{run_id}"
+    run.data.tags = tags or {}
+    return run
+
+
 @pytest.fixture
 def root_dir_with_config(tmp_path: Path) -> Path:
     """Create a root directory with config/ directory."""
@@ -52,14 +61,24 @@ class TestSweepTrackerConfigInference:
         
         # Create mock MLflow client and runs
         mock_client = MagicMock()
-        mock_run = MagicMock()
-        mock_run.info.run_id = "test-run-id"
-        mock_run.data.tags.get.return_value = "0"  # trial_number tag
-        mock_client.search_runs.return_value = [mock_run]
-        mock_client.get_run.return_value = mock_run
+        parent_run = _make_mlflow_run(
+            run_id="parent-run-id",
+            tags={"code.study_key_hash": "study_hash_123"},
+        )
+        candidate_run = _make_mlflow_run(
+            run_id="child-run-id",
+            tags={
+                "mlflow.parentRunId": "parent-run-id",
+                "trial_number": "0",
+                "code.study_key_hash": "study_hash_123",
+            },
+        )
+        active_run = _make_mlflow_run(run_id="active-run-id", experiment_id="exp-1")
+        mock_client.search_runs.return_value = [candidate_run]
+        mock_client.get_run.return_value = parent_run
         
         with patch("mlflow.tracking.MlflowClient", return_value=mock_client):
-            with patch("mlflow.active_run", return_value=mock_run):
+            with patch("mlflow.active_run", return_value=active_run):
                 with patch("mlflow.log_param") as mock_log_param:
                     with patch("mlflow.set_tag") as mock_set_tag:
                         # Call _log_best_trial_id with output_dir
@@ -69,9 +88,7 @@ class TestSweepTrackerConfigInference:
                             output_dir=output_dir_structure,
                         )
                         
-                        # Verify that get_hpo_best_trial_run_id was called with correct config_dir
-                        # We can't directly verify the config_dir passed, but we can verify
-                        # that set_tag was called (which means config_dir was inferred correctly)
+                        # Verify tags were set (means a matching run was found and config_dir inferred)
                         assert mock_set_tag.called
                         
                         # Verify tags were set (indicating config_dir was found)
@@ -103,14 +120,24 @@ class TestSweepTrackerConfigInference:
         mock_study.best_trial = mock_trial
         
         mock_client = MagicMock()
-        mock_run = MagicMock()
-        mock_run.info.run_id = "test-run-id"
-        mock_run.data.tags.get.return_value = "0"
-        mock_client.search_runs.return_value = [mock_run]
-        mock_client.get_run.return_value = mock_run
+        parent_run = _make_mlflow_run(
+            run_id="parent-run-id",
+            tags={"code.study_key_hash": "study_hash_123"},
+        )
+        candidate_run = _make_mlflow_run(
+            run_id="child-run-id",
+            tags={
+                "mlflow.parentRunId": "parent-run-id",
+                "trial_number": "0",
+                "code.study_key_hash": "study_hash_123",
+            },
+        )
+        active_run = _make_mlflow_run(run_id="active-run-id", experiment_id="exp-1")
+        mock_client.search_runs.return_value = [candidate_run]
+        mock_client.get_run.return_value = parent_run
         
         with patch("mlflow.tracking.MlflowClient", return_value=mock_client):
-            with patch("mlflow.active_run", return_value=mock_run):
+            with patch("mlflow.active_run", return_value=active_run):
                 with patch("mlflow.log_param"):
                     with patch("mlflow.set_tag") as mock_set_tag:
                         # Should find config_dir at root_dir_with_config / "config"
@@ -147,14 +174,24 @@ class TestSweepTrackerConfigInference:
         mock_study.best_trial = mock_trial
         
         mock_client = MagicMock()
-        mock_run = MagicMock()
-        mock_run.info.run_id = "test-run-id"
-        mock_run.data.tags.get.return_value = "0"
-        mock_client.search_runs.return_value = [mock_run]
-        mock_client.get_run.return_value = mock_run
+        parent_run = _make_mlflow_run(
+            run_id="parent-run-id",
+            tags={"code.study_key_hash": "study_hash_123"},
+        )
+        candidate_run = _make_mlflow_run(
+            run_id="child-run-id",
+            tags={
+                "mlflow.parentRunId": "parent-run-id",
+                "trial_number": "0",
+                "code.study_key_hash": "study_hash_123",
+            },
+        )
+        active_run = _make_mlflow_run(run_id="active-run-id", experiment_id="exp-1")
+        mock_client.search_runs.return_value = [candidate_run]
+        mock_client.get_run.return_value = parent_run
         
         with patch("mlflow.tracking.MlflowClient", return_value=mock_client):
-            with patch("mlflow.active_run", return_value=mock_run):
+            with patch("mlflow.active_run", return_value=active_run):
                 with patch("mlflow.log_param"):
                     with patch("mlflow.set_tag") as mock_set_tag:
                         tracker._log_best_trial_id(
@@ -182,14 +219,25 @@ class TestSweepTrackerConfigInference:
         mock_study.trials = [mock_trial]
         
         mock_client = MagicMock()
-        mock_run = MagicMock()
-        mock_run.info.run_id = "test-run-id"
-        mock_run.data.tags.get.return_value = "0"
-        mock_client.search_runs.return_value = [mock_run]
-        mock_client.get_run.return_value = mock_run
+        # Configure best-trial lookup to succeed (so mlflow.set_tag is exercised)
+        parent_run = _make_mlflow_run(
+            run_id="parent-run-id",
+            tags={"code.study_key_hash": "study_hash_123"},
+        )
+        candidate_run = _make_mlflow_run(
+            run_id="child-run-id",
+            tags={
+                "mlflow.parentRunId": "parent-run-id",
+                "trial_number": "0",
+                "code.study_key_hash": "study_hash_123",
+            },
+        )
+        mock_client.get_run.return_value = parent_run
+        mock_client.search_runs.return_value = [candidate_run]
+        active_run = _make_mlflow_run(run_id="active-run-id", experiment_id="exp-1")
         
         with patch("mlflow.tracking.MlflowClient", return_value=mock_client):
-            with patch("mlflow.active_run", return_value=mock_run):
+            with patch("mlflow.active_run", return_value=active_run):
                 with patch("mlflow.log_metric") as mock_log_metric:
                     with patch("mlflow.log_param") as mock_log_param:
                         with patch("mlflow.set_tag") as mock_set_tag:
@@ -203,7 +251,7 @@ class TestSweepTrackerConfigInference:
                             # Verify metrics and params were logged
                             assert mock_log_metric.called
                             assert mock_log_param.called
-                            # Tags should be set (indicating config_dir was found)
+                            # Tags should be set (best trial run id/number)
                             assert mock_set_tag.called
 
     def test_log_final_metrics_uses_hpo_output_dir_when_output_dir_none(
@@ -222,14 +270,25 @@ class TestSweepTrackerConfigInference:
         mock_study.trials = [mock_trial]
         
         mock_client = MagicMock()
-        mock_run = MagicMock()
-        mock_run.info.run_id = "test-run-id"
-        mock_run.data.tags.get.return_value = "0"
-        mock_client.search_runs.return_value = [mock_run]
-        mock_client.get_run.return_value = mock_run
+        # Configure best-trial lookup to succeed so get_hpo_best_trial_run_id is called
+        parent_run = _make_mlflow_run(
+            run_id="parent-run-id",
+            tags={"code.study_key_hash": "study_hash_123"},
+        )
+        candidate_run = _make_mlflow_run(
+            run_id="child-run-id",
+            tags={
+                "mlflow.parentRunId": "parent-run-id",
+                "trial_number": "0",
+                "code.study_key_hash": "study_hash_123",
+            },
+        )
+        mock_client.get_run.return_value = parent_run
+        mock_client.search_runs.return_value = [candidate_run]
+        active_run = _make_mlflow_run(run_id="active-run-id", experiment_id="exp-1")
         
         with patch("mlflow.tracking.MlflowClient", return_value=mock_client):
-            with patch("mlflow.active_run", return_value=mock_run):
+            with patch("mlflow.active_run", return_value=active_run):
                 with patch("mlflow.log_metric"):
                     with patch("mlflow.log_param"):
                         with patch("infrastructure.naming.mlflow.tag_keys.get_hpo_best_trial_run_id") as mock_get_tag:
@@ -280,14 +339,24 @@ class TestSweepTrackerConfigInference:
         mock_study.best_trial = mock_trial
         
         mock_client = MagicMock()
-        mock_run = MagicMock()
-        mock_run.info.run_id = "test-run-id"
-        mock_run.data.tags.get.return_value = "0"
-        mock_client.search_runs.return_value = [mock_run]
-        mock_client.get_run.return_value = mock_run
+        parent_run = _make_mlflow_run(
+            run_id="parent-run-id",
+            tags={"code.study_key_hash": "study_hash_123"},
+        )
+        candidate_run = _make_mlflow_run(
+            run_id="child-run-id",
+            tags={
+                "mlflow.parentRunId": "parent-run-id",
+                "trial_number": "0",
+                "code.study_key_hash": "study_hash_123",
+            },
+        )
+        active_run = _make_mlflow_run(run_id="active-run-id", experiment_id="exp-1")
+        mock_client.search_runs.return_value = [candidate_run]
+        mock_client.get_run.return_value = parent_run
         
         with patch("mlflow.tracking.MlflowClient", return_value=mock_client):
-            with patch("mlflow.active_run", return_value=mock_run):
+            with patch("mlflow.active_run", return_value=active_run):
                 with patch("mlflow.log_param"):
                     with patch("infrastructure.naming.mlflow.tag_keys.get_hpo_best_trial_run_id") as mock_get_tag:
                         # Capture the config_dir passed to get_hpo_best_trial_run_id
