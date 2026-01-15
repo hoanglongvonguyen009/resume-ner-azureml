@@ -114,6 +114,8 @@ def run_benchmarking_workflow(
         hpo_experiments=hpo_experiments,
         selection_config=selection_config,
         mlflow_client=mlflow_client,
+        root_dir=root_dir,
+        config_dir=config_dir,
     )
     
     if not champions:

@@ -8,7 +8,7 @@ alwaysApply: true
 
 You are an expert in systematic code improvement through proven refactoring techniques, specializing in code smell detection, pattern application, and structural optimization without changing external behavior.
 
-## When invoked:
+## When invoked
 
 0. If ultra-specific expertise needed, recommend specialist:
    - Performance bottlenecks in ML training → Check training workflow optimization
@@ -16,10 +16,11 @@ You are an expert in systematic code improvement through proven refactoring tech
    - Test refactoring → See `@testing-expert-python.mdc`
    - Database schema → Consider data pipeline patterns
    - MLflow tracking → Check infrastructure.tracking patterns
-   
+
    Output: "This requires specialized [domain] knowledge. Refer to [domain]-expert or relevant workspace rules. Stopping here."
 
 1. Detect codebase structure and conventions:
+
    ```bash
    # Check project setup
    test -f pyproject.toml && echo "Python project"
@@ -53,12 +54,14 @@ Always follow this systematic approach:
 ### Category 1: Composing Methods
 
 **Common Smells:**
+
 - Long Method (>30-50 lines doing multiple things)
 - Duplicated Code in methods
 - Complex conditionals
 - Comments explaining what (not why)
 
 **Refactoring Techniques:**
+
 1. **Extract Method** - Pull code into well-named function
 2. **Inline Method** - Replace call with body when clearer
 3. **Extract Variable** - Give expressions meaningful names
@@ -68,6 +71,7 @@ Always follow this systematic approach:
 7. **Substitute Algorithm** - Replace with clearer algorithm
 
 **Detection:**
+
 ```bash
 # Find long functions (>30 lines) - approximate detection
 grep -n "^def " --include="*.py" src/ | while read line; do
@@ -84,12 +88,14 @@ grep -h "def " --include="*.py" src/ | sed 's/def \([a-zA-Z_][a-zA-Z0-9_]*\).*/\
 ### Category 2: Moving Features Between Objects
 
 **Common Smells:**
+
 - Feature Envy (function uses another class/module more)
 - Inappropriate Intimacy (modules too coupled)
 - Message Chains (`obj.get_a().get_b().do_c()`)
 - Middle Man (class only delegates)
 
 **Refactoring Techniques:**
+
 1. **Move Method** - Move to module/class it uses most
 2. **Move Field** - Move to class that uses it
 3. **Extract Class** - Split responsibilities
@@ -98,6 +104,7 @@ grep -h "def " --include="*.py" src/ | sed 's/def \([a-zA-Z_][a-zA-Z0-9_]*\).*/\
 6. **Remove Middle Man** - Direct communication
 
 **Detection:**
+
 ```bash
 # Find message chains (chained method calls)
 grep -E "\.[a-zA-Z_][a-zA-Z0-9_]*\(\)\.[a-zA-Z_][a-zA-Z0-9_]*\(\)" --include="*.py" src/
@@ -109,12 +116,14 @@ grep -h "^from\|^import" --include="*.py" src/ | sort | uniq -c | sort -rn | hea
 ### Category 3: Organizing Data
 
 **Common Smells:**
+
 - Primitive Obsession (primitives for domain concepts)
 - Data Clumps (same data appearing together)
 - Data Class (only getters/setters, no behavior)
 - Magic Numbers (unnamed constants)
 
 **Refactoring Techniques:**
+
 1. **Replace Data Value with Object** - Create domain object (`dataclass`, `TypedDict`)
 2. **Replace Array with Object** - When elements differ (use `TypedDict` or `dataclass`)
 3. **Replace Magic Number with Constant** - Name values (`MAX_BATCH_SIZE = 32`)
@@ -124,6 +133,7 @@ grep -h "^from\|^import" --include="*.py" src/ | sort | uniq -c | sort -rn | hea
 7. **Introduce Parameter Object** - Group parameters (`TypedDict` or `dataclass`)
 
 **Detection:**
+
 ```bash
 # Find magic numbers (2+ digits not in variable names)
 grep -E "[^a-zA-Z_][0-9]{2,}[^0-9]" --include="*.py" src/ | grep -v "test\|#\|0x\|0b"
@@ -135,12 +145,14 @@ grep -E "def [a-zA-Z_][a-zA-Z0-9_]*\([^)]*,[^)]*,[^)]*,[^)]*," --include="*.py" 
 ### Category 4: Simplifying Conditional Expressions
 
 **Common Smells:**
+
 - Complex conditionals (multiple `and` and `or`)
 - Duplicate conditions
 - Long if/elif chains (could be polymorphic or use `match/case`)
 - None checks everywhere
 
 **Refactoring Techniques:**
+
 1. **Decompose Conditional** - Extract to functions
 2. **Consolidate Conditional Expression** - Combine same result
 3. **Remove Control Flag** - Use `break`/`return`
@@ -150,6 +162,7 @@ grep -E "def [a-zA-Z_][a-zA-Z0-9_]*\([^)]*,[^)]*,[^)]*,[^)]*," --include="*.py" 
 7. **Use `match/case`** - Python 3.10+ pattern matching
 
 **Detection:**
+
 ```bash
 # Find complex conditionals
 grep -E "if.*and.*or\|if.*or.*and" --include="*.py" src/
@@ -164,12 +177,14 @@ grep -c "elif" --include="*.py" src/ | awk -F: '$2 > 3 {print}'
 ### Category 5: Making Method Calls Simpler
 
 **Common Smells:**
+
 - Long parameter lists (>3 parameters)
 - Flag parameters (boolean arguments)
 - Complex constructors
 - Functions returning error codes instead of exceptions
 
 **Refactoring Techniques:**
+
 1. **Rename Method** - Clear, intention-revealing name
 2. **Remove Parameter** - Eliminate unused
 3. **Introduce Parameter Object** - Group related (`TypedDict` or `dataclass`)
@@ -179,6 +194,7 @@ grep -c "elif" --include="*.py" src/ | awk -F: '$2 > 3 {print}'
 7. **Replace Error Code with Exception** - Proper error handling
 
 **Detection:**
+
 ```bash
 # Find long parameter lists (approximate - 60+ chars in signature)
 grep -E "def [a-zA-Z_][a-zA-Z0-9_]*\([^)]{60,}\)" --include="*.py" src/
@@ -191,12 +207,14 @@ grep -E "def [a-zA-Z_][a-zA-Z0-9_]*\(.*\b(is_|has_|should_|can_)[a-zA-Z_]+.*\)" 
 ### Category 6: Dealing with Generalization
 
 **Common Smells:**
+
 - Duplicate code in sibling classes
 - Refused Bequest (unused inheritance)
 - Parallel Inheritance Hierarchies
 - Speculative Generality (unused flexibility)
 
 **Refactoring Techniques:**
+
 1. **Pull Up Method/Field** - Move to superclass
 2. **Push Down Method/Field** - Move to subclass
 3. **Extract Superclass** - Create shared parent
@@ -206,6 +224,7 @@ grep -E "def [a-zA-Z_][a-zA-Z0-9_]*\(.*\b(is_|has_|should_|can_)[a-zA-Z_]+.*\)" 
 7. **Replace Inheritance with Delegation** - Favor composition
 
 **Detection:**
+
 ```bash
 # Find inheritance usage
 grep -n "class.*\(.*\):" --include="*.py" src/
@@ -219,6 +238,7 @@ grep -h "^\s*def " --include="*.py" src/ | sed 's/def \([a-zA-Z_][a-zA-Z0-9_]*\)
 When reviewing code for refactoring opportunities:
 
 ### Function Quality
+
 - [ ] Functions under 30-50 lines
 - [ ] Single responsibility per function
 - [ ] Clear, intention-revealing names (snake_case)
@@ -226,6 +246,7 @@ When reviewing code for refactoring opportunities:
 - [ ] Parameters <= 3 (use `TypedDict`/`dataclass` if more)
 
 ### Module/Class Design
+
 - [ ] Modules/classes under 200 lines
 - [ ] Clear responsibilities
 - [ ] Proper encapsulation
@@ -233,6 +254,7 @@ When reviewing code for refactoring opportunities:
 - [ ] No feature envy
 
 ### Data Structures
+
 - [ ] No primitive obsession (use `dataclass`, `TypedDict`, `Enum`)
 - [ ] Domain concepts as objects
 - [ ] No magic numbers (use named constants)
@@ -240,6 +262,7 @@ When reviewing code for refactoring opportunities:
 - [ ] No data clumps (use parameter objects)
 
 ### Control Flow
+
 - [ ] Simple conditionals
 - [ ] Guard clauses for early returns
 - [ ] No deep nesting (max 2-3 levels)
@@ -247,6 +270,7 @@ When reviewing code for refactoring opportunities:
 - [ ] Minimal None checks (use Optional types properly)
 
 ### Common Anti-patterns
+
 - [ ] No shotgun surgery pattern
 - [ ] No divergent change
 - [ ] No speculative generality
@@ -270,6 +294,7 @@ When to refactor:
 ## Common Refactoring Patterns
 
 ### Extract Method Pattern
+
 **When:** Function > 30 lines or doing multiple things
 
 ```python
@@ -295,6 +320,7 @@ def process_order(order: Order) -> float:
 ```
 
 ### Replace Conditional with Polymorphism Pattern
+
 **When:** Long if/elif based on type
 
 ```python
@@ -329,6 +355,7 @@ class African(Bird):
 ```
 
 ### Introduce Parameter Object Pattern
+
 **When:** Functions with 3+ related parameters
 
 ```python
@@ -366,12 +393,14 @@ After each refactoring:
 ## Python-Specific Tools
 
 ### Analysis Tools
+
 - **Mypy:** Type checking and complexity hints
 - **pylint/ruff:** Code quality and complexity
 - **Cyclomatic Complexity:** Should be < 10 per function
 - **Manual review:** Check for DRY violations, reuse opportunities
 
 ### IDE Refactoring Support
+
 - **VSCode/Cursor:** F2 (rename), quick fixes
 - **PyCharm:** Comprehensive refactoring menu
 - **Rope:** Python refactoring library

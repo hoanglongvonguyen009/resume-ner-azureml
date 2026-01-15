@@ -269,7 +269,13 @@ class InferenceRunner:
 
         # Get tokens for decoding - only convert non-padding tokens for efficiency
         token_decode_start = time.time()
+        input_ids = None
+        attention_mask = None
+        non_padding_indices = None
         try:
+            # Handle case where tokenizer_output is empty (e.g., in tests with mocked tokenizers)
+            if not tokenizer_output or "input_ids" not in tokenizer_output:
+                raise KeyError("input_ids")
             input_ids = tokenizer_output["input_ids"][0]
             attention_mask = tokenizer_output.get("attention_mask", None)
             if attention_mask is not None:
@@ -300,10 +306,12 @@ class InferenceRunner:
             tokens = []
             raise InferenceError(f"Token decoding failed: {e}") from e
         finally:
-            # Clean up intermediate arrays
-            del input_ids
-            del attention_mask
-            if 'non_padding_indices' in locals():
+            # Clean up intermediate arrays (only if they were assigned)
+            if input_ids is not None:
+                del input_ids
+            if attention_mask is not None:
+                del attention_mask
+            if non_padding_indices is not None:
                 del non_padding_indices
             gc.collect()
 

@@ -26,8 +26,8 @@ class TestONNXInferenceEngine:
         checkpoint.mkdir()
         return checkpoint
 
-    @patch("src.api.inference.engine.AutoTokenizer")
-    @patch("src.api.inference.engine.AutoConfig")
+    @patch("transformers.AutoTokenizer")
+    @patch("transformers.AutoConfig")
     @patch("onnxruntime.InferenceSession")
     def test_load_model_success(
         self,
@@ -69,8 +69,8 @@ class TestONNXInferenceEngine:
                 tmp_path / "nonexistent",
             )
 
-    @patch("src.api.inference.engine.prepare_onnx_inputs")
-    @patch("src.api.inference.engine.get_offset_mapping")
+    @patch("src.deployment.api.inference.engine.prepare_onnx_inputs")
+    @patch("src.deployment.api.inference.engine.get_offset_mapping")
     @patch("transformers.AutoTokenizer")
     @patch("transformers.AutoConfig")
     @patch("onnxruntime.InferenceSession")

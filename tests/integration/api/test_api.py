@@ -26,8 +26,8 @@ def client():
 def mock_model_loaded():
     """Mock model as loaded."""
     # Patch the deployed API routes module used by the FastAPI app
-    with patch("deployment.api.routes.predictions.is_model_loaded", return_value=True):
-        with patch("deployment.api.routes.predictions.get_engine") as mock_get_engine:
+    with patch("src.deployment.api.routes.predictions.is_model_loaded", return_value=True):
+        with patch("src.deployment.api.routes.predictions.get_engine") as mock_get_engine:
             mock_engine = MagicMock()
             # Mock predict method for batch predictions
             mock_engine.predict.return_value = [
@@ -81,14 +81,14 @@ class TestHealthEndpoint:
 
     def test_model_info_not_loaded(self, client):
         """Test model info when model not loaded."""
-        with patch("deployment.api.routes.health.is_model_loaded", return_value=False):
+        with patch("src.deployment.api.routes.health.is_model_loaded", return_value=False):
             response = client.get("/info")
             assert response.status_code == 503
 
     def test_model_info_loaded(self, client):
         """Test model info when model loaded."""
-        with patch("deployment.api.routes.health.is_model_loaded", return_value=True):
-            with patch("deployment.api.routes.health.get_model_info") as mock_info:
+        with patch("src.deployment.api.routes.health.is_model_loaded", return_value=True):
+            with patch("src.deployment.api.routes.health.get_model_info") as mock_info:
                 mock_info.return_value = {
                     "backbone": "distilroberta",
                     "entity_types": ["SKILL", "NAME"],
@@ -107,7 +107,7 @@ class TestPredictEndpoint:
 
     def test_predict_not_loaded(self, client):
         """Test predict when model not loaded."""
-        with patch("src.api.routes.predictions.is_model_loaded", return_value=False):
+        with patch("src.deployment.api.routes.predictions.is_model_loaded", return_value=False):
             response = client.post(
                 "/predict",
                 json={"text": "John Doe is a software engineer."},
@@ -139,7 +139,7 @@ class TestPredictEndpoint:
 
     def test_predict_batch_size_exceeded(self, client, mock_model_loaded):
         """Test batch size limit."""
-        with patch("src.api.config.APIConfig.MAX_BATCH_SIZE", 1):
+        with patch("src.deployment.api.config.APIConfig.MAX_BATCH_SIZE", 1):
             response = client.post(
                 "/predict/batch",
                 json={"texts": ["Text 1", "Text 2"]},
@@ -152,14 +152,14 @@ class TestFileEndpoints:
 
     def test_predict_file_not_loaded(self, client):
         """Test file predict when model not loaded."""
-        with patch("src.api.routes.predictions.is_model_loaded", return_value=False):
+        with patch("src.deployment.api.routes.predictions.is_model_loaded", return_value=False):
             response = client.post(
                 "/predict/file",
                 files={"file": ("test.pdf", b"%PDF-1.4\n", "application/pdf")},
             )
             assert response.status_code == 503
 
-    @patch("src.api.routes.predictions.extract_text_from_pdf")
+    @patch("src.deployment.api.routes.predictions.extract_text_from_pdf")
     def test_predict_file_pdf(self, mock_extract, client, mock_model_loaded):
         """Test PDF file prediction."""
         mock_extract.return_value = "Extracted text from PDF"
@@ -173,7 +173,7 @@ class TestFileEndpoints:
         assert "entities" in data
         assert "extracted_text" in data
 
-    @patch("src.api.routes.predictions.extract_text_from_image")
+    @patch("src.deployment.api.routes.predictions.extract_text_from_image")
     def test_predict_file_image(self, mock_extract, client, mock_model_loaded):
         """Test image file prediction."""
         mock_extract.return_value = "Extracted text from image"

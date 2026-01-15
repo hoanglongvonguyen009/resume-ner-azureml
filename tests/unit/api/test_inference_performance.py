@@ -139,9 +139,9 @@ class TestInferencePerformance:
         mock_tokenizer.convert_ids_to_tokens.return_value = ["[CLS]", "John", "Doe", "[SEP]"]
         return mock_tokenizer
 
-    @patch("src.api.inference.engine.prepare_onnx_inputs")
-    @patch("src.api.inference.engine.get_offset_mapping")
-    @patch("src.api.inference.engine.AutoTokenizer")
+    @patch("src.deployment.api.inference.engine.prepare_onnx_inputs")
+    @patch("src.deployment.api.inference.engine.get_offset_mapping")
+    @patch("transformers.AutoTokenizer")
     @patch("transformers.AutoConfig")
     @patch("onnxruntime.InferenceSession")
     def test_tokenization_does_not_hang(
@@ -208,9 +208,9 @@ class TestInferencePerformance:
         assert "input_ids" in tokenizer_output
         assert offset_mapping is not None or "offset_mapping" in tokenizer_output
 
-    @patch("src.api.inference.engine.prepare_onnx_inputs")
-    @patch("src.api.inference.engine.get_offset_mapping")
-    @patch("src.api.inference.engine.AutoTokenizer")
+    @patch("src.deployment.api.inference.engine.prepare_onnx_inputs")
+    @patch("src.deployment.api.inference.engine.get_offset_mapping")
+    @patch("transformers.AutoTokenizer")
     @patch("transformers.AutoConfig")
     @patch("onnxruntime.InferenceSession")
     def test_entity_extraction_with_offset_mapping(
@@ -329,9 +329,9 @@ class TestInferencePerformance:
         assert any("John" in text or "Doe" in text for text in entity_texts), \
             f"Expected 'John' or 'Doe' in entities, got: {entity_texts}"
 
-    @patch("src.api.inference.engine.prepare_onnx_inputs")
-    @patch("src.api.inference.engine.get_offset_mapping")
-    @patch("src.api.inference.engine.AutoTokenizer")
+    @patch("src.deployment.api.inference.engine.prepare_onnx_inputs")
+    @patch("src.deployment.api.inference.engine.get_offset_mapping")
+    @patch("transformers.AutoTokenizer")
     @patch("transformers.AutoConfig")
     @patch("onnxruntime.InferenceSession")
     def test_empty_text_handling(
@@ -386,9 +386,9 @@ class TestInferencePerformance:
         # Empty text should produce no entities (or only special tokens)
         assert len(entities) == 0 or all(e["label"] == "O" for e in entities)
 
-    @patch("src.api.inference.engine.prepare_onnx_inputs")
-    @patch("src.api.inference.engine.get_offset_mapping")
-    @patch("src.api.inference.engine.AutoTokenizer")
+    @patch("src.deployment.api.inference.engine.prepare_onnx_inputs")
+    @patch("src.deployment.api.inference.engine.get_offset_mapping")
+    @patch("transformers.AutoTokenizer")
     @patch("transformers.AutoConfig")
     @patch("onnxruntime.InferenceSession")
     def test_special_characters_handling(
@@ -480,9 +480,9 @@ class TestInferencePerformance:
         entities = engine.predict(special_text, return_confidence=False)
         assert isinstance(entities, list)
 
-    @patch("src.api.inference.engine.prepare_onnx_inputs")
-    @patch("src.api.inference.engine.get_offset_mapping")
-    @patch("src.api.inference.engine.AutoTokenizer")
+    @patch("src.deployment.api.inference.engine.prepare_onnx_inputs")
+    @patch("src.deployment.api.inference.engine.get_offset_mapping")
+    @patch("transformers.AutoTokenizer")
     @patch("transformers.AutoConfig")
     @patch("onnxruntime.InferenceSession")
     def test_tokenization_consistency(

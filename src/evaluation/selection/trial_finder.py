@@ -55,6 +55,87 @@ from training.hpo.utils.paths import resolve_hpo_output_dir
 
 logger = get_logger(__name__)
 
+# UUID pattern for validating run IDs
+_UUID_PATTERN = re.compile(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    re.IGNORECASE
+)
+
+
+def _find_metrics_file(trial_dir: Path) -> Optional[Path]:
+    """Find metrics.json file in trial directory.
+    
+    Checks multiple locations:
+    1. Trial root: trial_dir/metrics.json
+    2. CV folds: trial_dir/cv/fold0/metrics.json (for CV trials)
+    
+    Args:
+        trial_dir: Path to trial directory
+        
+    Returns:
+        Path to metrics.json if found, else None
+    """
+    # Try trial root first
+    root_metrics = trial_dir / "metrics.json"
+    if root_metrics.exists():
+        return root_metrics
+    
+    # Try CV folds
+    cv_dir = trial_dir / "cv"
+    if cv_dir.exists():
+        for fold_dir in cv_dir.iterdir():
+            if fold_dir.is_dir() and fold_dir.name.startswith("fold"):
+                fold_metrics = fold_dir / "metrics.json"
+                if fold_metrics.exists():
+                    return fold_metrics
+    
+    return None
+
+
+def _read_trial_meta(trial_dir: Path) -> Optional[Dict[str, Any]]:
+    """Read trial_meta.json from trial directory.
+    
+    Args:
+        trial_dir: Path to trial directory
+        
+    Returns:
+        Dictionary with trial metadata, or None if file doesn't exist or can't be read
+    """
+    trial_meta_path = trial_dir / "trial_meta.json"
+    if not trial_meta_path.exists():
+        return None
+    
+    try:
+        with open(trial_meta_path, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.debug(f"Could not read {trial_meta_path}: {e}")
+        return None
+
+
+def _extract_hashes_from_trial_dir(trial_dir: Path) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """Extract hashes and run_id from trial directory.
+    
+    Args:
+        trial_dir: Path to trial directory
+        
+    Returns:
+        Tuple of (study_key_hash, trial_key_hash, trial_run_id)
+    """
+    meta = _read_trial_meta(trial_dir)
+    if not meta:
+        return None, None, None
+    
+    study_key_hash = meta.get("study_key_hash")
+    trial_key_hash = meta.get("trial_key_hash")
+    trial_run_id = None
+    
+    run_id_from_meta = meta.get("run_id")
+    if run_id_from_meta and _UUID_PATTERN.match(run_id_from_meta):
+        trial_run_id = run_id_from_meta
+    
+    return study_key_hash, trial_key_hash, trial_run_id
+
 
 def find_best_trial_in_study_folder(
     study_folder: Path,
@@ -96,22 +177,8 @@ def find_best_trial_in_study_folder(
     # Find best trial by metrics
     trials_with_metrics = []
     for trial_dir in trial_dirs:
-        # Try multiple locations for metrics.json
-        # 1. Trial root: trial_dir/metrics.json
-        # 2. CV folds: trial_dir/cv/fold0/metrics.json (for CV trials)
-        metrics_file = None
-        if (trial_dir / "metrics.json").exists():
-            metrics_file = trial_dir / "metrics.json"
-        elif (trial_dir / "cv").exists():
-            # Check first fold for metrics (CV trials aggregate metrics at fold level)
-            for fold_dir in (trial_dir / "cv").iterdir():
-                if fold_dir.is_dir() and fold_dir.name.startswith("fold"):
-                    fold_metrics = fold_dir / "metrics.json"
-                    if fold_metrics.exists():
-                        metrics_file = fold_metrics
-                        break
-
-        if not metrics_file or not metrics_file.exists():
+        metrics_file = _find_metrics_file(trial_dir)
+        if not metrics_file:
             continue
 
         try:
@@ -147,23 +214,9 @@ def find_best_trial_in_study_folder(
             f"No trials with {objective_metric} found in {study_folder}")
         return None
 
-    # Load metrics - use same logic as above to find metrics.json
-    # Try multiple locations for metrics.json
-    # 1. Trial root: trial_dir/metrics.json
-    # 2. CV folds: trial_dir/cv/fold0/metrics.json (for CV trials)
-    metrics_file = None
-    if (best_trial_dir / "metrics.json").exists():
-        metrics_file = best_trial_dir / "metrics.json"
-    elif (best_trial_dir / "cv").exists():
-        # Check first fold for metrics (CV trials aggregate metrics at fold level)
-        for fold_dir in (best_trial_dir / "cv").iterdir():
-            if fold_dir.is_dir() and fold_dir.name.startswith("fold"):
-                fold_metrics = fold_dir / "metrics.json"
-                if fold_metrics.exists():
-                    metrics_file = fold_metrics
-                    break
-
-    if not metrics_file or not metrics_file.exists():
+    # Load metrics for best trial
+    metrics_file = _find_metrics_file(best_trial_dir)
+    if not metrics_file:
         logger.warning(
             f"metrics.json not found in {best_trial_dir} (checked root and CV folds)")
         return None
@@ -171,29 +224,8 @@ def find_best_trial_in_study_folder(
     with open(metrics_file, "r") as f:
         metrics = json.load(f)
 
-    # Try to read trial_meta.json for run_id and hashes
-    trial_run_id = None
-    study_key_hash = None
-    trial_key_hash = None
-    trial_meta_path = best_trial_dir / "trial_meta.json"
-    if trial_meta_path.exists():
-        try:
-            import re
-            with open(trial_meta_path, "r") as f:
-                trial_meta = json.load(f)
-            if "run_id" in trial_meta:
-                run_id_from_meta = trial_meta["run_id"]
-                uuid_pattern = re.compile(
-                    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-                    re.IGNORECASE
-                )
-            # Extract hashes for benchmarking
-            study_key_hash = trial_meta.get("study_key_hash")
-            trial_key_hash = trial_meta.get("trial_key_hash")
-            if uuid_pattern.match(run_id_from_meta):
-                trial_run_id = run_id_from_meta
-        except Exception:
-            pass
+    # Extract hashes and run_id from trial_meta.json
+    study_key_hash, trial_key_hash, trial_run_id = _extract_hashes_from_trial_dir(best_trial_dir)
 
     result = {
         "trial_name": best_trial_name,
@@ -233,32 +265,202 @@ def format_trial_identifier(trial_dir: Path, trial_number: Optional[int] = None)
     Returns:
         Formatted identifier string (e.g., "study-350a79aa, trial-9d4153fb, t1" or "trial_1_20260106_173735")
     """
-    trial_meta_path = trial_dir / "trial_meta.json"
-    if trial_meta_path.exists():
-        try:
-            with open(trial_meta_path, "r") as f:
-                meta = json.load(f)
-            study_key_hash = meta.get("study_key_hash")
-            trial_key_hash = meta.get("trial_key_hash")
-            meta_trial_number = meta.get("trial_number")
+    meta = _read_trial_meta(trial_dir)
+    if meta:
+        study_key_hash = meta.get("study_key_hash")
+        trial_key_hash = meta.get("trial_key_hash")
+        meta_trial_number = meta.get("trial_number")
 
-            # Use trial_number from meta if available, else use provided trial_number
-            display_trial_number = meta_trial_number if meta_trial_number is not None else trial_number
+        # Use trial_number from meta if available, else use provided trial_number
+        display_trial_number = meta_trial_number if meta_trial_number is not None else trial_number
 
-            if study_key_hash and trial_key_hash:
-                if display_trial_number is not None:
-                    return f"study-{study_key_hash[:8]}, trial-{trial_key_hash[:8]}, t{display_trial_number}"
-                else:
-                    return f"study-{study_key_hash[:8]}, trial-{trial_key_hash[:8]}"
-            elif display_trial_number is not None:
-                return f"t{display_trial_number}"
-        except Exception:
-            pass
+        if study_key_hash and trial_key_hash:
+            if display_trial_number is not None:
+                return f"study-{study_key_hash[:8]}, trial-{trial_key_hash[:8]}, t{display_trial_number}"
+            else:
+                return f"study-{study_key_hash[:8]}, trial-{trial_key_hash[:8]}"
+        elif display_trial_number is not None:
+            return f"t{display_trial_number}"
 
     # Fallback to directory name or trial number
     if trial_number is not None:
         return f"t{trial_number}"
     return trial_dir.name
+
+
+def _compute_trial_key_hash_from_study(
+    study: Any,
+    backbone_name: str,
+    hpo_config: Optional[Dict[str, Any]],
+    data_config: Optional[Dict[str, Any]],
+) -> Tuple[Optional[str], Optional[str]]:
+    """Compute trial_key_hash and study_key_hash from Optuna study.
+    
+    Args:
+        study: Optuna study object
+        backbone_name: Model backbone name
+        hpo_config: HPO configuration
+        data_config: Data configuration
+        
+    Returns:
+        Tuple of (trial_key_hash, study_key_hash) or (None, None) if computation fails
+    """
+    if not hpo_config or not data_config or not study.best_trial:
+        return None, None
+    
+    try:
+        from infrastructure.tracking.mlflow.hash_utils import (
+            compute_trial_key_hash_from_configs,
+        )
+        from infrastructure.naming.mlflow.hpo_keys import (
+            build_hpo_study_key,
+            build_hpo_study_key_hash,
+        )
+        
+        # Build study key hash
+        study_key = build_hpo_study_key(
+            data_config=data_config,
+            hpo_config=hpo_config,
+            model=backbone_name,
+        )
+        study_key_hash = build_hpo_study_key_hash(study_key)
+        
+        if not study_key_hash:
+            return None, None
+        
+        # Extract hyperparameters (excluding metadata fields)
+        hyperparameters = {
+            k: v
+            for k, v in study.best_trial.params.items()
+            if k not in ("backbone", "trial_number")
+        }
+        
+        # Compute trial_key_hash
+        trial_key_hash = compute_trial_key_hash_from_configs(
+            study_key_hash, hyperparameters, None
+        )
+        
+        return trial_key_hash, study_key_hash
+    except Exception:
+        return None, None
+
+
+def _find_trial_dir_by_hash(
+    study_folder: Path,
+    trial_key_hash: str,
+    study_key_hash: Optional[str],
+    backbone_name: str,
+    hpo_backbone_dir: Path,
+) -> Optional[Path]:
+    """Find trial directory by trial_key_hash.
+    
+    Args:
+        study_folder: Path to study folder
+        trial_key_hash: Trial key hash to match
+        study_key_hash: Study key hash (for v2 path lookup)
+        backbone_name: Model backbone name
+        hpo_backbone_dir: HPO backbone output directory
+        
+    Returns:
+        Path to trial directory if found, else None
+    """
+    # Try v2 path lookup first if we have study_key_hash
+    if study_key_hash:
+        try:
+            from infrastructure.paths.parse import find_trial_by_hash
+            from infrastructure.paths.utils import resolve_project_paths
+            
+            project_root, resolved_config_dir = resolve_project_paths(
+                output_dir=hpo_backbone_dir,
+                config_dir=None,
+            )
+            if project_root and resolved_config_dir:
+                v2_trial_dir = find_trial_by_hash(
+                    root_dir=project_root,
+                    config_dir=resolved_config_dir,
+                    model=backbone_name,
+                    study_key_hash=study_key_hash,
+                    trial_key_hash=trial_key_hash,
+                )
+                if v2_trial_dir and v2_trial_dir.exists():
+                    return v2_trial_dir
+        except Exception:
+            pass
+    
+    # Fallback: iterate through study_folder looking for v2 trials
+    for trial_dir in study_folder.iterdir():
+        if not trial_dir.is_dir():
+            continue
+        if not (trial_dir.name.startswith("trial-") and len(trial_dir.name) > 7):
+            continue
+        
+        meta = _read_trial_meta(trial_dir)
+        if meta and meta.get("trial_key_hash") == trial_key_hash:
+            return trial_dir
+    
+    return None
+
+
+def _find_trial_dir_by_number(
+    study_folder: Path,
+    trial_number: int,
+) -> Optional[Path]:
+    """Find trial directory by trial number.
+    
+    Args:
+        study_folder: Path to study folder
+        trial_number: Trial number to match
+        
+    Returns:
+        Path to trial directory if found, else None
+    """
+    for trial_dir in study_folder.iterdir():
+        if not trial_dir.is_dir():
+            continue
+        if not (trial_dir.name.startswith("trial-") and len(trial_dir.name) > 7):
+            continue
+        
+        meta = _read_trial_meta(trial_dir)
+        if meta and meta.get("trial_number") == trial_number:
+            return trial_dir
+    
+    return None
+
+
+def _build_trial_result_dict(
+    trial_dir: Path,
+    best_trial_config: Dict[str, Any],
+    study_key_hash: Optional[str] = None,
+    trial_key_hash: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Build trial result dictionary from trial directory and config.
+    
+    Args:
+        trial_dir: Path to trial directory
+        best_trial_config: Best trial configuration from study
+        study_key_hash: Optional study key hash
+        trial_key_hash: Optional trial key hash
+        
+    Returns:
+        Dictionary with trial information
+    """
+    # Extract hashes from trial_meta.json if not provided
+    if not study_key_hash or not trial_key_hash:
+        meta_study_hash, meta_trial_hash, _ = _extract_hashes_from_trial_dir(trial_dir)
+        study_key_hash = study_key_hash or meta_study_hash
+        trial_key_hash = trial_key_hash or meta_trial_hash
+    
+    return {
+        "trial_name": trial_dir.name,
+        "trial_dir": str(trial_dir),
+        "checkpoint_dir": None,  # Will be determined later
+        "checkpoint_type": "unknown",
+        "accuracy": best_trial_config.get("selection_criteria", {}).get("best_value"),
+        "metrics": best_trial_config.get("metrics", {}),
+        "hyperparameters": best_trial_config.get("hyperparameters", {}),
+        "study_key_hash": study_key_hash,
+        "trial_key_hash": trial_key_hash,
+    }
 
 
 def find_study_folder_in_backbone_dir(backbone_dir: Path) -> Optional[Path]:
@@ -359,165 +561,35 @@ def find_best_trial_from_study(
         best_trial = study.best_trial
         best_trial_number = best_trial.number
 
-        # Compute trial_key_hash from Optuna trial hyperparameters using centralized utilities
-        computed_trial_key_hash = None
-        if hpo_config and data_config:
-            try:
-                from infrastructure.tracking.mlflow.hash_utils import (
-                    compute_study_key_hash_v2,
-                    compute_trial_key_hash_from_configs,
-                )
-                from infrastructure.naming.mlflow.hpo_keys import (
-                    build_hpo_study_key,
-                    build_hpo_study_key_hash,
-                )
-
-                # Try v2 first (requires train_config, which we don't have here)
-                # Fallback to v1 for backward compatibility
-                study_key_hash = None
-                try:
-                    # We don't have train_config here, so use v1 fallback
-                    study_key = build_hpo_study_key(
-                        data_config=data_config,
-                        hpo_config=hpo_config,
-                        model=backbone_name,
-                    )
-                    study_key_hash = build_hpo_study_key_hash(study_key)
-                except Exception:
-                    pass
-
-                if study_key_hash:
-                    # Extract hyperparameters (excluding metadata fields)
-                    hyperparameters = {
-                        k: v
-                        for k, v in best_trial.params.items()
-                        if k not in ("backbone", "trial_number")
-                    }
-
-                    # Compute trial_key_hash using centralized utility
-                    computed_trial_key_hash = compute_trial_key_hash_from_configs(
-                        study_key_hash, hyperparameters, None
-                    )
-
-            except Exception:
-                pass
+        # Compute trial_key_hash from Optuna trial hyperparameters
+        computed_trial_key_hash, computed_study_key_hash = _compute_trial_key_hash_from_study(
+            study, backbone_name, hpo_config, data_config
+        )
 
         best_trial_dir = None
 
         # Strategy 1: Match by trial_key_hash (most reliable)
-        # Support v2 paths (trial-{hash}) only
         if computed_trial_key_hash:
-            # Try v2 path lookup first if we have study_key_hash
-            study_key_hash = None
-            if hpo_config and data_config:
-                try:
-                    from infrastructure.naming.mlflow.hpo_keys import (
-                        build_hpo_study_key,
-                        build_hpo_study_key_hash,
-                    )
-                    study_key = build_hpo_study_key(
-                        data_config=data_config,
-                        hpo_config=hpo_config,
-                        model=backbone_name,
-                        benchmark_config=None,
-                    )
-                    study_key_hash = build_hpo_study_key_hash(study_key)
-                except Exception:
-                    pass
+            best_trial_dir = _find_trial_dir_by_hash(
+                study_folder,
+                computed_trial_key_hash,
+                computed_study_key_hash,
+                backbone_name,
+                hpo_backbone_dir,
+            )
 
-            # Try v2 path lookup using find_trial_by_hash
-            if study_key_hash:
-                try:
-                    from infrastructure.paths.parse import find_trial_by_hash
-                    # Find project root and config_dir from hpo_backbone_dir
-                    # hpo_backbone_dir is typically: outputs/hpo/{storage_env}/{model}
-                    from infrastructure.paths.utils import find_project_root
-                    project_root = find_project_root(output_dir=hpo_backbone_dir)
-                    config_dir = project_root / "config"
-
-                    v2_trial_dir = find_trial_by_hash(
-                        root_dir=project_root,
-                        config_dir=config_dir,
-                        model=backbone_name,
-                        study_key_hash=study_key_hash,
-                        trial_key_hash=computed_trial_key_hash,
-                    )
-                    if v2_trial_dir and v2_trial_dir.exists():
-                        best_trial_dir = v2_trial_dir
-                except Exception:
-                    pass
-
-            # Fallback: iterate through study_folder looking for v2 trials
-            if best_trial_dir is None:
-                for trial_dir in study_folder.iterdir():
-                    # Support v2 (trial-{hash}) naming only
-                    if not trial_dir.is_dir():
-                        continue
-                    if not (trial_dir.name.startswith("trial-") and len(trial_dir.name) > 7):
-                        continue
-
-                    trial_meta_path = trial_dir / "trial_meta.json"
-                    if not trial_meta_path.exists():
-                        continue
-
-                    try:
-                        with open(trial_meta_path, "r") as f:
-                            meta = json.load(f)
-
-                        # Match by trial_key_hash
-                        if meta.get("trial_key_hash") == computed_trial_key_hash:
-                            best_trial_dir = trial_dir
-                            break
-                    except Exception:
-                        continue
-
-        # Strategy 2: Fallback to trial number + verify checkpoint exists
+        # Strategy 2: Fallback to trial number
         if best_trial_dir is None:
-            for trial_dir in study_folder.iterdir():
-                if not trial_dir.is_dir():
-                    continue
-                # Support v2 (trial-{hash}) naming only
-                if not (trial_dir.name.startswith("trial-") and len(trial_dir.name) > 7):
-                    continue
-
-                # Check trial_meta.json for trial_number match (works for both v2 and legacy)
-                trial_meta_path = trial_dir / "trial_meta.json"
-                if trial_meta_path.exists():
-                    try:
-                        with open(trial_meta_path, "r") as f:
-                            meta = json.load(f)
-                        if meta.get("trial_number") == best_trial_number:
-                            best_trial_dir = trial_dir
-                            break
-                    except Exception:
-                        continue
+            best_trial_dir = _find_trial_dir_by_number(study_folder, best_trial_number)
 
         # Construct best_trial_from_disk from study.best_trial
         if best_trial_dir:
-            # Extract hashes from trial_meta.json if available
-            study_key_hash = None
-            trial_key_hash = None
-            trial_meta_path = best_trial_dir / "trial_meta.json"
-            if trial_meta_path.exists():
-                try:
-                    with open(trial_meta_path, "r") as f:
-                        meta = json.load(f)
-                    study_key_hash = meta.get("study_key_hash")
-                    trial_key_hash = meta.get("trial_key_hash")
-                except Exception:
-                    pass
-            
-            best_trial_from_disk = {
-                "trial_name": best_trial_dir.name,
-                "trial_dir": str(best_trial_dir),
-                "checkpoint_dir": None,  # Will be determined later
-                "checkpoint_type": "unknown",
-                "accuracy": best_trial_config.get("selection_criteria", {}).get("best_value"),
-                "metrics": best_trial_config.get("metrics", {}),
-                "hyperparameters": best_trial_config.get("hyperparameters", {}),
-                "study_key_hash": study_key_hash,  # Include hashes for benchmarking
-                "trial_key_hash": trial_key_hash,
-            }
+            best_trial_from_disk = _build_trial_result_dict(
+                best_trial_dir,
+                best_trial_config,
+                computed_study_key_hash,
+                computed_trial_key_hash,
+            )
         else:
             # Fallback: trial directory not found by hash or number
             # Use find_best_trial_in_study_folder to find best trial by metrics
@@ -535,19 +607,8 @@ def find_best_trial_from_study(
             )
 
             if best_trial_from_folder:
-                # Extract hashes from trial_meta.json if available
-                study_key_hash = None
-                trial_key_hash = None
                 trial_dir_path = Path(best_trial_from_folder["trial_dir"])
-                trial_meta_path = trial_dir_path / "trial_meta.json"
-                if trial_meta_path.exists():
-                    try:
-                        with open(trial_meta_path, "r") as f:
-                            meta = json.load(f)
-                        study_key_hash = meta.get("study_key_hash")
-                        trial_key_hash = meta.get("trial_key_hash")
-                    except Exception:
-                        pass
+                study_key_hash, trial_key_hash, _ = _extract_hashes_from_trial_dir(trial_dir_path)
                 
                 best_trial_from_disk = {
                     "trial_name": best_trial_from_folder["trial_name"],
@@ -558,7 +619,7 @@ def find_best_trial_from_study(
                     "metrics": best_trial_from_folder.get("metrics", {}),
                     # Use from study if available
                     "hyperparameters": best_trial_config.get("hyperparameters", {}),
-                    "study_key_hash": study_key_hash,  # Include hashes for benchmarking
+                    "study_key_hash": study_key_hash,
                     "trial_key_hash": trial_key_hash,
                 }
             else:
@@ -574,30 +635,10 @@ def find_best_trial_from_study(
                         f"Using found v2 trial directory as fallback: {any_trial_dir.name} "
                         f"(NOTE: This may not be the best trial, but it exists)"
                     )
-                    # Extract hashes from trial_meta.json if available
-                    study_key_hash = None
-                    trial_key_hash = None
-                    trial_meta_path = any_trial_dir / "trial_meta.json"
-                    if trial_meta_path.exists():
-                        try:
-                            with open(trial_meta_path, "r") as f:
-                                meta = json.load(f)
-                            study_key_hash = meta.get("study_key_hash")
-                            trial_key_hash = meta.get("trial_key_hash")
-                        except Exception:
-                            pass
-                    
-                    best_trial_from_disk = {
-                        "trial_name": any_trial_dir.name,
-                        "trial_dir": str(any_trial_dir),
-                        "checkpoint_dir": None,
-                        "checkpoint_type": "unknown",
-                        "accuracy": best_trial_config.get("selection_criteria", {}).get("best_value"),
-                        "metrics": best_trial_config.get("metrics", {}),
-                        "hyperparameters": best_trial_config.get("hyperparameters", {}),
-                        "study_key_hash": study_key_hash,  # Include hashes for benchmarking
-                        "trial_key_hash": trial_key_hash,
-                    }
+                    best_trial_from_disk = _build_trial_result_dict(
+                        any_trial_dir,
+                        best_trial_config,
+                    )
                 else:
                     logger.error(
                         f"Could not find ANY v2 trial in {study_folder}. "
@@ -810,110 +851,47 @@ def find_best_trials_for_backbones(
     return best_trials
 
 
-def select_champion_per_backbone(
-    backbone: str,
-    hpo_experiment: Dict[str, str],
-    selection_config: Dict[str, Any],
+def _query_runs_with_fallback(
     mlflow_client: MlflowClient,
-    root_dir: Optional[Path] = None,
-    config_dir: Optional[Path] = None,
-) -> Optional[Dict[str, Any]]:
-    """
-    Select champion (best configuration group winner) per backbone.
+    experiment_id: str,
+    backbone_name: str,
+    backbone_tag: str,
+    stage_tag: str,
+) -> List[Any]:
+    """Query MLflow runs with fallback strategies for legacy runs.
     
-    Groups runs by study_key_hash v2 (comparable configuration groups),
-    then selects best group and best trial within that group.
-    
-    All parameters come from selection_config (centralized config).
-    
-    Requirements enforced:
-    1. Bound fingerprints in study_key_hash v2
-    2. Never mix v1 and v2 runs in same selection (config-driven)
-    3. Explicit objective direction (never assume max, with migration support)
-    4. Handle missing/NaN metrics deterministically
-    5. Minimum trial count guardrail (config-driven)
-    6. Artifact availability constraint (config-driven source)
-    7. Deterministic constraints (top_k <= min_trials)
+    Tries multiple tag combinations:
+    1. backbone + stage="hpo_trial" (new format)
+    2. stage="hpo_trial" only (legacy without backbone tag)
+    3. backbone + stage="hpo" (legacy format)
+    4. stage="hpo" only (legacy without backbone tag)
     
     Args:
-        backbone: Model backbone name
-        hpo_experiment: Dict with 'name' and 'id' of HPO experiment
-        selection_config: Selection configuration dictionary
         mlflow_client: MLflow client instance
-    
+        experiment_id: Experiment ID to query
+        backbone_name: Model backbone name
+        backbone_tag: Tag key for backbone
+        stage_tag: Tag key for stage
+        
     Returns:
-        {
-            "backbone": "distilbert",
-            "champion": {
-                "run_id": "...",  # PRIMARY: MLflow handle
-                "trial_key_hash": "...",  # Optional: for display
-                "metric": 0.87,
-                "stable_score": 0.86,
-                "study_key_hash": "abc123...",
-                "schema_version": "2.0",
-                "checkpoint_path": Path(...),
-            },
-            "all_groups": {...},
-            "selection_metadata": {...},
-        }
-        or None if no valid champions found
+        List of MLflow runs
     """
     from infrastructure.tracking.mlflow.queries import query_runs_by_tags
-    from infrastructure.naming.mlflow.tags_registry import TagsRegistry
-    from infrastructure.config.selection import (
-        get_objective_direction,
-        get_champion_selection_config,
-    )
     
-    # Extract config values with defaults and constraint validation
-    champion_config = get_champion_selection_config(selection_config)
-    min_trials_per_group = champion_config["min_trials_per_group"]
-    top_k_for_stable_score = champion_config["top_k_for_stable_score"]
-    require_artifact_available = champion_config["require_artifact_available"]
-    artifact_check_source = champion_config["artifact_check_source"]
-    allow_mixed_schema_groups = champion_config["allow_mixed_schema_groups"]
-    prefer_schema_version = champion_config["prefer_schema_version"]
-    
-    # Get objective direction (with migration support)
-    objective_metric = selection_config.get("objective", {}).get("metric", "macro-f1")
-    objective_direction = get_objective_direction(selection_config)  # Uses migration helper
-    maximize = objective_direction.lower() == "maximize"
-    
-    from infrastructure.naming.mlflow.tags_registry import load_tags_registry
-    from pathlib import Path
-    from infrastructure.paths.utils import infer_config_dir
-    # Infer config_dir
-    config_dir = infer_config_dir()
-    tags_registry = load_tags_registry(config_dir)
-    backbone_tag = tags_registry.key("process", "backbone")
-    stage_tag = tags_registry.key("process", "stage")
-    study_key_tag = tags_registry.key("grouping", "study_key_hash")
-    trial_key_tag = tags_registry.key("grouping", "trial_key_hash")
-    schema_version_tag = tags_registry.key("study", "key_schema_version")
-    artifact_tag = tags_registry.key("artifact", "available")
-    
-    backbone_name = backbone.split("-")[0] if "-" in backbone else backbone
-    
-    # Step 1: Filter runs
-    # NOTE: Since experiments are already per-backbone (e.g., resume_ner_baseline-hpo-distilbert),
-    # we don't strictly need the backbone tag filter. However, we'll try with it first,
-    # and fallback to stage-only if backbone tag is missing (legacy runs).
-    
-    # Try "hpo_trial" first (new format), fallback to "hpo" (legacy format)
-    # Try with backbone tag first
+    # Try "hpo_trial" first (new format), with backbone tag
     required_tags_with_backbone = {
         backbone_tag: backbone_name,
         stage_tag: "hpo_trial",
     }
     
     logger.debug(
-        f"Querying runs for {backbone} with tags: {backbone_tag}={backbone_name}, "
+        f"Querying runs with tags: {backbone_tag}={backbone_name}, "
         f"{stage_tag}=hpo_trial"
     )
     
     runs = query_runs_by_tags(
         client=mlflow_client,
-        experiment_ids=[hpo_experiment["id"]],
+        experiment_ids=[experiment_id],
         required_tags=required_tags_with_backbone,
         max_results=DEFAULT_MLFLOW_MAX_RESULTS,
     )
@@ -927,7 +905,7 @@ def select_champion_per_backbone(
         required_tags_stage_only = {stage_tag: "hpo_trial"}
         runs = query_runs_by_tags(
             client=mlflow_client,
-            experiment_ids=[hpo_experiment["id"]],
+            experiment_ids=[experiment_id],
             required_tags=required_tags_stage_only,
             max_results=DEFAULT_MLFLOW_MAX_RESULTS,
         )
@@ -935,7 +913,7 @@ def select_champion_per_backbone(
     # If still no runs, try legacy "hpo" stage tag (with backbone)
     if not runs:
         logger.info(
-            f"No runs found with stage='hpo_trial' for {backbone}, "
+            f"No runs found with stage='hpo_trial' for {backbone_name}, "
             f"trying legacy stage='hpo'"
         )
         required_tags_with_backbone = {
@@ -944,7 +922,7 @@ def select_champion_per_backbone(
         }
         runs = query_runs_by_tags(
             client=mlflow_client,
-            experiment_ids=[hpo_experiment["id"]],
+            experiment_ids=[experiment_id],
             required_tags=required_tags_with_backbone,
             max_results=DEFAULT_MLFLOW_MAX_RESULTS,
         )
@@ -958,53 +936,43 @@ def select_champion_per_backbone(
         required_tags_stage_only = {stage_tag: "hpo"}
         runs = query_runs_by_tags(
             client=mlflow_client,
-            experiment_ids=[hpo_experiment["id"]],
+            experiment_ids=[experiment_id],
             required_tags=required_tags_stage_only,
             max_results=DEFAULT_MLFLOW_MAX_RESULTS,
         )
     
     logger.info(
-        f"Found {len(runs)} runs with stage tag for {backbone} "
+        f"Found {len(runs)} runs with stage tag for {backbone_name} "
         f"(backbone={backbone_name})"
     )
     
-    # Step 1.5: Filter out parent runs (they don't have trial metrics)
-    # Parent runs have mlflow.parentRunId tag missing (they are the parent)
-    # Child runs have mlflow.parentRunId tag set
-    runs_before_parent_filter = len(runs)
-    runs = [r for r in runs if r.data.tags.get("mlflow.parentRunId") is not None]
-    parent_runs_filtered = runs_before_parent_filter - len(runs)
-    if parent_runs_filtered > 0:
-        logger.info(
-            f"Filtered out {parent_runs_filtered} parent run(s) (only child/trial runs have metrics). "
-            f"{len(runs)} child runs remaining."
-        )
+    return runs
+
+
+def _partition_runs_by_schema_version(
+    runs: List[Any],
+    study_key_tag: str,
+    schema_version_tag: str,
+) -> Tuple[Dict[str, List[Any]], Dict[str, List[Any]], int]:
+    """Partition runs by study_key_hash and schema version.
     
-    # Step 2: Artifact availability filter (config-driven source)
-    runs_before_artifact_filter = len(runs)
-    if require_artifact_available:
-        runs = _filter_by_artifact_availability(
-            runs, artifact_check_source, artifact_tag, logger, mlflow_client, schema_version_tag
-        )
-        runs_after_artifact_filter = len(runs)
-        if runs_after_artifact_filter < runs_before_artifact_filter:
-            logger.warning(
-                f"Artifact filter removed {runs_before_artifact_filter - runs_after_artifact_filter} "
-                f"runs for {backbone} ({runs_after_artifact_filter} remaining). "
-                f"Check that runs have '{artifact_tag}' tag set to 'true'."
-            )
-    
-    # Step 3: Partition by study_key_hash AND schema version
-    # CRITICAL: Never mix v1 and v2 runs if allow_mixed_schema_groups is False
-    groups_v1: Dict[str, List[Any]] = {}  # v1 runs
-    groups_v2: Dict[str, List[Any]] = {}  # v2 runs
+    Args:
+        runs: List of MLflow runs
+        study_key_tag: Tag key for study_key_hash
+        schema_version_tag: Tag key for schema version
+        
+    Returns:
+        Tuple of (groups_v1, groups_v2, runs_without_study_key)
+    """
+    groups_v1: Dict[str, List[Any]] = {}
+    groups_v2: Dict[str, List[Any]] = {}
     runs_without_study_key = 0
     
     for run in runs:
         study_key_hash = run.data.tags.get(study_key_tag)
         if not study_key_hash:
             runs_without_study_key += 1
-            continue  # Skip runs without grouping tag
+            continue
         
         # Check schema version (default to "1.0" if missing for backward compat)
         schema_version = run.data.tags.get(schema_version_tag, "1.0")
@@ -1020,74 +988,64 @@ def select_champion_per_backbone(
                 groups_v1[study_key_hash] = []
             groups_v1[study_key_hash].append(run)
     
-    if runs_without_study_key > 0:
-        logger.warning(
-            f"Skipped {runs_without_study_key} runs without {study_key_tag} tag for {backbone}"
-        )
+    return groups_v1, groups_v2, runs_without_study_key
+
+
+def _select_groups_by_schema_version(
+    groups_v1: Dict[str, List[Any]],
+    groups_v2: Dict[str, List[Any]],
+    allow_mixed_schema_groups: bool,
+    prefer_schema_version: str,
+) -> Tuple[Dict[str, List[Any]], str]:
+    """Select groups based on schema version preferences.
     
-    logger.info(
-        f"Grouped runs for {backbone}: {len(groups_v1)} v1 group(s), "
-        f"{len(groups_v2)} v2 group(s)"
-    )
-    
-    # Step 4: Select groups based on prefer_schema_version and allow_mixed_schema_groups
+    Args:
+        groups_v1: v1 groups
+        groups_v2: v2 groups
+        allow_mixed_schema_groups: Whether to allow mixing v1 and v2
+        prefer_schema_version: Preferred schema version ("1.0", "2.0", or "auto")
+        
+    Returns:
+        Tuple of (groups_to_use, schema_version_used)
+    """
     if allow_mixed_schema_groups:
         # WARNING: This is dangerous - only allow if explicitly enabled
         logger.warning(
-            f"allow_mixed_schema_groups=True is enabled for {backbone}. "
+            f"allow_mixed_schema_groups=True is enabled. "
             f"This may compare non-comparable runs. Use with caution."
         )
-        # Merge groups (dangerous but allowed)
-        groups_to_use = {**groups_v1, **groups_v2}
-        schema_version_used = "mixed"
+        return {**groups_v1, **groups_v2}, "mixed"
+    
+    # Safe: Prefer v2, fallback to v1 (never mix)
+    if prefer_schema_version == "2.0" or (prefer_schema_version == "auto" and groups_v2):
+        return groups_v2, "2.0"
+    elif prefer_schema_version == "1.0" or (prefer_schema_version == "auto" and not groups_v2):
+        return groups_v1, "1.0"
     else:
-        # Safe: Prefer v2, fallback to v1 (never mix)
-        if prefer_schema_version == "2.0" or (prefer_schema_version == "auto" and groups_v2):
-            groups_to_use = groups_v2
-            schema_version_used = "2.0"
-        elif prefer_schema_version == "1.0" or (prefer_schema_version == "auto" and not groups_v2):
-            groups_to_use = groups_v1
-            schema_version_used = "1.0"
-        else:
-            groups_to_use = groups_v2 if groups_v2 else groups_v1
-            schema_version_used = "2.0" if groups_v2 else "1.0"
+        return groups_v2 if groups_v2 else groups_v1, "2.0" if groups_v2 else "1.0"
+
+
+def _compute_group_scores(
+    groups_to_use: Dict[str, List[Any]],
+    objective_metric: str,
+    maximize: bool,
+    min_trials_per_group: int,
+    top_k_for_stable_score: int,
+) -> Tuple[Dict[str, Dict[str, Any]], int]:
+    """Compute stable scores for each group.
     
-    if not groups_to_use:
-        # Provide more helpful warning message
-        if len(groups_v1) == 0 and len(groups_v2) == 0:
-            logger.warning(
-                f"No valid groups found for {backbone}. "
-                f"No trial runs found in HPO experiment '{hpo_experiment.get('name', 'unknown')}'. "
-                f"This may indicate:\n"
-                f"  - HPO was not run for this backbone\n"
-                f"  - Runs exist but don't have required tags (stage='hpo_trial' or 'hpo', backbone tag)\n"
-                f"  - Runs exist but were filtered out (missing metrics, artifacts, or grouping tags)\n"
-                f"Skipping champion selection for {backbone}."
-            )
-        else:
-            logger.warning(
-                f"No valid groups found for {backbone}. "
-                f"Found {len(groups_v1)} v1 group(s) and {len(groups_v2)} v2 group(s), "
-                f"but none matched selection criteria (schema_version preference: {prefer_schema_version}). "
-                f"This may indicate:\n"
-                f"  - Groups don't meet min_trials requirement\n"
-                f"  - Schema version mismatch (prefer_schema_version={prefer_schema_version})\n"
-                f"  - Groups filtered out by other criteria\n"
-                f"Skipping champion selection for {backbone}."
-            )
-        return None
-    
-    # Log version usage
-    if groups_v1 and groups_v2 and not allow_mixed_schema_groups:
-        logger.info(
-            f"Found both v1 and v2 runs for {backbone}. "
-            f"Using {schema_version_used} groups only (never mixing versions)."
-        )
-    
-    # Step 5: Compute stable score per group (with all guards)
+    Args:
+        groups_to_use: Groups to score
+        objective_metric: Objective metric name
+        maximize: Whether to maximize the metric
+        min_trials_per_group: Minimum trials required per group
+        top_k_for_stable_score: Top K trials to use for stable score
+        
+    Returns:
+        Tuple of (group_scores, groups_skipped_min_trials)
+    """
     group_scores = {}
     groups_skipped_min_trials = 0
-    total_groups = len(groups_to_use)
     
     for study_key_hash, group_runs in groups_to_use.items():
         # Extract metrics (handle missing/NaN deterministically)
@@ -1160,6 +1118,197 @@ def select_champion_per_backbone(
             "n_invalid": invalid_count,
             "run_metrics": run_metrics,  # Lightweight: (run_id, metric) tuples
         }
+    
+    return group_scores, groups_skipped_min_trials
+
+
+def select_champion_per_backbone(
+    backbone: str,
+    hpo_experiment: Dict[str, str],
+    selection_config: Dict[str, Any],
+    mlflow_client: MlflowClient,
+    root_dir: Optional[Path] = None,
+    config_dir: Optional[Path] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Select champion (best configuration group winner) per backbone.
+    
+    Groups runs by study_key_hash v2 (comparable configuration groups),
+    then selects best group and best trial within that group.
+    
+    All parameters come from selection_config (centralized config).
+    
+    Requirements enforced:
+    1. Bound fingerprints in study_key_hash v2
+    2. Never mix v1 and v2 runs in same selection (config-driven)
+    3. Explicit objective direction (never assume max, with migration support)
+    4. Handle missing/NaN metrics deterministically
+    5. Minimum trial count guardrail (config-driven)
+    6. Artifact availability constraint (config-driven source)
+    7. Deterministic constraints (top_k <= min_trials)
+    
+    Args:
+        backbone: Model backbone name
+        hpo_experiment: Dict with 'name' and 'id' of HPO experiment
+        selection_config: Selection configuration dictionary
+        mlflow_client: MLflow client instance
+    
+    Returns:
+        {
+            "backbone": "distilbert",
+            "champion": {
+                "run_id": "...",  # PRIMARY: MLflow handle
+                "trial_key_hash": "...",  # Optional: for display
+                "metric": 0.87,
+                "stable_score": 0.86,
+                "study_key_hash": "abc123...",
+                "schema_version": "2.0",
+                "checkpoint_path": Path(...),
+            },
+            "all_groups": {...},
+            "selection_metadata": {...},
+        }
+        or None if no valid champions found
+    """
+    from infrastructure.tracking.mlflow.queries import query_runs_by_tags
+    from infrastructure.naming.mlflow.tags_registry import TagsRegistry
+    from infrastructure.config.selection import (
+        get_objective_direction,
+        get_champion_selection_config,
+    )
+    
+    # Extract config values with defaults and constraint validation
+    champion_config = get_champion_selection_config(selection_config)
+    min_trials_per_group = champion_config["min_trials_per_group"]
+    top_k_for_stable_score = champion_config["top_k_for_stable_score"]
+    require_artifact_available = champion_config["require_artifact_available"]
+    artifact_check_source = champion_config["artifact_check_source"]
+    allow_mixed_schema_groups = champion_config["allow_mixed_schema_groups"]
+    prefer_schema_version = champion_config["prefer_schema_version"]
+    
+    # Get objective direction (with migration support)
+    objective_metric = selection_config.get("objective", {}).get("metric", "macro-f1")
+    objective_direction = get_objective_direction(selection_config)  # Uses migration helper
+    maximize = objective_direction.lower() == "maximize"
+    
+    from infrastructure.naming.mlflow.tags_registry import load_tags_registry
+    from pathlib import Path
+    from infrastructure.paths.utils import resolve_project_paths
+    
+    # Trust provided config_dir parameter, only infer when None (DRY principle)
+    if config_dir is None:
+        # Infer config_dir only when not provided
+        _, resolved_config_dir = resolve_project_paths(
+            output_dir=None,
+            config_dir=None,
+        )
+        config_dir = resolved_config_dir if resolved_config_dir else Path.cwd() / "config"
+    
+    tags_registry = load_tags_registry(config_dir)
+    backbone_tag = tags_registry.key("process", "backbone")
+    stage_tag = tags_registry.key("process", "stage")
+    study_key_tag = tags_registry.key("grouping", "study_key_hash")
+    trial_key_tag = tags_registry.key("grouping", "trial_key_hash")
+    schema_version_tag = tags_registry.key("study", "key_schema_version")
+    artifact_tag = tags_registry.key("artifact", "available")
+    
+    backbone_name = backbone.split("-")[0] if "-" in backbone else backbone
+    
+    # Step 1: Query runs with fallback strategies
+    runs = _query_runs_with_fallback(
+        mlflow_client,
+        hpo_experiment["id"],
+        backbone_name,
+        backbone_tag,
+        stage_tag,
+    )
+    
+    # Step 1.5: Filter out parent runs (they don't have trial metrics)
+    # Parent runs have mlflow.parentRunId tag missing (they are the parent)
+    # Child runs have mlflow.parentRunId tag set
+    runs_before_parent_filter = len(runs)
+    runs = [r for r in runs if r.data.tags.get("mlflow.parentRunId") is not None]
+    parent_runs_filtered = runs_before_parent_filter - len(runs)
+    if parent_runs_filtered > 0:
+        logger.info(
+            f"Filtered out {parent_runs_filtered} parent run(s) (only child/trial runs have metrics). "
+            f"{len(runs)} child runs remaining."
+        )
+    
+    # Step 2: Artifact availability filter (config-driven source)
+    runs_before_artifact_filter = len(runs)
+    if require_artifact_available:
+        runs = _filter_by_artifact_availability(
+            runs, artifact_check_source, artifact_tag, logger, mlflow_client, schema_version_tag
+        )
+        runs_after_artifact_filter = len(runs)
+        if runs_after_artifact_filter < runs_before_artifact_filter:
+            logger.warning(
+                f"Artifact filter removed {runs_before_artifact_filter - runs_after_artifact_filter} "
+                f"runs for {backbone} ({runs_after_artifact_filter} remaining). "
+                f"Check that runs have '{artifact_tag}' tag set to 'true'."
+            )
+    
+    # Step 3: Partition by study_key_hash AND schema version
+    groups_v1, groups_v2, runs_without_study_key = _partition_runs_by_schema_version(
+        runs, study_key_tag, schema_version_tag
+    )
+    
+    if runs_without_study_key > 0:
+        logger.warning(
+            f"Skipped {runs_without_study_key} runs without {study_key_tag} tag for {backbone}"
+        )
+    
+    logger.info(
+        f"Grouped runs for {backbone}: {len(groups_v1)} v1 group(s), "
+        f"{len(groups_v2)} v2 group(s)"
+    )
+    
+    # Step 4: Select groups based on prefer_schema_version and allow_mixed_schema_groups
+    groups_to_use, schema_version_used = _select_groups_by_schema_version(
+        groups_v1, groups_v2, allow_mixed_schema_groups, prefer_schema_version
+    )
+    
+    if groups_v1 and groups_v2 and not allow_mixed_schema_groups:
+        logger.info(
+            f"Found both v1 and v2 runs for {backbone}. "
+            f"Using {schema_version_used} groups only (never mixing versions)."
+        )
+    
+    if not groups_to_use:
+        # Provide more helpful warning message
+        if len(groups_v1) == 0 and len(groups_v2) == 0:
+            logger.warning(
+                f"No valid groups found for {backbone}. "
+                f"No trial runs found in HPO experiment '{hpo_experiment.get('name', 'unknown')}'. "
+                f"This may indicate:\n"
+                f"  - HPO was not run for this backbone\n"
+                f"  - Runs exist but don't have required tags (stage='hpo_trial' or 'hpo', backbone tag)\n"
+                f"  - Runs exist but were filtered out (missing metrics, artifacts, or grouping tags)\n"
+                f"Skipping champion selection for {backbone}."
+            )
+        else:
+            logger.warning(
+                f"No valid groups found for {backbone}. "
+                f"Found {len(groups_v1)} v1 group(s) and {len(groups_v2)} v2 group(s), "
+                f"but none matched selection criteria (schema_version preference: {prefer_schema_version}). "
+                f"This may indicate:\n"
+                f"  - Groups don't meet min_trials requirement\n"
+                f"  - Schema version mismatch (prefer_schema_version={prefer_schema_version})\n"
+                f"  - Groups filtered out by other criteria\n"
+                f"Skipping champion selection for {backbone}."
+            )
+        return None
+    
+    # Step 5: Compute stable score per group (with all guards)
+    total_groups = len(groups_to_use)
+    group_scores, groups_skipped_min_trials = _compute_group_scores(
+        groups_to_use,
+        objective_metric,
+        maximize,
+        min_trials_per_group,
+        top_k_for_stable_score,
+    )
     
     if not group_scores:
         logger.warning(

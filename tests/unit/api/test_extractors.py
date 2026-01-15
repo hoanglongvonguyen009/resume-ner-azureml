@@ -44,7 +44,7 @@ class TestFileTypeDetection:
 class TestPDFExtraction:
     """Test PDF text extraction."""
 
-    @patch("src.api.extractors._extract_pdf_pymupdf")
+    @patch("src.deployment.api.extractors._extract_pdf_pymupdf")
     def test_extract_pdf_pymupdf(self, mock_extract):
         """Test PDF extraction with PyMuPDF."""
         pdf_content = b"%PDF-1.4\n"
@@ -55,7 +55,7 @@ class TestPDFExtraction:
         assert text == "Extracted text"
         mock_extract.assert_called_once_with(pdf_content)
 
-    @patch("src.api.extractors._extract_pdf_pdfplumber")
+    @patch("src.deployment.api.extractors._extract_pdf_pdfplumber")
     def test_extract_pdf_pdfplumber(self, mock_extract):
         """Test PDF extraction with pdfplumber."""
         pdf_content = b"%PDF-1.4\n"
@@ -76,7 +76,7 @@ class TestPDFExtraction:
 class TestImageExtraction:
     """Test image OCR extraction."""
 
-    @patch("src.api.extractors._extract_image_easyocr")
+    @patch("src.deployment.api.extractors._extract_image_easyocr")
     def test_extract_image_easyocr(self, mock_extract):
         """Test image extraction with EasyOCR."""
         image_content = b"\x89PNG\r\n\x1a\n"
@@ -88,7 +88,7 @@ class TestImageExtraction:
         assert "text" in text
         mock_extract.assert_called_once_with(image_content)
 
-    @patch("src.api.extractors._extract_image_pytesseract")
+    @patch("src.deployment.api.extractors._extract_image_pytesseract")
     def test_extract_image_pytesseract(self, mock_extract):
         """Test image extraction with pytesseract."""
         image_content = b"\x89PNG\r\n\x1a\n"

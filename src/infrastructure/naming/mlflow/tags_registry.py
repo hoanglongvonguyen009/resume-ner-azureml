@@ -133,6 +133,9 @@ def _get_default_tag_keys() -> Dict[str, Any]:
             "refit_has_validation": "code.refit_has_validation",
             "interrupted": "code.interrupted",
         },
+        "refit": {
+            "of_trial_run_id": "code.refit.of_trial_run_id",
+        },
         "hpo": {
             "trial_number": "code.hpo.trial_number",
             "best_trial_run_id": "best_trial_run_id",

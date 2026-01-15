@@ -91,6 +91,7 @@ def cleanup_interrupted_runs(
     mlflow_run_name: str,
     output_dir: Path,
     hpo_config: Dict[str, Any],
+    config_dir: Optional[Path] = None,
 ) -> Optional[Dict[str, list]]:
     """
     Clean up interrupted runs from previous sessions by tagging them.
@@ -102,6 +103,7 @@ def cleanup_interrupted_runs(
         mlflow_run_name: Generated MLflow run name.
         output_dir: Base output directory.
         hpo_config: HPO configuration dictionary.
+        config_dir: Optional config directory path. If provided, used directly without inference.
 
     Returns:
         Dictionary mapping parent_run_id to list of child runs, or None if cleanup skipped.
@@ -153,8 +155,18 @@ def cleanup_interrupted_runs(
         from infrastructure.naming.mlflow.config import get_naming_config
         from infrastructure.paths.utils import resolve_project_paths
 
-        # Use resolve_project_paths() to get config_dir from output_dir context
-        _, config_dir = resolve_project_paths(output_dir=output_dir, config_dir=None)
+        # Use resolve_project_paths() with provided config_dir if available
+        # Trust provided config_dir parameter, only infer if None
+        _, resolved_config_dir = resolve_project_paths(
+            output_dir=output_dir, 
+            config_dir=config_dir  # Use provided config_dir if available
+        )
+        # Standardized fallback: use resolved value, or provided parameter, or infer
+        # Use resolved config_dir, or provided config_dir, or infer as last resort
+        config_dir = resolved_config_dir or config_dir
+        if config_dir is None:
+            from infrastructure.paths.utils import infer_config_dir
+            config_dir = infer_config_dir()
         naming_config = get_naming_config(config_dir)
 
         # Get current run start_time for legacy run validation

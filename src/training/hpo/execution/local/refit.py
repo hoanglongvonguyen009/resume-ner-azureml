@@ -136,14 +136,18 @@ def run_refit_training(
     # (needed for v2 path construction)
     from infrastructure.paths.utils import resolve_project_paths
     
-    root_dir, _ = resolve_project_paths(
+    root_dir, resolved_config_dir = resolve_project_paths(
         config_dir=config_dir,  # Use provided config_dir
     )
     
-    # Fallback if resolution failed
+    # Standardized fallback: use resolved value, or provided parameter, or infer
     if root_dir is None:
-        from infrastructure.paths.utils import find_project_root
-        root_dir = find_project_root(config_dir) if config_dir else Path.cwd()
+        root_dir = Path.cwd()
+    # Use resolved config_dir, or provided config_dir, or infer as last resort
+    config_dir = resolved_config_dir or config_dir
+    if config_dir is None:
+        from infrastructure.paths.utils import infer_config_dir
+        config_dir = infer_config_dir(path=root_dir) if root_dir else infer_config_dir()
 
     # Follow SSOT pattern: Retrieve from tags first, then compute as fallback
     # Priority 1: Use provided study_key_hash (should have been retrieved by caller)
@@ -224,17 +228,33 @@ def run_refit_training(
         
         if is_v2_study_folder:
             if refit_context.trial_key_hash:
-                # We're in a v2 study folder and have trial_key_hash, construct v2 trial path manually
-                from infrastructure.naming.context_tokens import build_token_values
-                tokens = build_token_values(refit_context)
-                trial8 = tokens["trial8"]
-                trial_base_dir = output_dir / f"trial-{trial8}"
-                refit_output_dir = trial_base_dir / "refit"
-                refit_output_dir.mkdir(parents=True, exist_ok=True)
-                logger.warning(
-                    f"build_output_path() failed but we're in v2 study folder. "
-                    f"Constructed v2 refit folder manually: {refit_output_dir}"
-                )
+                # Retry build_output_path() - it should work now with the fix
+                try:
+                    from infrastructure.paths import build_output_path
+                    from infrastructure.paths.utils import resolve_project_paths
+                    
+                    root_dir, resolved_config_dir = resolve_project_paths(
+                        output_dir=output_dir,
+                        config_dir=config_dir,
+                    )
+                    if root_dir is None:
+                        root_dir = Path.cwd()
+                    config_dir_for_path = resolved_config_dir or config_dir
+                    
+                    refit_output_dir = build_output_path(root_dir, refit_context, config_dir=config_dir_for_path)
+                    refit_output_dir.mkdir(parents=True, exist_ok=True)
+                    logger.info(
+                        f"Successfully created v2 refit folder using build_output_path(): {refit_output_dir}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"build_output_path() failed even on retry: {e}",
+                        exc_info=True
+                    )
+                    raise RuntimeError(
+                        f"Cannot create refit in v2 study folder {study_folder_name}. "
+                        f"build_output_path() failed: {e}"
+                    ) from e
             else:
                 # We're in a v2 study folder but don't have trial_key_hash
                 # This is an error - we can't create v2 trial name without hash

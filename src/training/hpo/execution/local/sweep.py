@@ -290,22 +290,35 @@ def create_local_hpo_objective(
                     )
                     # Only create trial folder if we have a valid trial_key_hash
                     if trial_key_hash:
-                        # Use token expansion for consistency
-                        from infrastructure.naming.context_tokens import build_token_values
-                        from infrastructure.naming.context import NamingContext
-                        temp_context = NamingContext(
-                            process_type="hpo",
-                            model=backbone.split("-")[0] if "-" in backbone else backbone,
-                            environment=detect_platform(),
-                            trial_key_hash=trial_key_hash
-                        )
-                        tokens = build_token_values(temp_context)
-                        trial8 = tokens["trial8"]
-                        
-                        # Only create folder if trial8 is not empty
-                        if trial8:
-                            # Create trial-{hash} folder in study folder
-                            trial_output_dir = output_base_dir / f"trial-{trial8}"
+                        # Use build_output_path() for path construction
+                        try:
+                            from infrastructure.naming import create_naming_context
+                            from infrastructure.paths import build_output_path
+                            from infrastructure.paths.utils import resolve_project_paths
+                            
+                            # Resolve project paths for build_output_path()
+                            root_dir, resolved_config_dir = resolve_project_paths(
+                                output_dir=output_base_dir,
+                                config_dir=config_dir,
+                            )
+                            if root_dir is None:
+                                root_dir = Path.cwd()
+                            config_dir_for_path = resolved_config_dir or config_dir
+                            
+                            # Create NamingContext for trial
+                            trial_context = create_naming_context(
+                                process_type="hpo",
+                                model=backbone.split("-")[0] if "-" in backbone else backbone,
+                                environment=detect_platform(),
+                                storage_env=detect_platform(),
+                                study_key_hash=study_key_hash,
+                                trial_key_hash=trial_key_hash,
+                                trial_number=trial.number,
+                            )
+                            
+                            # Use build_output_path() to create trial folder
+                            # It will automatically append trial-{trial8} when trial_key_hash is provided
+                            trial_output_dir = build_output_path(root_dir, trial_context, config_dir=config_dir_for_path)
                             trial_output_dir.mkdir(parents=True, exist_ok=True)
                             
                             # Create trial_meta.json for easy lookup
@@ -334,10 +347,10 @@ def create_local_hpo_objective(
                             logger.debug(
                                 f"Created v2 trial folder for non-CV trial {trial.number}: {trial_output_dir.name}"
                             )
-                        else:
+                        except Exception as e:
                             logger.warning(
-                                f"trial8 token is empty for trial {trial.number}, "
-                                f"skipping v2 trial folder creation. Using study folder."
+                                f"Could not create v2 trial folder using build_output_path() for trial {trial.number}: {e}. "
+                                f"Using study folder directly."
                             )
                             trial_output_dir = output_base_dir
                     else:

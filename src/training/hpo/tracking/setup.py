@@ -57,16 +57,32 @@ def setup_hpo_mlflow_run(
         from infrastructure.naming import create_naming_context
         from infrastructure.naming.mlflow.run_names import build_mlflow_run_name
         from infrastructure.naming.mlflow.tags import build_mlflow_tags
-        from infrastructure.naming.mlflow.hpo_keys import (
-            build_hpo_study_key,
-            build_hpo_study_key_hash,
-        )
         from common.shared.platform_detection import detect_platform
 
 
         # Compute study_key_hash if missing
+        # Note: setup_hpo_mlflow_run() doesn't have train_config parameter, so we use
+        # the legacy build_hpo_study_key approach for backward compatibility.
+        # The caller should pass pre-computed study_key_hash when available.
         if study_key_hash is None and data_config and hpo_config:
             try:
+                from infrastructure.naming.mlflow.hpo_keys import (
+                    build_hpo_study_key,
+                    build_hpo_study_key_hash,
+                )
+                # Use resolve_project_paths() to get config_dir if not provided
+                # Standardized pattern: only resolve if config_dir is None
+                if config_dir is None:
+                    from infrastructure.paths.utils import resolve_project_paths
+                    _, resolved_config_dir = resolve_project_paths(output_dir=output_dir, config_dir=None)
+                    # Standardized fallback: use resolved value, or infer as last resort
+                    config_dir = resolved_config_dir
+                    if config_dir is None:
+                        from infrastructure.paths.utils import infer_config_dir
+                        config_dir = infer_config_dir()
+                
+                # Legacy approach: build_hpo_study_key (v1) since we don't have train_config
+                # This is acceptable as a fallback when study_key_hash is not pre-computed
                 study_key = build_hpo_study_key(
                     data_config=data_config,
                     hpo_config=hpo_config,
@@ -142,12 +158,14 @@ def setup_hpo_mlflow_run(
             config_dir=config_dir,
         )
         
-        # Use resolved config_dir (trusts provided config_dir if not None)
-        config_dir = resolved_config_dir
-        
-        # Fallback root_dir if resolution failed
+        # Standardized fallback: use resolved value, or provided parameter, or infer
         if root_dir is None:
             root_dir = Path.cwd()
+        # Use resolved config_dir, or provided config_dir, or infer as last resort
+        config_dir = resolved_config_dir or config_dir
+        if config_dir is None:
+            from infrastructure.paths.utils import infer_config_dir
+            config_dir = infer_config_dir(path=root_dir) if root_dir else infer_config_dir()
 
         mlflow_run_name = build_mlflow_run_name(
             hpo_parent_context,
@@ -221,9 +239,17 @@ def commit_run_name_version(
     hpo_parent_context: Any,
     mlflow_run_name: str,
     output_dir: Path,
+    config_dir: Optional[Path] = None,
 ) -> None:
     """
     Commit reserved version if auto-increment was used.
+    
+    Args:
+        parent_run_id: MLflow parent run ID
+        hpo_parent_context: Naming context for HPO parent run
+        mlflow_run_name: Generated MLflow run name
+        output_dir: Base output directory
+        config_dir: Optional config directory path. If provided, used directly without inference.
     """
     if not (parent_run_id and hpo_parent_context and mlflow_run_name):
         return
@@ -244,18 +270,19 @@ def commit_run_name_version(
         )
 
         # Use resolve_project_paths() to consolidate path resolution
+        # Trust provided config_dir parameter if available
         from infrastructure.paths.utils import resolve_project_paths
         
-        root_dir, config_dir = resolve_project_paths(
+        root_dir, resolved_config_dir = resolve_project_paths(
             output_dir=output_dir,
-            config_dir=None,  # No config_dir parameter in this function signature
+            config_dir=config_dir,  # Use provided config_dir if available
         )
         
-        # Fallback root_dir if resolution failed
+        # Standardized fallback: use resolved value, or provided parameter, or infer
         if root_dir is None:
             root_dir = Path.cwd()
-        
-        # Fallback config_dir if resolution failed
+        # Use resolved config_dir, or provided config_dir, or infer as last resort
+        config_dir = resolved_config_dir or config_dir
         if config_dir is None:
             from infrastructure.paths.utils import infer_config_dir
             config_dir = infer_config_dir(path=root_dir) if root_dir else infer_config_dir()

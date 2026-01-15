@@ -54,8 +54,8 @@ class TestInferenceFixes:
         """Test that tokenization with return_tensors='np' returns numpy arrays."""
         onnx_path, checkpoint_dir = mock_setup
         
-        with patch("src.api.inference.engine.prepare_onnx_inputs") as mock_prepare, \
-             patch("src.api.inference.engine.get_offset_mapping") as mock_get_offset, \
+        with patch("src.deployment.api.inference.engine.prepare_onnx_inputs") as mock_prepare, \
+             patch("src.deployment.api.inference.engine.get_offset_mapping") as mock_get_offset, \
              patch("onnxruntime.InferenceSession") as mock_session, \
              patch("transformers.AutoTokenizer") as mock_tokenizer_class, \
              patch("transformers.AutoConfig") as mock_config:
@@ -138,8 +138,8 @@ class TestInferenceFixes:
         """Test that offset mapping is correctly extracted from tokenizer output."""
         onnx_path, checkpoint_dir = mock_setup
         
-        with patch("src.api.inference.engine.prepare_onnx_inputs") as mock_prepare, \
-             patch("src.api.inference.engine.get_offset_mapping") as mock_get_offset, \
+        with patch("src.deployment.api.inference.engine.prepare_onnx_inputs") as mock_prepare, \
+             patch("src.deployment.api.inference.engine.get_offset_mapping") as mock_get_offset, \
              patch("onnxruntime.InferenceSession") as mock_session, \
              patch("transformers.AutoTokenizer") as mock_tokenizer_class, \
              patch("transformers.AutoConfig") as mock_config:
@@ -217,8 +217,8 @@ class TestInferenceFixes:
         onnx_path, checkpoint_dir = mock_setup
         text = "John Doe works at Google"
         
-        with patch("src.api.inference.engine.prepare_onnx_inputs") as mock_prepare, \
-             patch("src.api.inference.engine.get_offset_mapping") as mock_get_offset, \
+        with patch("src.deployment.api.inference.engine.prepare_onnx_inputs") as mock_prepare, \
+             patch("src.deployment.api.inference.engine.get_offset_mapping") as mock_get_offset, \
              patch("onnxruntime.InferenceSession") as mock_session, \
              patch("transformers.AutoTokenizer") as mock_tokenizer_class, \
              patch("transformers.AutoConfig") as mock_config:
@@ -323,8 +323,8 @@ class TestInferenceFixes:
         """Test that special tokens don't cause the code to hang."""
         onnx_path, checkpoint_dir = mock_setup
         
-        with patch("src.api.inference.engine.prepare_onnx_inputs") as mock_prepare, \
-             patch("src.api.inference.engine.get_offset_mapping") as mock_get_offset, \
+        with patch("src.deployment.api.inference.engine.prepare_onnx_inputs") as mock_prepare, \
+             patch("src.deployment.api.inference.engine.get_offset_mapping") as mock_get_offset, \
              patch("onnxruntime.InferenceSession") as mock_session, \
              patch("transformers.AutoTokenizer") as mock_tokenizer_class, \
              patch("transformers.AutoConfig") as mock_config:

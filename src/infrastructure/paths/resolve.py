@@ -409,6 +409,24 @@ def build_output_path(
         pattern_parts = [part for part in pattern_parts if part]
         base_output_path = base_path / output_dir / Path(*pattern_parts)
 
+        # CRITICAL: For HPO, if trial_key_hash is provided but pattern doesn't include {trial8},
+        # automatically append trial-{trial8} folder. This handles cases where the pattern
+        # is '{storage_env}/{model}/study-{study8}' but we need trial folder.
+        if context.process_type == "hpo" and context.trial_key_hash:
+            # Check if pattern already includes {trial8} placeholder
+            pattern_has_trial = "{trial8}" in pattern
+            
+            if not pattern_has_trial:
+                # Pattern doesn't include {trial8}, but we have trial_key_hash - append it
+                trial8 = values.get("trial8", "")
+                if trial8:
+                    base_output_path = base_output_path / f"trial-{trial8}"
+                else:
+                    logger.warning(
+                        f"trial_key_hash provided but trial8 token is empty. "
+                        f"Pattern: {pattern}, Resolved: {resolved_pattern}"
+                    )
+
         # For hpo_refit, append "refit" subdirectory
         if context.process_type == "hpo_refit":
             final_path = base_output_path / "refit"
