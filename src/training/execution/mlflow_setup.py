@@ -131,37 +131,26 @@ def create_training_mlflow_run(
             tracking_uri=tracking_uri,
         )
 
-    # Get or create experiment
-    client = MlflowClient(tracking_uri=tracking_uri)
-    experiment_id = None
+    # Get or create experiment using SSOT function
+    from infrastructure.tracking.mlflow.runs import get_or_create_experiment, resolve_experiment_id
 
-    try:
-        experiment = client.get_experiment_by_name(experiment_name)
-        if experiment is None:
-            experiment_id = client.create_experiment(experiment_name)
-        else:
-            experiment_id = experiment.experiment_id
-    except Exception as e:
-        # Fallback: verify experiment exists (assumes MLflow already configured)
-        experiment = mlflow.get_experiment_by_name(experiment_name)
-        if experiment is None:
+    # Resolve experiment ID (prefer parent run if provided)
+    experiment_id = resolve_experiment_id(
+        experiment_name=experiment_name,
+        parent_run_id=parent_run_id,
+    )
+
+    # If resolution failed, try get_or_create
+    if not experiment_id:
+        experiment_id = get_or_create_experiment(experiment_name)
+        if not experiment_id:
             raise RuntimeError(
-                f"Could not get experiment: {experiment_name}. "
+                f"Could not get or create experiment: {experiment_name}. "
                 f"Ensure MLflow is configured via infrastructure.tracking.mlflow.setup.setup_mlflow()"
-            ) from e
-        experiment_id = experiment.experiment_id
-
-    # If parent_run_id is provided, get experiment from parent
-    if parent_run_id:
-        try:
-            parent_run_info = client.get_run(parent_run_id)
-            experiment_id = parent_run_info.info.experiment_id
-        except Exception as e:
-            logger.warning(
-                f"Could not get parent run {parent_run_id}, using experiment directly: {e}"
             )
 
     # Create run
+    client = MlflowClient(tracking_uri=tracking_uri)
     try:
         created_run = client.create_run(
             experiment_id=experiment_id,
@@ -285,6 +274,9 @@ def create_training_child_run(
     which is required for HPO trials where the run should remain RUNNING until the parent
     process explicitly terminates it.
 
+    **Note**: This function delegates to `infrastructure.tracking.mlflow.runs.create_child_run_core()`
+    (SSOT) for the actual run creation logic. It adds training-specific logging and error handling.
+
     **Note**: This function assumes MLflow has already been configured by
     `infrastructure.tracking.mlflow.setup.setup_mlflow()`.
 
@@ -310,63 +302,21 @@ def create_training_child_run(
             fold_idx=0
         )
     """
-    client = MlflowClient(tracking_uri=tracking_uri)
+    # Delegate to SSOT core function
+    from infrastructure.tracking.mlflow.runs import create_child_run_core
 
-    # Get experiment ID from parent run
-    experiment_id: Optional[str] = None
     try:
-        parent_run_info = client.get_run(parent_run_id)
-        experiment_id = parent_run_info.info.experiment_id
-        logger.debug(f"Using parent's experiment ID: {experiment_id}")
-    except Exception as e:
-        logger.warning(f"Could not get parent run {parent_run_id}, trying experiment name: {e}")
-        # Fallback: try to get experiment by name
-        try:
-            experiment = client.get_experiment_by_name(experiment_name)
-            if experiment:
-                experiment_id = experiment.experiment_id
-        except Exception as e2:
-            logger.warning(f"Could not get experiment by name: {e2}")
-
-    if not experiment_id:
-        raise RuntimeError(
-            f"Could not determine experiment ID from parent run {parent_run_id} "
-            f"or experiment name {experiment_name}"
-        )
-
-    # Build child run tags
-    child_tags: Dict[str, str] = {
-        "mlflow.parentRunId": parent_run_id,
-        "azureml.runType": "trial",  # Mark as trial for Azure ML UI
-        "azureml.trial": "true",  # Azure ML-specific tag for trials
-    }
-
-    # Add trial number if provided
-    if trial_number is not None:
-        child_tags["trial_number"] = str(trial_number)
-
-    # Add fold index if k-fold CV is enabled
-    if fold_idx is not None:
-        child_tags["fold_idx"] = str(fold_idx)
-
-    # CRITICAL: Set mlflow.runName tag (required for proper run name display in Azure ML)
-    # Without this, Azure ML may show "trial_unknown" instead of the actual run name
-    child_tags["mlflow.runName"] = run_name
-
-    # Merge with provided tags (provided tags take precedence)
-    if tags:
-        child_tags.update(tags)
-
-    # Create child run via client API
-    try:
-        created_run = client.create_run(
-            experiment_id=experiment_id,
+        run_id, created_run = create_child_run_core(
+            parent_run_id=parent_run_id,
             run_name=run_name,
-            tags=child_tags,
+            experiment_name=experiment_name,
+            trial_number=str(trial_number) if trial_number is not None else None,
+            fold_idx=fold_idx,
+            additional_tags=tags,
+            tracking_uri=tracking_uri,
         )
-        run_id = created_run.info.run_id
 
-        logger.info(f"Created child run: {run_name} ({run_id[:12]}...)")
+        # Training-specific logging
         print(
             f"  [Training] ✓ Created child run: {run_id[:12]}...",
             file=sys.stderr,
