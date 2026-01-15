@@ -1,3 +1,27 @@
+"""
+@meta
+name: core_placeholders
+type: utility
+domain: core
+responsibility:
+  - Extract placeholder names from pattern strings
+  - Parse {placeholder} patterns for naming and path resolution
+inputs:
+  - Pattern strings containing placeholders
+outputs:
+  - Sets of placeholder names
+tags:
+  - utility
+  - core
+  - naming
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Placeholder extraction utility for parsing {placeholder} patterns."""
 
 import re

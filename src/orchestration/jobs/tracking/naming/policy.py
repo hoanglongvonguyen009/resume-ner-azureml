@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from infrastructure.naming.context import NamingContext
+from core.normalize import normalize_for_name
 from core.placeholders import extract_placeholders
 from core.tokens import (
     is_token_allowed,
@@ -201,35 +202,6 @@ def parse_parent_training_id(parent_id: str) -> Dict[str, str]:
     return {"spec_hash": "unknown", "exec_hash": "unknown", "variant": "1"}
 
 
-def normalize_value(value: str, rules: Optional[Dict[str, Any]] = None) -> str:
-    """
-    Apply normalization rules to a value.
-
-    Args:
-        value: Value to normalize.
-        rules: Normalization rules dict with "replace" and "lowercase" keys.
-
-    Returns:
-        Normalized value.
-    """
-    if not value:
-        return value
-
-    if rules is None:
-        return value
-
-    result = value
-
-    # Apply character replacements
-    if "replace" in rules and isinstance(rules["replace"], dict):
-        for old_char, new_char in rules["replace"].items():
-            result = result.replace(old_char, new_char)
-
-    # Apply lowercase if specified
-    if rules.get("lowercase", False):
-        result = result.lower()
-
-    return result
 
 
 def sanitize_semantic_suffix(study_name: str, max_length: int = 30, model: Optional[str] = None) -> str:
@@ -419,8 +391,8 @@ def format_run_name(
     # Extract environment and model (with normalization)
     env = context.storage_env if hasattr(
         context, "storage_env") else context.environment
-    env = normalize_value(env, normalize_rules.get("env"))
-    model = normalize_value(context.model, normalize_rules.get("model"))
+    env = normalize_for_name(env, normalize_rules.get("env"), return_warnings=False)
+    model = normalize_for_name(context.model, normalize_rules.get("model"), return_warnings=False)
 
     # Extract components
     component_values: Dict[str, Any] = {}

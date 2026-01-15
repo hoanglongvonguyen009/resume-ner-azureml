@@ -33,10 +33,32 @@ Note: These functions are distinct from text normalization used in training
 (see training/data.py::normalize_text_for_tokenization() for tokenization-specific normalization).
 """
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union, overload
 
 
-def normalize_for_name(value: Any, rules: Dict[str, Any] | None = None) -> Tuple[str, List[str]]:
+@overload
+def normalize_for_name(
+    value: Any,
+    rules: Dict[str, Any] | None = None,
+    return_warnings: bool = True,
+) -> Tuple[str, List[str]]:
+    ...
+
+
+@overload
+def normalize_for_name(
+    value: Any,
+    rules: Dict[str, Any] | None = None,
+    return_warnings: bool = False,
+) -> str:
+    ...
+
+
+def normalize_for_name(
+    value: Any,
+    rules: Dict[str, Any] | None = None,
+    return_warnings: bool = True,
+) -> Union[str, Tuple[str, List[str]]]:
     """
     Normalize a value for display/name usage.
 
@@ -49,29 +71,39 @@ def normalize_for_name(value: Any, rules: Dict[str, Any] | None = None) -> Tuple
         rules: Optional normalization rules dictionary with:
             - "replace": Dict[str, str] - character/string replacements
             - "lowercase": bool - whether to convert to lowercase
+        return_warnings: If True, returns tuple of (normalized_value, warnings).
+            If False, returns only the normalized string. Defaults to True for
+            backward compatibility.
 
     Returns:
-        Tuple of (normalized_value, warnings) where warnings is a list of
-        normalization warnings encountered during processing.
+        If return_warnings is True: Tuple of (normalized_value, warnings) where
+            warnings is a list of normalization warnings encountered during processing.
+        If return_warnings is False: Just the normalized string.
     """
     if value is None:
-        return "", []
+        normalized = ""
+        warnings: List[str] = []
+    else:
+        result = str(value)
+        warnings = []
 
-    result = str(value)
-    warnings: List[str] = []
+        if not rules:
+            normalized = result
+        else:
+            replacements = rules.get("replace", {})
+            if isinstance(replacements, dict):
+                for old, new in replacements.items():
+                    result = result.replace(old, new)
 
-    if not rules:
-        return result, warnings
+            if rules.get("lowercase", False):
+                result = result.lower()
 
-    replacements = rules.get("replace", {})
-    if isinstance(replacements, dict):
-        for old, new in replacements.items():
-            result = result.replace(old, new)
+            normalized = result
 
-    if rules.get("lowercase", False):
-        result = result.lower()
-
-    return result, warnings
+    if return_warnings:
+        return normalized, warnings
+    else:
+        return normalized
 
 
 def normalize_for_path(value: Any, rules: Dict[str, Any] | None = None) -> Tuple[str, List[str]]:

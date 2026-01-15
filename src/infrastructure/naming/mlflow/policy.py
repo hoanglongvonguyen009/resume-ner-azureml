@@ -31,6 +31,10 @@ lifecycle:
 This module provides backward compatibility by re-exporting from the old location.
 """
 
+from typing import Any, Dict, Optional
+
+from core.normalize import normalize_for_name
+
 # Lazy import to avoid circular import issues during module initialization
 _policy_module = None
 
@@ -57,8 +61,9 @@ def parse_parent_training_id(*args, **kwargs):
 def validate_naming_policy(*args, **kwargs):
     return _get_policy_module().validate_naming_policy(*args, **kwargs)
 
-def normalize_value(*args, **kwargs):
-    return _get_policy_module().normalize_value(*args, **kwargs)
+def normalize_value(value: str, rules: Optional[Dict[str, Any]] = None) -> str:
+    """Apply normalization rules to a value (backward-compatible wrapper)."""
+    return normalize_for_name(value, rules, return_warnings=False)
 
 def sanitize_semantic_suffix(*args, **kwargs):
     return _get_policy_module().sanitize_semantic_suffix(*args, **kwargs)
