@@ -115,16 +115,21 @@ class MLflowTrainingTracker(BaseTracker):
                 tracking_uri = mlflow.get_tracking_uri()
 
                 # Build and set tags atomically
-                tags = build_mlflow_tags(
+                base_tags = build_mlflow_tags(
                     context=context,
                     output_dir=output_dir,
                     parent_run_id=parent_run_id,
                     group_id=group_id,
                     config_dir=config_dir,
                 )
-                # Add training-specific tags
-                tags["mlflow.runType"] = "training"
-                tags["training_type"] = training_type
+                # Add training-specific tags using consolidated helper
+                from training.execution.tag_helpers import add_training_tags
+
+                tags = add_training_tags(
+                    tags=base_tags,
+                    training_type=training_type,
+                    config_dir=config_dir,
+                )
                 mlflow.set_tags(tags)
 
                 # Build RunHandle

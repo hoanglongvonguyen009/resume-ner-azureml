@@ -249,8 +249,10 @@ def setup_training_environment(
     env["MLFLOW_EXPERIMENT_NAME"] = mlflow_config.experiment_name
 
     # Set Azure ML artifact upload timeout if using Azure ML
+    # Note: setup_mlflow() already sets this, but we ensure it's in env for subprocess
     if "azureml" in tracking_uri.lower():
-        env["AZUREML_ARTIFACTS_DEFAULT_TIMEOUT"] = "600"
+        from infrastructure.tracking.mlflow.setup import AZUREML_ARTIFACTS_DEFAULT_TIMEOUT_SECONDS
+        env["AZUREML_ARTIFACTS_DEFAULT_TIMEOUT"] = str(AZUREML_ARTIFACTS_DEFAULT_TIMEOUT_SECONDS)
 
     # Set parent run ID and trial number for nested runs
     if mlflow_config.parent_run_id:

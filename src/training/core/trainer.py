@@ -330,70 +330,17 @@ def train_model(
             training_type = "final"
 
     # Start MLflow tracking run if tracker provided
-    # Try to use systematic naming if context information is available
-    run_name = None
+    # Use consolidated run name building with fallback
+    from training.execution.run_names import build_training_run_name_with_fallback
 
-    # First, check if MLFLOW_RUN_NAME is set (from notebook/environment)
-    import os
-    env_run_name = os.environ.get("MLFLOW_RUN_NAME")
-    if env_run_name:
-        run_name = env_run_name
-
-    # If not set, try to build systematic name from config
-    if not run_name:
-        try:
-            from infrastructure.naming import create_naming_context
-            from infrastructure.naming.mlflow.run_names import build_mlflow_run_name
-            from common.shared.platform_detection import detect_platform
-
-            # Try to extract fingerprints from config if available
-            spec_fp = config.get("fingerprints", {}).get("spec_fp")
-            exec_fp = config.get("fingerprints", {}).get("exec_fp")
-            variant = config.get("fingerprints", {}).get("variant", 1)
-
-            # Infer config_dir from output_dir if possible
-            config_dir = None
-            if output_dir:
-                # Try to find config directory: go up from outputs/ to root, then to config/
-                current = output_dir
-                for _ in range(5):  # Limit search depth
-                    if current.name == "outputs" and (current.parent / "config").exists():
-                        config_dir = current.parent / "config"
-                        break
-                    current = current.parent
-                    if not current or current == current.parent:  # Reached root
-                        break
-
-            # Build NamingContext if we have required fields
-            if spec_fp and exec_fp:
-                training_context = create_naming_context(
-                    process_type="final_training",
-                    model=backbone,
-                    spec_fp=spec_fp,
-                    exec_fp=exec_fp,
-                    environment=detect_platform(),
-                    variant=variant,
-                )
-                run_name = build_mlflow_run_name(training_context, config_dir)
-        except Exception as e:
-            # If systematic naming fails, fallback to manual construction
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.debug(
-                f"Could not build systematic run name: {e}, using fallback")
-
-    # Fallback to policy-like format if systematic naming didn't work
-    if not run_name:
-        from common.shared.platform_detection import detect_platform
-        environment = detect_platform()
-        run_id = config.get("training", {}).get("run_id", "unknown")
-        # Shorten run_id if it's long (take first 8 chars)
-        run_id_short = run_id[:8] if len(run_id) > 8 else run_id
-        # Sanitize: replace problematic characters
-        backbone_safe = backbone.replace("/", "_").replace("\\", "_").replace(":", "_")
-        run_id_safe = run_id_short.replace("/", "_").replace("\\", "_").replace(":", "_")
-        # Use policy-like format: {env}_{backbone}_training_{run_id}
-        run_name = f"{environment}_{backbone_safe}_training_{run_id_safe}"
+    run_id = config.get("training", {}).get("run_id", "unknown")
+    run_name = build_training_run_name_with_fallback(
+        process_type="final_training",
+        config=config,
+        output_dir=output_dir,
+        backbone=backbone,
+        run_id=run_id,
+    )
 
     # We'll use the tracker context manager later, after training completes
 

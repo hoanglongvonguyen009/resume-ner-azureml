@@ -386,63 +386,23 @@ def execute_final_training(
     )
 
     # Build tags using build_mlflow_tags + add training-specific and lineage tags
-    tags = build_mlflow_tags(
+    base_tags = build_mlflow_tags(
         context=training_context,
         output_dir=final_output_dir,
         parent_run_id=None,
         group_id=None,
         config_dir=config_dir,
     )
-    # Get tag keys from registry (using centralized helpers)
-    from infrastructure.naming.mlflow.tag_keys import (
-        get_lineage_hpo_refit_run_id,
-        get_lineage_hpo_study_key_hash,
-        get_lineage_hpo_sweep_run_id,
-        get_lineage_hpo_trial_key_hash,
-        get_lineage_hpo_trial_run_id,
-        get_lineage_parent_training_run_id,
-        get_lineage_source,
-        get_mlflow_run_type,
-        get_study_key_hash,
-        get_trained_on_full_data,
-        get_trial_key_hash,
+
+    # Use consolidated tag building helper
+    from training.execution.tag_helpers import add_training_tags_with_lineage
+
+    tags = add_training_tags_with_lineage(
+        tags=base_tags,
+        lineage=lineage,
+        run_name=run_name,
+        config_dir=config_dir,
     )
-    
-    mlflow_run_type_tag = get_mlflow_run_type(config_dir)
-    trained_on_full_data_tag = get_trained_on_full_data(config_dir)
-    study_key_hash_tag = get_study_key_hash(config_dir)
-    trial_key_hash_tag = get_trial_key_hash(config_dir)
-    lineage_source_tag = get_lineage_source(config_dir)
-    lineage_hpo_study_key_hash_tag = get_lineage_hpo_study_key_hash(config_dir)
-    lineage_hpo_trial_key_hash_tag = get_lineage_hpo_trial_key_hash(config_dir)
-    lineage_hpo_trial_run_id_tag = get_lineage_hpo_trial_run_id(config_dir)
-    lineage_hpo_refit_run_id_tag = get_lineage_hpo_refit_run_id(config_dir)
-    lineage_hpo_sweep_run_id_tag = get_lineage_hpo_sweep_run_id(config_dir)
-    
-    tags[mlflow_run_type_tag] = "training"
-    tags["training_type"] = "final"
-    tags[trained_on_full_data_tag] = "true"
-    tags["mlflow.runName"] = run_name  # Ensure run name is set
-
-    # Add lineage tags (keep code.study_key_hash and code.trial_key_hash as primary,
-    # also add code.lineage.* for explicit lineage tracking)
-    if lineage.get("hpo_study_key_hash"):
-        # Primary grouping tags (for consistency with rest of system)
-        tags[study_key_hash_tag] = lineage["hpo_study_key_hash"]
-        # Lineage tags (additional, for explicit lineage tracking)
-        tags[lineage_hpo_study_key_hash_tag] = lineage["hpo_study_key_hash"]
-        tags[lineage_source_tag] = "hpo_best_selected"
-
-    if lineage.get("hpo_trial_key_hash"):
-        tags[trial_key_hash_tag] = lineage["hpo_trial_key_hash"]
-        tags[lineage_hpo_trial_key_hash_tag] = lineage["hpo_trial_key_hash"]
-
-    if lineage.get("hpo_trial_run_id"):
-        tags[lineage_hpo_trial_run_id_tag] = lineage["hpo_trial_run_id"]
-    if lineage.get("hpo_refit_run_id"):
-        tags[lineage_hpo_refit_run_id_tag] = lineage["hpo_refit_run_id"]
-    if lineage.get("hpo_sweep_run_id"):
-        tags[lineage_hpo_sweep_run_id_tag] = lineage["hpo_sweep_run_id"]
 
     # Create run WITHOUT starting it (no active context) using shared infrastructure
     run_id = None

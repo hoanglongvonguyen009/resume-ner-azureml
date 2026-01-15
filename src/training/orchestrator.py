@@ -113,56 +113,27 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
     # CRITICAL: Set up MLflow BEFORE using context manager
     # This ensures tracking URI and experiment are set, and child runs are created correctly
     import sys
-    
-    # Import azureml.mlflow early to register the 'azureml' URI scheme before MLflow initializes
-    # This must happen before mlflow is imported to ensure the scheme is registered
-    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
-    if tracking_uri and "azureml" in tracking_uri.lower():
-        try:
-            import azureml.mlflow  # noqa: F401
-        except ImportError:
-            # If azureml.mlflow is not available, fallback to local tracking
-            # This is expected in some environments and the code handles it gracefully
-            print(
-                "  [Training] INFO: azureml.mlflow not available, but Azure ML URI detected. "
-                "Falling back to local tracking. (This is normal if azureml-mlflow is not installed)",
-                file=sys.stderr, flush=True)
-            # Override with local tracking URI
-            from common.shared.mlflow_setup import _get_local_tracking_uri
-            tracking_uri = _get_local_tracking_uri()
-            os.environ["MLFLOW_TRACKING_URI"] = tracking_uri
-            # Clear Azure ML run IDs - they won't exist in local SQLite database
-            # This forces creation of a new run in local tracking
-            if "MLFLOW_RUN_ID" in os.environ:
-                old_run_id = os.environ.pop("MLFLOW_RUN_ID")
-                print(
-                    f"  [Training] Cleared Azure ML run ID {old_run_id[:12]}... (will create new run in local tracking)",
-                    file=sys.stderr, flush=True)
-            if "MLFLOW_USE_RUN_ID" in os.environ:
-                os.environ.pop("MLFLOW_USE_RUN_ID")
-    
+
+    # Use SSOT for MLflow setup (handles Azure ML compatibility, fallback, timeout)
+    from infrastructure.tracking.mlflow.setup import setup_mlflow
     import mlflow
-    
-    # Set tracking URI from environment variable (CRITICAL for subprocesses)
-    if tracking_uri:
-        mlflow.set_tracking_uri(tracking_uri)
-        print(
-            f"  [Training] Set MLflow tracking URI: {tracking_uri[:50]}...", file=sys.stderr, flush=True)
 
-        # Set Azure ML artifact upload timeout if using Azure ML and not already set
-        if "azureml" in tracking_uri.lower():
-            if "AZUREML_ARTIFACTS_DEFAULT_TIMEOUT" not in os.environ:
-                os.environ["AZUREML_ARTIFACTS_DEFAULT_TIMEOUT"] = "600"
-                print(
-                    f"  [Training] Set AZUREML_ARTIFACTS_DEFAULT_TIMEOUT=600 for artifact uploads",
-                    file=sys.stderr, flush=True)
-
-    # Set experiment from environment variable
     experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME")
     if experiment_name:
-        mlflow.set_experiment(experiment_name)
+        tracking_uri = setup_mlflow(
+            experiment_name=experiment_name,
+            fallback_to_local=True,
+        )
         print(
-            f"  [Training] Set MLflow experiment: {experiment_name}", file=sys.stderr, flush=True)
+            f"  [Training] Set MLflow tracking URI: {tracking_uri[:50]}...",
+            file=sys.stderr,
+            flush=True,
+        )
+        print(
+            f"  [Training] Set MLflow experiment: {experiment_name}",
+            file=sys.stderr,
+            flush=True,
+        )
 
     # Check if we should use an existing run (for refit) or create a child run (for HPO trials)
     use_run_id = os.environ.get(
@@ -227,74 +198,22 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
         if fold_idx is not None:
             os.environ["MLFLOW_FOLD_IDX"] = str(fold_idx)
 
-        # Initialize variables for fallback use
-        study_key_hash = None
-        model = None
+        # Use consolidated run name building with fallback
+        from training.execution.run_names import build_training_run_name_with_fallback
 
-        # Try to build systematic name using naming policy
-        try:
-            from infrastructure.naming import create_naming_context
-            from infrastructure.naming.mlflow.run_names import build_mlflow_run_name
-            from common.shared.platform_detection import detect_platform
+        # Determine process type: hpo_trial_fold if fold_idx, otherwise hpo_trial
+        process_type = "hpo_trial_fold" if fold_idx is not None else "hpo_trial"
 
-            # Try to get study_key_hash and model from parent run
-            try:
-                from mlflow.tracking import MlflowClient
-                client = MlflowClient()
-                parent_run = client.get_run(parent_run_id)
-                study_key_hash = parent_run.data.tags.get(
-                    "code.study_key_hash")
-                model = parent_run.data.tags.get("code.model")
-            except Exception:
-                pass
+        # Infer config_dir from environment or current directory
+        config_dir = Path(os.environ.get("CONFIG_DIR", Path.cwd() / "config"))
 
-            # Infer config_dir from environment or current directory
-            config_dir = Path(os.environ.get(
-                "CONFIG_DIR", Path.cwd() / "config"))
-
-            # Determine process type: hpo_trial_fold if fold_idx, otherwise hpo_trial
-            process_type = "hpo_trial_fold" if fold_idx is not None else "hpo_trial"
-
-            # Create context if we have minimum required info
-            if model or study_key_hash:
-                fold_context = create_naming_context(
-                    process_type="hpo",
-                    model=model or "unknown",
-                    environment=detect_platform(),
-                    trial_id=f"trial_{trial_number}",
-                    trial_number=trial_number,
-                    fold_idx=fold_idx,
-                    study_key_hash=study_key_hash,
-                )
-                run_name = build_mlflow_run_name(
-                    fold_context, config_dir=config_dir)
-        except Exception as e:
-            # If systematic naming fails, will use fallback below
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.debug(
-                f"Could not build systematic run name: {e}, using fallback")
-
-        # Fallback to policy-like deterministic format if systematic naming didn't work
-        if not run_name:
-            from common.shared.platform_detection import detect_platform
-            env = detect_platform()
-            model_name = model or "unknown"
-
-            # Try to get study_hash short version
-            study_hash_short = "unknown"
-            if study_key_hash:
-                study_hash_short = study_key_hash[:8]
-
-            # Build policy-like name
-            if fold_idx is not None:
-                # Use hpo_trial_fold pattern
-                trial_num_str = f"t{str(trial_number).zfill(2)}"
-                run_name = f"{env}_{model_name}_hpo_trial_study-{study_hash_short}_{trial_num_str}_fold{fold_idx}"
-            else:
-                # Use hpo_trial pattern
-                trial_num_str = f"t{str(trial_number).zfill(2)}"
-                run_name = f"{env}_{model_name}_hpo_trial_study-{study_hash_short}_{trial_num_str}"
+        run_name = build_training_run_name_with_fallback(
+            process_type=process_type,
+            trial_number=trial_number,
+            fold_idx=fold_idx,
+            parent_run_id=parent_run_id,
+            config_dir=config_dir,
+        )
 
         print(
             f"  [Training] Creating child run with parent: {parent_run_id[:12]}... ({trial_display})",
@@ -302,63 +221,34 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
             flush=True,
         )
 
-        # Get experiment ID from environment or parent run
-        experiment_id = os.environ.get("MLFLOW_EXPERIMENT_ID")
-        if not experiment_id:
-            # Get from parent run
-            try:
-                from mlflow.tracking import MlflowClient
-                client = MlflowClient()
-                parent_run_info = client.get_run(parent_run_id)
-                experiment_id = parent_run_info.info.experiment_id
-                print(
-                    f"  [Training] Using parent's experiment ID: {experiment_id}", file=sys.stderr, flush=True)
-            except Exception as e:
-                print(
-                    f"  [Training] Warning: Could not get parent run info: {e}", file=sys.stderr, flush=True)
+        # Use consolidated child run creation
+        from training.execution.mlflow_setup import create_training_child_run
 
-        if experiment_id:
-            # Create child run with parent tag and Azure ML-specific tags
-            # These tags help Azure ML UI recognize this as a trial and display metrics/parameters
-            tags = {
-                "mlflow.parentRunId": parent_run_id,
-                "azureml.runType": "trial",  # Mark as trial for Azure ML UI
-                "azureml.trial": "true",  # Azure ML-specific tag for trials
-                # Store trial number as tag
-                "trial_number": str(trial_number),
-            }
-            # Add fold index to tags if k-fold CV is enabled
-            if fold_idx is not None:
-                tags["fold_idx"] = str(fold_idx)
-
-            # CRITICAL: Set mlflow.runName tag (required for proper run name display in Azure ML)
-            # Without this, Azure ML may show "trial_unknown" instead of the actual run name
-            tags["mlflow.runName"] = run_name
-
-            try:
-                from mlflow.tracking import MlflowClient
-                client = MlflowClient()
-                run = client.create_run(
-                    experiment_id=experiment_id,
-                    tags=tags,
-                    run_name=run_name
-                )
-                print(
-                    f"  [Training] ✓ Created child run: {run.info.run_id[:12]}...", file=sys.stderr, flush=True)
-                # Use this child run instead of creating a new one
-                mlflow.start_run(run_id=run.info.run_id)
-                started_run_directly = True
-                print(f"  [Training] ✓ Started child run",
-                      file=sys.stderr, flush=True)
-            except Exception as e:
-                print(
-                    f"  [Training] Error creating child run: {e}", file=sys.stderr, flush=True)
-                import traceback
-                traceback.print_exc()
-                # Fallback to independent run
-                mlflow.start_run(run_name=run_name)
-                started_run_directly = True
-        else:
+        experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME", "default")
+        try:
+            child_run_id, _ = create_training_child_run(
+                experiment_name=experiment_name,
+                run_name=run_name,
+                parent_run_id=parent_run_id,
+                trial_number=trial_number,
+                fold_idx=fold_idx,
+            )
+            # Start the child run
+            mlflow.start_run(run_id=child_run_id)
+            started_run_directly = True
+            print(
+                f"  [Training] ✓ Started child run",
+                file=sys.stderr,
+                flush=True,
+            )
+        except Exception as e:
+            print(
+                f"  [Training] Error creating child run: {e}",
+                file=sys.stderr,
+                flush=True,
+            )
+            import traceback
+            traceback.print_exc()
             # Fallback to independent run
             mlflow.start_run(run_name=run_name)
             started_run_directly = True

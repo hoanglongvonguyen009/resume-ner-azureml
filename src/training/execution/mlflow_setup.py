@@ -35,6 +35,7 @@ MLflow tracking for training subprocesses.
 
 from pathlib import Path
 from typing import Any, Dict, Optional
+import sys
 
 import mlflow
 from mlflow.tracking import MlflowClient
@@ -54,6 +55,9 @@ def create_training_mlflow_run(
     config_dir: Optional[Path] = None,
     context: Optional[Any] = None,
     tracking_uri: Optional[str] = None,
+    trial_number: Optional[int] = None,
+    fold_idx: Optional[int] = None,
+    create_as_child: bool = False,
 ) -> tuple[str, Any]:
     """
     Create MLflow run for training execution.
@@ -72,6 +76,10 @@ def create_training_mlflow_run(
         config_dir: Optional config directory (for index updating).
         context: Optional naming context (for index updating).
         tracking_uri: Optional tracking URI (if None, uses current MLflow config).
+        trial_number: Optional trial number (for HPO trials).
+        fold_idx: Optional fold index (for k-fold CV).
+        create_as_child: If True, create child run via client API (for HPO trials).
+                        If False, create standalone run or use parent_run_id tag.
 
     Returns:
         Tuple of (run_id, run_object)
@@ -94,12 +102,34 @@ def create_training_mlflow_run(
             config_dir=Path("config"),
             context=training_context
         )
+
+        # Create child run via client API (HPO trial usage):
+        run_id, run = create_training_mlflow_run(
+            experiment_name="my_experiment",
+            run_name="trial_0",
+            parent_run_id="parent_run_123",
+            trial_number=0,
+            fold_idx=0,
+            create_as_child=True
+        )
     """
     if run_id:
         # Run already exists, just return it
         client = MlflowClient(tracking_uri=tracking_uri)
         run = client.get_run(run_id)
         return run_id, run
+
+    # If create_as_child is True, use child run creation function
+    if create_as_child and parent_run_id:
+        return create_training_child_run(
+            experiment_name=experiment_name,
+            run_name=run_name,
+            parent_run_id=parent_run_id,
+            tags=tags,
+            trial_number=trial_number,
+            fold_idx=fold_idx,
+            tracking_uri=tracking_uri,
+        )
 
     # Get or create experiment
     client = MlflowClient(tracking_uri=tracking_uri)
@@ -237,3 +267,118 @@ def setup_mlflow_tracking_env(
         env_vars.update(additional_vars)
 
     return env_vars
+
+
+def create_training_child_run(
+    experiment_name: str,
+    run_name: str,
+    parent_run_id: str,
+    tags: Optional[Dict[str, str]] = None,
+    trial_number: Optional[int] = None,
+    fold_idx: Optional[int] = None,
+    tracking_uri: Optional[str] = None,
+) -> tuple[str, Any]:
+    """
+    Create MLflow child run via client API (for HPO trials).
+
+    This function creates a child run using the MLflow client API (not active run context),
+    which is required for HPO trials where the run should remain RUNNING until the parent
+    process explicitly terminates it.
+
+    **Note**: This function assumes MLflow has already been configured by
+    `infrastructure.tracking.mlflow.setup.setup_mlflow()`.
+
+    Args:
+        experiment_name: MLflow experiment name (used for fallback if parent lookup fails).
+        run_name: Run name for the child run.
+        parent_run_id: Parent run ID (required).
+        tags: Optional base tags dictionary (will be merged with child run tags).
+        trial_number: Optional trial number (added to tags).
+        fold_idx: Optional fold index for k-fold CV (added to tags).
+        tracking_uri: Optional tracking URI (if None, uses current MLflow config).
+
+    Returns:
+        Tuple of (run_id, run_object)
+
+    Examples:
+        # Create HPO trial child run:
+        run_id, run = create_training_child_run(
+            experiment_name="my_experiment",
+            run_name="trial_0",
+            parent_run_id="parent_run_123",
+            trial_number=0,
+            fold_idx=0
+        )
+    """
+    client = MlflowClient(tracking_uri=tracking_uri)
+
+    # Get experiment ID from parent run
+    experiment_id: Optional[str] = None
+    try:
+        parent_run_info = client.get_run(parent_run_id)
+        experiment_id = parent_run_info.info.experiment_id
+        logger.debug(f"Using parent's experiment ID: {experiment_id}")
+    except Exception as e:
+        logger.warning(f"Could not get parent run {parent_run_id}, trying experiment name: {e}")
+        # Fallback: try to get experiment by name
+        try:
+            experiment = client.get_experiment_by_name(experiment_name)
+            if experiment:
+                experiment_id = experiment.experiment_id
+        except Exception as e2:
+            logger.warning(f"Could not get experiment by name: {e2}")
+
+    if not experiment_id:
+        raise RuntimeError(
+            f"Could not determine experiment ID from parent run {parent_run_id} "
+            f"or experiment name {experiment_name}"
+        )
+
+    # Build child run tags
+    child_tags: Dict[str, str] = {
+        "mlflow.parentRunId": parent_run_id,
+        "azureml.runType": "trial",  # Mark as trial for Azure ML UI
+        "azureml.trial": "true",  # Azure ML-specific tag for trials
+    }
+
+    # Add trial number if provided
+    if trial_number is not None:
+        child_tags["trial_number"] = str(trial_number)
+
+    # Add fold index if k-fold CV is enabled
+    if fold_idx is not None:
+        child_tags["fold_idx"] = str(fold_idx)
+
+    # CRITICAL: Set mlflow.runName tag (required for proper run name display in Azure ML)
+    # Without this, Azure ML may show "trial_unknown" instead of the actual run name
+    child_tags["mlflow.runName"] = run_name
+
+    # Merge with provided tags (provided tags take precedence)
+    if tags:
+        child_tags.update(tags)
+
+    # Create child run via client API
+    try:
+        created_run = client.create_run(
+            experiment_id=experiment_id,
+            run_name=run_name,
+            tags=child_tags,
+        )
+        run_id = created_run.info.run_id
+
+        logger.info(f"Created child run: {run_name} ({run_id[:12]}...)")
+        print(
+            f"  [Training] ✓ Created child run: {run_id[:12]}...",
+            file=sys.stderr,
+            flush=True,
+        )
+
+        return run_id, created_run
+    except Exception as e:
+        logger.error(f"Could not create child run: {e}", exc_info=True)
+        print(
+            f"  [Training] Error creating child run: {e}",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise

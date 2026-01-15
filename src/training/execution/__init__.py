@@ -5,7 +5,13 @@ This module provides utilities for executing training as subprocesses.
 
 from .mlflow_setup import (
     create_training_mlflow_run,
+    create_training_child_run,
     setup_mlflow_tracking_env,
+)
+from .run_names import build_training_run_name_with_fallback
+from .tag_helpers import (
+    add_training_tags,
+    add_training_tags_with_lineage,
 )
 from .subprocess_runner import (
     FoldConfig,
@@ -30,7 +36,11 @@ __all__ = [
     "execute_training_subprocess",
     "verify_training_environment",
     "create_training_mlflow_run",
+    "create_training_child_run",
     "setup_mlflow_tracking_env",
+    "build_training_run_name_with_fallback",
+    "add_training_tags",
+    "add_training_tags_with_lineage",
     "TrainingOptions",
     "MLflowConfig",
     "FoldConfig",
