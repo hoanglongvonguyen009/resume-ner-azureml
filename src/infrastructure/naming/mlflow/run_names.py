@@ -98,23 +98,10 @@ def build_mlflow_run_name(
     Returns:
         Human-readable run name string.
     """
-    # Infer root_dir from output_dir if not provided
-    if root_dir is None and output_dir is not None:
-        # Walk up from output_dir until we find "outputs" directory
-        current = output_dir
-        while current.parent != current:  # Stop at filesystem root
-            if current.name == "outputs":
-                root_dir = current.parent
-                break
-            current = current.parent
-
-    # Fallback: try to derive from config_dir if available
-    if root_dir is None and config_dir is not None:
-        root_dir = config_dir.parent
-
-    # Last resort: fallback to current directory
+    # Infer root_dir from output_dir or config_dir if not provided
     if root_dir is None:
-        root_dir = Path.cwd()
+        from infrastructure.paths.utils import find_project_root
+        root_dir = find_project_root(config_dir=config_dir, output_dir=output_dir)
 
     naming_config = get_naming_config(config_dir)
     run_name_config = naming_config.get("run_name", {})

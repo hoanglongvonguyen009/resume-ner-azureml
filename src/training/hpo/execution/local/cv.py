@@ -170,27 +170,22 @@ def run_training_trial_with_cv(
             from infrastructure.paths import build_output_path, resolve_output_path
             from common.shared.platform_detection import detect_platform
             
-            # Derive root_dir and config_dir from output_dir
+            # Use resolve_project_paths() to consolidate path resolution
             # output_dir is the study folder: outputs/hpo/{env}/{model}/{study_name} or outputs/hpo/{env}/{model}/study-{study8}
-            # Walk up until we find "outputs" directory, then go one level up for project root
-            root_dir = None
-            current = output_dir
-            while current.parent != current:  # Stop at filesystem root
-                if current.name == "outputs":
-                    root_dir = current.parent
-                    break
-                current = current.parent
+            from infrastructure.paths.utils import resolve_project_paths
             
+            root_dir, resolved_config_dir = resolve_project_paths(
+                output_dir=output_dir,
+                config_dir=config_dir,  # Use provided config_dir if available
+            )
+            
+            # Fallback if resolution failed
             if root_dir is None:
-                # Fallback: try to find project root by looking for config directory
                 root_dir = Path.cwd()
-                # Try common locations
-                for candidate in [Path.cwd(), Path.cwd().parent]:
-                    if (candidate / "config").exists():
-                        root_dir = candidate
-                        break
+            if resolved_config_dir is None:
+                resolved_config_dir = root_dir / "config" if root_dir else Path.cwd() / "config"
             
-            config_dir = root_dir / "config"
+            config_dir = resolved_config_dir
             
             # Create NamingContext for trial
             # For v2 paths, set trial_id to trial-{hash8} format so build_output_path can use it
@@ -581,7 +576,8 @@ def _create_trial_run(
                 f"Could not build systematic run name and tags: {e}, using fallback")
             run_name = f"trial_{trial_number}"
             try:
-                from orchestration.jobs.tracking.config.loader import get_naming_config
+                from infrastructure.naming.mlflow.config import get_naming_config
+                # config_dir is already available from function parameter, use it directly
                 naming_config = get_naming_config(config_dir)
                 project_name = naming_config.get("project_name", "resume-ner")
             except Exception:

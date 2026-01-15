@@ -159,10 +159,14 @@ def _try_systematic_naming(
         from infrastructure.naming.mlflow.run_names import build_mlflow_run_name
         from common.shared.platform_detection import detect_platform
 
-        # Infer config_dir if not provided
+        # Use resolve_project_paths() to consolidate path resolution
         if config_dir is None:
-            from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
-            config_dir = infer_config_dir_from_path(output_dir)
+            from infrastructure.paths.utils import resolve_project_paths
+            _, config_dir = resolve_project_paths(output_dir=output_dir, config_dir=None)
+            # Fallback if inference failed
+            if config_dir is None:
+                from infrastructure.paths.utils import infer_config_dir
+                config_dir = infer_config_dir(path=output_dir)
 
         # Build naming context based on process type
         if process_type == "final_training":

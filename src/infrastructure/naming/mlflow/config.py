@@ -47,13 +47,18 @@ def load_mlflow_config(config_dir: Optional[Path] = None) -> Dict[str, Any]:
     Cache is invalidated when the file modification time changes.
     
     Args:
-        config_dir: Path to config directory (defaults to current directory / "config").
+        config_dir: Path to config directory. If None, inferred using `resolve_project_paths()`.
     
     Returns:
         Full MLflow config dictionary, or empty dict if file not found.
     """
     if config_dir is None:
-        config_dir = Path.cwd() / "config"
+        from infrastructure.paths.utils import resolve_project_paths
+        _, config_dir = resolve_project_paths(config_dir=None)
+        # If inference failed, fall back to infer_config_dir for backward compatibility
+        if config_dir is None:
+            from infrastructure.paths.utils import infer_config_dir
+            config_dir = infer_config_dir()
     
     config_path = config_dir / "mlflow.yaml"
     mtime = get_file_mtime(config_path)

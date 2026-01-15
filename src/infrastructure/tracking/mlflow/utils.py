@@ -110,18 +110,16 @@ def get_mlflow_run_id() -> Optional[str]:
     return os.environ.get("MLFLOW_RUN_ID")
 
 
+# Re-export infer_config_dir from paths.utils for backward compatibility
+import warnings
+from infrastructure.paths.utils import infer_config_dir
+
 def infer_config_dir_from_path(path: Optional[Path]) -> Path:
     """
     Infer config directory by searching up the parent chain from a given path.
     
-    This function searches up the directory tree from the given path to find
-    a parent directory that contains a "config" subdirectory. This ensures
-    config directories are found correctly regardless of directory structure depth.
-    
-    When path is None or no config is found in the path's parent chain, it searches
-    from the current working directory up to find the project root (where both
-    config/ and src/ exist), ensuring correct behavior when running from notebooks
-    or subdirectories.
+    **DEPRECATED**: Use `infrastructure.paths.utils.infer_config_dir()` instead.
+    This function is kept for backward compatibility and re-exports the new function.
     
     Args:
         path: Starting path to search from (e.g., output_dir, checkpoint_dir).
@@ -129,40 +127,13 @@ def infer_config_dir_from_path(path: Optional[Path]) -> Path:
     
     Returns:
         Path to config directory. Falls back to Path.cwd() / "config" if not found.
-    
-    Examples:
-        >>> # Typical structure: /workspace/outputs/hpo/...
-        >>> # Will find: /workspace/config
-        >>> infer_config_dir_from_path(Path("/workspace/outputs/hpo/local/distilbert"))
-        Path("/workspace/config")
-        
-        >>> # Deep structure: /workspace/outputs/hpo/local/distilbert/study-abc/trial-xyz
-        >>> # Will still find: /workspace/config
-        >>> infer_config_dir_from_path(Path("/workspace/outputs/hpo/local/distilbert/study-abc/trial-xyz"))
-        Path("/workspace/config")
-        
-        >>> # When running from notebook: /workspace/notebooks/
-        >>> # Will find: /workspace/config (by searching up from cwd)
-        >>> infer_config_dir_from_path(None)
-        Path("/workspace/config")
     """
-    # First, try searching from the provided path
-    if path is not None:
-        for parent in path.parents:
-            candidate = parent / "config"
-            if candidate.exists():
-                return candidate
-    
-    # If path is None or no config found in path's parent chain,
-    # search from current working directory to find project root
-    # (where both config/ and src/ exist)
-    current = Path.cwd()
-    for parent in [current] + list(current.parents):
-        candidate = parent / "config"
-        if candidate.exists() and (parent / "src").exists():
-            # Found project root with both config/ and src/
-            return candidate
-    
-    # Last resort: fall back to cwd/config if not found
-    return Path.cwd() / "config"
+    warnings.warn(
+        "infer_config_dir_from_path is deprecated. "
+        "Please use infrastructure.paths.utils.infer_config_dir() instead. "
+        "This function will be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return infer_config_dir(path=path)
 

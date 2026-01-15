@@ -5,6 +5,30 @@
 
 Create single source of truth for paths and naming at `src/` level, organized into focused modules following SRP. **Paths owns all filesystem layout; naming owns display/run names.** Keep `orchestration.*` as stable public API for notebooks. Includes optimizations: remove redundancies, add config caching, centralize mappings, avoid circular dependencies.
 
+## Status
+
+**Last Updated**: 2026-01-15
+
+### Completed Steps
+- ⏳ None yet (plan not started)
+
+### Pending Steps
+- ⏳ Step 1: Create src/core/ module (shared utilities)
+- ⏳ Step 2: Create src/paths/ module (filesystem authority)
+- ⏳ Step 3: Create src/naming/ module (display names authority)
+- ⏳ Step 4: Update orchestration/ for backward compatibility
+- ⏳ Step 5: Update all internal imports
+- ⏳ Step 6: Handle MLflow naming dependencies
+- ⏳ Step 7: Remove redundancies and optimize
+- ⏳ Step 8: Cleanup (after 1-2 releases)
+
+## Preconditions
+
+- All existing tests must pass before starting
+- No active PRs that would conflict with these changes
+- Backup of current working state
+- Review of `consolidate-path-naming-utilities.plan.md` to understand what's already been consolidated
+
 ## Current State Analysis
 
 ### Path-related modules (to consolidate):
@@ -92,7 +116,7 @@ src/
 
 ## Implementation Steps
 
-### Step 1: Create src/core/ module (shared utilities)
+### Step 1: Create src/core/ module (shared utilities) ⏳
 
 1. **core/tokens.py** - Responsibility: Token validation and checking
 
@@ -112,11 +136,19 @@ src/
    - Utility for parsing {placeholder} patterns
    - No dependencies on paths or naming
 
-4. **core/init.py** - Public API
+4. **core/__init__.py** - Public API
 
    - Export all public functions
 
-### Step 2: Create src/paths/ module (filesystem authority)
+**Success criteria**:
+- `src/core/` directory exists with all submodules
+- All functions moved from `orchestration/tokens.py` and `orchestration/normalize.py`
+- `extract_placeholders()` extracted from paths.py
+- `core/__init__.py` exports all public functions
+- `uvx mypy src/core` passes with 0 errors
+- All imports updated to use `from core import ...`
+
+### Step 2: Create src/paths/ module (filesystem authority) ⏳
 
 1. **paths/config.py** - Responsibility: Load and manage paths.yaml configuration
 
@@ -166,13 +198,22 @@ src/
    - `find_study_by_hash()` - Find study by hash
    - `find_trial_by_hash()` - Find trial by hash
 
-7. **paths/init.py** - Public API
+7. **paths/__init__.py** - Public API
 
    - Export all public functions from submodules
    - Maintain backward compatibility signatures
    - **Do NOT export `resolve_output_path_v2()`** (only in legacy facade if needed)
 
-### Step 3: Create src/naming/ module (display names authority)
+**Success criteria**:
+- `src/paths/` directory exists with all submodules
+- `paths/config.py` implements caching by `(config_dir, storage_env, mtime)`
+- `paths/resolve.py` contains `PROCESS_PATTERN_KEYS` constant and `build_output_path()` as only v2 entrypoint
+- `paths/validation.py` provides public `validate_output_path()` function
+- All path resolution logic consolidated in `paths/resolve.py`
+- `uvx mypy src/paths` passes with 0 errors
+- Tests pass: `uvx pytest tests/ -k path`
+
+### Step 3: Create src/naming/ module (display names authority) ⏳
 
 1. **naming/context.py** - Responsibility: NamingContext dataclass and factory
 
@@ -223,12 +264,22 @@ src/
      - `tags_registry.py` - Tags registry management
    - Update imports to use relative imports within mlflow/
 
-6. **naming/init.py** - Public API
+6. **naming/__init__.py** - Public API
 
    - Export all public functions from submodules
    - Re-export MLflow naming functions (if moved)
    - Maintain backward compatibility signatures
    - **Note**: Does NOT export `build_output_path()` - that's in paths/
+
+**Success criteria**:
+- `src/naming/` directory exists with all submodules
+- `naming/context.py` contains `NamingContext` dataclass and `create_naming_context()` factory
+- `naming/context_tokens.py` provides `build_token_values()` function
+- `naming/display_policy.py` implements caching by `(config_dir, mtime)`
+- `naming/experiments.py` uses dict interface (no dependency on `orchestration.config_loader`)
+- MLflow naming modules moved or facaded appropriately
+- `uvx mypy src/naming` passes with 0 errors
+- Tests pass: `uvx pytest tests/ -k naming`
 
 ### Step 4: Update orchestration/ for backward compatibility
 
@@ -251,14 +302,21 @@ src/
    - Re-export for backward compatibility
    - Keep existing public API stable
 
-### Step 5: Update all internal imports
+### Step 5: Update all internal imports ⏳
 
 1. Update files in `src/orchestration/jobs/` to import from `paths` and `naming`
 2. Update files in `src/orchestration/` that use paths/naming
 3. Update imports to use new module structure
 4. **Keep notebooks using `orchestration.*` imports** (stable API, no changes needed)
 
-### Step 6: Handle MLflow naming dependencies
+**Success criteria**:
+- All files in `src/orchestration/jobs/` import from `paths` and `naming` (not `orchestration.paths` or `orchestration.naming`)
+- All files in `src/orchestration/` (except facades) import from `paths` and `naming`
+- Notebooks continue to work with `orchestration.*` imports (no changes needed)
+- `uvx mypy src` passes with 0 errors
+- All tests pass: `uvx pytest tests/`
+
+### Step 6: Handle MLflow naming dependencies ⏳
 
 1. Analyze dependencies of `orchestration/jobs/tracking/naming/` modules
 2. Check if they depend on `orchestration.jobs.tracking.config`
@@ -268,6 +326,14 @@ src/
    - If heavy dependencies: Keep under `tracking/` and expose thin facade in `naming/`
 
 4. Ensure no circular dependencies
+
+**Success criteria**:
+- Dependency analysis completed and documented
+- Decision made and implemented (either move to `naming/mlflow/` or create facade)
+- No circular dependencies introduced
+- All MLflow naming functions accessible via `naming.mlflow.*` or `naming.*`
+- `uvx mypy src` passes with 0 errors
+- Tests pass: `uvx pytest tests/ -k mlflow`
 
 ### Step 7: Remove redundancies and optimize
 
@@ -304,6 +370,17 @@ src/
    - Use dict-based interface in `naming/experiments.py`
    - Move minimal config loader to `naming/` or `core/` if needed
 
+**Success criteria**:
+- `resolve_output_path_v2()` removed from `paths/` (only in `orchestration/paths.py` if needed)
+- `validate_output_path()` exists only in `paths/validation.py`
+- `PROCESS_PATTERN_KEYS` constant exists only in `paths/resolve.py`
+- Config caching implemented in both `paths/config.py` and `naming/display_policy.py`
+- `naming/context_tokens.py` created and used by both `paths/` and `naming/`
+- `naming/experiments.py` uses dict interface (no `orchestration.config_loader` dependency)
+- No duplicate validation, pattern mapping, or config loading logic
+- `uvx mypy src` passes with 0 errors
+- All tests pass: `uvx pytest tests/`
+
 ### Step 8: Cleanup (after 1-2 releases)
 
 1. Remove old modules:
@@ -316,6 +393,27 @@ src/
    - `src/orchestration/normalize.py` (moved to core/)
 
 2. Consider removing `orchestration/jobs/tracking/naming/` if fully migrated to `naming/mlflow/`
+
+**Success criteria**:
+- Old modules removed after deprecation period (1-2 releases)
+- All imports updated to use new modules
+- No references to old modules in codebase
+- Documentation updated
+- `uvx mypy src` passes with 0 errors
+- All tests pass: `uvx pytest tests/`
+
+## Success Criteria (Overall)
+
+- ✅ Single source of truth for paths at `src/paths/` (all filesystem layout)
+- ✅ Single source of truth for naming at `src/naming/` (all display/run names)
+- ✅ `orchestration.*` remains stable public API for notebooks (backward compatible)
+- ✅ No circular dependencies between `core/`, `paths/`, and `naming/`
+- ✅ Config caching implemented (paths.yaml and naming.yaml)
+- ✅ No duplicate path building, validation, or pattern mapping logic
+- ✅ All tests pass: `uvx pytest tests/`
+- ✅ Mypy passes: `uvx mypy src --show-error-codes`
+- ✅ Notebooks continue to work without changes
+- ✅ Reduced code duplication (target: <5% overlap in path/naming utilities)
 
 ## Key Design Decisions
 
@@ -378,55 +476,8 @@ src/
 9. Test config caching (verify mtime checks work)
 10. Test token expansion (verify no duplicate logic)
 
-## Migration Checklist
+## Notes
 
-- [ ] Create `src/core/` module structure (tokens, normalize, placeholders)
-- [ ] Create `src/paths/` module structure (config with caching, resolve with PROCESS_PATTERN_KEYS, validation, cache, drive, parse)
-- [ ] Move `build_output_path()` from naming_centralized.py to paths/resolve.py
-- [ ] Create `naming/context_tokens.py` for token expansion
-- [ ] Create `src/naming/` module structure (context, context_tokens, experiments with dict interface, display_policy with caching)
-- [ ] Rename naming/policy.py to naming/display_policy.py
-- [ ] Rename naming/mlflow/policy.py to naming/mlflow/mlflow_policy.py
-- [ ] Decide on MLflow naming location (mlflow/ vs tracking/)
-- [ ] Update `orchestration/__init__.py` and create legacy facades
-- [ ] Add resolve_output_path_v2 wrapper only in orchestration/paths.py (if needed)
-- [ ] Update all internal imports in `src/orchestration/`
-- [ ] Keep notebooks using `orchestration.*` imports (no changes needed)
-- [ ] Test all path resolution scenarios
-- [ ] Test all naming scenarios
-- [ ] Verify backward compatibility
-- [ ] Verify no circular dependencies
-- [ ] Verify single authority for path building
-- [ ] Test config caching
-- [ ] Test token expansion
-- [ ] Document new import patterns
-- [ ] (After 1-2 releases) Remove old modules
-
-### To-dos
-
-- [ ] Create src/core/ directory structure with __init__.py and submodules (tokens, normalize, placeholders)
-- [ ] Move orchestration/tokens.py to core/tokens.py with is_token_known, is_token_allowed functions
-- [ ] Move orchestration/normalize.py to core/normalize.py with normalize_for_path function
-- [ ] Create core/placeholders.py with extract_placeholders() extracted from paths.py
-- [ ] Create core/__init__.py to export all public functions
-- [ ] Create src/paths/ directory structure with __init__.py and all submodules
-- [ ] Create paths/config.py with load_paths_config (cached by config_dir + storage_env + mtime), apply_env_overrides, validate_paths_config (enforces PROCESS_PATTERN_KEYS)
-- [ ] Create paths/resolve.py with resolve_output_path, build_output_path (ONLY v2 entrypoint), PROCESS_PATTERN_KEYS constant, calls paths/validation.validate_output_path()
-- [ ] Create paths/validation.py with validate_path_before_mkdir and validate_output_path (public function, filesystem safety only)
-- [ ] Create paths/cache.py with cache file path management functions
-- [ ] Create paths/drive.py with Drive backup path mapping functions
-- [ ] Create paths/parse.py with path parsing and detection helper functions
-- [ ] Create paths/__init__.py to export all public functions (NOT resolve_output_path_v2)
-- [ ] Create src/naming/ directory structure with __init__.py and all submodules (context, context_tokens, experiments, display_policy, mlflow/)
-- [ ] Create naming/context.py with NamingContext dataclass and create_naming_context factory (moved from naming_centralized.py, keep it dumb)
-- [ ] Create naming/context_tokens.py with build_token_values(context) -> dict to expand context into tokens (spec8, trial8, etc.)
-- [ ] Create naming/experiments.py with get_stage_config(experiment_cfg: dict, stage: str) using dict interface (NOT orchestration.config_loader)
-- [ ] Create naming/display_policy.py (renamed from policy.py) with load_naming_policy (cached by config_dir + mtime), format_run_name, internal validation helpers
-- [ ] Analyze MLflow naming dependencies and decide: move to naming/mlflow/ (if standalone) or keep in tracking/ with facade
-- [ ] Move orchestration/jobs/tracking/naming/ to naming/mlflow/ (if decided) with mlflow_policy.py renamed, or create facade in naming/
-- [ ] Create naming/__init__.py to export all public functions (NOT build_output_path - that is in paths/)
-- [ ] Update paths/resolve.py to use naming/context_tokens.py for token expansion
-- [ ] Create orchestration/paths.py and orchestration/naming.py as legacy facades re-exporting from paths/ and naming/, add resolve_output_path_v2 wrapper only here if needed
-- [ ] Update orchestration/__init__.py to import from paths and naming modules, re-exporting for backward compatibility
-- [ ] Update all imports in src/orchestration/ and src/orchestration/jobs/ to use paths and naming modules directly
-- [ ] Run tests and verify path resolution, naming functions, backward compatibility, no circular deps, single authority for paths, config caching, token expansion
+- This plan builds on the work completed in `consolidate-path-naming-utilities.plan.md`
+- The previous plan consolidated duplicate implementations; this plan reorganizes the structure
+- Review `consolidate-path-naming-utilities.plan.md` to understand what utilities already exist in `infrastructure.paths` and `infrastructure.naming`

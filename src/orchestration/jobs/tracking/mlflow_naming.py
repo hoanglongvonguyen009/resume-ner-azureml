@@ -12,7 +12,7 @@ from infrastructure.naming.mlflow.run_keys import (
     build_mlflow_run_key_hash,
     build_counter_key,
 )
-from orchestration.jobs.tracking.naming.run_names import (
+from infrastructure.naming.mlflow.run_names import (
     build_mlflow_run_name,
 )
 from orchestration.jobs.tracking.naming.tags import (

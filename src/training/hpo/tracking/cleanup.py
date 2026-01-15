@@ -150,10 +150,11 @@ def cleanup_interrupted_runs(
         run_key_hash = build_mlflow_run_key_hash(run_key) if run_key else None
 
         # Load naming config for project name comparison
-        from orchestration.jobs.tracking.config.loader import get_naming_config
+        from infrastructure.naming.mlflow.config import get_naming_config
+        from infrastructure.paths.utils import resolve_project_paths
 
-        from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
-        config_dir = infer_config_dir_from_path(output_dir) if output_dir else None
+        # Use resolve_project_paths() to get config_dir from output_dir context
+        _, config_dir = resolve_project_paths(output_dir=output_dir, config_dir=None)
         naming_config = get_naming_config(config_dir)
 
         # Get current run start_time for legacy run validation

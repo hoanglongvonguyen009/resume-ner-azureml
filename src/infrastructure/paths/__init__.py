@@ -28,7 +28,12 @@ from .resolve import (
     build_output_path,
     resolve_output_path,
 )
-from .utils import find_project_root
+from .utils import (
+    find_project_root,
+    infer_config_dir,
+    infer_root_dir,
+    resolve_project_paths,
+)
 from .validation import (
     validate_output_path,
     validate_path_before_mkdir,
@@ -63,5 +68,8 @@ __all__ = [
     "find_trial_by_hash",
     # Utils
     "find_project_root",
+    "infer_config_dir",
+    "infer_root_dir",
+    "resolve_project_paths",
 ]
 

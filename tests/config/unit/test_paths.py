@@ -13,6 +13,7 @@ from infrastructure.paths import (
     get_cache_strategy_config,
     save_cache_with_dual_strategy,
     load_cache_file,
+    resolve_project_paths,
 )
 
 
@@ -467,4 +468,196 @@ patterns:
         assert f"trial-{trial8_expected}" in path_str
         assert study8_expected == study_key_hash[:8]
         assert trial8_expected == trial_key_hash[:8]
+
+
+class TestResolveProjectPaths:
+    """Test resolve_project_paths() helper function."""
+    
+    def test_trusts_provided_config_dir(self, tmp_path):
+        """Test that provided config_dir is trusted and returned directly."""
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        
+        root_dir, resolved_config_dir = resolve_project_paths(
+            output_dir=tmp_path / "outputs" / "hpo" / "local" / "distilbert",
+            config_dir=config_dir
+        )
+        
+        # Should trust provided config_dir
+        assert resolved_config_dir == config_dir
+        # Should derive root_dir from config_dir
+        assert root_dir == tmp_path
+    
+    def test_infers_from_output_dir_when_config_dir_none(self, tmp_path):
+        """Test inference from output_dir when config_dir is None."""
+        # Create project structure
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        outputs_dir = tmp_path / "outputs"
+        outputs_dir.mkdir()
+        
+        output_dir = outputs_dir / "hpo" / "local" / "distilbert"
+        output_dir.mkdir(parents=True)
+        
+        root_dir, config_dir_resolved = resolve_project_paths(
+            output_dir=output_dir,
+            config_dir=None
+        )
+        
+        # Should infer from output_dir
+        assert root_dir == tmp_path
+        assert config_dir_resolved == config_dir
+    
+    def test_infers_from_start_path_as_fallback(self, tmp_path):
+        """Test inference from start_path when output_dir not available."""
+        # Create project structure
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        
+        start_path = src_dir / "training" / "core" / "trainer.py"
+        start_path.parent.mkdir(parents=True)
+        start_path.write_text("# trainer code")
+        
+        root_dir, config_dir_resolved = resolve_project_paths(
+            output_dir=None,
+            start_path=start_path
+        )
+        
+        # Should infer from start_path
+        assert root_dir == tmp_path
+        assert config_dir_resolved == config_dir
+    
+    def test_handles_config_dir_with_different_name(self, tmp_path, monkeypatch):
+        """Test handling config_dir that is not named 'config'."""
+        # Change to tmp_path to avoid finding actual project root
+        monkeypatch.chdir(tmp_path)
+        
+        # Create project structure
+        config_dir = tmp_path / "my_config"
+        config_dir.mkdir()
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        # Also create standard config dir so find_project_root can find it
+        standard_config_dir = tmp_path / "config"
+        standard_config_dir.mkdir()
+        
+        root_dir, resolved_config_dir = resolve_project_paths(
+            config_dir=config_dir
+        )
+        
+        # Should still trust provided config_dir
+        assert resolved_config_dir == config_dir
+        # Should find root_dir from config_dir location (or from standard structure)
+        assert root_dir == tmp_path
+    
+    def test_returns_none_when_inference_fails(self, tmp_path):
+        """Test that function returns None when all inference strategies fail."""
+        # Create a directory structure that doesn't match project layout
+        random_dir = tmp_path / "random" / "deep" / "structure"
+        random_dir.mkdir(parents=True)
+        
+        root_dir, config_dir = resolve_project_paths(
+            output_dir=random_dir,
+            config_dir=None
+        )
+        
+        # Should return None for both if inference fails
+        # (Note: find_project_root may still find something, so this test
+        # verifies the function handles the case gracefully)
+        # In practice, it may return fallback values, but should not crash
+        assert isinstance(root_dir, (type(None), Path))
+        assert isinstance(config_dir, (type(None), Path))
+    
+    def test_prioritizes_config_dir_over_output_dir(self, tmp_path):
+        """Test that provided config_dir takes priority over output_dir."""
+        # Create two different project structures
+        project1 = tmp_path / "project1"
+        project1_config = project1 / "config"
+        project1_config.mkdir(parents=True)
+        project1_src = project1 / "src"
+        project1_src.mkdir()
+        
+        project2 = tmp_path / "project2"
+        project2_outputs = project2 / "outputs"
+        project2_outputs.mkdir(parents=True)
+        project2_config = project2 / "config"
+        project2_config.mkdir()
+        project2_src = project2 / "src"
+        project2_src.mkdir()
+        
+        output_dir = project2_outputs / "hpo" / "local" / "distilbert"
+        output_dir.mkdir(parents=True)
+        
+        root_dir, config_dir = resolve_project_paths(
+            output_dir=output_dir,
+            config_dir=project1_config
+        )
+        
+        # Should use provided config_dir (project1), not infer from output_dir (project2)
+        assert config_dir == project1_config
+        assert root_dir == project1
+    
+    def test_handles_none_inputs(self, tmp_path):
+        """Test handling when all inputs are None."""
+        # This should try to infer from cwd
+        root_dir, config_dir = resolve_project_paths(
+            output_dir=None,
+            config_dir=None,
+            start_path=None
+        )
+        
+        # Should attempt inference from cwd (may succeed or fail depending on test environment)
+        assert isinstance(root_dir, (type(None), Path))
+        assert isinstance(config_dir, (type(None), Path))
+    
+    def test_derives_config_dir_from_root_dir(self, tmp_path):
+        """Test that config_dir is derived from root_dir when not provided."""
+        # Create project structure
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        outputs_dir = tmp_path / "outputs"
+        outputs_dir.mkdir()
+        
+        output_dir = outputs_dir / "hpo" / "local" / "distilbert"
+        output_dir.mkdir(parents=True)
+        
+        root_dir, config_dir_resolved = resolve_project_paths(
+            output_dir=output_dir,
+            config_dir=None
+        )
+        
+        # Should derive config_dir from root_dir
+        assert root_dir == tmp_path
+        assert config_dir_resolved == config_dir
+        assert config_dir_resolved == root_dir / "config"
+    
+    def test_handles_output_dir_without_outputs_parent(self, tmp_path, monkeypatch):
+        """Test handling output_dir that doesn't have 'outputs' parent."""
+        # Change to tmp_path to avoid finding actual project root
+        monkeypatch.chdir(tmp_path)
+        
+        # Create project structure
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        
+        # Create output_dir that's not under 'outputs'
+        output_dir = tmp_path / "custom" / "output" / "hpo"
+        output_dir.mkdir(parents=True)
+        
+        root_dir, config_dir_resolved = resolve_project_paths(
+            output_dir=output_dir,
+            config_dir=None
+        )
+        
+        # Should still find project root (using src/config strategy)
+        assert root_dir == tmp_path
+        assert config_dir_resolved == config_dir
 

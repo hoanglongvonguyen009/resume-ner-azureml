@@ -95,8 +95,8 @@ class MLflowTrainingTracker(BaseTracker):
             RunHandle with run information.
         """
         # Infer config_dir from output_dir BEFORE creating run
-        from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
-        config_dir = infer_config_dir_from_path(output_dir)
+        from infrastructure.paths.utils import infer_config_dir
+        config_dir = infer_config_dir(path=output_dir)
 
         # Check if tracking is enabled for training stage BEFORE creating run
         from orchestration.jobs.tracking.config.loader import get_tracking_config
@@ -168,9 +168,8 @@ class MLflowTrainingTracker(BaseTracker):
                         from infrastructure.metadata.training import save_metadata_with_fingerprints
 
                         # Build root_dir from output_dir
-                        root_dir = output_dir.parent.parent if output_dir.parent.name == "outputs" else output_dir.parent.parent.parent
-                        if not root_dir or not root_dir.exists():
-                            root_dir = Path.cwd()
+                        from infrastructure.paths.utils import find_project_root
+                        root_dir = find_project_root(output_dir=output_dir)
 
                         # Save MLflow run information to metadata
                         mlflow_info = {
@@ -303,8 +302,8 @@ class MLflowTrainingTracker(BaseTracker):
         """
         try:
             # Infer config_dir to check tracking config
-            from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
-            config_dir = infer_config_dir_from_path(checkpoint_dir)
+            from infrastructure.paths.utils import infer_config_dir
+            config_dir = infer_config_dir(path=checkpoint_dir)
             
             from infrastructure.tracking.mlflow.artifacts.stage_helpers import upload_training_artifacts
             

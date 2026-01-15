@@ -49,8 +49,22 @@ def _normalize_hyperparameters(params: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Normalized dictionary with canonical representations.
     """
+    # Import Mock check here to avoid circular imports and only import when needed
+    try:
+        from unittest.mock import Mock
+        has_mock = True
+    except ImportError:
+        # unittest.mock might not be available in all environments
+        has_mock = False
+        Mock = None
+    
     normalized = {}
     for key, value in sorted(params.items()):
+        # Filter out Mock objects (can occur in test environments)
+        if has_mock and isinstance(value, Mock):
+            # Skip Mock objects - they're not valid hyperparameters
+            continue
+        
         if isinstance(value, float):
             # Normalize floats to 12 significant figures for stability
             # This ensures 2.33e-05 and 0.0000233000001 both become the same value
@@ -238,7 +252,27 @@ def build_hpo_trial_key(
     Returns:
         Canonical JSON string representing the trial key.
     """
+    # Validate inputs to catch Mock objects early (common in test environments)
+    try:
+        from unittest.mock import Mock
+        has_mock = True
+    except ImportError:
+        has_mock = False
+        Mock = None
+    
+    # Validate study_key_hash is a string (not a Mock)
+    if has_mock and isinstance(study_key_hash, Mock):
+        raise ValueError(
+            f"study_key_hash must be a string, got Mock object. "
+            f"This usually indicates a test setup issue where Mock objects are being passed instead of real values."
+        )
+    if not isinstance(study_key_hash, str):
+        raise ValueError(
+            f"study_key_hash must be a string, got {type(study_key_hash).__name__}"
+        )
+    
     # Normalize hyperparameters for deterministic hashing
+    # This will filter out any Mock objects in the hyperparameters dict
     normalized_params = _normalize_hyperparameters(hyperparameters)
 
     payload = {

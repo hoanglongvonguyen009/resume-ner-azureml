@@ -115,8 +115,8 @@ class MLflowBenchmarkTracker(BaseTracker):
         """
         try:
             # Infer config_dir from output_dir
-            from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
-            config_dir = infer_config_dir_from_path(output_dir)
+            from infrastructure.paths.utils import infer_config_dir
+            config_dir = infer_config_dir(path=output_dir)
 
             # Check if tracking is enabled for benchmark stage
             from orchestration.jobs.tracking.config.loader import get_tracking_config
@@ -288,12 +288,8 @@ class MLflowBenchmarkTracker(BaseTracker):
                                 # Infer root_dir from output_dir
                                 root_dir = None
                                 if output_dir:
-                                    current = output_dir
-                                    while current.parent != current:  # Stop at filesystem root
-                                        if current.name == "outputs":
-                                            root_dir = current.parent
-                                            break
-                                        current = current.parent
+                                    from infrastructure.paths.utils import find_project_root
+                                    root_dir = find_project_root(output_dir=output_dir)
 
                                 if root_dir is None:
                                     # Fallback: try to find project root by looking for config directory
@@ -350,12 +346,8 @@ class MLflowBenchmarkTracker(BaseTracker):
                         # Derive project root correctly by finding "outputs" directory
                         root_dir = None
                         if output_dir:
-                            current = output_dir
-                            while current.parent != current:  # Stop at filesystem root
-                                if current.name == "outputs":
-                                    root_dir = current.parent
-                                    break
-                                current = current.parent
+                            from infrastructure.paths.utils import find_project_root
+                            root_dir = find_project_root(output_dir=output_dir)
                         
                         if root_dir is None:
                             # Fallback: try to find project root by looking for config directory
@@ -447,8 +439,8 @@ class MLflowBenchmarkTracker(BaseTracker):
                             "throughput_samples_per_sec", batch_results["throughput_docs_per_sec"])
 
             # Log artifact using unified uploader (works for both Azure ML and non-Azure ML backends)
-            from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
-            config_dir = infer_config_dir_from_path(benchmark_json_path) if benchmark_json_path else None
+            from infrastructure.paths.utils import infer_config_dir
+            config_dir = infer_config_dir(path=benchmark_json_path) if benchmark_json_path else None
             
             from infrastructure.tracking.mlflow.artifacts.stage_helpers import upload_benchmark_artifacts
             

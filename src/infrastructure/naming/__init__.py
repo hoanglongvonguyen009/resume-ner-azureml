@@ -9,6 +9,7 @@ from .display_policy import (
     format_run_name,
     load_naming_policy,
     parse_parent_training_id,
+    sanitize_semantic_suffix,
     validate_naming_policy,
     validate_run_name,
 )
@@ -63,6 +64,7 @@ __all__ = [
     "validate_naming_policy",
     "validate_run_name",
     "parse_parent_training_id",
+    "sanitize_semantic_suffix",
     # Experiments
     "get_stage_config",
     "build_aml_experiment_name",

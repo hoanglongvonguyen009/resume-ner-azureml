@@ -129,7 +129,10 @@ def run_benchmarking(
     if device:
         args.extend(["--device", device])
 
-    cwd = project_root if project_root else checkpoint_dir.parent.parent.parent
+    if not project_root and checkpoint_dir:
+        from infrastructure.paths.utils import find_project_root
+        project_root = find_project_root(start_path=checkpoint_dir)
+    cwd = project_root if project_root else Path.cwd()
 
     # Run subprocess without capturing output so progress is visible in real-time
     # This is especially important on Colab where users need to see progress

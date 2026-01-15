@@ -458,10 +458,8 @@ def _set_phase2_hpo_tags(
         client = mlflow.tracking.MlflowClient()
         # Use provided config_dir or infer from current directory
         if config_dir is None:
-            from pathlib import Path
-            config_dir = Path.cwd() / "config"
-            if not config_dir.exists():
-                config_dir = Path.cwd().parent / "config"
+            from infrastructure.paths.utils import infer_config_dir
+            config_dir = infer_config_dir()
         tags_registry = load_tags_registry(config_dir)
         
         # Compute fingerprints
@@ -648,16 +646,14 @@ def run_local_hpo_sweep(
             missing.append("train_config")
         logger.warning(f"✗ Cannot compute v2 study_key_hash early - missing: {', '.join(missing)}")
 
-    # Derive root_dir from output_dir if not already available
+    # Use resolve_project_paths() to consolidate path resolution
     # (needed for variant computation in create_study_name)
-    root_dir_for_variants = None
-    if output_dir:
-        current = output_dir
-        while current.parent != current:  # Stop at filesystem root
-            if current.name == "outputs":
-                root_dir_for_variants = current.parent
-                break
-            current = current.parent
+    from infrastructure.paths.utils import resolve_project_paths
+    
+    root_dir_for_variants, _ = resolve_project_paths(
+        output_dir=output_dir,
+        config_dir=project_config_dir,  # Use provided project_config_dir
+    )
     
     # Create study manager and load/create study
     study_manager = StudyManager(
@@ -676,24 +672,19 @@ def run_local_hpo_sweep(
             from infrastructure.paths import load_paths_config, apply_env_overrides, resolve_output_path
             from common.shared.platform_detection import detect_platform
 
-            # Derive root_dir by walking up from output_dir until we find "outputs" directory
-            root_dir = None
-            current = output_dir
-            while current.parent != current:  # Stop at filesystem root
-                if current.name == "outputs":
-                    root_dir = current.parent
-                    break
-                current = current.parent
-
+            # Use resolve_project_paths() to consolidate path resolution
+            from infrastructure.paths.utils import resolve_project_paths
+            
+            root_dir, config_dir = resolve_project_paths(
+                output_dir=output_dir,
+                config_dir=project_config_dir,  # Use provided project_config_dir
+            )
+            
+            # Fallback if resolution failed
             if root_dir is None:
-                # Fallback: try to find project root by looking for config directory
                 root_dir = Path.cwd()
-                for candidate in [Path.cwd(), Path.cwd().parent]:
-                    if (candidate / "config").exists():
-                        root_dir = candidate
-                        break
-
-            config_dir = root_dir / "config"
+            if config_dir is None:
+                config_dir = root_dir / "config" if root_dir else Path.cwd() / "config"
             hpo_base = resolve_output_path(root_dir, config_dir, "hpo")
             paths_config = load_paths_config(config_dir)
             storage_env = detect_platform()
@@ -1075,10 +1066,15 @@ def run_local_hpo_sweep(
                         compute_trial_key_hash_from_configs,
                         compute_study_key_hash_v2,
                     )
-                    from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+                    from infrastructure.paths.utils import resolve_project_paths
                     
                     client = mlflow.tracking.MlflowClient()
-                    config_dir_for_refit = infer_config_dir_from_path(output_dir)
+                    # Use resolve_project_paths() for consistency
+                    _, config_dir_for_refit = resolve_project_paths(output_dir=output_dir, config_dir=None)
+                    # Fallback if inference failed
+                    if config_dir_for_refit is None:
+                        from infrastructure.paths.utils import infer_config_dir
+                        config_dir_for_refit = infer_config_dir(path=output_dir)
                     
                     # Priority 1: Retrieve study_key_hash from parent run tags (SSOT)
                     refit_study_key_hash = None

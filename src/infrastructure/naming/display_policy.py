@@ -63,7 +63,8 @@ def load_naming_policy(
         Naming policy dictionary, or empty dict if file not found.
     """
     if config_dir is None:
-        config_dir = Path.cwd() / "config"
+        from infrastructure.paths.utils import infer_config_dir
+        config_dir = infer_config_dir()
 
     policy_path = config_dir / "naming.yaml"
     mtime = get_file_mtime(policy_path)
@@ -233,8 +234,46 @@ def parse_parent_training_id(parent_id: str) -> Dict[str, str]:
     return {"spec_hash": "unknown", "exec_hash": "unknown", "variant": "1"}
 
 
-# sanitize_semantic_suffix is now imported from orchestration.jobs.tracking.naming.policy
-# (single source of truth - see import at top of file)
+def sanitize_semantic_suffix(study_name: str, max_length: int = 30, model: Optional[str] = None) -> str:
+    """
+    Sanitize HPO study semantic suffix (minimal - just make it valid for MLflow).
+    
+    Only performs minimal sanitization needed for valid MLflow run names:
+    - Replaces spaces and slashes
+    - Removes problematic characters
+    - Truncates to max_length
+    
+    Does NOT strip hpo_ prefix or model name - preserves user's explicit study_name.
+
+    Args:
+        study_name: Study name to sanitize.
+        max_length: Maximum length for the suffix.
+        model: Optional model name (unused - kept for compatibility).
+
+    Returns:
+        Sanitized suffix (empty string if disabled or invalid).
+    """
+    if not study_name:
+        return ""
+
+    # Minimal sanitization: just make it valid for MLflow run names
+    label = study_name
+
+    # Replace spaces and slashes
+    label = label.replace(" ", "").replace("/", "-")
+
+    # Remove problematic characters (keep alphanumeric, underscore, hyphen)
+    label = re.sub(r'[^\w\-]', '', label)
+
+    # Truncate to max_length
+    if len(label) > max_length:
+        label = label[:max_length]
+
+    # Add underscore prefix if non-empty
+    if label:
+        return f"_{label}"
+
+    return ""
 
 def _short(value: Optional[str], length: int = 8, default: str = "unknown") -> str:
     """Return a short hash of specified length or a default if missing."""
@@ -308,8 +347,6 @@ def extract_component(
         max_length = component_config.get("max_length", 30)
         enabled = component_config.get("enabled", True)
         if enabled and value:
-            # Lazy import to avoid circular dependency (single source of truth)
-            from orchestration.jobs.tracking.naming.policy import sanitize_semantic_suffix
             # Pass model name to avoid duplication (e.g., "distilbert" in study_name)
             model_name = context.model if hasattr(context, "model") else None
             return sanitize_semantic_suffix(value, max_length, model=model_name)
@@ -366,7 +403,8 @@ def format_run_name(
     # Load policy if not provided
     if policy is None:
         if config_dir is None:
-            config_dir = Path.cwd() / "config"
+            from infrastructure.paths.utils import infer_config_dir
+            config_dir = infer_config_dir()
         policy = load_naming_policy(config_dir)
 
     if not policy or "run_names" not in policy:

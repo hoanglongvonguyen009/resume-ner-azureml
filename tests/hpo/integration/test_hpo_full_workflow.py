@@ -175,17 +175,37 @@ patterns:
         mock_client = Mock()
         mock_client.create_run.side_effect = [mock_trial_run, mock_refit_run]
         
+        # Set up parent run with proper tags BEFORE creating the mock
+        # The tags need to be actual strings, not Mock objects
+        study_key_hash_value = "a" * 64  # 64-character hex string (simulated hash)
+        study_family_hash_value = "b" * 64
+        
+        # Create a proper data object with tags
+        mock_data = Mock()
+        mock_data.tags = {
+            "code.study_key_hash": study_key_hash_value,
+            "code.study_family_hash": study_family_hash_value,
+        }
+        mock_parent_run.data = mock_data
+        
         # Mock get_run to return parent run with proper tags
         def get_run_side_effect(run_id):
             if run_id == "hpo_parent_123":
-                mock_parent_run.data.tags = {
-                    "code.study_key_hash": "a" * 64,
-                    "code.study_family_hash": "b" * 64,
-                }
                 return mock_parent_run
             return mock_parent_run
         
         mock_client.get_run.side_effect = get_run_side_effect
+        
+        # Ensure active_run returns a run with proper tags (not Mock objects)
+        # This is needed because the code accesses mlflow.active_run().data.tags.get()
+        mock_active_run = Mock()
+        mock_active_run_data = Mock()
+        mock_active_run_data.tags = {
+            "code.study_key_hash": study_key_hash_value,
+            "code.study_family_hash": study_family_hash_value,
+        }
+        mock_active_run.data = mock_active_run_data
+        mock_mlflow.active_run.return_value = mock_active_run
         mock_client.set_tag = Mock()
         mock_client.log_metric = Mock()
         mock_client.log_param = Mock()

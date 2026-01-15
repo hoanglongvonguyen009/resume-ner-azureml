@@ -60,7 +60,8 @@ from infrastructure.naming.mlflow.run_keys import build_mlflow_run_key, build_ml
 from orchestration.jobs.tracking.index.run_index import update_mlflow_index
 from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
 from infrastructure.tracking.mlflow.trackers.base_tracker import BaseTracker
-from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path, get_mlflow_run_id
+from infrastructure.paths.utils import infer_config_dir
+from infrastructure.tracking.mlflow.utils import get_mlflow_run_id
 # Tag key imports moved to local scope where needed
 
 logger = get_logger(__name__)
@@ -122,7 +123,7 @@ class MLflowSweepTracker(BaseTracker):
                 tracking_uri = mlflow.get_tracking_uri()
 
                 # Infer config_dir from output_dir
-                config_dir = infer_config_dir_from_path(output_dir)
+                config_dir = infer_config_dir(path=output_dir)
 
                 # Compute grouping tags using centralized utilities
                 # Priority: 1) Compute v2 from configs (for new runs), 2) Fallback to v1
@@ -249,7 +250,7 @@ class MLflowSweepTracker(BaseTracker):
         max_trials = hpo_config["sampling"]["max_trials"]
 
         # Infer config_dir from output_dir
-        config_dir = infer_config_dir_from_path(output_dir)
+        config_dir = infer_config_dir(path=output_dir)
 
         # Mark parent run as sweep job for Azure ML UI
         from infrastructure.naming.mlflow.tag_keys import (
@@ -326,7 +327,7 @@ class MLflowSweepTracker(BaseTracker):
         # Infer config_dir if not provided
         if config_dir is None:
             # Use output_dir (or hpo_output_dir) for config inference
-            config_dir = infer_config_dir_from_path(output_dir)
+            config_dir = infer_config_dir(path=output_dir)
 
         try:
             # Count completed trials
@@ -582,7 +583,7 @@ class MLflowSweepTracker(BaseTracker):
                             f"(study_key_hash + trial_number + parentRunId): {best_run_id[:12]}..."
                         )
                         # Log it
-                        config_dir = infer_config_dir_from_path(output_dir)
+                        config_dir = infer_config_dir(path=output_dir)
                         from infrastructure.naming.mlflow.tag_keys import (
                             get_hpo_best_trial_number,
                             get_hpo_best_trial_run_id,
@@ -814,7 +815,7 @@ class MLflowSweepTracker(BaseTracker):
                         "Active MLflow run does not have 'info.run_id' attribute")
 
                 # Infer config_dir from checkpoint_dir
-                config_dir = infer_config_dir_from_path(checkpoint_dir)
+                config_dir = infer_config_dir(path=checkpoint_dir)
                 
                 # Use ArtifactUploader for unified checkpoint upload
                 uploader = ArtifactUploader(
@@ -952,7 +953,7 @@ class MLflowSweepTracker(BaseTracker):
             return
 
         # Infer config_dir from checkpoint_dir
-        config_dir = infer_config_dir_from_path(checkpoint_dir)
+        config_dir = infer_config_dir(path=checkpoint_dir)
 
         # Use ArtifactUploader for unified checkpoint upload
         try:

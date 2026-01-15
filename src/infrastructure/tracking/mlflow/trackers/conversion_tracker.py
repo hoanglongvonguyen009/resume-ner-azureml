@@ -83,8 +83,8 @@ class MLflowConversionTracker(BaseTracker):
         Start a MLflow run for model conversion.
         """
         # Infer config_dir from output_dir BEFORE creating run
-        from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
-        config_dir = infer_config_dir_from_path(output_dir)
+        from infrastructure.paths.utils import infer_config_dir
+        config_dir = infer_config_dir(path=output_dir)
 
         # Check if tracking is enabled for conversion stage BEFORE creating run
         from orchestration.jobs.tracking.config.loader import get_tracking_config
@@ -207,17 +207,17 @@ class MLflowConversionTracker(BaseTracker):
 
             # Infer config_dir to check tracking config
             # Try onnx_model_path first, then conversion_log_path, then fallback to current working directory
-            from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+            from infrastructure.paths.utils import infer_config_dir
             config_dir = None
             for path_to_check in [onnx_model_path, conversion_log_path]:
                 if path_to_check:
-                    config_dir = infer_config_dir_from_path(path_to_check)
+                    config_dir = infer_config_dir(path=path_to_check)
                     if config_dir.exists():
                         break
             
-            # Fallback handled by infer_config_dir_from_path if still None
+            # Fallback handled by infer_config_dir if still None
             if config_dir is None:
-                config_dir = infer_config_dir_from_path(None)
+                config_dir = infer_config_dir()
             
             from orchestration.jobs.tracking.config.loader import get_tracking_config
             tracking_config = get_tracking_config(config_dir=config_dir, stage="conversion")

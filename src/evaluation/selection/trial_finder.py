@@ -431,9 +431,8 @@ def find_best_trial_from_study(
                     from infrastructure.paths.parse import find_trial_by_hash
                     # Find project root and config_dir from hpo_backbone_dir
                     # hpo_backbone_dir is typically: outputs/hpo/{storage_env}/{model}
-                    # So we need to go up to project root
-                    # outputs/hpo/{storage_env}/{model} -> project_root
-                    project_root = hpo_backbone_dir.parent.parent.parent
+                    from infrastructure.paths.utils import find_project_root
+                    project_root = find_project_root(output_dir=hpo_backbone_dir)
                     config_dir = project_root / "config"
 
                     v2_trial_dir = find_trial_by_hash(
@@ -882,10 +881,9 @@ def select_champion_per_backbone(
     
     from infrastructure.naming.mlflow.tags_registry import load_tags_registry
     from pathlib import Path
-    # Infer config_dir - try current directory first, then parent
-    config_dir = Path.cwd() / "config"
-    if not config_dir.exists():
-        config_dir = Path.cwd().parent / "config"
+    from infrastructure.paths.utils import infer_config_dir
+    # Infer config_dir
+    config_dir = infer_config_dir()
     tags_registry = load_tags_registry(config_dir)
     backbone_tag = tags_registry.key("process", "backbone")
     stage_tag = tags_registry.key("process", "stage")

@@ -46,7 +46,7 @@ from infrastructure.naming.mlflow.run_keys import (
     build_mlflow_run_key_hash,
 )
 # Tag key imports moved to local scope where needed
-from infrastructure.paths import find_project_root
+from infrastructure.paths.utils import resolve_project_paths
 from training.execution import (
     MLflowConfig,
     TrainingOptions,
@@ -132,8 +132,18 @@ def run_refit_training(
         f"trial_number={trial_number}"
     )
 
-    # Derive project root from config_dir (needed for v2 path construction)
-    root_dir = find_project_root(config_dir)
+    # Use resolve_project_paths() to consolidate path resolution
+    # (needed for v2 path construction)
+    from infrastructure.paths.utils import resolve_project_paths
+    
+    root_dir, _ = resolve_project_paths(
+        config_dir=config_dir,  # Use provided config_dir
+    )
+    
+    # Fallback if resolution failed
+    if root_dir is None:
+        from infrastructure.paths.utils import find_project_root
+        root_dir = find_project_root(config_dir) if config_dir else Path.cwd()
 
     # Follow SSOT pattern: Retrieve from tags first, then compute as fallback
     # Priority 1: Use provided study_key_hash (should have been retrieved by caller)

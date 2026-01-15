@@ -30,7 +30,8 @@ def load_mlflow_config(config_dir: Optional[Path] = None) -> Dict[str, Any]:
     global _config_cache, _config_cache_path
     
     if config_dir is None:
-        config_dir = Path.cwd() / "config"
+        from infrastructure.paths.utils import infer_config_dir
+        config_dir = infer_config_dir()
     
     config_path = config_dir / "mlflow.yaml"
     

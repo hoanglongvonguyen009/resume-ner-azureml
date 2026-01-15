@@ -111,7 +111,16 @@ def resolve_training_checkpoint_path(
                 checkpoint_path = Path.cwd() / checkpoint_path
                 if not checkpoint_path.exists():
                     # Try relative to config directory
-                    config_dir = Path(config.get("_config_dir", Path.cwd() / "config"))
+                    # Use provided _config_dir from config if available, otherwise infer
+                    if config.get("_config_dir"):
+                        config_dir = Path(config.get("_config_dir"))
+                    else:
+                        from infrastructure.paths.utils import resolve_project_paths
+                        _, config_dir = resolve_project_paths(config_dir=None)
+                        # Fallback if inference failed
+                        if config_dir is None:
+                            from infrastructure.paths.utils import infer_config_dir
+                            config_dir = infer_config_dir()
                     checkpoint_path = config_dir.parent / source_path
             
             checkpoint_path = checkpoint_path.resolve()

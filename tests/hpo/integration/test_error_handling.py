@@ -27,6 +27,27 @@ except ImportError:
     pytest.skip("optuna not available", allow_module_level=True)
 
 
+def _create_minimal_training_config(config_dir: Path):
+    """Create minimal config files needed for training subprocess to start."""
+    # train.yaml - needs early_stopping section
+    train_yaml = config_dir / "train.yaml"
+    train_yaml.write_text("""training:
+  epochs: 1
+  early_stopping:
+    enabled: false
+""")
+    # model/distilbert.yaml
+    model_dir = config_dir / "model"
+    model_dir.mkdir(exist_ok=True)
+    model_yaml = model_dir / "distilbert.yaml"
+    model_yaml.write_text("model:\n  name: distilbert\n")
+    # data/resume_v1.yaml
+    data_dir = config_dir / "data"
+    data_dir.mkdir(exist_ok=True)
+    data_yaml = data_dir / "resume_v1.yaml"
+    data_yaml.write_text("data:\n  name: resume_v1\n")
+
+
 class TestTrialExecutionErrors:
     """Test error handling in trial execution."""
 
@@ -70,10 +91,32 @@ class TestTrialExecutionErrors:
             )
 
     def test_training_module_not_found(self, tmp_path):
-        """Test that missing training module raises RuntimeError."""
-        # Don't create src/training/__init__.py to simulate missing module
+        """Test that missing training module raises RuntimeError.
+        
+        Note: After refactoring, find_project_root() may fall back to actual project root
+        when tmp_path doesn't have src/ directory. This test now verifies the actual
+        behavior: the subprocess will fail when it can't find required files, but
+        verify_training_environment() should catch missing training module in isolated
+        test environments.
+        
+        For this test, we create a proper project structure in tmp_path so find_project_root
+        works correctly.
+        """
+        # Create proper project structure: tmp_path should be the project root
         config_dir = tmp_path / "config"
         config_dir.mkdir()
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        # Don't create src/training/__init__.py to simulate missing module
+        # But create other src subdirs so find_project_root recognizes it as project root
+        (src_dir / "common").mkdir()
+        (src_dir / "common" / "__init__.py").write_text("")
+        
+        # Create minimal config files needed for subprocess to start
+        _create_minimal_training_config(config_dir)
+        # Create dataset directory (needed for subprocess)
+        dataset_dir = tmp_path / "dataset"
+        dataset_dir.mkdir()
         output_dir = tmp_path / "outputs" / "hpo" / "local" / "distilbert" / "study-abc12345" / "trial-def67890"
         output_dir.mkdir(parents=True)
         
@@ -85,10 +128,11 @@ class TestTrialExecutionErrors:
         )
         
         # The executor will check for training module and raise RuntimeError
+        # verify_training_environment() is called before subprocess and should catch it
         with pytest.raises(RuntimeError, match="Training module not found"):
             executor.execute(
                 trial_params=trial_params,
-                dataset_path=str(tmp_path / "dataset"),
+                dataset_path=str(dataset_dir),
                 backbone="distilbert",
                 output_dir=output_dir,
                 train_config={"epochs": 1},
@@ -248,20 +292,22 @@ class TestCVOrchestratorErrors:
 class TestRefitExecutionErrors:
     """Test error handling in refit execution."""
 
-    @patch("training.hpo.execution.local.refit.execute_training_subprocess")
+    @patch("training.execution.subprocess_runner.execute_training_subprocess")
     @patch("training.hpo.execution.local.refit.mlflow")
     def test_refit_subprocess_failure(self, mock_mlflow, mock_execute, tmp_path):
         """Test that refit subprocess failure raises RuntimeError."""
         
-        # Mock subprocess to return non-zero exit code
-        mock_result = Mock()
-        mock_result.returncode = 1
-        mock_result.stdout = "Refit output"
-        mock_result.stderr = "Refit training failed: Out of memory"
-        mock_execute.return_value = mock_result
+        # Mock subprocess to raise RuntimeError on failure (matching actual behavior)
+        mock_execute.side_effect = RuntimeError(
+            "Training failed with return code 1\n"
+            "STDOUT: Refit output\n"
+            "STDERR: Refit training failed: Out of memory"
+        )
         
         config_dir = tmp_path / "config"
         config_dir.mkdir()
+        # Create minimal config files needed for refit to start
+        _create_minimal_training_config(config_dir)
         output_dir = tmp_path / "outputs" / "hpo" / "local" / "distilbert" / "study-aaaaaaaa"
         output_dir.mkdir(parents=True)
         
@@ -285,11 +331,22 @@ class TestRefitExecutionErrors:
             "backbone": "distilbert",
         }
         
-        # Refit may fail with different errors (training module not found, subprocess failure, etc.)
-        with pytest.raises((RuntimeError, FileNotFoundError), match="Refit training failed|Training module not found"):
+        # Create dataset directory and minimal project structure for refit
+        dataset_dir = tmp_path / "dataset"
+        dataset_dir.mkdir()
+        # Create project structure so find_project_root works
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        (src_dir / "training").mkdir()
+        (src_dir / "training" / "__init__.py").write_text("")
+        (src_dir / "common").mkdir()
+        (src_dir / "common" / "__init__.py").write_text("")
+        
+        # Refit should raise RuntimeError when subprocess fails
+        with pytest.raises(RuntimeError, match="Training failed with return code"):
             run_refit_training(
                 best_trial=best_trial,
-                dataset_path=str(tmp_path / "dataset"),
+                dataset_path=str(dataset_dir),
                 config_dir=config_dir,
                 backbone="distilbert",
                 output_dir=output_dir,
