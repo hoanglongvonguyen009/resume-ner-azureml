@@ -1,4 +1,32 @@
 """
+@meta
+name: artifact_acquisition
+type: utility
+domain: selection
+responsibility:
+  - Artifact acquisition utilities for best model selection
+  - Checkpoint acquisition with local-first priority
+  - Checkpoint validation and Azure ML compatibility
+inputs:
+  - Best run information
+  - Acquisition configuration
+  - MLflow run IDs
+outputs:
+  - Checkpoint directory paths
+tags:
+  - utility
+  - selection
+  - artifacts
+  - mlflow
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
+"""
 Artifact acquisition utilities for best model selection.
 
 This module provides robust checkpoint acquisition with local-first priority,
@@ -17,6 +45,8 @@ import shutil
 
 # Import unified acquisition system
 from evaluation.selection.artifact_unified.compat import acquire_best_model_checkpoint as _acquire_best_model_checkpoint_unified
+
+from .types import BestModelInfo
 
 
 def _extract_tar_gz(tar_path: Path, extract_to: Optional[Path] = None) -> Path:
@@ -313,7 +343,7 @@ def _get_azure_ml_info(config_dir: Path, root_dir: Path, tracking_uri: str) -> t
 
 
 def acquire_best_model_checkpoint(
-    best_run_info: Dict[str, Any],
+    best_run_info: BestModelInfo,
     root_dir: Path,
     config_dir: Path,
     acquisition_config: Dict[str, Any],

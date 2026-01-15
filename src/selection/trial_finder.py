@@ -1,3 +1,31 @@
+"""
+@meta
+name: trial_finder
+type: utility
+domain: selection
+responsibility:
+  - Find best trials from HPO studies or disk
+  - Extract trial information from Optuna studies
+  - Locate trial directories by hash or number
+inputs:
+  - Optuna study objects
+  - HPO output directories
+  - Trial metadata files
+outputs:
+  - Best trial information dictionaries
+tags:
+  - utility
+  - selection
+  - hpo
+  - optuna
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Find best trials from HPO studies or disk.
 
 This module provides utilities to locate and extract best trial information
@@ -7,7 +35,7 @@ from Optuna studies or from saved outputs on disk.
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from common.shared.logging_utils import get_logger
 
@@ -15,13 +43,18 @@ from training.hpo.core.study import extract_best_config_from_study
 from .disk_loader import load_best_trial_from_disk
 from training.hpo.utils.paths import resolve_hpo_output_dir
 
+if TYPE_CHECKING:
+    from optuna import Study, Trial
+
+from .types import TrialInfo
+
 logger = get_logger(__name__)
 
 
 def find_best_trial_in_study_folder(
     study_folder: Path,
     objective_metric: str = "macro-f1",
-) -> Optional[Dict[str, Any]]:
+) -> Optional[TrialInfo]:
     """
     Find best trial in a specific study folder by reading metrics.json files.
 
@@ -254,14 +287,14 @@ def find_study_folder_in_backbone_dir(backbone_dir: Path) -> Optional[Path]:
 
 
 def find_best_trial_from_study(
-    study: Any,
+    study: "Study",
     backbone_name: str,
     dataset_version: str,
     objective_metric: str,
     hpo_backbone_dir: Path,
     hpo_config: Optional[Dict[str, Any]] = None,
     data_config: Optional[Dict[str, Any]] = None,
-) -> Optional[Dict[str, Any]]:
+) -> Optional[TrialInfo]:
     """
     Find best trial from an Optuna study object.
 
@@ -315,7 +348,7 @@ def find_best_trial_from_study(
         study_key_hash: Optional[str] = None
         if hpo_config and data_config:
             try:
-                from infrastructure.tracking.mlflow.naming import (
+                from infrastructure.naming.mlflow.hpo_keys import (
                     build_hpo_study_key,
                     build_hpo_study_key_hash,
                     build_hpo_trial_key,
@@ -359,7 +392,7 @@ def find_best_trial_from_study(
             if study_key_hash is None:
                 if hpo_config and data_config:
                     try:
-                        from infrastructure.tracking.mlflow.naming import (
+                        from infrastructure.naming.mlflow.hpo_keys import (
                             build_hpo_study_key,
                             build_hpo_study_key_hash,
                         )
@@ -521,12 +554,12 @@ def find_best_trial_from_study(
 
 def find_best_trials_for_backbones(
     backbone_values: list[str],
-    hpo_studies: Optional[Dict[str, Any]],
+    hpo_studies: Optional[Dict[str, "Study"]],
     hpo_config: Dict[str, Any],
     data_config: Dict[str, Any],
     root_dir: Path,
     environment: str,
-) -> Dict[str, Dict[str, Any]]:
+) -> Dict[str, TrialInfo]:
     """
     Find best trials for multiple backbones.
     """

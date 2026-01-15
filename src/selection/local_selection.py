@@ -31,7 +31,7 @@ This module provides a facade for configuration selection, delegating to
 specialized modules for study extraction, disk loading, and selection logic.
 """
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from common.shared.logging_utils import get_logger
 
@@ -40,7 +40,13 @@ from orchestration.jobs.errors import SelectionError
 from .selection_logic import MODEL_SPEED_SCORES, SelectionLogic
 from training.hpo.core.study import extract_best_config_from_study
 
+if TYPE_CHECKING:
+    from optuna import Study
+
 logger = get_logger(__name__)
+
+# Default speed score fallback when benchmark data is unavailable
+DEFAULT_SPEED_SCORE = 10.0
 
 def _import_optuna() -> Any:
     """Lazy import optuna - only import when actually needed for local execution."""
@@ -64,7 +70,7 @@ __all__ = [
 ]
 
 def select_best_configuration_across_studies(
-    studies: Optional[Dict[str, Any]] = None,
+    studies: Optional[Dict[str, "Study"]] = None,
     hpo_config: Optional[Dict[str, Any]] = None,
     dataset_version: Optional[str] = None,
     hpo_output_dir: Optional[Path] = None,
@@ -145,7 +151,7 @@ def select_best_configuration_across_studies(
             study, backbone, dataset_version, objective_metric)
 
         # Try to load benchmark data if hpo_output_dir is provided
-        speed_score = MODEL_SPEED_SCORES.get(backbone, 10.0)
+        speed_score = MODEL_SPEED_SCORES.get(backbone, DEFAULT_SPEED_SCORE)
         speed_data_source = "parameter_proxy"
         benchmark_latency = None
 
@@ -270,7 +276,7 @@ def select_best_from_disk(
                 speed_score = benchmark_latency
                 speed_data_source = "benchmark"
             else:
-                speed_score = MODEL_SPEED_SCORES.get(backbone, 10.0)
+                speed_score = MODEL_SPEED_SCORES.get(backbone, DEFAULT_SPEED_SCORE)
                 speed_data_source = "parameter_proxy"
 
             # Build config dictionary matching Optuna-based format

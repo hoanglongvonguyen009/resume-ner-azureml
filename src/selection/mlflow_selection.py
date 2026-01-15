@@ -1,5 +1,33 @@
 from __future__ import annotations
 
+"""
+@meta
+name: mlflow_selection
+type: utility
+domain: selection
+responsibility:
+  - MLflow-based best model selection from benchmark and training runs
+  - Join benchmark runs with training runs using hash-based matching
+  - Compute composite scores (F1 + latency)
+inputs:
+  - Benchmark experiment (name, id)
+  - HPO experiments (backbone -> experiment info)
+  - Tags configuration
+  - Selection configuration
+outputs:
+  - Best model information dictionary
+tags:
+  - utility
+  - selection
+  - mlflow
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: true
+lifecycle:
+  status: active
+"""
+
 """MLflow-based best model selection from benchmark and training runs."""
 
 from typing import Any, Dict, Optional, Tuple, Union
@@ -9,7 +37,15 @@ from mlflow.tracking import MlflowClient
 from common.shared.logging_utils import get_logger
 from infrastructure.naming.mlflow.tags_registry import TagsRegistry
 
+from .types import BestModelInfo
+
 logger = get_logger(__name__)
+
+# Maximum number of benchmark runs to query from MLflow
+MAX_BENCHMARK_RUNS = 2000
+
+# Maximum number of HPO runs to query from MLflow
+MAX_HPO_RUNS = 5000
 
 
 def find_best_model_from_mlflow(
@@ -18,7 +54,7 @@ def find_best_model_from_mlflow(
     tags_config: Union[TagsRegistry, Dict[str, Any]],
     selection_config: Dict[str, Any],
     use_python_filtering: bool = True,
-) -> Optional[Dict[str, Any]]:
+) -> Optional[BestModelInfo]:
     """
     Find best model by joining benchmark runs with training (refit) runs.
 
@@ -112,7 +148,7 @@ def find_best_model_from_mlflow(
     all_benchmark_runs = client.search_runs(
         experiment_ids=[benchmark_experiment["id"]],
         filter_string="",
-        max_results=2000,
+        max_results=MAX_BENCHMARK_RUNS,
     )
 
     # Filter for finished runs in Python (more reliable than MLflow filter on Azure ML)
@@ -150,7 +186,7 @@ def find_best_model_from_mlflow(
         all_hpo_runs = client.search_runs(
             experiment_ids=[exp_info["id"]],
             filter_string="",
-            max_results=5000,
+            max_results=MAX_HPO_RUNS,
         )
 
         # Filter for finished runs in Python

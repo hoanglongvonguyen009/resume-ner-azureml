@@ -1,5 +1,32 @@
 from __future__ import annotations
 
+"""
+@meta
+name: disk_loader
+type: utility
+domain: selection
+responsibility:
+  - Load trial data from disk-based HPO outputs
+  - Read metrics and benchmark data from trial directories
+  - Support v2 path structures
+inputs:
+  - HPO output directories
+  - Trial directories
+  - Metrics and benchmark JSON files
+outputs:
+  - Trial information dictionaries
+tags:
+  - utility
+  - selection
+  - disk-io
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Load trial data from disk-based HPO outputs."""
 
 import json
@@ -8,6 +35,8 @@ from typing import Any, Dict, Optional
 
 from common.shared.logging_utils import get_logger
 from infrastructure.paths import parse_hpo_path_v2, is_v2_path
+
+from .types import TrialInfo
 
 logger = get_logger(__name__)
 
@@ -45,7 +74,7 @@ def load_best_trial_from_disk(
     hpo_output_dir: Path,
     backbone: str,
     objective_metric: str = "macro-f1",
-) -> Optional[Dict[str, Any]]:
+) -> Optional[TrialInfo]:
     """
     Load best trial configuration from saved HPO outputs on disk.
 

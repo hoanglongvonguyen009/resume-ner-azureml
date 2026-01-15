@@ -35,7 +35,12 @@ from .disk_loader import load_benchmark_speed_score, load_best_trial_from_disk
 from orchestration.jobs.errors import SelectionError
 from training.hpo.core.study import extract_best_config_from_study
 
+from .types import CandidateInfo
+
 logger = get_logger(__name__)
+
+# Large fallback value for fold index when fold number cannot be extracted
+FOLD_INDEX_NOT_FOUND = 10**9
 
 # Model speed characteristics (parameter count as proxy for inference speed)
 MODEL_SPEED_SCORES = {
@@ -47,7 +52,7 @@ class SelectionLogic:
     """Handles selection logic for best configuration."""
 
     @staticmethod
-    def normalize_speed_scores(candidates: List[Dict[str, Any]]) -> None:
+    def normalize_speed_scores(candidates: List[CandidateInfo]) -> None:
         """
         Normalize speed scores relative to fastest model.
 
@@ -63,11 +68,11 @@ class SelectionLogic:
 
     @staticmethod
     def apply_threshold(
-        candidates: List[Dict[str, Any]],
+        candidates: List[CandidateInfo],
         accuracy_threshold: Optional[float],
         use_relative_threshold: bool,
         min_accuracy_gain: Optional[float],
-    ) -> tuple[Dict[str, Any], str]:
+    ) -> tuple[CandidateInfo, str]:
         """
         Apply accuracy-speed tradeoff threshold to select best candidate.
 
@@ -132,7 +137,7 @@ class SelectionLogic:
 
     @staticmethod
     def select_best(
-        candidates: List[Dict[str, Any]],
+        candidates: List[CandidateInfo],
         accuracy_threshold: Optional[float],
         use_relative_threshold: bool,
         min_accuracy_gain: Optional[float],

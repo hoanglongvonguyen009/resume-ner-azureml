@@ -1,5 +1,33 @@
 from __future__ import annotations
 
+"""
+@meta
+name: study_summary
+type: utility
+domain: selection
+responsibility:
+  - Display and summarize HPO study results
+  - Load Optuna studies from disk
+  - Format trial summaries for display
+inputs:
+  - Optuna study objects
+  - HPO output directories
+  - Trial metadata files
+outputs:
+  - Formatted study summaries
+tags:
+  - utility
+  - selection
+  - hpo
+  - optuna
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Utilities for displaying and summarizing HPO study results.
 
 This module provides functions to load Optuna studies, extract trial information,
@@ -8,17 +36,20 @@ and format summaries for display in notebooks or logs.
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, TYPE_CHECKING
 
 from common.shared.logging_utils import get_logger
 
 from training.hpo.utils.paths import resolve_hpo_output_dir
 from training.hpo.checkpoint.storage import resolve_storage_path
 
+if TYPE_CHECKING:
+    from optuna import Trial
+
 logger = get_logger(__name__)
 
 
-def extract_cv_statistics(best_trial: Any) -> Optional[Tuple[float, float]]:
+def extract_cv_statistics(best_trial: "Trial") -> Optional[Tuple[float, float]]:
     """Extract CV statistics from Optuna trial user attributes.
 
     Args:
@@ -63,7 +94,7 @@ def load_study_from_disk(
     root_dir: Path,
     environment: str,
     hpo_config: Dict[str, Any],
-) -> Optional[Any]:
+) -> Optional["Study"]:
     """Load Optuna study from disk if not in memory.
 
     Args:
@@ -209,7 +240,7 @@ def format_study_summary_line(
 
 
 def print_study_summaries(
-    hpo_studies: Optional[Dict[str, Any]],
+    hpo_studies: Optional[Dict[str, "Study"]],
     backbone_values: list[str],
     hpo_config: Dict[str, Any],
     root_dir: Path,

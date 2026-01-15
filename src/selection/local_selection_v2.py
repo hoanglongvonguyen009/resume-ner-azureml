@@ -1,5 +1,33 @@
 from __future__ import annotations
 
+"""
+@meta
+name: local_selection_v2
+type: utility
+domain: selection
+responsibility:
+  - Improved best configuration selection from local Optuna HPO studies
+  - Config-aware study folder discovery
+  - CV-based trial selection with deterministic fold ordering
+inputs:
+  - HPO study directories
+  - HPO configuration
+  - Trial metadata files
+outputs:
+  - Best selected configuration
+tags:
+  - utility
+  - selection
+  - hpo
+  - optuna
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Improved best configuration selection from local Optuna HPO studies.
 
 This module provides config-aware study folder discovery and CV-based trial selection.
@@ -20,6 +48,11 @@ import json
 import re
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+
+from .types import TrialInfo
+
+# Large fallback value for fold index when fold number cannot be extracted
+FOLD_INDEX_NOT_FOUND = 10**9
 
 
 def parse_version_from_name(name: str) -> Optional[Tuple[int, int, int]]:
@@ -43,7 +76,7 @@ def parse_version_from_name(name: str) -> Optional[Tuple[int, int, int]]:
 def fold_index(name: str) -> int:
     """Extract numeric fold index from folder name (e.g., 'fold0' -> 0, 'fold10' -> 10)."""
     m = re.search(r'fold(\d+)', name)
-    return int(m.group(1)) if m else 10**9
+    return int(m.group(1)) if m else FOLD_INDEX_NOT_FOUND
 
 
 def find_study_folder_by_config(
@@ -151,7 +184,7 @@ def find_study_folder_by_config(
 def load_best_trial_from_study_folder(
     study_folder: Path,
     objective_metric: str = "macro-f1",
-) -> Optional[Dict[str, Any]]:
+) -> Optional[TrialInfo]:
     """
     Load best trial from a specific study folder.
 

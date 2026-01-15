@@ -1,5 +1,34 @@
 from __future__ import annotations
 
+"""
+@meta
+name: cache
+type: utility
+domain: selection
+responsibility:
+  - Cache management for best model selection
+  - Validate cached selections against MLflow runs
+  - Save and load selection cache with dual strategy
+inputs:
+  - Best model selection results
+  - MLflow experiment IDs
+  - Selection and tags configuration
+outputs:
+  - Cached selection data
+  - Cache validation status
+tags:
+  - utility
+  - selection
+  - cache
+  - mlflow
+ci:
+  runnable: true
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: active
+"""
+
 """Cache management for best model selection with validation."""
 
 from datetime import datetime
@@ -14,7 +43,15 @@ from common.shared.hash_utils import compute_selection_cache_key, compute_json_h
 
 from common.shared.logging_utils import get_logger
 
+from .types import CacheData, BestModelInfo
+
 logger = get_logger(__name__)
+
+# Length of run ID to display in logs (first 12 characters)
+RUN_ID_DISPLAY_LENGTH = 12
+
+# Hash length for config hashes
+HASH_LENGTH = 16
 
 
 def load_cached_best_model(
@@ -25,7 +62,7 @@ def load_cached_best_model(
     tags_config: Dict[str, Any],
     benchmark_experiment_id: str,
     tracking_uri: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
+) -> Optional[CacheData]:
     """
     Load cached best model selection if available and valid.
     
@@ -114,7 +151,7 @@ def load_cached_best_model(
             print(f"  ⚠ Cached best model missing run_id (corrupted cache)")
             return None
         
-        print(f"  ✓ Validating MLflow run: {run_id[:12]}...")
+        print(f"  ✓ Validating MLflow run: {run_id[:RUN_ID_DISPLAY_LENGTH]}...")
         
         try:
             client = MlflowClient()
@@ -134,17 +171,17 @@ def load_cached_best_model(
             
             print(f"\n✓ Cache validation successful - reusing cached best model selection")
             print(f"  Cache timestamp: {cache_data.get('timestamp')}")
-            print(f"  Run ID: {run_id[:12]}...")
+            print(f"  Run ID: {run_id[:RUN_ID_DISPLAY_LENGTH]}...")
             print(f"  Backbone: {best_model.get('backbone', 'unknown')}")
-            logger.info(f"Using cached best model selection: run_id={run_id[:12]}...")
+            logger.info(f"Using cached best model selection: run_id={run_id[:RUN_ID_DISPLAY_LENGTH]}...")
             from typing import cast
-            return cast(Dict[str, Any], cache_data)
+            return cast(CacheData, cache_data)
             
         except Exception as e:
             print(f"  ⚠ Could not validate MLflow run: {e}")
             print(f"    Run may have been deleted or MLflow is unreachable")
             print(f"    Will query MLflow for fresh selection")
-            logger.warning(f"Cache validation failed for run {run_id[:12]}...: {e}")
+            logger.warning(f"Cache validation failed for run {run_id[:RUN_ID_DISPLAY_LENGTH]}...: {e}")
             return None
             
     except Exception as e:
@@ -157,7 +194,7 @@ def load_cached_best_model(
 def save_best_model_cache(
     root_dir: Path,
     config_dir: Path,
-    best_model: Dict[str, Any],
+    best_model: BestModelInfo,
     experiment_name: str,
     selection_config: Dict[str, Any],
     tags_config: Dict[str, Any],
@@ -191,8 +228,8 @@ def save_best_model_cache(
     )
     
     # Compute config hashes for reference
-    selection_config_hash = compute_json_hash(selection_config, length=16)
-    tags_config_hash = compute_json_hash(tags_config, length=16)
+    selection_config_hash = compute_json_hash(selection_config, length=HASH_LENGTH)
+    tags_config_hash = compute_json_hash(tags_config, length=HASH_LENGTH)
     
     # Prepare cache payload
     backbone = best_model.get("backbone", "unknown")
