@@ -7,7 +7,7 @@ import pytest
 from orchestration.naming_centralized import NamingContext, build_output_path
 from infrastructure.naming.mlflow.run_names import build_mlflow_run_name
 from infrastructure.naming.mlflow.tags import build_mlflow_tags
-from orchestration.paths import resolve_output_path
+from infrastructure.paths import resolve_output_path
 
 
 @pytest.fixture

@@ -48,11 +48,10 @@ from common.constants import (
     DEFAULT_K_FOLDS,
 )
 
-# Paths - these remain in orchestration/paths.py (facade to paths module)
-from .paths import (
+# Paths - import directly from infrastructure.paths (no longer via deprecated facade)
+from infrastructure.paths import (
     load_paths_config,
     resolve_output_path,
-    resolve_output_path_v2,
     get_cache_file_path,
     get_timestamped_cache_filename,
     get_cache_strategy_config,
@@ -61,8 +60,10 @@ from .paths import (
     get_drive_backup_base,
     get_drive_backup_path,
 )
+# Import resolve_output_path_v2 from legacy facade (deprecated, not used)
+from .paths import resolve_output_path_v2
 
-# Storage - moved to infrastructure.storage module
+# Storage - moved to infrastructure.storage module (no longer via deprecated facade)
 from infrastructure.storage import (
     DriveBackupStore,
     BackupResult,

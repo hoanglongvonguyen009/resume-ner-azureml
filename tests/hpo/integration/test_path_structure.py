@@ -5,7 +5,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from orchestration.paths import resolve_output_path, is_v2_path, find_study_by_hash, find_trial_by_hash
+from infrastructure.paths import resolve_output_path, is_v2_path, find_study_by_hash, find_trial_by_hash
 from orchestration.naming_centralized import create_naming_context, build_output_path
 
 

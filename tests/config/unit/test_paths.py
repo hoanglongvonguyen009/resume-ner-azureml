@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from orchestration.paths import (
+from infrastructure.paths import (
     load_paths_config,
     resolve_output_path,
     get_cache_file_path,

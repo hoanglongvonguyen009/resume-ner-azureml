@@ -76,6 +76,9 @@ def get_drive_backup_path(
     Only paths within outputs/ can be backed up. The function automatically
     mirrors the exact same directory structure from outputs/ to Drive.
 
+    This function uses DriveBackupStore.drive_path_for() internally to eliminate
+    code duplication while maintaining backward compatibility.
+
     Args:
         root_dir: Project root directory.
         config_dir: Config directory.
@@ -91,36 +94,29 @@ def get_drive_backup_path(
         Local: outputs/cache/best_configurations/latest_best_configuration.json
         Drive:  /content/drive/MyDrive/resume-ner-checkpoints/outputs/cache/best_configurations/latest_best_configuration.json
     """
-    paths_config = load_paths_config(config_dir)
-    drive_config = paths_config.get("drive", {})
-
-    if not drive_config:
-        return None
-
-    # Get the base outputs directory
-    base_outputs = paths_config["base"]["outputs"]
-    base_outputs_path = Path(base_outputs)
-    outputs_dir = (
-        base_outputs_path if base_outputs_path.is_absolute() else root_dir / base_outputs
-    )
-    base_outputs_name = base_outputs_path.name if base_outputs_path.is_absolute() else base_outputs
-
-    # Check if the local path is within outputs/
-    try:
-        relative_path = local_path.relative_to(outputs_dir)
-    except ValueError:
-        # Path is not within outputs/, can't mirror it
-        return None
-
-    # Get Drive base directory
+    # Get Drive base directory from config
     drive_base = get_drive_backup_base(config_dir)
     if not drive_base:
         return None
 
-    # Build Drive path: mount_point/MyDrive/backup_base/outputs/relative_path
-    drive_path = drive_base / base_outputs_name / relative_path
+    # Import DriveBackupStore here to avoid circular import
+    # (infrastructure.storage.drive imports get_drive_backup_base from this module)
+    from infrastructure.storage.drive import DriveBackupStore
 
-    return drive_path
+    # Create DriveBackupStore instance to use its path mapping logic
+    # This consolidates duplicate path mapping code
+    try:
+        store = DriveBackupStore(
+            root_dir=root_dir,
+            backup_root=drive_base,
+            only_outputs=True  # Enforce outputs/ restriction
+        )
+        # Use DriveBackupStore's path mapping (SSOT)
+        return store.drive_path_for(local_path)
+    except ValueError:
+        # Path is outside root_dir or outside outputs/ - return None
+        # (DriveBackupStore raises ValueError, but this function returns None for backward compatibility)
+        return None
 
 
 def resolve_output_path_for_colab(
