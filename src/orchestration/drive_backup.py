@@ -15,7 +15,7 @@ from infrastructure.storage.drive import (
     create_colab_store,
             )
 # Also re-export get_drive_backup_base from paths for backward compatibility
-    from infrastructure.paths import get_drive_backup_base
+from infrastructure.paths import get_drive_backup_base
 
 __all__ = [
     "Path",

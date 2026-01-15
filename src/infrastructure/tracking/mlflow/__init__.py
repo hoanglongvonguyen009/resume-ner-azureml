@@ -47,7 +47,7 @@ from .urls import get_mlflow_run_url
 from .utils import retry_with_backoff, get_mlflow_run_id
 
 # Export setup utilities
-from .setup import setup_mlflow_for_stage
+from .setup import setup_mlflow
 
 __all__ = [
     # Compatibility
@@ -76,6 +76,6 @@ __all__ = [
     "retry_with_backoff",
     "get_mlflow_run_id",
     # Setup
-    "setup_mlflow_for_stage",
+    "setup_mlflow",
 ]
 

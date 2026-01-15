@@ -4,6 +4,13 @@ This module provides backward compatibility by re-exporting from evaluation.sele
 
 DEPRECATED: Use 'from evaluation.selection import ...' instead.
 This shim will be removed in 2 releases.
+
+Note: This module contains unique logic in:
+- selection.py: AzureML sweep job selection (not a wrapper)
+- selection_logic.py: Selection algorithm logic (not a wrapper)
+- types.py: Type definitions used by selection modules
+
+All other submodules are proxied to evaluation.selection.* equivalents.
 """
 
 import sys
@@ -61,10 +68,12 @@ if not _finder_installed:
     sys.meta_path.insert(0, SelectionSubmoduleFinder())
 
 # Create submodule proxies for backward compatibility
-# Note: mlflow_selection has a local wrapper file, so it's handled by the finder
+# Note: selection.py and selection_logic.py contain unique logic (not wrappers) and are kept.
+# All other submodules are proxied to evaluation.selection.*
 _submodules = [
-    'selection_logic',
-    # 'mlflow_selection',  # Has local wrapper file - handled by finder
+    'selection_logic',  # Unique logic - kept
+    'selection',  # Unique AzureML logic - kept
+    # Deprecated wrapper modules removed - now proxied to evaluation.selection.*
     'artifact_acquisition',
     'cache',
     'local_selection',
@@ -72,7 +81,7 @@ _submodules = [
     'disk_loader',
     'trial_finder',
     'study_summary',
-    'selection',
+    'mlflow_selection',
 ]
 
 def _create_submodule_proxy(name: str) -> ModuleType:

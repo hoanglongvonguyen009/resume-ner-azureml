@@ -41,6 +41,7 @@ from typing import Any, Dict, Optional
 
 import mlflow
 from common.shared.logging_utils import get_logger
+from infrastructure.paths import find_project_root
 
 # Lazy import to avoid circular dependency
 def _get_read_trial_metrics():
@@ -100,7 +101,7 @@ class TrialExecutor:
             Objective metric value (e.g., macro-f1).
         """
         # Find project root (parent of config_dir)
-        root_dir = self._find_project_root(self.config_dir)
+        root_dir = find_project_root(self.config_dir)
         src_dir = root_dir / "src"
 
         # Build command
@@ -180,24 +181,6 @@ class TrialExecutor:
 
         return metric_value
 
-    def _find_project_root(self, config_dir: Path) -> Path:
-        """Find project root directory by walking up from config_dir."""
-        candidate_root = config_dir.parent
-        max_depth = 5
-        depth = 0
-        while depth < max_depth:
-            if (candidate_root / "src").exists() and (candidate_root / "src" / "training").exists():
-                return candidate_root
-            candidate_root = candidate_root.parent
-            depth += 1
-
-        # Fallback: assume config_dir is project_root/config
-        root_dir = config_dir.parent
-        logger.warning(
-            f"[TRIAL] Could not find project root with src/training/ directory after {max_depth} levels. "
-            f"Using {root_dir} as root_dir. Config_dir: {config_dir}"
-        )
-        return root_dir
 
     def _build_command(
         self,

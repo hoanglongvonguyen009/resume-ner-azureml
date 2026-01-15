@@ -160,10 +160,9 @@ def _try_systematic_naming(
         from common.shared.platform_detection import detect_platform
 
         # Infer config_dir if not provided
-        if config_dir is None and output_dir:
-            config_dir = _infer_config_dir_from_output(output_dir)
-        elif config_dir is None:
-            config_dir = Path(os.environ.get("CONFIG_DIR", Path.cwd() / "config"))
+        if config_dir is None:
+            from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+            config_dir = infer_config_dir_from_path(output_dir)
 
         # Build naming context based on process type
         if process_type == "final_training":
@@ -336,24 +335,4 @@ def _build_hpo_trial_fallback_name(
         return f"{env}_{model_name}_hpo_trial_study-{study_hash_short}_{trial_num_str}"
 
 
-def _infer_config_dir_from_output(output_dir: Path) -> Optional[Path]:
-    """
-    Infer config directory from output directory.
-
-    Looks for config/ directory by going up from outputs/ to root.
-
-    Args:
-        output_dir: Output directory path.
-
-    Returns:
-        Config directory path if found, None otherwise.
-    """
-    current = output_dir
-    for _ in range(5):  # Limit search depth
-        if current.name == "outputs" and (current.parent / "config").exists():
-            return current.parent / "config"
-        current = current.parent
-        if not current or current == current.parent:  # Reached root
-            break
-    return None
 

@@ -47,6 +47,8 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from evaluation.selection.local_selection_v2 import _get_checkpoint_path_from_trial_dir
+
 def parse_version_from_name(name: str) -> Optional[Tuple[int, int, int]]:
     """
     Parse version from folder name like 'hpo_distilbert_smoke_test_3.69' or 'hpo_distilbert_smoke_test_3.69_1'.
@@ -374,84 +376,6 @@ def write_active_study_marker(
         logger = logging.getLogger(__name__)
         logger.warning(f"Could not write .active_study.json: {e}")
 
-def _get_checkpoint_path_from_trial_dir(trial_dir: Path) -> Optional[Path]:
-    """
-    Get checkpoint path from trial directory.
-    
-    Prefers:
-    1. refit/checkpoint/ (if refit training completed)
-    2. cv/foldN/checkpoint/ (best CV fold based on metrics)
-    3. checkpoint/ (fallback)
-    
-    Args:
-        trial_dir: Path to trial directory
-        
-    Returns:
-        Path to checkpoint directory, or None if not found
-    """
-    if not trial_dir.exists():
-        return None
-    
-    # 1. Check for refit checkpoint
-    refit_checkpoint = trial_dir / "refit" / "checkpoint"
-    if refit_checkpoint.exists():
-        return refit_checkpoint
-    
-    # 2. Check for CV fold checkpoints
-    cv_dir = trial_dir / "cv"
-    if cv_dir.exists():
-        # Find all fold directories
-        fold_dirs = []
-        for item in cv_dir.iterdir():
-            if item.is_dir():
-                import re
-                if re.match(r"fold_?\d+", item.name):
-                    fold_dirs.append(item)
-        
-        if fold_dirs:
-            # Try to find the best fold by looking for metrics.json
-            best_fold = None
-            best_score = None
-            
-            for fold_dir in fold_dirs:
-                metrics_file = fold_dir / "metrics.json"
-                if metrics_file.exists():
-                    try:
-                        with open(metrics_file, "r") as f:
-                            metrics = json.load(f)
-                        # Look for macro-f1 or first numeric metric
-                        score = metrics.get("macro-f1")
-                        if score is None:
-                            # Try to find first numeric value
-                            for key, value in metrics.items():
-                                if isinstance(value, (int, float)):
-                                    score = value
-                                    break
-                        
-                        if score is not None and (best_score is None or score > best_score):
-                            best_score = score
-                            best_fold = fold_dir
-                    except Exception:
-                        continue
-            
-            # Use best fold if found, otherwise use first fold
-            if best_fold:
-                checkpoint = best_fold / "checkpoint"
-                if checkpoint.exists():
-                    return checkpoint
-            
-            # Fallback: try all folds in order
-            for fold_dir in fold_dirs:
-                checkpoint = fold_dir / "checkpoint"
-                if checkpoint.exists():
-                    return checkpoint
-    
-    # 3. Fallback: check root checkpoint
-    root_checkpoint = trial_dir / "checkpoint"
-    if root_checkpoint.exists():
-        return root_checkpoint
-    
-    return None
 
 def find_trial_checkpoint_by_hash(
     hpo_backbone_dir: Path,

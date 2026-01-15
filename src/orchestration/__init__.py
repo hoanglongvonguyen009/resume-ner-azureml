@@ -103,7 +103,7 @@ from infrastructure.metadata import (
 )
 
 # MLflow utils - moved to tracking/mlflow/setup.py
-from infrastructure.tracking.mlflow.setup import setup_mlflow_for_stage
+from infrastructure.tracking.mlflow.setup import setup_mlflow
 
 # Benchmarking - moved to evaluation.benchmarking module
 # Use lazy import via __getattr__ to avoid circular dependencies during module initialization
@@ -207,7 +207,7 @@ __all__ = [
     "find_by_model",
     "find_by_spec_and_env",
     "get_latest_entry",
-    "setup_mlflow_for_stage",
+    "setup_mlflow",
     "run_benchmarking",
     # Final training config (may be None if PyTorch not available)
     "load_final_training_config",

@@ -218,27 +218,5 @@ def _set_azureml_artifact_timeout() -> None:
         )
 
 
-def setup_mlflow_for_stage(
-    experiment_name: str,
-    tracking_uri: Optional[str] = None
-) -> None:
-    """Setup MLflow tracking for a specific stage (legacy wrapper).
-
-    **Deprecated**: Use `setup_mlflow()` instead for new code. This function
-    is kept for backward compatibility but delegates to `setup_mlflow()`.
-
-    Args:
-        experiment_name: MLflow experiment name.
-        tracking_uri: Optional tracking URI (uses default if None).
-    """
-    setup_mlflow(
-        experiment_name=experiment_name,
-        tracking_uri=tracking_uri,
-        fallback_to_local=True,
-    )
-
-
-
-
 
 

@@ -11,7 +11,9 @@ Eliminate duplication in core utility scripts (tagged `core` in metadata) by:
 
 ## Status
 
-**Last Updated**: 2026-01-27
+**Last Updated**: 2026-01-15
+
+**Status**: ✅ **ALL STEPS COMPLETE** - Plan finished
 
 ### Completed Steps
 
@@ -23,7 +25,7 @@ Eliminate duplication in core utility scripts (tagged `core` in metadata) by:
 
 ### Pending Steps
 
-- ⏳ None (all plan steps complete)
+- None - All steps complete!
 
 ## Preconditions
 
@@ -153,6 +155,11 @@ Eliminate duplication in core utility scripts (tagged `core` in metadata) by:
 - Metadata follows same structure as other core utilities
 - `uvx mypy src/core/placeholders.py` passes with 0 errors
 
+**Completion Notes** (2026-01-15):
+- ✅ Metadata block added to `src/core/placeholders.py` with `core` tag
+- ✅ Metadata follows same structure as `tokens.py` and `normalize.py`
+- ✅ All core utilities now have consistent metadata blocks
+
 ---
 
 ### Step 2: Extend `core.normalize.normalize_for_name()` for simplified usage
@@ -179,6 +186,12 @@ Eliminate duplication in core utility scripts (tagged `core` in metadata) by:
 - `normalize_for_name(value, rules, return_warnings=True)` returns `Tuple[str, List[str]]` (backward compatible)
 - `uvx mypy src/core/normalize.py` passes with 0 errors
 - Existing callers using tuple unpacking continue to work
+
+**Completion Notes** (2026-01-15):
+- ✅ `return_warnings: bool = True` parameter added to `normalize_for_name()`
+- ✅ `@overload` decorators added for proper type hints (str vs Tuple[str, List[str]])
+- ✅ Implementation updated to conditionally return warnings
+- ✅ Backward compatibility maintained - existing callers continue to work
 
 ---
 
@@ -215,6 +228,13 @@ Eliminate duplication in core utility scripts (tagged `core` in metadata) by:
 - `uvx mypy src/` passes with 0 errors
 - `uvx pytest tests/` passes (verify no regressions)
 
+**Completion Notes** (2026-01-15):
+- ✅ Duplicate `normalize_value()` removed from `infrastructure.naming.display_policy`
+- ✅ Duplicate `normalize_value()` removed from `orchestration.jobs.tracking.naming.policy`
+- ✅ `infrastructure.naming.mlflow.policy.normalize_value()` updated to wrapper calling SSOT
+- ✅ All files import `normalize_for_name` from `core.normalize`
+- ✅ No duplicate implementations remain (only acceptable wrapper in mlflow/policy.py)
+
 ---
 
 ### Step 4: Remove deprecated backward-compatibility modules
@@ -245,6 +265,12 @@ Eliminate duplication in core utility scripts (tagged `core` in metadata) by:
 - `uvx mypy src/` passes with 0 errors
 - `uvx pytest tests/` passes
 
+**Completion Notes** (2026-01-15):
+- ✅ `src/orchestration/tokens.py` deleted
+- ✅ `src/orchestration/normalize.py` deleted
+- ✅ No imports from deprecated modules found in src/ or tests/
+- ✅ All code uses `core.tokens` and `core.normalize` directly
+
 ---
 
 ### Step 5: Verification and regression testing
@@ -263,6 +289,13 @@ Eliminate duplication in core utility scripts (tagged `core` in metadata) by:
 - ✅ No duplicate normalization logic remains
 - ✅ All core utilities have metadata blocks
 - ✅ Deprecated modules removed (if applicable)
+
+**Completion Notes** (2026-01-15):
+- ✅ All consolidation verified complete
+- ✅ No duplicate normalization logic remains
+- ✅ All core utilities have consistent metadata blocks
+- ✅ Deprecated modules removed
+- ✅ All imports updated to use SSOT functions
 
 ---
 
