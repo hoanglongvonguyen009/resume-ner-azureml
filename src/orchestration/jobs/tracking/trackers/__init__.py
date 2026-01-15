@@ -1,25 +1,15 @@
-"""MLflow tracker classes for different run types."""
+"""MLflow tracker classes for different run types.
 
-from orchestration.jobs.tracking.trackers.base_tracker import BaseTracker
-from orchestration.jobs.tracking.trackers.sweep_tracker import MLflowSweepTracker
-from orchestration.jobs.tracking.trackers.benchmark_tracker import MLflowBenchmarkTracker
-from orchestration.jobs.tracking.trackers.training_tracker import MLflowTrainingTracker
-from orchestration.jobs.tracking.trackers.conversion_tracker import MLflowConversionTracker
+This module re-exports tracker classes from infrastructure (SSOT) for backward compatibility.
+New code should import directly from infrastructure.tracking.mlflow.trackers.*
+"""
 
-__all__ = [
-    "BaseTracker",
-    "MLflowSweepTracker",
-    "MLflowBenchmarkTracker",
-    "MLflowTrainingTracker",
-    "MLflowConversionTracker",
-]
-
-
-from orchestration.jobs.tracking.trackers.base_tracker import BaseTracker
-from orchestration.jobs.tracking.trackers.sweep_tracker import MLflowSweepTracker
-from orchestration.jobs.tracking.trackers.benchmark_tracker import MLflowBenchmarkTracker
-from orchestration.jobs.tracking.trackers.training_tracker import MLflowTrainingTracker
-from orchestration.jobs.tracking.trackers.conversion_tracker import MLflowConversionTracker
+# Re-export all tracker classes from infrastructure (SSOT) for backward compatibility
+from infrastructure.tracking.mlflow.trackers.base_tracker import BaseTracker
+from infrastructure.tracking.mlflow.trackers.sweep_tracker import MLflowSweepTracker
+from infrastructure.tracking.mlflow.trackers.benchmark_tracker import MLflowBenchmarkTracker
+from infrastructure.tracking.mlflow.trackers.training_tracker import MLflowTrainingTracker
+from infrastructure.tracking.mlflow.trackers.conversion_tracker import MLflowConversionTracker
 
 __all__ = [
     "BaseTracker",

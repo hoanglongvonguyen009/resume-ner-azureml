@@ -36,9 +36,9 @@ from mlflow.tracking import MlflowClient
 
 from infrastructure.naming.context import NamingContext
 from infrastructure.tracking.mlflow.types import RunLookupReport
-from infrastructure.tracking.mlflow.naming import build_mlflow_run_key, build_mlflow_run_key_hash
-from infrastructure.tracking.mlflow.index import find_in_mlflow_index
-from infrastructure.tracking.mlflow.config_loader import get_run_finder_config
+from infrastructure.naming.mlflow.run_keys import build_mlflow_run_key, build_mlflow_run_key_hash
+from orchestration.jobs.tracking.index.run_index import find_in_mlflow_index
+from orchestration.jobs.tracking.config.loader import get_run_finder_config
 from common.shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -113,10 +113,10 @@ def find_mlflow_run(
             else:
                 logger.info(f"Found run via direct run_id: {run_id[:12]}...")
                 return RunLookupReport(
+                    found=True,
                     run_id=run_id,
-                    method="direct_run_id",
-                    experiment_id=experiment_id,
-                    run_name=run.info.run_name,
+                    strategy_used="direct_run_id",
+                    strategies_attempted=["direct_run_id"],
                 )
         except Exception as e:
             logger.warning(f"Direct run_id {run_id[:12]}... not found: {e}")
@@ -139,10 +139,10 @@ def find_mlflow_run(
                                 f"Found run via metadata.json: {metadata_run_id[:12]}..."
                             )
                             return RunLookupReport(
+                                found=True,
                                 run_id=metadata_run_id,
-                                method="metadata_json",
-                                experiment_id=experiment_id,
-                                run_name=run.info.run_name,
+                                strategy_used="metadata_json",
+                                strategies_attempted=["metadata_json"],
                             )
                     except Exception as e:
                         logger.debug(f"Run from metadata.json not found: {e}")
@@ -176,10 +176,10 @@ def find_mlflow_run(
                                 f"Found run via local index: {index_run_id[:12]}..."
                             )
                             return RunLookupReport(
+                                found=True,
                                 run_id=index_run_id,
-                                method="local_index",
-                                experiment_id=experiment_id,
-                                run_name=run.info.run_name,
+                                strategy_used="local_index",
+                                strategies_attempted=["local_index"],
                             )
                     except Exception as e:
                         logger.debug(f"Run from index not found: {e}")
@@ -203,10 +203,10 @@ def find_mlflow_run(
                         f"Found run via tag search (run_key_hash): {run.info.run_id[:12]}..."
                     )
                     return RunLookupReport(
+                        found=True,
                         run_id=run.info.run_id,
-                        method="tag_run_key_hash",
-                        experiment_id=experiment_id,
-                        run_name=run.info.run_name,
+                        strategy_used="tag_run_key_hash",
+                        strategies_attempted=["tag_run_key_hash"],
                     )
             except Exception as e:
                 logger.debug(f"Tag search by run_key_hash failed: {e}")
@@ -241,10 +241,10 @@ def find_mlflow_run(
                             f"Found run via tag search (context): {run.info.run_id[:12]}..."
                         )
                         return RunLookupReport(
+                            found=True,
                             run_id=run.info.run_id,
-                            method="tag_context",
-                            experiment_id=experiment_id,
-                            run_name=run.info.run_name,
+                            strategy_used="tag_context",
+                            strategies_attempted=["tag_context"],
                         )
                 except Exception as e:
                     logger.debug(f"Tag search by context failed: {e}")
@@ -264,10 +264,10 @@ def find_mlflow_run(
                         f"Found run via run_name tag: {run.info.run_id[:12]}..."
                     )
                     return RunLookupReport(
+                        found=True,
                         run_id=run.info.run_id,
-                        method="run_name_tag",
-                        experiment_id=experiment_id,
-                        run_name=run.info.run_name,
+                        strategy_used="run_name_tag",
+                        strategies_attempted=["run_name_tag"],
                     )
             except Exception as e:
                 logger.debug(f"Search by run_name failed: {e}")
@@ -285,23 +285,108 @@ def find_mlflow_run(
                     f"Using most recent run as fallback: {run.info.run_id[:12]}..."
                 )
                 return RunLookupReport(
+                    found=True,
                     run_id=run.info.run_id,
-                    method="most_recent_fallback",
-                    experiment_id=experiment_id,
-                    run_name=run.info.run_name,
+                    strategy_used="most_recent_fallback",
+                    strategies_attempted=["most_recent_fallback"],
                 )
         except Exception as e:
             logger.debug(f"Most recent run search failed: {e}")
     
     # No run found
+    strategies_attempted_list = ["direct_run_id", "metadata_json", "local_index", "tag_run_key_hash"]
+    if not strict:
+        strategies_attempted_list.extend(["tag_context", "run_name_tag", "most_recent_fallback"])
+    
     if strict:
         raise ValueError(
             f"Could not find run in experiment '{experiment_name}' "
             f"using strict mode (tried priorities 1-4)"
         )
     else:
-        raise ValueError(
-            f"Could not find run in experiment '{experiment_name}' "
-            f"(tried all priority methods)"
+        return RunLookupReport(
+            found=False,
+            strategies_attempted=strategies_attempted_list,
+            error=f"Could not find run in experiment '{experiment_name}' after trying all strategies"
         )
+
+
+def find_run_by_trial_id(
+    trial_id: str,
+    experiment_name: Optional[str] = None,
+    config_dir: Optional[Path] = None,
+) -> RunLookupReport:
+    """
+    Find MLflow run by trial_id tag.
+    
+    This is a convenience function for finding HPO trial runs by their trial_id.
+    
+    Args:
+        trial_id: Trial ID to search for (e.g., "trial_1_20251231_161745").
+        experiment_name: Optional experiment name (if None, searches all experiments).
+        config_dir: Optional config directory.
+    
+    Returns:
+        RunLookupReport with found status, run_id if found, strategy used, and any errors.
+    """
+    report = RunLookupReport(found=False)
+    report.strategies_attempted.append("trial_id_tag_search")
+    
+    try:
+        client = MlflowClient()
+        
+        # Build filter string
+        filter_string = f"tags.code.trial_id = '{trial_id}' AND (tags.code.interrupted != 'true' OR tags.code.interrupted IS NULL)"
+        
+        if experiment_name:
+            # Search in specific experiment
+            experiment = mlflow.get_experiment_by_name(experiment_name)
+            if not experiment:
+                report.error = f"Experiment '{experiment_name}' not found"
+                logger.warning(f"[Find Run by Trial ID] Experiment '{experiment_name}' not found")
+                return report
+            
+            runs = client.search_runs(
+                experiment_ids=[experiment.experiment_id],
+                filter_string=filter_string,
+                max_results=1,
+                order_by=["start_time DESC"],
+            )
+        else:
+            # Search all experiments (slower but more flexible)
+            experiments = client.search_experiments()
+            runs = []
+            for exp in experiments:
+                try:
+                    exp_runs = client.search_runs(
+                        experiment_ids=[exp.experiment_id],
+                        filter_string=filter_string,
+                        max_results=1,
+                        order_by=["start_time DESC"],
+                    )
+                    if exp_runs:
+                        runs.extend(exp_runs)
+                        break  # Found it, stop searching
+                except Exception as e:
+                    logger.debug(f"Error searching experiment {exp.name}: {e}")
+                    continue
+        
+        if runs:
+            found_run_id = runs[0].info.run_id
+            report.found = True
+            report.run_id = found_run_id
+            report.strategy_used = "trial_id_tag_search"
+            logger.info(
+                f"[Find Run by Trial ID] Found run {found_run_id[:12]}... for trial_id={trial_id}"
+            )
+            return report
+        else:
+            report.error = f"No run found with trial_id='{trial_id}'"
+            logger.debug(f"[Find Run by Trial ID] No run found with trial_id='{trial_id}'")
+            return report
+            
+    except Exception as e:
+        report.error = f"Trial ID search failed: {e}"
+        logger.warning(f"[Find Run by Trial ID] Search failed: {e}", exc_info=True)
+        return report
 

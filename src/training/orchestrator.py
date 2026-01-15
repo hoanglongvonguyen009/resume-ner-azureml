@@ -234,7 +234,7 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
         # Try to build systematic name using naming policy
         try:
             from infrastructure.naming import create_naming_context
-            from infrastructure.tracking.mlflow.naming import build_mlflow_run_name
+            from infrastructure.naming.mlflow.run_names import build_mlflow_run_name
             from common.shared.platform_detection import detect_platform
 
             # Try to get study_key_hash and model from parent run

@@ -42,8 +42,9 @@ import mlflow
 from common.shared.logging_utils import get_logger
 
 from infrastructure.tracking.mlflow.types import RunHandle
-from infrastructure.tracking.mlflow.naming import build_mlflow_tags, build_mlflow_run_key, build_mlflow_run_key_hash
-from infrastructure.tracking.mlflow.index import update_mlflow_index
+from infrastructure.naming.mlflow.tags import build_mlflow_tags
+from infrastructure.naming.mlflow.run_keys import build_mlflow_run_key, build_mlflow_run_key_hash
+from orchestration.jobs.tracking.index.run_index import update_mlflow_index
 from infrastructure.tracking.mlflow.utils import retry_with_backoff
 # Lazy import to avoid pytest collection issues
 try:
@@ -114,29 +115,11 @@ class MLflowBenchmarkTracker(BaseTracker):
         """
         try:
             # Infer config_dir from output_dir
-            config_dir = None
-            if output_dir:
-                # Derive project root correctly by finding "outputs" directory
-                root_dir_for_config = None
-                current = output_dir
-                while current.parent != current:  # Stop at filesystem root
-                    if current.name == "outputs":
-                        root_dir_for_config = current.parent
-                        break
-                    current = current.parent
-                
-                if root_dir_for_config is None:
-                    # Fallback: try to find project root by looking for config directory
-                    root_dir_for_config = Path.cwd()
-                    for candidate in [Path.cwd(), Path.cwd().parent]:
-                        if (candidate / "config").exists():
-                            root_dir_for_config = candidate
-                            break
-                
-                config_dir = root_dir_for_config / "config" if root_dir_for_config else None
+            from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+            config_dir = infer_config_dir_from_path(output_dir)
 
             # Check if tracking is enabled for benchmark stage
-            from infrastructure.tracking.mlflow.config_loader import get_tracking_config
+            from orchestration.jobs.tracking.config.loader import get_tracking_config
             tracking_config = get_tracking_config(config_dir=config_dir, stage="benchmark")
             if not tracking_config.get("enabled", True):
                 logger.info("[Benchmark Tracker] MLflow tracking disabled for benchmark stage (tracking.benchmark.enabled=false)")
@@ -181,7 +164,7 @@ class MLflowBenchmarkTracker(BaseTracker):
                 )
 
                 # Compute run_key_hash for benchmark run (needed for cleanup matching)
-                from infrastructure.tracking.mlflow.naming import (
+                from infrastructure.naming.mlflow.run_keys import (
                     build_mlflow_run_key,
                     build_mlflow_run_key_hash,
                 )
@@ -266,13 +249,13 @@ class MLflowBenchmarkTracker(BaseTracker):
                 if context and run_name:
                     try:
                         import re
-                        from infrastructure.tracking.mlflow.index import commit_run_name_version
-                        from infrastructure.tracking.mlflow.naming import (
+                        from orchestration.jobs.tracking.index.version_counter import commit_run_name_version
+                        from infrastructure.naming.mlflow.run_keys import (
                             build_mlflow_run_key,
                             build_mlflow_run_key_hash,
                             build_counter_key,
                         )
-                        from infrastructure.tracking.mlflow.config_loader import (
+                        from orchestration.jobs.tracking.config.loader import (
                             get_naming_config,
                             get_auto_increment_config,
                         )
@@ -464,16 +447,8 @@ class MLflowBenchmarkTracker(BaseTracker):
                             "throughput_samples_per_sec", batch_results["throughput_docs_per_sec"])
 
             # Log artifact using unified uploader (works for both Azure ML and non-Azure ML backends)
-            config_dir = None
-            if benchmark_json_path:
-                # Try to infer config_dir from benchmark_json_path
-                current = benchmark_json_path.parent
-                while current.parent != current:
-                    if current.name == "outputs":
-                        root_dir_for_config = current.parent
-                        config_dir = root_dir_for_config / "config" if root_dir_for_config else None
-                        break
-                    current = current.parent
+            from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+            config_dir = infer_config_dir_from_path(benchmark_json_path) if benchmark_json_path else None
             
             from infrastructure.tracking.mlflow.artifacts.stage_helpers import upload_benchmark_artifacts
             

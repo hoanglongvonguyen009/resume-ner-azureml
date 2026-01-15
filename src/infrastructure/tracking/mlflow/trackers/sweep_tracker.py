@@ -55,11 +55,12 @@ except ImportError:
 from common.shared.logging_utils import get_logger
 
 from infrastructure.tracking.mlflow.types import RunHandle
-from infrastructure.tracking.mlflow.naming import build_mlflow_tags, build_mlflow_run_key, build_mlflow_run_key_hash
-from infrastructure.tracking.mlflow.index import update_mlflow_index
+from infrastructure.naming.mlflow.tags import build_mlflow_tags
+from infrastructure.naming.mlflow.run_keys import build_mlflow_run_key, build_mlflow_run_key_hash
+from orchestration.jobs.tracking.index.run_index import update_mlflow_index
 from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
 from infrastructure.tracking.mlflow.trackers.base_tracker import BaseTracker
-from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path, get_mlflow_run_id
 # Tag key imports moved to local scope where needed
 
 logger = get_logger(__name__)
@@ -146,7 +147,7 @@ class MLflowSweepTracker(BaseTracker):
                 # Always compute family hash (v1, doesn't depend on train_config)
                 if not study_family_hash and hpo_config and data_config:
                     try:
-                        from infrastructure.tracking.mlflow.naming import (
+                        from infrastructure.naming.mlflow.hpo_keys import (
                             build_hpo_study_family_key,
                             build_hpo_study_family_hash,
                         )
@@ -768,36 +769,34 @@ class MLflowSweepTracker(BaseTracker):
             best_trial_run_id = None
 
             try:
-                active_run = mlflow.active_run()
-                if active_run and hasattr(active_run, 'info') and hasattr(active_run.info, 'run_id'):
-                    parent_run_id_for_artifacts = active_run.info.run_id
+                parent_run_id_for_artifacts = get_mlflow_run_id()
 
-                    # Try to get the best trial's child run ID from MLflow tags on the parent run
+                # Try to get the best trial's child run ID from MLflow tags on the parent run
+                try:
+                    client = mlflow.tracking.MlflowClient()
+                    parent_run_data = client.get_run(
+                        parent_run_id_for_artifacts)
+                    if parent_run_data and parent_run_data.data and parent_run_data.data.tags:
+                        tags = parent_run_data.data.tags
+                        best_trial_run_id = tags.get("best_trial_run_id")
+                except Exception:
+                    pass
+
+                # Fallback: If best_trial_run_id not found in tags, search child runs by trial number
+                if not best_trial_run_id:
                     try:
                         client = mlflow.tracking.MlflowClient()
-                        parent_run_data = client.get_run(
-                            parent_run_id_for_artifacts)
-                        if parent_run_data and parent_run_data.data and parent_run_data.data.tags:
-                            tags = parent_run_data.data.tags
-                            best_trial_run_id = tags.get("best_trial_run_id")
+                        experiment_id = active_run.info.experiment_id
+                        # Search for child runs of the parent run with matching trial number
+                        child_runs = client.search_runs(
+                            experiment_ids=[experiment_id],
+                            filter_string=f"tags.mlflow.parentRunId = '{parent_run_id_for_artifacts}' AND (tags.trial_number = '{best_trial_number}' OR tags.optuna.trial.number = '{best_trial_number}')",
+                            max_results=1
+                        )
+                        if child_runs:
+                            best_trial_run_id = child_runs[0].info.run_id
                     except Exception:
                         pass
-
-                    # Fallback: If best_trial_run_id not found in tags, search child runs by trial number
-                    if not best_trial_run_id:
-                        try:
-                            client = mlflow.tracking.MlflowClient()
-                            experiment_id = active_run.info.experiment_id
-                            # Search for child runs of the parent run with matching trial number
-                            child_runs = client.search_runs(
-                                experiment_ids=[experiment_id],
-                                filter_string=f"tags.mlflow.parentRunId = '{parent_run_id_for_artifacts}' AND (tags.trial_number = '{best_trial_number}' OR tags.optuna.trial.number = '{best_trial_number}')",
-                                max_results=1
-                            )
-                            if child_runs:
-                                best_trial_run_id = child_runs[0].info.run_id
-                        except Exception:
-                            pass
             except Exception:
                 pass
 
@@ -912,10 +911,8 @@ class MLflowSweepTracker(BaseTracker):
         run_id_to_use = refit_run_id if refit_run_id else parent_run_id
         if not run_id_to_use:
             # Only fall back to active_run if neither refit_run_id nor parent_run_id provided
-            active_run = mlflow.active_run()
-            if active_run:
-                run_id_to_use = active_run.info.run_id
-            else:
+            run_id_to_use = get_mlflow_run_id()
+            if not run_id_to_use:
                 raise ValueError(
                     "No active MLflow run and no parent_run_id/refit_run_id provided. "
                     "Cannot log checkpoint artifacts."

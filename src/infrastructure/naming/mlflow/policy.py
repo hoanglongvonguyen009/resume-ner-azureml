@@ -31,18 +31,40 @@ lifecycle:
 This module provides backward compatibility by re-exporting from the old location.
 """
 
-# Import the entire module first to avoid circular import issues
-import orchestration.jobs.tracking.naming.policy as _policy_module
+# Lazy import to avoid circular import issues during module initialization
+_policy_module = None
 
-# Re-export all the functions
-load_naming_policy = _policy_module.load_naming_policy
-format_run_name = _policy_module.format_run_name
-validate_run_name = _policy_module.validate_run_name
-parse_parent_training_id = _policy_module.parse_parent_training_id
-validate_naming_policy = _policy_module.validate_naming_policy
-normalize_value = _policy_module.normalize_value
-sanitize_semantic_suffix = _policy_module.sanitize_semantic_suffix
-extract_component = _policy_module.extract_component
+def _get_policy_module():
+    """Lazy import of the policy module."""
+    global _policy_module
+    if _policy_module is None:
+        import orchestration.jobs.tracking.naming.policy as _policy_module
+    return _policy_module
+
+# Re-export all the functions with lazy loading
+def load_naming_policy(*args, **kwargs):
+    return _get_policy_module().load_naming_policy(*args, **kwargs)
+
+def format_run_name(*args, **kwargs):
+    return _get_policy_module().format_run_name(*args, **kwargs)
+
+def validate_run_name(*args, **kwargs):
+    return _get_policy_module().validate_run_name(*args, **kwargs)
+
+def parse_parent_training_id(*args, **kwargs):
+    return _get_policy_module().parse_parent_training_id(*args, **kwargs)
+
+def validate_naming_policy(*args, **kwargs):
+    return _get_policy_module().validate_naming_policy(*args, **kwargs)
+
+def normalize_value(*args, **kwargs):
+    return _get_policy_module().normalize_value(*args, **kwargs)
+
+def sanitize_semantic_suffix(*args, **kwargs):
+    return _get_policy_module().sanitize_semantic_suffix(*args, **kwargs)
+
+def extract_component(*args, **kwargs):
+    return _get_policy_module().extract_component(*args, **kwargs)
 
 __all__ = [
     "load_naming_policy",

@@ -143,11 +143,11 @@ def create_training_mlflow_run(
         # Update local index if context provided
         if root_dir and config_dir and context:
             try:
-                from infrastructure.tracking.mlflow.naming import (
+                from infrastructure.naming.mlflow.run_keys import (
                     build_mlflow_run_key,
                     build_mlflow_run_key_hash,
                 )
-                from infrastructure.tracking.mlflow.index import update_mlflow_index
+                from orchestration.jobs.tracking.index.run_index import update_mlflow_index
 
                 run_key = build_mlflow_run_key(context)
                 run_key_hash = build_mlflow_run_key_hash(run_key)

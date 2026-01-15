@@ -233,25 +233,23 @@ class TestArtifactAcquisitionEdgeCases:
         assert len(priority) == 1
         assert priority[0] == "mlflow"
 
-    @patch("orchestration.jobs.selection.artifact_acquisition._validate_checkpoint")
-    @patch("orchestration.jobs.local_selection_v2.find_trial_checkpoint_by_hash")
     def test_missing_study_trial_hashes_skips_local(
         self,
-        mock_find_checkpoint,
-        mock_validate,
         tmp_path,
         sample_acquisition_config,
         mock_best_run_info,
     ):
-        """Test that missing study_key_hash or trial_key_hash skips local strategy."""
+        """Test that missing study_key_hash or trial_key_hash skips local strategy.
+        
+        After consolidation, the unified discovery system handles hash-based discovery.
+        When hashes are missing, discover_artifact_local returns None early (line 91-93),
+        causing the local strategy to be skipped. This test verifies the end-to-end
+        behavior without mocking internal functions.
+        """
         root_dir = tmp_path / "outputs"
         config_dir = tmp_path / "config"
         root_dir.mkdir()
         config_dir.mkdir()
-        
-        # Setup mocks
-        mock_find_checkpoint.return_value = None
-        mock_validate.return_value = True
         
         # Remove hashes from best_run_info
         best_run_info_no_hashes = mock_best_run_info.copy()
@@ -264,7 +262,7 @@ class TestArtifactAcquisitionEdgeCases:
         acquisition_config["drive"]["enabled"] = False
         acquisition_config["mlflow"]["enabled"] = False
         
-        # Should raise ValueError when all strategies fail
+        # Should raise ValueError when all strategies fail (local skipped due to missing hashes)
         with pytest.raises(ValueError, match="Could not acquire checkpoint"):
             acquire_best_model_checkpoint(
                 best_run_info=best_run_info_no_hashes,
@@ -277,9 +275,6 @@ class TestArtifactAcquisitionEdgeCases:
                 drive_store=None,
                 in_colab=False,
             )
-        
-        # find_trial_checkpoint_by_hash should not be called when hashes are missing
-        assert not mock_find_checkpoint.called
 
     def test_config_with_all_optional_fields(self):
         """Test config with all optional fields (including unimplemented ones)."""

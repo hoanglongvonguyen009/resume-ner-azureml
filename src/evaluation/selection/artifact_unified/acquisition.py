@@ -32,6 +32,10 @@ lifecycle:
 
 This module provides the unified API for artifact acquisition across all stages.
 It orchestrates discovery, validation, and download from multiple sources.
+
+**Single Source of Truth (SSOT)**: This module is the SSOT for tar.gz extraction
+logic. All tar.gz extraction functionality should use `_extract_tar_gz()` from
+this module to avoid duplication.
 """
 import shutil
 import tarfile
@@ -345,8 +349,6 @@ def _acquire_from_location(
     # Check if destination already exists and is valid (before any acquisition)
     # Also check for nested extracted checkpoints (e.g., destination/best_trial_checkpoint.tar.gz/best_trial_checkpoint)
     if destination.exists():
-        from evaluation.selection.artifact_unified.validation import validate_artifact
-        
         # First check destination directly
         is_valid, error = validate_artifact(
             request.artifact_kind,
@@ -361,12 +363,23 @@ def _acquire_from_location(
             for item in destination.iterdir():
                 if item.is_dir():
                     # Check if this directory or a subdirectory is a valid checkpoint
-                    if _validate_checkpoint_dir(item):
+                    is_valid_checkpoint, _ = validate_artifact(
+                        ArtifactKind.CHECKPOINT,
+                        item,
+                        strict=False,  # Lenient mode for quick checks
+                    )
+                    if is_valid_checkpoint:
                         nested_checkpoints.append(item)
                     # Also check common nested patterns like tar.gz/best_trial_checkpoint
                     for subitem in item.iterdir():
-                        if subitem.is_dir() and _validate_checkpoint_dir(subitem):
-                            nested_checkpoints.append(subitem)
+                        if subitem.is_dir():
+                            is_valid_subcheckpoint, _ = validate_artifact(
+                                ArtifactKind.CHECKPOINT,
+                                subitem,
+                                strict=False,  # Lenient mode for quick checks
+                            )
+                            if is_valid_subcheckpoint:
+                                nested_checkpoints.append(subitem)
             
             if nested_checkpoints:
                 # Use the first valid nested checkpoint
@@ -514,8 +527,6 @@ def _download_from_mlflow(
     # Check if destination already exists and is valid
     # Also check for nested extracted checkpoints (e.g., destination/best_trial_checkpoint.tar.gz/best_trial_checkpoint)
     if destination.exists():
-        from evaluation.selection.artifact_unified.validation import validate_artifact
-        
         # First check destination directly
         is_valid, error = validate_artifact(
             request.artifact_kind,
@@ -530,12 +541,23 @@ def _download_from_mlflow(
             for item in destination.iterdir():
                 if item.is_dir():
                     # Check if this directory or a subdirectory is a valid checkpoint
-                    if _validate_checkpoint_dir(item):
+                    is_valid_checkpoint, _ = validate_artifact(
+                        ArtifactKind.CHECKPOINT,
+                        item,
+                        strict=False,  # Lenient mode for quick checks
+                    )
+                    if is_valid_checkpoint:
                         nested_checkpoints.append(item)
                     # Also check common nested patterns like tar.gz/best_trial_checkpoint
                     for subitem in item.iterdir():
-                        if subitem.is_dir() and _validate_checkpoint_dir(subitem):
-                            nested_checkpoints.append(subitem)
+                        if subitem.is_dir():
+                            is_valid_subcheckpoint, _ = validate_artifact(
+                                ArtifactKind.CHECKPOINT,
+                                subitem,
+                                strict=False,  # Lenient mode for quick checks
+                            )
+                            if is_valid_subcheckpoint:
+                                nested_checkpoints.append(subitem)
             
             if nested_checkpoints:
                 # Use the first valid nested checkpoint
@@ -642,21 +664,38 @@ def _download_from_mlflow(
         if request.artifact_kind == ArtifactKind.CHECKPOINT and downloaded_path.is_dir():
             # First check for "checkpoint" subdirectory
             checkpoint_subdir = downloaded_path / "checkpoint"
-            if checkpoint_subdir.exists() and checkpoint_subdir.is_dir() and _validate_checkpoint_dir(checkpoint_subdir):
-                logger.info(f"Found checkpoint subdirectory: {checkpoint_subdir}")
-                return checkpoint_subdir
+            if checkpoint_subdir.exists() and checkpoint_subdir.is_dir():
+                is_valid, _ = validate_artifact(
+                    ArtifactKind.CHECKPOINT,
+                    checkpoint_subdir,
+                    strict=False,  # Lenient mode for quick checks
+                )
+                if is_valid:
+                    logger.info(f"Found checkpoint subdirectory: {checkpoint_subdir}")
+                    return checkpoint_subdir
             
             # Check if directory itself is checkpoint
-            if _validate_checkpoint_dir(downloaded_path):
+            is_valid, _ = validate_artifact(
+                ArtifactKind.CHECKPOINT,
+                downloaded_path,
+                strict=False,  # Lenient mode for quick checks
+            )
+            if is_valid:
                 logger.info(f"Directory is a valid checkpoint: {downloaded_path}")
                 return downloaded_path
             
             # If still not found, search recursively for checkpoint directories
             logger.debug(f"Searching recursively for checkpoint in: {downloaded_path}")
             for item in downloaded_path.rglob("*"):
-                if item.is_dir() and _validate_checkpoint_dir(item):
-                    logger.info(f"Found checkpoint in nested directory: {item}")
-                    return item
+                if item.is_dir():
+                    is_valid, _ = validate_artifact(
+                        ArtifactKind.CHECKPOINT,
+                        item,
+                        strict=False,  # Lenient mode for quick checks
+                    )
+                    if is_valid:
+                        logger.info(f"Found checkpoint in nested directory: {item}")
+                        return item
         
         logger.info(f"Artifact acquired successfully: {downloaded_path}")
         return downloaded_path
@@ -741,14 +780,4 @@ def _extract_tar_gz(tar_path: Path, extract_to: Optional[Path] = None) -> Path:
     return extract_to
 
 
-def _validate_checkpoint_dir(path: Path) -> bool:
-    """Quick check if directory looks like a checkpoint."""
-    if not path.exists() or not path.is_dir():
-        return False
-    has_config = (path / "config.json").exists()
-    has_model = any(
-        (path / fname).exists()
-        for fname in ["pytorch_model.bin", "model.safetensors", "model.bin"]
-    )
-    return has_config or has_model
 

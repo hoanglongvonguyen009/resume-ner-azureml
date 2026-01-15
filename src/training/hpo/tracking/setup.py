@@ -33,10 +33,8 @@ def setup_hpo_mlflow_run(
     """
     try:
         from infrastructure.naming import create_naming_context
-        from infrastructure.tracking.mlflow.naming import (
-            build_mlflow_run_name,
-            build_mlflow_tags,
-        )
+        from infrastructure.naming.mlflow.run_names import build_mlflow_run_name
+        from infrastructure.naming.mlflow.tags import build_mlflow_tags
         from infrastructure.naming.mlflow.hpo_keys import (
             build_hpo_study_key,
             build_hpo_study_key_hash,
@@ -128,7 +126,8 @@ def setup_hpo_mlflow_run(
         if root_dir is None:
             root_dir = Path.cwd()
 
-        config_dir = root_dir / "config"
+        from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+        config_dir = infer_config_dir_from_path(root_dir) if root_dir else infer_config_dir_from_path(None)
 
         mlflow_run_name = build_mlflow_run_name(
             hpo_parent_context,
@@ -154,9 +153,8 @@ def setup_hpo_mlflow_run(
             from infrastructure.naming import create_naming_context
             from common.shared.platform_detection import detect_platform
 
-            config_dir = Path.cwd() / "config"
-            if not config_dir.exists():
-                config_dir = Path.cwd().parent / "config"
+            from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+            config_dir = infer_config_dir_from_path(Path.cwd())
 
             if config_dir.exists():
                 policy = load_naming_policy(config_dir)
@@ -210,16 +208,16 @@ def commit_run_name_version(
 
     try:
         import re
-        from infrastructure.tracking.mlflow.naming import (
+        from infrastructure.naming.mlflow.run_keys import (
             build_mlflow_run_key,
             build_mlflow_run_key_hash,
             build_counter_key,
         )
-        from infrastructure.tracking.mlflow.config_loader import (
+        from orchestration.jobs.tracking.config.loader import (
             get_naming_config,
             get_auto_increment_config,
         )
-        from infrastructure.tracking.mlflow.index import (
+        from orchestration.jobs.tracking.index.version_counter import (
             commit_run_name_version as commit_version_internal,
         )
 
@@ -238,7 +236,8 @@ def commit_run_name_version(
         if root_dir is None:
             root_dir = Path.cwd()
 
-        config_dir = root_dir / "config"
+        from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+        config_dir = infer_config_dir_from_path(root_dir) if root_dir else infer_config_dir_from_path(None)
 
         # Check if auto-increment was used (suffix _1, _2, ...)
         version_match = re.search(r"_(\d+)$", mlflow_run_name)

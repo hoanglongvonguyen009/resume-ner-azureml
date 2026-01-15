@@ -141,7 +141,7 @@ def cleanup_interrupted_runs(
         current_env = detect_platform()
 
         # Get run_key_hash from context for tag-based search
-        from infrastructure.tracking.mlflow.naming import (
+        from infrastructure.naming.mlflow.run_keys import (
             build_mlflow_run_key_hash,
             build_mlflow_run_key,
         )
@@ -150,9 +150,10 @@ def cleanup_interrupted_runs(
         run_key_hash = build_mlflow_run_key_hash(run_key) if run_key else None
 
         # Load naming config for project name comparison
-        from infrastructure.tracking.mlflow.config_loader import get_naming_config
+        from orchestration.jobs.tracking.config.loader import get_naming_config
 
-        config_dir = output_dir.parent.parent / "config" if output_dir else None
+        from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+        config_dir = infer_config_dir_from_path(output_dir) if output_dir else None
         naming_config = get_naming_config(config_dir)
 
         # Get current run start_time for legacy run validation

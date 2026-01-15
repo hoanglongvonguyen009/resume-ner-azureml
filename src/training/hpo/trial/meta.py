@@ -87,7 +87,7 @@ def generate_missing_trial_meta(
     # If still not found, try to compute from configs
     if not study_key_hash and hpo_config and data_config:
         try:
-            from infrastructure.tracking.mlflow.naming import (
+            from infrastructure.naming.mlflow.hpo_keys import (
                 build_hpo_study_key,
                 build_hpo_study_key_hash,
             )
@@ -148,7 +148,7 @@ def generate_missing_trial_meta(
         if study_key_hash:
             try:
                 import mlflow
-                from infrastructure.tracking.mlflow.naming import (
+                from infrastructure.naming.mlflow.hpo_keys import (
                     build_hpo_trial_key,
                     build_hpo_trial_key_hash,
                 )

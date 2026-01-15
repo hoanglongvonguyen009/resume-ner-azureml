@@ -42,8 +42,9 @@ import mlflow
 from common.shared.logging_utils import get_logger
 
 from infrastructure.tracking.mlflow.types import RunHandle
-from infrastructure.tracking.mlflow.naming import build_mlflow_tags, build_mlflow_run_key, build_mlflow_run_key_hash
-from infrastructure.tracking.mlflow.index import update_mlflow_index
+from infrastructure.naming.mlflow.tags import build_mlflow_tags
+from infrastructure.naming.mlflow.run_keys import build_mlflow_run_key, build_mlflow_run_key_hash
+from orchestration.jobs.tracking.index.run_index import update_mlflow_index
 from infrastructure.tracking.mlflow.utils import retry_with_backoff
 # Lazy import to avoid pytest collection issues
 try:
@@ -94,13 +95,11 @@ class MLflowTrainingTracker(BaseTracker):
             RunHandle with run information.
         """
         # Infer config_dir from output_dir BEFORE creating run
-        config_dir = None
-        if output_dir:
-            root_dir_for_config = output_dir.parent.parent if output_dir.parent.name == "outputs" else output_dir.parent.parent.parent
-            config_dir = root_dir_for_config / "config" if root_dir_for_config else None
+        from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+        config_dir = infer_config_dir_from_path(output_dir)
 
         # Check if tracking is enabled for training stage BEFORE creating run
-        from infrastructure.tracking.mlflow.config_loader import get_tracking_config
+        from orchestration.jobs.tracking.config.loader import get_tracking_config
         tracking_config = get_tracking_config(config_dir=config_dir, stage="training")
         if not tracking_config.get("enabled", True):
             logger.info("[Training Tracker] MLflow tracking disabled for training stage (tracking.training.enabled=false)")
@@ -299,15 +298,8 @@ class MLflowTrainingTracker(BaseTracker):
         """
         try:
             # Infer config_dir to check tracking config
-            config_dir = None
-            if checkpoint_dir:
-                current = checkpoint_dir.parent
-                while current.parent != current:
-                    if current.name == "outputs":
-                        root_dir_for_config = current.parent
-                        config_dir = root_dir_for_config / "config" if root_dir_for_config else None
-                        break
-                    current = current.parent
+            from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+            config_dir = infer_config_dir_from_path(checkpoint_dir)
             
             from infrastructure.tracking.mlflow.artifacts.stage_helpers import upload_training_artifacts
             

@@ -15,7 +15,9 @@ from importlib.abc import MetaPathFinder, Loader
 from importlib.util import spec_from_loader
 
 # Make this module act as a package by setting __path__
-__path__ = []
+# Include the directory containing selection modules so local wrapper files can be found
+from pathlib import Path
+__path__ = [str(Path(__file__).parent)]
 
 # Custom import finder to handle submodule imports
 class SelectionSubmoduleFinder(MetaPathFinder):
@@ -23,7 +25,19 @@ class SelectionSubmoduleFinder(MetaPathFinder):
     
     def find_spec(self, name: str, path: Any, target: Any = None) -> Any:
         if name.startswith('selection.') and name != 'selection':
-            # Redirect to evaluation.selection.*
+            # First check if a local file exists (for wrapper modules)
+            # This allows wrapper files in selection/ to take precedence over proxy
+            try:
+                from pathlib import Path
+                submodule_file = name.replace('selection.', 'selection/').replace('.', '/') + '.py'
+                local_file = Path(__file__).parent / submodule_file.split('/', 1)[1]
+                if local_file.exists():
+                    # Local file exists, let Python's normal import handle it
+                    return None
+            except Exception:
+                pass
+            
+            # No local file, redirect to evaluation.selection.*
             submodule_name = name.replace('selection.', 'evaluation.selection.', 1)
             try:
                 # Try to import the actual module
@@ -47,9 +61,10 @@ if not _finder_installed:
     sys.meta_path.insert(0, SelectionSubmoduleFinder())
 
 # Create submodule proxies for backward compatibility
+# Note: mlflow_selection has a local wrapper file, so it's handled by the finder
 _submodules = [
     'selection_logic',
-    'mlflow_selection',
+    # 'mlflow_selection',  # Has local wrapper file - handled by finder
     'artifact_acquisition',
     'cache',
     'local_selection',
@@ -62,18 +77,51 @@ _submodules = [
 
 def _create_submodule_proxy(name: str) -> ModuleType:
     """Create a proxy module for a submodule."""
+    # Check if a local wrapper file exists first
+    try:
+        from pathlib import Path
+        local_file = Path(__file__).parent / f"{name}.py"
+        if local_file.exists():
+            # Local wrapper file exists, import it instead of proxying
+            try:
+                module = importlib.import_module(f'selection.{name}')
+                return module
+            except ImportError:
+                pass
+    except Exception:
+        pass
+    
+    # No local file, proxy to evaluation.selection
     try:
         module = importlib.import_module(f'evaluation.selection.{name}')
         return module
     except ImportError:
         return ModuleType(f'selection.{name}')
 
-# Register submodule proxies
+# Register submodule proxies (only for modules without local wrapper files)
 _current_module = sys.modules[__name__]
 for submodule_name in _submodules:
-    submodule = _create_submodule_proxy(submodule_name)
-    sys.modules[f'selection.{submodule_name}'] = submodule
-    setattr(_current_module, submodule_name, submodule)
+    # Check if local wrapper file exists
+    from pathlib import Path
+    local_file = Path(__file__).parent / f"{submodule_name}.py"
+    if local_file.exists():
+        # Local wrapper exists - don't pre-register proxy, let it load naturally
+        # But still set attribute for backward compatibility
+        try:
+            # Try to import the local module
+            submodule = importlib.import_module(f'selection.{submodule_name}')
+            sys.modules[f'selection.{submodule_name}'] = submodule
+            setattr(_current_module, submodule_name, submodule)
+        except ImportError:
+            # If import fails, fall back to proxy
+            submodule = _create_submodule_proxy(submodule_name)
+            sys.modules[f'selection.{submodule_name}'] = submodule
+            setattr(_current_module, submodule_name, submodule)
+    else:
+        # No local file, create proxy
+        submodule = _create_submodule_proxy(submodule_name)
+        sys.modules[f'selection.{submodule_name}'] = submodule
+        setattr(_current_module, submodule_name, submodule)
 
 warnings.warn(
     "selection is deprecated, use evaluation.selection instead. "

@@ -42,8 +42,9 @@ import mlflow
 from common.shared.logging_utils import get_logger
 
 from infrastructure.tracking.mlflow.types import RunHandle
-from infrastructure.tracking.mlflow.naming import build_mlflow_tags, build_mlflow_run_key, build_mlflow_run_key_hash
-from infrastructure.tracking.mlflow.index import update_mlflow_index
+from infrastructure.naming.mlflow.tags import build_mlflow_tags
+from infrastructure.naming.mlflow.run_keys import build_mlflow_run_key, build_mlflow_run_key_hash
+from orchestration.jobs.tracking.index.run_index import update_mlflow_index
 from infrastructure.tracking.mlflow.utils import retry_with_backoff
 # Lazy import to avoid pytest collection issues
 try:
@@ -82,16 +83,11 @@ class MLflowConversionTracker(BaseTracker):
         Start a MLflow run for model conversion.
         """
         # Infer config_dir from output_dir BEFORE creating run
-        config_dir = None
-        if output_dir:
-            if output_dir.parent.name == "outputs":
-                root_dir_for_config = output_dir.parent.parent
-            else:
-                root_dir_for_config = output_dir.parent.parent.parent
-            config_dir = root_dir_for_config / "config"
+        from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+        config_dir = infer_config_dir_from_path(output_dir)
 
         # Check if tracking is enabled for conversion stage BEFORE creating run
-        from infrastructure.tracking.mlflow.config_loader import get_tracking_config
+        from orchestration.jobs.tracking.config.loader import get_tracking_config
         tracking_config = get_tracking_config(config_dir=config_dir, stage="conversion")
         if not tracking_config.get("enabled", True):
             logger.info("[Conversion Tracker] MLflow tracking disabled for conversion stage (tracking.conversion.enabled=false)")
@@ -211,25 +207,19 @@ class MLflowConversionTracker(BaseTracker):
 
             # Infer config_dir to check tracking config
             # Try onnx_model_path first, then conversion_log_path, then fallback to current working directory
+            from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
             config_dir = None
             for path_to_check in [onnx_model_path, conversion_log_path]:
                 if path_to_check:
-                    current = path_to_check.parent
-                    while current.parent != current:
-                        if current.name == "outputs":
-                            root_dir_for_config = current.parent
-                            config_dir = root_dir_for_config / "config" if root_dir_for_config else None
-                            break
-                        current = current.parent
-                    if config_dir:
+                    config_dir = infer_config_dir_from_path(path_to_check)
+                    if config_dir.exists():
                         break
             
-            # Fallback to current working directory if still None
+            # Fallback handled by infer_config_dir_from_path if still None
             if config_dir is None:
-                from pathlib import Path
-                config_dir = Path.cwd() / "config"
+                config_dir = infer_config_dir_from_path(None)
             
-            from infrastructure.tracking.mlflow.config_loader import get_tracking_config
+            from orchestration.jobs.tracking.config.loader import get_tracking_config
             tracking_config = get_tracking_config(config_dir=config_dir, stage="conversion")
 
             # Use MLflow for artifact upload (works for both Azure ML and non-Azure ML backends)

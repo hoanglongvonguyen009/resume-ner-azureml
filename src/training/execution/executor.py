@@ -68,13 +68,13 @@ except ImportError:
             dataset_path = dataset_path / f"seed{seed}"
         return dataset_path
 from infrastructure.fingerprints.compute import compute_exec_fp, compute_spec_fp
-from infrastructure.tracking.mlflow.naming import (
-    build_mlflow_run_name,
-    build_mlflow_tags,
+from infrastructure.naming.mlflow.run_names import build_mlflow_run_name
+from infrastructure.naming.mlflow.tags import build_mlflow_tags
+from infrastructure.naming.mlflow.run_keys import (
     build_mlflow_run_key,
     build_mlflow_run_key_hash,
 )
-from infrastructure.tracking.mlflow.index import update_mlflow_index
+from orchestration.jobs.tracking.index.run_index import update_mlflow_index
 from infrastructure.naming import create_naming_context
 from infrastructure.paths import build_output_path
 from common.shared.platform_detection import detect_platform

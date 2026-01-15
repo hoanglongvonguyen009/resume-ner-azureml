@@ -30,27 +30,33 @@ lifecycle:
 
 """Utilities for displaying and summarizing HPO study results.
 
+DEPRECATED: This module is a backward-compatibility wrapper around
+`evaluation.selection.study_summary`. Use `evaluation.selection.study_summary`
+directly for new code.
+
+This module will be removed in a future release.
+
 This module provides functions to load Optuna studies, extract trial information,
 and format summaries for display in notebooks or logs.
 """
 
-import json
+import warnings
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, TYPE_CHECKING
 
-from common.shared.logging_utils import get_logger
-
-from training.hpo.utils.paths import resolve_hpo_output_dir
-from training.hpo.checkpoint.storage import resolve_storage_path
+# Import from SSOT
+from evaluation.selection import study_summary as _eval_study_summary
 
 if TYPE_CHECKING:
-    from optuna import Trial
-
-logger = get_logger(__name__)
+    from optuna import Study, Trial
 
 
 def extract_cv_statistics(best_trial: "Trial") -> Optional[Tuple[float, float]]:
-    """Extract CV statistics from Optuna trial user attributes.
+    """
+    Extract CV statistics from Optuna trial user attributes.
+
+    DEPRECATED: Use `evaluation.selection.study_summary.extract_cv_statistics`
+    directly instead.
 
     Args:
         best_trial: Optuna trial object with user_attrs.
@@ -58,15 +64,24 @@ def extract_cv_statistics(best_trial: "Trial") -> Optional[Tuple[float, float]]:
     Returns:
         Tuple of (cv_mean, cv_std) if available, else None.
     """
-    if not hasattr(best_trial, "user_attrs"):
-        return None
-    cv_mean = best_trial.user_attrs.get("cv_mean")
-    cv_std = best_trial.user_attrs.get("cv_std")
-    return (cv_mean, cv_std) if cv_mean is not None else None
+    warnings.warn(
+        "selection.study_summary is deprecated. "
+        "Use evaluation.selection.study_summary instead. "
+        "This module will be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    
+    # Type cast: selection version expects Trial, evaluation version accepts Any
+    return _eval_study_summary.extract_cv_statistics(best_trial=best_trial)  # type: ignore[arg-type]
 
 
 def get_trial_hash_info(trial_dir: Path) -> Tuple[Optional[str], Optional[str], Optional[int]]:
-    """Extract study_key_hash, trial_key_hash, and trial_number from trial_meta.json if available.
+    """
+    Extract study_key_hash, trial_key_hash, and trial_number from trial_meta.json if available.
+
+    DEPRECATED: Use `evaluation.selection.study_summary.get_trial_hash_info`
+    directly instead.
 
     Args:
         trial_dir: Path to trial directory containing trial_meta.json.
@@ -74,19 +89,15 @@ def get_trial_hash_info(trial_dir: Path) -> Tuple[Optional[str], Optional[str], 
     Returns:
         Tuple of (study_key_hash, trial_key_hash, trial_number), or (None, None, None) if not found.
     """
-    trial_meta_path = trial_dir / "trial_meta.json"
-    if not trial_meta_path.exists():
-        return None, None, None
-    try:
-        with open(trial_meta_path, "r") as f:
-            meta = json.load(f)
-        return (
-            meta.get("study_key_hash"),
-            meta.get("trial_key_hash"),
-            meta.get("trial_number"),
-        )
-    except Exception:
-        return None, None, None
+    warnings.warn(
+        "selection.study_summary is deprecated. "
+        "Use evaluation.selection.study_summary instead. "
+        "This module will be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    
+    return _eval_study_summary.get_trial_hash_info(trial_dir=trial_dir)
 
 
 def load_study_from_disk(
@@ -95,7 +106,11 @@ def load_study_from_disk(
     environment: str,
     hpo_config: Dict[str, Any],
 ) -> Optional["Study"]:
-    """Load Optuna study from disk if not in memory.
+    """
+    Load Optuna study from disk if not in memory.
+
+    DEPRECATED: Use `evaluation.selection.study_summary.load_study_from_disk`
+    directly instead.
 
     Args:
         backbone_name: Model backbone name (e.g., "distilbert" or "distilbert-base-uncased").
@@ -106,49 +121,23 @@ def load_study_from_disk(
     Returns:
         Optuna study object if found, else None.
     """
-    # Normalize backbone name (extract base name before first "-")
-    # This matches the normalization used in the notebook when creating directories
-    normalized_backbone = backbone_name.split("-")[0] if "-" in backbone_name else backbone_name
-    backbone_output_dir = root_dir / "outputs" / "hpo" / environment / normalized_backbone
-    hpo_backbone_dir = resolve_hpo_output_dir(backbone_output_dir)
-    if not hpo_backbone_dir.exists():
-        return None
-
-    checkpoint_config = hpo_config.get("checkpoint", {})
-    study_name_template = checkpoint_config.get(
-        "study_name") or hpo_config.get("study_name")
-    study_name = None
-    if study_name_template:
-        # Use normalized backbone name for study name replacement
-        study_name = study_name_template.replace("{backbone}", normalized_backbone)
-
-    # Find v2 study folder
-    from .trial_finder import find_study_folder_in_backbone_dir
-    study_folder = find_study_folder_in_backbone_dir(backbone_output_dir)
-
-    if not study_folder or not study_folder.exists():
-        return None
-
-    study_db_path = study_folder / "study.db"
-    if not study_db_path.exists():
-        return None
-
-    # Import optuna module
-    try:
-        from training.hpo.core.optuna_integration import import_optuna
-
-        optuna_for_load, _, _, _ = import_optuna()  # type: ignore[no-untyped-call]
-    except ImportError:
-        import optuna as optuna_for_load  # type: ignore[no-redef]
-
-    try:
-        storage_uri = f"sqlite:///{study_db_path.resolve()}"
-        study = optuna_for_load.load_study(
-            study_name=study_folder.name, storage=storage_uri)
-        return study
-    except Exception as e:
-        logger.debug(f"Could not load study for {normalized_backbone}: {e}")
-        return None
+    warnings.warn(
+        "selection.study_summary is deprecated. "
+        "Use evaluation.selection.study_summary instead. "
+        "This module will be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    
+    result = _eval_study_summary.load_study_from_disk(
+        backbone_name=backbone_name,
+        root_dir=root_dir,
+        environment=environment,
+        hpo_config=hpo_config,
+    )
+    
+    # Type cast: evaluation version returns Optional[Any], selection version expects Optional[Study]
+    return result  # type: ignore[return-value]
 
 
 def find_trial_hash_info_for_study(
@@ -157,7 +146,11 @@ def find_trial_hash_info_for_study(
     root_dir: Path,
     environment: str,
 ) -> Tuple[Optional[str], Optional[str], Optional[int]]:
-    """Find trial hash info for a specific trial number in a study.
+    """
+    Find trial hash info for a specific trial number in a study.
+
+    DEPRECATED: Use `evaluation.selection.study_summary.find_trial_hash_info_for_study`
+    directly instead.
 
     Args:
         backbone_name: Model backbone name (e.g., "distilbert" or "distilbert-base-uncased").
@@ -168,33 +161,20 @@ def find_trial_hash_info_for_study(
     Returns:
         Tuple of (study_key_hash, trial_key_hash, trial_number), or (None, None, None) if not found.
     """
-    # Normalize backbone name (extract base name before first "-")
-    # This matches the normalization used in the notebook when creating directories
-    normalized_backbone = backbone_name.split("-")[0] if "-" in backbone_name else backbone_name
-    backbone_dir = root_dir / "outputs" / "hpo" / \
-        environment / normalized_backbone
-    if not backbone_dir.exists():
-        return None, None, None
-
-    for study_folder in backbone_dir.iterdir():
-        if not study_folder.is_dir() or not study_folder.name.startswith("study-"):
-            continue
-        for trial_dir in study_folder.iterdir():
-            if (
-                trial_dir.is_dir()
-                and trial_dir.name.startswith("trial-")
-            ):
-                # Check trial_meta.json for trial_number match
-                trial_meta_path = trial_dir / "trial_meta.json"
-                if trial_meta_path.exists():
-                    try:
-                        with open(trial_meta_path, "r") as f:
-                            meta = json.load(f)
-                        if meta.get("trial_number") == trial_number:
-                            return get_trial_hash_info(trial_dir)
-                    except Exception:
-                        continue
-    return None, None, None
+    warnings.warn(
+        "selection.study_summary is deprecated. "
+        "Use evaluation.selection.study_summary instead. "
+        "This module will be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    
+    return _eval_study_summary.find_trial_hash_info_for_study(
+        backbone_name=backbone_name,
+        trial_number=trial_number,
+        root_dir=root_dir,
+        environment=environment,
+    )
 
 
 def format_study_summary_line(
@@ -207,7 +187,14 @@ def format_study_summary_line(
     trial_number: Optional[int] = None,
     cv_stats: Optional[Tuple[float, float]] = None,
 ) -> str:
-    """Format a single line summary for an HPO study.
+    """
+    Format a single line summary for an HPO study.
+
+    DEPRECATED: Use `evaluation.selection.study_summary.format_study_summary_line`
+    directly instead.
+
+    Note: The evaluation version has an additional `from_disk` parameter that is not
+    exposed in this wrapper. If you need that functionality, use the evaluation version directly.
 
     Args:
         backbone: Model backbone name.
@@ -222,21 +209,27 @@ def format_study_summary_line(
     Returns:
         Formatted summary line string.
     """
-    # Format hash info
-    if study_key_hash and trial_key_hash:
-        hash_info = f" [study-{study_key_hash[:8]}, trial-{trial_key_hash[:8]}, t{trial_number}]"
-    elif trial_number is not None:
-        hash_info = f" [t{trial_number}]"
-    else:
-        hash_info = ""
-
-    line = f"📊 {backbone}: {num_trials} trials, best {objective_metric}={best_metric_value:.4f}{hash_info}"
-
-    if cv_stats:
-        cv_mean, cv_std = cv_stats
-        line += f"\n   CV: {cv_mean:.4f} ± {cv_std:.4f}"
-
-    return line
+    warnings.warn(
+        "selection.study_summary is deprecated. "
+        "Use evaluation.selection.study_summary instead. "
+        "This module will be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    
+    # Note: evaluation version has `from_disk` parameter, but we don't expose it here
+    # to maintain backward compatibility with selection API
+    return _eval_study_summary.format_study_summary_line(
+        backbone=backbone,
+        num_trials=num_trials,
+        best_metric_value=best_metric_value,
+        objective_metric=objective_metric,
+        study_key_hash=study_key_hash,
+        trial_key_hash=trial_key_hash,
+        trial_number=trial_number,
+        cv_stats=cv_stats,
+        from_disk=False,  # Default value for backward compatibility
+    )
 
 
 def print_study_summaries(
@@ -246,7 +239,11 @@ def print_study_summaries(
     root_dir: Path,
     environment: str,
 ) -> None:
-    """Print formatted summaries for HPO studies.
+    """
+    Print formatted summaries for HPO studies.
+
+    DEPRECATED: Use `evaluation.selection.study_summary.print_study_summaries`
+    directly instead.
 
     Processes both in-memory studies and studies loaded from disk,
     displaying hash-based identifiers and CV statistics when available.
@@ -258,71 +255,21 @@ def print_study_summaries(
         root_dir: Project root directory.
         environment: Platform environment (e.g., "local", "colab").
     """
-    objective_metric = hpo_config["objective"]["metric"]
-    printed_backbones = set()  # Track which backbones we've printed
-
-    def normalize_backbone(name: str) -> str:
-        """Normalize backbone name by extracting base name before first '-'."""
-        return name.split("-")[0] if "-" in name else name
-
-    # Process in-memory studies
-    if hpo_studies:
-        for backbone_key, study in hpo_studies.items():
-            if not study or not study.trials:
-                continue
-
-            normalized_key = normalize_backbone(backbone_key)
-            best_trial = study.best_trial
-            cv_stats = extract_cv_statistics(best_trial)
-            trial_number = best_trial.number
-
-            study_key_hash, trial_key_hash, _ = find_trial_hash_info_for_study(
-                normalized_key, trial_number, root_dir, environment
-            )
-
-            summary_line = format_study_summary_line(
-                backbone=normalized_key,
-                num_trials=len(study.trials),
-                best_metric_value=best_trial.value,
-                objective_metric=objective_metric,
-                study_key_hash=study_key_hash,
-                trial_key_hash=trial_key_hash,
-                trial_number=trial_number,
-                cv_stats=cv_stats,
-            )
-            print(summary_line)
-            printed_backbones.add(normalized_key)
-            printed_backbones.add(backbone_key)
-
-    # Process remaining backbones from disk
-    for backbone in backbone_values:
-        normalized_backbone = normalize_backbone(backbone)
-        
-        if normalized_backbone in printed_backbones or backbone in printed_backbones:
-            continue
-
-        study = load_study_from_disk(backbone, root_dir, environment, hpo_config)
-        if not study or not study.trials:
-            continue
-
-        best_trial = study.best_trial
-        cv_stats = extract_cv_statistics(best_trial)
-        trial_number = best_trial.number
-
-        study_key_hash, trial_key_hash, _ = find_trial_hash_info_for_study(
-            normalized_backbone, trial_number, root_dir, environment
-        )
-
-        summary_line = format_study_summary_line(
-            backbone=normalized_backbone,
-            num_trials=len(study.trials),
-            best_metric_value=best_trial.value,
-            objective_metric=objective_metric,
-            study_key_hash=study_key_hash,
-            trial_key_hash=trial_key_hash,
-            trial_number=trial_number,
-            cv_stats=cv_stats,
-        )
-        print(summary_line)
-        printed_backbones.add(normalized_backbone)
-        printed_backbones.add(backbone)
+    warnings.warn(
+        "selection.study_summary is deprecated. "
+        "Use evaluation.selection.study_summary instead. "
+        "This module will be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    
+    # Type cast: selection version expects Dict[str, Study], evaluation version accepts Dict[str, Any]
+    hpo_studies_any: Optional[Dict[str, Any]] = hpo_studies  # type: ignore[assignment]
+    
+    return _eval_study_summary.print_study_summaries(
+        hpo_studies=hpo_studies_any,
+        backbone_values=backbone_values,
+        hpo_config=hpo_config,
+        root_dir=root_dir,
+        environment=environment,
+    )

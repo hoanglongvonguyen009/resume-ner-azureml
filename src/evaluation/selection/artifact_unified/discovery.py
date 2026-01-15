@@ -31,6 +31,11 @@ lifecycle:
 
 This module provides discovery functions that check for artifact availability
 in different sources (local disk, Google Drive, MLflow) without downloading.
+
+**Single Source of Truth (SSOT)**: This module is the SSOT for all checkpoint
+discovery and path finding logic. All checkpoint discovery functionality should
+use functions from this module (e.g., `_find_checkpoint_in_path()`,
+`_find_checkpoint_in_drive_by_hash()`) to avoid duplication.
 """
 import json
 from pathlib import Path
@@ -54,16 +59,6 @@ from infrastructure.paths import build_output_path, resolve_output_path
 logger = get_logger(__name__)
 
 
-def _check_checkpoint_files(path: Path) -> bool:
-    """Check if a directory contains essential checkpoint files."""
-    if not path.exists() or not path.is_dir():
-        return False
-    has_model = any(
-        (path / f).exists() 
-        for f in ["pytorch_model.bin", "model.safetensors", "model.bin"]
-    )
-    has_config = (path / "config.json").exists()
-    return has_model and has_config
 
 
 def discover_artifact_local(
@@ -269,8 +264,14 @@ def _find_checkpoint_in_path(path: Path) -> Optional[Path]:
         return None
     
     # Check if path itself is a checkpoint directory
-    if path.is_dir() and _check_checkpoint_files(path):
-        return path
+    if path.is_dir():
+        is_valid, _ = validate_artifact(
+            ArtifactKind.CHECKPOINT,
+            path,
+            strict=True,  # Require both config and model files
+        )
+        if is_valid:
+            return path
     
     # Check for extracted tar.gz directories first (before checking for tar.gz files)
     # This handles the case where tar.gz was already extracted in a previous run
@@ -278,23 +279,46 @@ def _find_checkpoint_in_path(path: Path) -> Optional[Path]:
         # Look for common extracted structures
         for subdir_name in ["best_trial_checkpoint", "checkpoint"]:
             subdir = path / subdir_name
-            if subdir.exists() and subdir.is_dir() and _check_checkpoint_files(subdir):
-                return subdir
+            if subdir.exists() and subdir.is_dir():
+                is_valid, _ = validate_artifact(
+                    ArtifactKind.CHECKPOINT,
+                    subdir,
+                    strict=True,  # Require both config and model files
+                )
+                if is_valid:
+                    return subdir
         
         # Check for directories that look like extracted tar.gz (name ends with .tar.gz)
         for item in path.iterdir():
             if item.is_dir() and item.name.endswith(".tar.gz"):
                 # Check inside the extracted directory
                 checkpoint_subdir = item / "checkpoint"
-                if checkpoint_subdir.exists() and checkpoint_subdir.is_dir() and _check_checkpoint_files(checkpoint_subdir):
-                    return checkpoint_subdir
+                if checkpoint_subdir.exists() and checkpoint_subdir.is_dir():
+                    is_valid, _ = validate_artifact(
+                        ArtifactKind.CHECKPOINT,
+                        checkpoint_subdir,
+                        strict=True,  # Require both config and model files
+                    )
+                    if is_valid:
+                        return checkpoint_subdir
                 
                 best_trial_dir = item / "best_trial_checkpoint"
-                if best_trial_dir.exists() and best_trial_dir.is_dir() and _check_checkpoint_files(best_trial_dir):
-                    return best_trial_dir
+                if best_trial_dir.exists() and best_trial_dir.is_dir():
+                    is_valid, _ = validate_artifact(
+                        ArtifactKind.CHECKPOINT,
+                        best_trial_dir,
+                        strict=True,  # Require both config and model files
+                    )
+                    if is_valid:
+                        return best_trial_dir
                 
                 # Or the extracted directory itself might contain checkpoint files
-                if _check_checkpoint_files(item):
+                is_valid, _ = validate_artifact(
+                    ArtifactKind.CHECKPOINT,
+                    item,
+                    strict=True,  # Require both config and model files
+                )
+                if is_valid:
                     return item
     
     # Check for tar.gz files (not extracted yet) - only if no extracted checkpoint found

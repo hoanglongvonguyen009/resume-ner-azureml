@@ -265,7 +265,7 @@ def run_training_trial_with_cv(
                     f"Attempting to compute trial_key_hash from trial_params..."
                 )
                 try:
-                    from infrastructure.tracking.mlflow.naming import (
+                    from infrastructure.naming.mlflow.hpo_keys import (
                         build_hpo_trial_key,
                         build_hpo_trial_key_hash,
                     )
@@ -439,7 +439,7 @@ def _create_trial_run(
         run_name = None
         try:
             from infrastructure.naming import create_naming_context
-            from infrastructure.tracking.mlflow.naming import build_mlflow_run_name
+            from infrastructure.naming.mlflow.run_names import build_mlflow_run_name
             from common.shared.platform_detection import detect_platform
 
             # Extract backbone short name
@@ -497,7 +497,7 @@ def _create_trial_run(
                     
                 if not computed_study_family_hash:
                     try:
-                        from infrastructure.tracking.mlflow.naming import (
+                        from infrastructure.naming.mlflow.hpo_keys import (
                             build_hpo_study_family_key,
                             build_hpo_study_family_hash,
                         )
@@ -552,8 +552,8 @@ def _create_trial_run(
                     )
 
             # Build tags including project identity tags and grouping tags
-            from infrastructure.tracking.mlflow.naming import (
-                build_mlflow_tags,
+            from infrastructure.naming.mlflow.tags import build_mlflow_tags
+            from infrastructure.naming.mlflow.run_keys import (
                 build_mlflow_run_key,
                 build_mlflow_run_key_hash,
             )
@@ -581,7 +581,7 @@ def _create_trial_run(
                 f"Could not build systematic run name and tags: {e}, using fallback")
             run_name = f"trial_{trial_number}"
             try:
-                from infrastructure.tracking.mlflow.config_loader import get_naming_config
+                from orchestration.jobs.tracking.config.loader import get_naming_config
                 naming_config = get_naming_config(config_dir)
                 project_name = naming_config.get("project_name", "resume-ner")
             except Exception:

@@ -39,9 +39,9 @@ import mlflow
 from common.shared.logging_utils import get_logger
 from common.constants import METRICS_FILENAME
 from infrastructure.naming import create_naming_context
-from infrastructure.tracking.mlflow.naming import (
-    build_mlflow_run_name,
-    build_mlflow_tags,
+from infrastructure.naming.mlflow.run_names import build_mlflow_run_name
+from infrastructure.naming.mlflow.tags import build_mlflow_tags
+from infrastructure.naming.mlflow.run_keys import (
     build_mlflow_run_key,
     build_mlflow_run_key_hash,
 )

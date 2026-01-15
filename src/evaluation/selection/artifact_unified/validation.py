@@ -31,6 +31,11 @@ lifecycle:
 
 This module provides validation functions for different artifact kinds.
 Each artifact kind has its own validation requirements.
+
+**Single Source of Truth (SSOT)**: This module is the SSOT for all artifact
+validation logic across the codebase. All checkpoint validation, metadata
+validation, and other artifact-kind-specific validation should use functions
+from this module to avoid duplication.
 """
 from pathlib import Path
 from typing import List, Optional

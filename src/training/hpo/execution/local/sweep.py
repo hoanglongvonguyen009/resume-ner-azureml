@@ -213,20 +213,19 @@ def create_local_hpo_objective(
         study_key_hash = None
         study_family_hash = None
         try:
-            active_run = mlflow.active_run()
-            if active_run:
-                hpo_parent_run_id = active_run.info.run_id
-                # Get grouping tags from parent run
-                try:
-                    client = mlflow.tracking.MlflowClient()
-                    parent_run = client.get_run(hpo_parent_run_id)
-                    study_key_hash = parent_run.data.tags.get(
-                        "code.study_key_hash")
-                    study_family_hash = parent_run.data.tags.get(
-                        "code.study_family_hash")
-                except Exception as e:
-                    logger.debug(
-                        f"Could not get grouping tags from parent run: {e}")
+            from infrastructure.tracking.mlflow.utils import get_mlflow_run_id
+            hpo_parent_run_id = get_mlflow_run_id()
+            # Get grouping tags from parent run
+            try:
+                client = mlflow.tracking.MlflowClient()
+                parent_run = client.get_run(hpo_parent_run_id)
+                study_key_hash = parent_run.data.tags.get(
+                    "code.study_key_hash")
+                study_family_hash = parent_run.data.tags.get(
+                    "code.study_family_hash")
+            except Exception as e:
+                logger.debug(
+                    f"Could not get grouping tags from parent run: {e}")
         except Exception:
             pass
 
@@ -278,7 +277,7 @@ def create_local_hpo_objective(
             trial_key_hash = None
             if study_key_hash:
                 try:
-                    from infrastructure.tracking.mlflow.naming import (
+                    from infrastructure.naming.mlflow.hpo_keys import (
                         build_hpo_trial_key,
                         build_hpo_trial_key_hash,
                     )
@@ -832,7 +831,7 @@ def run_local_hpo_sweep(
 
     # Cleanup stale reservations from crashed processes
     try:
-        from infrastructure.tracking.mlflow.index import cleanup_stale_reservations
+        from orchestration.jobs.tracking.index.version_counter import cleanup_stale_reservations
         root_dir = output_dir.parent.parent if output_dir else Path.cwd()
         config_dir = output_dir.parent.parent / "config" if output_dir else None
         cleaned_count = cleanup_stale_reservations(
@@ -1108,7 +1107,7 @@ def run_local_hpo_sweep(
                     # Priority 2: Compute from configs if tags unavailable
                     if not refit_study_family_hash and data_config and hpo_config:
                         try:
-                            from infrastructure.tracking.mlflow.naming import (
+                            from infrastructure.naming.mlflow.hpo_keys import (
                                 build_hpo_study_family_key,
                                 build_hpo_study_family_hash,
                             )
@@ -1154,7 +1153,7 @@ def run_local_hpo_sweep(
                         )
 
                     # Compute refit protocol fingerprint
-                    from infrastructure.tracking.mlflow.naming import compute_refit_protocol_fp
+                    from infrastructure.naming.mlflow.refit_keys import compute_refit_protocol_fp
                     refit_protocol_fp = compute_refit_protocol_fp(
                         data_config=data_config if data_config else {},
                         train_config=train_config,

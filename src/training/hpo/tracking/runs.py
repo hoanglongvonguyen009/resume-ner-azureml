@@ -59,10 +59,8 @@ def create_trial_run_no_cv(
         run_name = None
         try:
             from infrastructure.naming import create_naming_context
-            from infrastructure.tracking.mlflow.naming import (
-                build_mlflow_run_name,
-                build_mlflow_tags,
-            )
+            from infrastructure.naming.mlflow.run_names import build_mlflow_run_name
+            from infrastructure.naming.mlflow.tags import build_mlflow_tags
             from common.shared.platform_detection import detect_platform
 
             # Extract backbone short name
@@ -132,7 +130,7 @@ def create_trial_run_no_cv(
             run_name = f"trial_{trial_number}"
             # Fallback to minimal tags - still try to get project name from config
             try:
-                from infrastructure.tracking.mlflow.config_loader import (
+                from orchestration.jobs.tracking.config.loader import (
                     get_naming_config,
                 )
 

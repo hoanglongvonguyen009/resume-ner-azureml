@@ -367,7 +367,7 @@ def find_best_trial_from_study(
                     compute_study_key_hash_v2,
                     compute_trial_key_hash_from_configs,
                 )
-                from infrastructure.tracking.mlflow.naming import (
+                from infrastructure.naming.mlflow.hpo_keys import (
                     build_hpo_study_key,
                     build_hpo_study_key_hash,
                 )
@@ -411,7 +411,7 @@ def find_best_trial_from_study(
             study_key_hash = None
             if hpo_config and data_config:
                 try:
-                    from infrastructure.tracking.mlflow.naming import (
+                    from infrastructure.naming.mlflow.hpo_keys import (
                         build_hpo_study_key,
                         build_hpo_study_key_hash,
                     )

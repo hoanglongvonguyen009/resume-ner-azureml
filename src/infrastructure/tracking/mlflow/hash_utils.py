@@ -357,7 +357,7 @@ def compute_trial_key_hash_from_configs(
         trial_key_hash if computation succeeds, None otherwise
     """
     try:
-        from infrastructure.tracking.mlflow.naming import (
+        from infrastructure.naming.mlflow.hpo_keys import (
             build_hpo_trial_key,
             build_hpo_trial_key_hash,
         )

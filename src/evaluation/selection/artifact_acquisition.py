@@ -30,121 +30,26 @@ lifecycle:
 """
 Artifact acquisition utilities for best model selection.
 
-This module provides robust checkpoint acquisition with local-first priority,
-checkpoint validation, and graceful handling of Azure ML compatibility issues.
+This module is a backward compatibility wrapper around the unified artifact
+acquisition system. It maintains the original API for existing callers while
+delegating all functionality to `artifact_unified.compat`.
 
-NOTE: This module now uses the unified artifact acquisition system under the hood.
+**Consolidation Note**: This module no longer contains duplicate implementations
+of validation, extraction, or discovery logic. All such functionality has been
+consolidated into the `artifact_unified` modules:
+- Validation: `artifact_unified.validation` (SSOT)
+- Extraction: `artifact_unified.acquisition` (SSOT)
+- Discovery: `artifact_unified.discovery` (SSOT)
+
 The API remains the same for backward compatibility.
 """
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 import os
-import tarfile
-import mlflow
-import json
-import shutil
 
 # Import unified acquisition system
 from evaluation.selection.artifact_unified.compat import acquire_best_model_checkpoint as _acquire_best_model_checkpoint_unified
 
-
-def _extract_tar_gz(tar_path: Path, extract_to: Optional[Path] = None) -> Path:
-    """
-    Extract a tar.gz file and return the path to the extracted directory.
-    
-    NOTE: This function is kept for backward compatibility.
-    The unified artifact acquisition system has its own implementation.
-
-    Args:
-        tar_path: Path to the tar.gz file
-        extract_to: Directory to extract to (defaults to same directory as tar file)
-
-    Returns:
-        Path to the extracted directory containing checkpoint files
-    """
-    if extract_to is None:
-        extract_to = tar_path.parent
-
-    extract_to = Path(extract_to)
-    extract_to.mkdir(parents=True, exist_ok=True)
-
-    with tarfile.open(tar_path, 'r:gz') as tar:
-        members = tar.getmembers()
-        if members:
-            tar.extractall(path=extract_to)
-
-            # If archive has a single root directory, return that
-            root_names = {Path(m.name).parts[0] for m in members if m.name}
-            if len(root_names) == 1:
-                root_name = list(root_names)[0]
-                extracted_path = extract_to / root_name
-                if extracted_path.exists():
-                    return extracted_path
-
-            return extract_to
-
-    return extract_to
-
-
-def _validate_checkpoint(checkpoint_path: Path) -> bool:
-    """
-    Validate checkpoint integrity by checking for essential files.
-    
-    NOTE: This function is kept for backward compatibility.
-    The unified artifact acquisition system uses artifact-kind-specific validation.
-
-    Args:
-        checkpoint_path: Path to checkpoint directory
-
-    Returns:
-        True if checkpoint appears valid, False otherwise
-    """
-    if not checkpoint_path.exists() or not checkpoint_path.is_dir():
-        return False
-
-    # Check for common checkpoint files (PyTorch/HuggingFace)
-    essential_files = [
-        "pytorch_model.bin",
-        "model.safetensors",
-        "model.bin",
-        "pytorch_model.bin.index.json",
-    ]
-
-    has_model_file = any((checkpoint_path / fname).exists()
-                         for fname in essential_files)
-    has_config = (checkpoint_path / "config.json").exists()
-
-    return has_model_file or has_config
-
-
-def _find_checkpoint_in_directory(directory: Path) -> Optional[Path]:
-    """
-    Search for a valid checkpoint directory within the given directory.
-
-    Args:
-        directory: Directory to search in
-
-    Returns:
-        Path to valid checkpoint directory, or None if not found
-    """
-    if not directory.is_dir():
-        return None
-
-    # Check if directory itself contains checkpoint files
-    if _validate_checkpoint(directory):
-        return directory
-
-    # Check for checkpoint subdirectory
-    checkpoint_subdir = directory / "checkpoint"
-    if checkpoint_subdir.exists() and checkpoint_subdir.is_dir() and _validate_checkpoint(checkpoint_subdir):
-        return checkpoint_subdir
-
-    # Search recursively for any directory with checkpoint files
-    for item in directory.rglob("*"):
-        if item.is_dir() and _validate_checkpoint(item):
-            return item
-
-    return None
 
 
 def _build_checkpoint_dir(
@@ -190,75 +95,6 @@ def _build_checkpoint_dir(
         return base_dir / f"sel_{study8}_{trial8}"
 
     return base_dir / f"run_{artifact_run_id[:8]}"
-
-
-def _find_checkpoint_in_drive_by_hash(
-    drive_hpo_dir: Path,
-    study_key_hash: str,
-    trial_key_hash: str,
-) -> Optional[Path]:
-    """
-    Find checkpoint in Drive by scanning Drive directory structure directly.
-    This avoids restoring the entire HPO directory structure.
-
-    Args:
-        drive_hpo_dir: Drive path to HPO backbone directory
-        study_key_hash: Target study key hash
-        trial_key_hash: Target trial key hash
-
-    Returns:
-        Path to checkpoint directory in Drive, or None if not found
-    """
-    if not drive_hpo_dir.exists():
-        return None
-
-    # Scan study folders in Drive
-    for study_folder in drive_hpo_dir.iterdir():
-        if not study_folder.is_dir() or study_folder.name.startswith("trial_"):
-            continue
-
-        # Scan trial folders
-        for trial_dir in study_folder.iterdir():
-            if not trial_dir.is_dir() or not trial_dir.name.startswith("trial_"):
-                continue
-
-            # Read trial metadata from Drive
-            trial_meta_path = trial_dir / "trial_meta.json"
-            if not trial_meta_path.exists():
-                continue
-
-            try:
-                with open(trial_meta_path, "r") as f:
-                    meta = json.load(f)
-
-                # Match by hashes
-                if (meta.get("study_key_hash") == study_key_hash and
-                        meta.get("trial_key_hash") == trial_key_hash):
-                    # Found match! Get checkpoint path (prefer refit, else best CV fold)
-                    refit_checkpoint = trial_dir / "refit" / "checkpoint"
-                    if refit_checkpoint.exists():
-                        return refit_checkpoint
-
-                    # Check CV folds
-                    cv_dir = trial_dir / "cv"
-                    if cv_dir.exists():
-                        fold_dirs = [d for d in cv_dir.iterdir()
-                                     if d.is_dir() and d.name.startswith("fold")]
-                        if fold_dirs:
-                            # Return first fold checkpoint (or implement best fold selection)
-                            for fold_dir in sorted(fold_dirs):
-                                fold_checkpoint = fold_dir / "checkpoint"
-                                if fold_checkpoint.exists():
-                                    return fold_checkpoint
-
-                    # Fallback
-                    checkpoint = trial_dir / "checkpoint"
-                    if checkpoint.exists():
-                        return checkpoint
-            except Exception:
-                continue
-
-    return None
 
 
 def _get_azure_ml_info(config_dir: Path, root_dir: Path, tracking_uri: str) -> tuple[str, str]:

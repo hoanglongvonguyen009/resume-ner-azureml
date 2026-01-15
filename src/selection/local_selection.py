@@ -35,7 +35,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from common.shared.logging_utils import get_logger
 
-from .disk_loader import load_best_trial_from_disk, load_benchmark_speed_score
+from evaluation.selection.disk_loader import load_best_trial_from_disk, load_benchmark_speed_score
 from orchestration.jobs.errors import SelectionError
 from .selection_logic import MODEL_SPEED_SCORES, SelectionLogic
 from training.hpo.core.study import extract_best_config_from_study
