@@ -28,7 +28,7 @@ from unittest.mock import patch
 import mlflow
 import pytest
 
-from orchestration import EXPERIMENT_NAME
+from common.constants import EXPERIMENT_NAME
 from infrastructure.config.loader import load_experiment_config
 from training.execution import extract_lineage_from_best_model
 from infrastructure.naming.mlflow.tags_registry import load_tags_registry

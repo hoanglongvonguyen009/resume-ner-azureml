@@ -122,8 +122,25 @@ def create_dry_run_sweep_job_for_backbone(
         compute=compute_cluster,
     )
 
+    # Get direction with backward compatibility for "goal"
+    objective_config = smoke_hpo_config["objective"]
+    if "direction" in objective_config:
+        direction = objective_config["direction"]
+    elif "goal" in objective_config:
+        import warnings
+        warnings.warn(
+            "Using deprecated 'objective.goal' key. "
+            "Please update config to use 'objective.direction' instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        goal = objective_config["goal"]
+        direction = "maximize" if goal.lower() in ["maximize", "max"] else "minimize"
+    else:
+        direction = "maximize"
+    
     objective = Objective(
-        goal=smoke_hpo_config["objective"]["goal"],
+        goal=direction,  # Azure ML uses "goal" parameter name
         primary_metric=smoke_hpo_config["objective"]["metric"],
     )
     timeout_seconds = smoke_hpo_config["sampling"]["timeout_minutes"] * 60
@@ -213,8 +230,25 @@ def create_hpo_sweep_job_for_backbone(
         compute=compute_cluster,
     )
 
+    # Get direction with backward compatibility for "goal"
+    objective_config = hpo_config["objective"]
+    if "direction" in objective_config:
+        direction = objective_config["direction"]
+    elif "goal" in objective_config:
+        import warnings
+        warnings.warn(
+            "Using deprecated 'objective.goal' key. "
+            "Please update config to use 'objective.direction' instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        goal = objective_config["goal"]
+        direction = "maximize" if goal.lower() in ["maximize", "max"] else "minimize"
+    else:
+        direction = "maximize"
+    
     objective = Objective(
-        goal=hpo_config["objective"]["goal"],
+        goal=direction,  # Azure ML uses "goal" parameter name
         primary_metric=hpo_config["objective"]["metric"],
     )
     timeout_seconds = hpo_config["sampling"]["timeout_minutes"] * 60

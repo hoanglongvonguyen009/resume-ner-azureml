@@ -19,16 +19,86 @@ This module will be removed in 2 releases.
 """
 
 import warnings
+import sys
+import inspect
 from typing import Any
 
-# Emit deprecation warning
-warnings.warn(
-    "orchestration module is deprecated. "
-    "Use 'infrastructure', 'common', or 'data' modules instead. "
-    "This will be removed in 2 releases.",
-    DeprecationWarning,
-    stacklevel=2
-)
+# Check if we're being imported as part of a submodule import (e.g., orchestration.jobs.tracking.*)
+# Only emit warning for direct imports of orchestration module, not for active submodules
+def _should_emit_deprecation_warning() -> bool:
+    """Check if deprecation warning should be emitted.
+    
+    Returns False if we're being imported as part of an active submodule import
+    (e.g., orchestration.jobs.tracking.* or orchestration.jobs.hpo.local.*).
+    
+    This uses heuristics to detect submodule imports. Since Python loads the parent
+    module before submodules, we check the call stack for import statements
+    containing 'orchestration.jobs'.
+    """
+    # Check if orchestration.jobs is already in sys.modules
+    # This is the most reliable indicator of a submodule import
+    if 'orchestration.jobs' in sys.modules:
+        return False
+    
+    try:
+        # Get the call stack to examine import context
+        stack = inspect.stack()
+        
+        # Look through frames to find the import statement
+        # We need to find the frame that contains the actual import statement
+        for frame_info in stack[2:12]:  # Skip this function and module init, check callers
+            frame = frame_info.frame
+            code = frame.f_code
+            filename = code.co_filename
+            
+            # Skip frames that are part of the orchestration package itself
+            # (these would be internal imports, not user imports)
+            if 'orchestration' in filename and ('/jobs/' in filename or '\\jobs\\' in filename):
+                # We're being imported from within the orchestration.jobs package
+                # This indicates a submodule import
+                return False
+            
+            try:
+                # Try to get the source code to find import statements
+                try:
+                    source_lines, start_line = inspect.getsourcelines(frame)
+                    current_line = frame.f_lineno
+                    line_index = current_line - start_line
+                    
+                    # Check a window around the current line for import statements
+                    window_start = max(0, line_index - 3)
+                    window_end = min(len(source_lines), line_index + 3)
+                    
+                    for i in range(window_start, window_end):
+                        line = source_lines[i].strip()
+                        # Only check actual import statements (not comments or docstrings)
+                        if (line.startswith('import ') or line.startswith('from ')) and not line.startswith('#'):
+                            if 'orchestration.jobs' in line:
+                                # Found an import statement with orchestration.jobs
+                                return False
+                except (OSError, IOError, ValueError, IndexError):
+                    # Can't read source, continue to next frame
+                    pass
+                
+            except Exception:
+                continue
+                
+    except Exception:
+        # If we can't determine, default to emitting warning (safer)
+        pass
+    
+    # Default: emit warning for direct imports
+    return True
+
+# Emit deprecation warning only for direct imports, not for active submodules
+if _should_emit_deprecation_warning():
+    warnings.warn(
+        "orchestration module is deprecated. "
+        "Use 'infrastructure', 'common', or 'data' modules instead. "
+        "This will be removed in 2 releases.",
+        DeprecationWarning,
+        stacklevel=2
+    )
 
 # Constants - moved to common.constants module
 from common.constants import (

@@ -162,8 +162,30 @@ class StudyManager:
 
         # Extract configuration
         self.objective_metric = hpo_config["objective"]["metric"]
-        self.goal = hpo_config["objective"]["goal"]
-        self.direction = "maximize" if self.goal == "maximize" else "minimize"
+        # Support both "direction" (new) and "goal" (deprecated) keys
+        objective = hpo_config["objective"]
+        if "direction" in objective:
+            self.direction = objective["direction"]
+        elif "goal" in objective:
+            import warnings
+            warnings.warn(
+                "Using deprecated 'objective.goal' key. "
+                "Please update config to use 'objective.direction' instead.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            goal = objective["goal"]
+            # Map goal values to direction
+            if goal.lower() in ["maximize", "max"]:
+                self.direction = "maximize"
+            elif goal.lower() in ["minimize", "min"]:
+                self.direction = "minimize"
+            else:
+                self.direction = goal  # Pass through if already correct format
+        else:
+            self.direction = "maximize"  # Default
+        # Keep goal for backward compatibility (deprecated)
+        self.goal = self.direction
 
         # Create pruner and sampler
         self.pruner = create_optuna_pruner(hpo_config)

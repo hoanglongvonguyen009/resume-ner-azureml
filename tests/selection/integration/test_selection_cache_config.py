@@ -77,9 +77,9 @@ class TestSelectionCacheConfig:
         # Cache keys should be identical
         assert cache_key1 == cache_key2
 
-    @patch("orchestration.jobs.selection.cache.MlflowClient")
-    @patch("orchestration.jobs.selection.cache.get_cache_file_path")
-    @patch("orchestration.jobs.selection.cache.load_json")
+    @patch("evaluation.selection.cache.MlflowClient")
+    @patch("evaluation.selection.cache.get_cache_file_path")
+    @patch("evaluation.selection.cache.load_json")
     def test_load_cached_best_model_validates_cache_key(
         self,
         mock_load_json,
@@ -142,8 +142,8 @@ class TestSelectionCacheConfig:
         # (validation happens at line 116 in cache.py)
         assert result is not None
 
-    @patch("orchestration.jobs.selection.cache.get_cache_file_path")
-    @patch("orchestration.jobs.selection.cache.load_json")
+    @patch("evaluation.selection.cache.get_cache_file_path")
+    @patch("evaluation.selection.cache.load_json")
     def test_load_cached_best_model_cache_key_mismatch(
         self,
         mock_load_json,
@@ -182,7 +182,7 @@ class TestSelectionCacheConfig:
         # Should return None due to cache key mismatch
         assert result is None
 
-    @patch("orchestration.jobs.selection.cache.save_cache_with_dual_strategy")
+    @patch("evaluation.selection.cache.save_cache_with_dual_strategy")
     def test_save_best_model_cache_includes_selection_config(
         self,
         mock_save_cache,
@@ -233,8 +233,8 @@ class TestSelectionCacheConfig:
         # So the cache data should have a cache_key that depends on selection_config
         assert "cache_key" in cache_data
 
-    @patch("orchestration.jobs.selection.cache.get_cache_file_path")
-    @patch("orchestration.jobs.selection.cache.load_json")
+    @patch("evaluation.selection.cache.get_cache_file_path")
+    @patch("evaluation.selection.cache.load_json")
     def test_run_mode_reuse_if_exists_behavior(
         self,
         mock_load_json,
@@ -273,7 +273,7 @@ class TestSelectionCacheConfig:
         mock_load_json.return_value = cache_data
         
         # Mock MLflow client
-        with patch("orchestration.jobs.selection.cache.MlflowClient") as mock_client_class:
+        with patch("evaluation.selection.cache.MlflowClient") as mock_client_class:
             mock_client = Mock()
             mock_client_class.return_value = mock_client
             mock_run = Mock()
@@ -294,8 +294,8 @@ class TestSelectionCacheConfig:
             assert mock_load_json.called
             assert result is not None
 
-    @patch("orchestration.jobs.selection.cache.get_cache_file_path")
-    @patch("orchestration.jobs.selection.cache.load_json")
+    @patch("evaluation.selection.cache.get_cache_file_path")
+    @patch("evaluation.selection.cache.load_json")
     def test_run_mode_force_new_behavior(
         self,
         mock_load_json,

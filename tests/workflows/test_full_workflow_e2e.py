@@ -54,7 +54,7 @@ if str(ROOT_DIR) not in sys.path:
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from orchestration import (
+from common.constants import (
     STAGE_HPO,
     EXPERIMENT_NAME,
     METRICS_FILENAME,
@@ -218,7 +218,7 @@ def test_full_workflow_e2e(
         backbone_values = hpo_config["search_space"]["backbone"]["values"]
         backbone = backbone_values[0] if backbone_values else "distilbert"
         
-        from orchestration import build_mlflow_experiment_name
+        from infrastructure.naming import build_mlflow_experiment_name
         mlflow_experiment_name = build_mlflow_experiment_name(
             experiment_config.name, STAGE_HPO, backbone
         )

@@ -179,7 +179,21 @@ class CheckpointCleanupManager:
         optuna_module, _, _, _ = _import_optuna()
         try:
             study = trial.study
-            goal = self.hpo_config["objective"]["goal"]
+            # Get direction with backward compatibility for "goal"
+            objective = self.hpo_config["objective"]
+            if "direction" in objective:
+                goal = objective["direction"]
+            elif "goal" in objective:
+                import warnings
+                warnings.warn(
+                    "Using deprecated 'objective.goal' key. "
+                    "Please update config to use 'objective.direction' instead.",
+                    DeprecationWarning,
+                    stacklevel=2
+                )
+                goal = objective["goal"]
+            else:
+                goal = "maximize"
 
             # Find best completed trial from existing study
             best_existing_trial = None
@@ -263,7 +277,21 @@ class CheckpointCleanupManager:
                 return early_return
 
             # Check if this is a new best trial
-            goal = self.hpo_config["objective"]["goal"]
+            # Get direction with backward compatibility for "goal"
+            objective = self.hpo_config["objective"]
+            if "direction" in objective:
+                goal = objective["direction"]
+            elif "goal" in objective:
+                import warnings
+                warnings.warn(
+                    "Using deprecated 'objective.goal' key. "
+                    "Please update config to use 'objective.direction' instead.",
+                    DeprecationWarning,
+                    stacklevel=2
+                )
+                goal = objective["goal"]
+            else:
+                goal = "maximize"
             is_new_best = False
 
             if goal == "maximize":

@@ -10,7 +10,7 @@ from evaluation.selection.mlflow_selection import find_best_model_from_mlflow
 class TestMLflowSelectionConfigUsage:
     """Test that find_best_model_from_mlflow() uses config options correctly."""
 
-    @patch("orchestration.jobs.selection.mlflow_selection.MlflowClient")
+    @patch("evaluation.selection.mlflow_selection.MlflowClient")
     def test_find_best_model_uses_objective_metric(
         self,
         mock_client_class,
@@ -46,7 +46,7 @@ class TestMLflowSelectionConfigUsage:
         call_args = mock_client.search_runs.call_args_list
         assert len(call_args) > 0
 
-    @patch("orchestration.jobs.selection.mlflow_selection.MlflowClient")
+    @patch("evaluation.selection.mlflow_selection.MlflowClient")
     def test_find_best_model_uses_scoring_weights(
         self,
         mock_client_class,
@@ -82,7 +82,7 @@ class TestMLflowSelectionConfigUsage:
         # We can't directly verify weights were used without runs,
         # but we verify the function executed (weights extracted at line 70-73)
 
-    @patch("orchestration.jobs.selection.mlflow_selection.MlflowClient")
+    @patch("evaluation.selection.mlflow_selection.MlflowClient")
     def test_find_best_model_uses_benchmark_required_metrics(
         self,
         mock_client_class,
@@ -122,7 +122,7 @@ class TestMLflowSelectionConfigUsage:
         # Function should filter runs based on required_metrics (line 115-116)
         # Since we have a run with required metrics, it should be considered valid
 
-    @patch("orchestration.jobs.selection.mlflow_selection.MlflowClient")
+    @patch("evaluation.selection.mlflow_selection.MlflowClient")
     def test_find_best_model_weight_normalization(
         self,
         mock_client_class,
@@ -156,7 +156,7 @@ class TestMLflowSelectionConfigUsage:
         
         # When normalize_weights=False, weights should not be normalized (line 77-81)
 
-    @patch("orchestration.jobs.selection.mlflow_selection.MlflowClient")
+    @patch("evaluation.selection.mlflow_selection.MlflowClient")
     def test_find_best_model_composite_score_calculation(
         self,
         mock_client_class,
@@ -224,7 +224,7 @@ class TestMLflowSelectionConfigUsage:
             assert "f1_score" in result
             assert "latency_ms" in result
 
-    @patch("orchestration.jobs.selection.mlflow_selection.MlflowClient")
+    @patch("evaluation.selection.mlflow_selection.MlflowClient")
     def test_find_best_model_all_config_options_together(
         self,
         mock_client_class,
@@ -262,7 +262,7 @@ class TestMLflowSelectionConfigUsage:
         # All config options are extracted at lines 69-74
         # We verify the function executed successfully with all options
 
-    @patch("orchestration.jobs.selection.mlflow_selection.MlflowClient")
+    @patch("evaluation.selection.mlflow_selection.MlflowClient")
     def test_find_best_model_custom_config_values(
         self,
         mock_client_class,

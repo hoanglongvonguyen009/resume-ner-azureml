@@ -172,7 +172,7 @@ class TestSelectionConfigEdgeCases:
         assert isinstance(cache_key, str)
         assert len(cache_key) == 16
 
-    @patch("orchestration.jobs.selection.mlflow_selection.MlflowClient")
+    @patch("evaluation.selection.mlflow_selection.MlflowClient")
     def test_find_best_model_missing_required_metrics(
         self,
         mock_client_class,
@@ -206,7 +206,7 @@ class TestSelectionConfigEdgeCases:
         # Should return None because no valid benchmark runs (filtered out at line 115-116)
         assert result is None
 
-    @patch("orchestration.jobs.selection.mlflow_selection.MlflowClient")
+    @patch("evaluation.selection.mlflow_selection.MlflowClient")
     def test_find_best_model_empty_required_metrics(
         self,
         mock_client_class,

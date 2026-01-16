@@ -35,7 +35,7 @@ early_termination:
 
 objective:
   metric: "macro-f1"
-  goal: "maximize"
+  direction: "maximize"
 
 # Run mode configuration (unified behavior control)
 run:

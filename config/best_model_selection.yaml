@@ -17,7 +17,6 @@ objective:
   # MIGRATION: Renamed from "goal" to "direction" for consistency
   # Code will accept both during migration period (warns if "goal" is used)
   direction: "maximize"  # "maximize" or "minimize"
-  goal: "maximize"  # Legacy - will be deprecated
 
 # Champion Selection Configuration (Phase 2)
 champion_selection:

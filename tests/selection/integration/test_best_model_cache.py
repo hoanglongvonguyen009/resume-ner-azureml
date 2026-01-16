@@ -110,7 +110,7 @@ def test_cache_load_valid_cache_with_mlflow_validation(tmp_path, cache_dir):
     mock_run.info.status = "FINISHED"
     mock_client.get_run.return_value = mock_run
 
-    with patch("orchestration.jobs.selection.cache.MlflowClient", return_value=mock_client):
+    with patch("evaluation.selection.cache.MlflowClient", return_value=mock_client):
         result = load_cached_best_model(
             root_dir=root_dir,
             config_dir=config_dir,
@@ -202,7 +202,7 @@ def test_cache_partial_write_recovery(tmp_path, cache_dir):
     mock_run.info.status = "FINISHED"
     mock_client.get_run.return_value = mock_run
 
-    with patch("orchestration.jobs.selection.cache.MlflowClient", return_value=mock_client):
+    with patch("evaluation.selection.cache.MlflowClient", return_value=mock_client):
         result = load_cached_best_model(
             root_dir=root_dir,
             config_dir=config_dir,
@@ -258,7 +258,7 @@ def test_cache_missing_metrics_handling(tmp_path, cache_dir):
     mock_client.get_run.return_value = mock_run
 
     # Load should handle missing metrics gracefully
-    with patch("orchestration.jobs.selection.cache.MlflowClient", return_value=mock_client):
+    with patch("evaluation.selection.cache.MlflowClient", return_value=mock_client):
         result = load_cached_best_model(
             root_dir=root_dir,
             config_dir=config_dir,

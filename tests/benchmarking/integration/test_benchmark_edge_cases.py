@@ -278,11 +278,11 @@ class TestBenchmarkConfigEdgeCases:
         # Should use defaults
         assert filename == "benchmark.json"
 
-    @patch("orchestration.jobs.benchmarking.orchestrator.run_benchmarking")
-    @patch("orchestration.jobs.benchmarking.orchestrator.create_naming_context")
-    @patch("orchestration.jobs.benchmarking.orchestrator.build_output_path")
-    @patch("orchestration.jobs.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("orchestration.jobs.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
     def test_benchmark_best_trials_handles_missing_test_data(
         self,
         mock_validate_path,

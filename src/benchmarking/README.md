@@ -129,7 +129,7 @@ python -m src.benchmarking.cli \
 # 4. Run model selection (will automatically use benchmark data)
 python -c "
 from pathlib import Path
-from orchestration.jobs.local_selection import select_best_configuration_across_studies
+from evaluation.selection import select_best_configuration_across_studies
 # ... selection code ...
 "
 ```
