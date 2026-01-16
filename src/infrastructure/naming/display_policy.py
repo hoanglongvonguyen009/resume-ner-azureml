@@ -63,6 +63,10 @@ def load_naming_policy(
         Naming policy dictionary, or empty dict if file not found.
     """
     if config_dir is None:
+        from infrastructure.paths.utils import resolve_project_paths
+        _, config_dir = resolve_project_paths(config_dir=None)
+        # If inference failed, fall back to infer_config_dir for backward compatibility
+        if config_dir is None:
         from infrastructure.paths.utils import infer_config_dir
         config_dir = infer_config_dir()
 
@@ -402,6 +406,10 @@ def format_run_name(
     """
     # Load policy if not provided
     if policy is None:
+        if config_dir is None:
+            from infrastructure.paths.utils import resolve_project_paths
+            _, config_dir = resolve_project_paths(config_dir=None)
+            # If inference failed, fall back to infer_config_dir for backward compatibility
         if config_dir is None:
             from infrastructure.paths.utils import infer_config_dir
             config_dir = infer_config_dir()

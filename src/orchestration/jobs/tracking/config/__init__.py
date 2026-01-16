@@ -6,9 +6,11 @@ This module re-exports configuration functions for backward compatibility.
 New code should import directly from orchestration.jobs.tracking.config.*
 """
 
-# Re-export all configuration functions
+# Import load_mlflow_config from SSOT
+from infrastructure.naming.mlflow.config import load_mlflow_config
+
+# Re-export other configuration functions from loader
 from orchestration.jobs.tracking.config.loader import (
-    load_mlflow_config,
     get_naming_config,
     get_index_config,
     get_run_finder_config,

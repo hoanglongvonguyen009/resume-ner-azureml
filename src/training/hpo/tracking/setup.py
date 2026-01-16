@@ -153,19 +153,26 @@ def setup_hpo_mlflow_run(
         # This trusts provided config_dir and only infers when necessary
         from infrastructure.paths.utils import resolve_project_paths
         
-        root_dir, resolved_config_dir = resolve_project_paths(
+        # Trust provided config_dir - only resolve if None
+        if config_dir is None:
+            root_dir, config_dir = resolve_project_paths(
+                output_dir=output_dir,
+                config_dir=None,
+            )
+            # Fallback if resolve_project_paths() didn't find config_dir
+            if config_dir is None:
+                from infrastructure.paths.utils import infer_config_dir
+                config_dir = infer_config_dir(path=root_dir) if root_dir else infer_config_dir()
+        else:
+            # When config_dir is provided, derive root_dir from it
+            root_dir, _ = resolve_project_paths(
             output_dir=output_dir,
             config_dir=config_dir,
         )
         
-        # Standardized fallback: use resolved value, or provided parameter, or infer
+        # Fallback for root_dir if not found
         if root_dir is None:
             root_dir = Path.cwd()
-        # Use resolved config_dir, or provided config_dir, or infer as last resort
-        config_dir = resolved_config_dir or config_dir
-        if config_dir is None:
-            from infrastructure.paths.utils import infer_config_dir
-            config_dir = infer_config_dir(path=root_dir) if root_dir else infer_config_dir()
 
         mlflow_run_name = build_mlflow_run_name(
             hpo_parent_context,
@@ -273,19 +280,26 @@ def commit_run_name_version(
         # Trust provided config_dir parameter if available
         from infrastructure.paths.utils import resolve_project_paths
         
-        root_dir, resolved_config_dir = resolve_project_paths(
+        # Trust provided config_dir - only resolve if None
+        if config_dir is None:
+            root_dir, config_dir = resolve_project_paths(
+                output_dir=output_dir,
+                config_dir=None,
+            )
+            # Fallback if resolve_project_paths() didn't find config_dir
+            if config_dir is None:
+                from infrastructure.paths.utils import infer_config_dir
+                config_dir = infer_config_dir(path=root_dir) if root_dir else infer_config_dir()
+        else:
+            # When config_dir is provided, derive root_dir from it
+            root_dir, _ = resolve_project_paths(
             output_dir=output_dir,
-            config_dir=config_dir,  # Use provided config_dir if available
+                config_dir=config_dir,
         )
         
-        # Standardized fallback: use resolved value, or provided parameter, or infer
+        # Fallback for root_dir if not found
         if root_dir is None:
             root_dir = Path.cwd()
-        # Use resolved config_dir, or provided config_dir, or infer as last resort
-        config_dir = resolved_config_dir or config_dir
-        if config_dir is None:
-            from infrastructure.paths.utils import infer_config_dir
-            config_dir = infer_config_dir(path=root_dir) if root_dir else infer_config_dir()
 
         # Check if auto-increment was used (suffix _1, _2, ...)
         version_match = re.search(r"_(\d+)$", mlflow_run_name)

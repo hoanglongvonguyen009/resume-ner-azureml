@@ -1,59 +1,20 @@
 from __future__ import annotations
 
-"""MLflow configuration loader for systematic naming settings."""
+"""MLflow configuration loader for systematic naming settings.
+
+This module provides configuration accessor functions that use the SSOT
+load_mlflow_config() from infrastructure.naming.mlflow.config.
+"""
 
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from common.shared.yaml_utils import load_yaml
 from common.shared.logging_utils import get_logger
 
+# Import SSOT for load_mlflow_config
+from infrastructure.naming.mlflow.config import load_mlflow_config
+
 logger = get_logger(__name__)
-
-# Module-level cache for loaded config
-_config_cache: Optional[Dict[str, Any]] = None
-_config_cache_path: Optional[Path] = None
-
-
-def load_mlflow_config(config_dir: Optional[Path] = None) -> Dict[str, Any]:
-    """
-    Load full MLflow config from config/mlflow.yaml.
-    
-    Uses caching to avoid repeated file reads.
-    
-    Args:
-        config_dir: Path to config directory (defaults to current directory / "config").
-    
-    Returns:
-        Full MLflow config dictionary, or empty dict if file not found.
-    """
-    global _config_cache, _config_cache_path
-    
-    if config_dir is None:
-        from infrastructure.paths.utils import infer_config_dir
-        config_dir = infer_config_dir()
-    
-    config_path = config_dir / "mlflow.yaml"
-    
-    # Check cache
-    if _config_cache is not None and _config_cache_path == config_path:
-        return _config_cache
-    
-    # Load config
-    if not config_path.exists():
-        _config_cache = {}
-        _config_cache_path = config_path
-        return _config_cache
-    
-    try:
-        _config_cache = load_yaml(config_path)
-        _config_cache_path = config_path
-        return _config_cache
-    except Exception as e:
-        logger.warning(f"[MLflow Config] Failed to load config from {config_path}: {e}", exc_info=True)
-        _config_cache = {}
-        _config_cache_path = config_path
-        return _config_cache
 
 
 def _validate_naming_config(config: Dict[str, Any]) -> Dict[str, Any]:

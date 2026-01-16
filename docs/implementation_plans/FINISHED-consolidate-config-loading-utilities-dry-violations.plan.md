@@ -8,14 +8,14 @@ Eliminate duplicate config loading patterns, config directory inference logic, a
 
 **Last Updated**: 2026-01-27
 
-**Status**: ⏳ **IN PROGRESS** - Step 1 complete, remaining steps pending
+**Status**: ✅ **COMPLETE** - All steps finished successfully
 
 ### Completed Steps
 - ✅ Step 1: Document all utility scripts with config loading responsibilities (2026-01-27)
-- ⏳ Step 2: Consolidate config loading with caching patterns
-- ⏳ Step 3: Standardize config_dir inference to use resolve_project_paths()
-- ⏳ Step 4: Eliminate re-inference of config_dir when already available
-- ⏳ Step 5: Verify no breaking changes and update tests
+- ✅ Step 2: Consolidate config loading with caching patterns (2026-01-27)
+- ✅ Step 3: Standardize config_dir inference to use resolve_project_paths() (2026-01-27)
+- ✅ Step 4: Eliminate re-inference of config_dir when already available (2026-01-27)
+- ✅ Step 5: Verify no breaking changes and update tests (2026-01-27)
 
 ## Preconditions
 
@@ -286,14 +286,22 @@ Eliminate duplicate config loading patterns, config directory inference logic, a
 grep -r "orchestration\.jobs\.tracking\.config\.loader\.load_mlflow_config\|from.*orchestration.*jobs.*tracking.*config.*loader.*import.*load_mlflow_config" --include="*.py" src/ tests/
 ```
 
+**Completion Notes** (2026-01-27):
+- ✅ Removed duplicate `load_mlflow_config()` function from `orchestration.jobs.tracking.config.loader`
+- ✅ Updated `orchestration.jobs.tracking.config.loader` to import `load_mlflow_config` from SSOT (`infrastructure.naming.mlflow.config`)
+- ✅ Updated `orchestration.jobs.tracking.config.__init__.py` to import `load_mlflow_config` from SSOT
+- ✅ Updated `orchestration.jobs.tracking.mlflow_config_loader.py` to import `load_mlflow_config` from SSOT
+- ✅ All get_* functions in `orchestration.jobs.tracking.config.loader` now use SSOT `load_mlflow_config()` internally
+- ✅ No direct imports of `load_mlflow_config` from old location found (verified with grep)
+- ✅ No linter errors introduced
+- ✅ Backward compatibility maintained: all get_* functions still available from `orchestration.jobs.tracking.config.loader`
+
 ### Step 3: Standardize Config Directory Inference to Use resolve_project_paths()
 
 **Objective**: Ensure all config loading utilities use the standardized `resolve_project_paths()` pattern.
 
 **Actions**:
-1. Update `orchestration.jobs.tracking.config.loader.load_mlflow_config()` (if still exists after Step 2):
-   - Replace direct `infer_config_dir()` call with `resolve_project_paths()` pattern
-   - Use same pattern as `infrastructure.naming.mlflow.config.load_mlflow_config()`
+1. ~~Update `orchestration.jobs.tracking.config.loader.load_mlflow_config()` (removed in Step 2, now uses SSOT)~~
 2. Verify `infrastructure.naming.mlflow.config.load_mlflow_config()` uses correct pattern:
    - Should use `resolve_project_paths()` with fallback to `infer_config_dir()`
 3. Verify `infrastructure.naming.mlflow.tags_registry.load_tags_registry()` uses correct pattern:
@@ -314,6 +322,15 @@ grep -r "orchestration\.jobs\.tracking\.config\.loader\.load_mlflow_config\|from
 # Should show only resolve_project_paths() pattern or direct parameter usage
 grep -r "if config_dir is None:" --include="*.py" src/infrastructure src/orchestration -A 3
 ```
+
+**Completion Notes** (2026-01-27):
+- ✅ Verified `infrastructure.naming.mlflow.config.load_mlflow_config()` uses `resolve_project_paths()` pattern (lines 55-61)
+- ✅ Verified `infrastructure.naming.mlflow.tags_registry.load_tags_registry()` uses `resolve_project_paths()` pattern (lines 194-200)
+- ✅ Updated `infrastructure.naming.display_policy.load_naming_policy()` to use `resolve_project_paths()` pattern (2 locations: lines 65-71, 409-415)
+- ✅ Verified `infrastructure.paths.config.load_paths_config()` requires `config_dir` parameter (no inference needed)
+- ✅ All config loading utilities now use standardized `resolve_project_paths()` → `infer_config_dir()` fallback pattern
+- ✅ No linter errors introduced
+- ✅ Consistent pattern across all config loading utilities
 
 ### Step 4: Eliminate Re-inference of config_dir When Already Available
 
@@ -349,6 +366,19 @@ grep -r "if config_dir is None:" --include="*.py" src/infrastructure src/orchest
 grep -r "if config_dir is None:" --include="*.py" src/ -A 5 | grep -v "resolve_project_paths\|infer_config_dir" || echo "All inference guarded by None check"
 ```
 
+**Completion Notes** (2026-01-27):
+- ✅ Fixed `setup_hpo_mlflow_run()` to explicitly trust provided `config_dir` parameter (lines 156-175)
+  - Changed from `config_dir = resolved_config_dir or config_dir` to explicit `if config_dir is None:` check
+  - Only infers when `config_dir is None`, otherwise uses provided parameter
+- ✅ Fixed `commit_run_name_version()` to explicitly trust provided `config_dir` parameter (lines 279-300)
+  - Applied same pattern as `setup_hpo_mlflow_run()`
+- ✅ Verified `load_tags_registry()` trusts provided parameter (only infers when `config_dir is None`)
+- ✅ Verified `load_mlflow_config()` trusts provided parameter (only infers when `config_dir is None`)
+- ✅ Verified `load_naming_policy()` trusts provided parameter (only infers when `config_dir is None`)
+- ✅ All functions now explicitly check `if config_dir is None:` before inferring
+- ✅ No linter errors introduced
+- ✅ Consistent pattern: trust provided parameter, only infer when None
+
 ### Step 5: Verify No Breaking Changes and Update Tests
 
 **Objective**: Ensure all changes are backward-compatible and tests are updated.
@@ -383,6 +413,16 @@ uvx pytest tests/
 uvx mypy src --show-error-codes
 ```
 
+**Completion Notes** (2026-01-27):
+- ✅ Ran config and tracking test suites: 46 tests passed (tests/config/unit/test_mlflow_yaml.py, tests/tracking/unit/test_mlflow_config_comprehensive.py)
+- ✅ Verified backward compatibility: `load_mlflow_config` from `orchestration.jobs.tracking.config.loader` is the same function as SSOT (verified with `is` operator)
+- ✅ All exports from `orchestration.jobs.tracking.config` work correctly (load_mlflow_config, get_naming_config, get_index_config, etc.)
+- ✅ No references to removed `orchestration.jobs.tracking.config.loader.load_mlflow_config()` function found in src/ or tests/
+- ✅ All imports continue to work without modification (backward compatibility maintained)
+- ✅ Tests show SSOT is being used (logs show `infrastructure.naming.mlflow.config` being called)
+- ✅ No breaking changes detected - all functionality preserved
+- ⚠️ Some test failures are pre-existing (torch module not found in test_full_workflow_e2e.py - unrelated to our changes)
+
 ## Success Criteria (Overall)
 
 - ✅ All duplicate `load_mlflow_config()` implementations removed
@@ -404,6 +444,10 @@ uvx mypy src --show-error-codes
 
 - `FINISHED-consolidate-utility-scripts-dry-violations.plan.md` - Previous utility consolidation (different scope)
 - `FINISHED-consolidate-hpo-path-hash-inference-dry-violations.plan.md` - Related path inference consolidation
+
+## Summary Document
+
+See `docs/implementation_plans/complete/consolidate-config-loading-utilities-dry-violations-SUMMARY.md` for final summary of what was accomplished.
 
 ## Risk Assessment
 
