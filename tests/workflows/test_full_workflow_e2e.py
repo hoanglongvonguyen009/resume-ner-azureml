@@ -326,7 +326,7 @@ def test_full_workflow_e2e(
         mock_result.stderr = ""
         return mock_result
     
-    with patch('benchmarking.utils.subprocess.run', side_effect=benchmark_subprocess_side_effect):
+    with patch('evaluation.benchmarking.utils.subprocess.run', side_effect=benchmark_subprocess_side_effect):
         from evaluation.benchmarking.orchestrator import benchmark_champions
         
         # Create champions dict matching new architecture

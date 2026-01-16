@@ -30,8 +30,17 @@ lifecycle:
 """Run name building utilities for training execution.
 
 This module provides consolidated run name building logic with fallback support.
-It handles both systematic naming (via infrastructure.naming) and policy-like
-fallback formats for final training and HPO trials.
+It uses infrastructure naming as the primary system, with training-specific fallbacks.
+
+**Layering**:
+- Primary: Uses `infrastructure.naming.mlflow.run_names.build_mlflow_run_name()` for systematic naming
+- Fallback: Uses training-specific policy-like formats when systematic naming fails
+- Legacy: Maintains backward compatibility with older naming patterns
+
+**Naming Hierarchy**:
+1. Environment variable `MLFLOW_RUN_NAME` (highest priority, for manual override)
+2. Systematic naming via `infrastructure.naming` (preferred)
+3. Training-specific fallback formats (when systematic naming unavailable)
 """
 
 import os

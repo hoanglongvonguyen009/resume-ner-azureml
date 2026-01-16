@@ -1,5 +1,9 @@
 # Inference Performance Benchmarking
 
+> **⚠️ DEPRECATED**: This module is deprecated. Use [`src/evaluation/benchmarking/`](../evaluation/benchmarking/README.md) instead.
+>
+> This module is kept only for backward compatibility. All new code should use `evaluation.benchmarking`.
+
 This directory contains tools for benchmarking NER model inference performance, measuring actual latency and throughput to replace parameter-count proxies with real performance data.
 
 ## Overview
@@ -139,7 +143,7 @@ from evaluation.selection import select_best_configuration_across_studies
 Use the utility functions to compare multiple models:
 
 ```python
-from src.benchmarking import compare_models
+from evaluation.benchmarking.formatting import compare_models
 from pathlib import Path
 
 benchmark_files = [
@@ -160,7 +164,8 @@ You can also use the benchmarking functions programmatically:
 
 ```python
 from pathlib import Path
-from src.benchmarking import benchmark_model, load_test_texts
+from evaluation.benchmarking.cli import benchmark_model
+from data.loaders.benchmark_loader import load_test_texts
 
 # Load test data
 test_texts = load_test_texts(Path("dataset/test.json"))
@@ -205,6 +210,14 @@ The benchmarking module is organized with Single Responsibility Principle:
 - `formatting.py`: Result formatting and comparison utilities
 - `orchestrator.py`: High-level orchestration for HPO trials
 - `utils.py`: Subprocess wrapper and MLflow logging
+
+## Related Modules
+
+- [`../evaluation/README.md`](../evaluation/README.md) - Model evaluation and selection
+- [`../evaluation/benchmarking/README.md`](../evaluation/benchmarking/README.md) - Evaluation benchmarking utilities
+- [`../evaluation/selection/README.md`](../evaluation/selection/README.md) - Model selection logic
+- [`../data/README.md`](../data/README.md) - Data loading utilities
+- [`../training/README.md`](../training/README.md) - Training workflows
 
 
 

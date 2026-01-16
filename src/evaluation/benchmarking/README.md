@@ -139,7 +139,7 @@ from evaluation.selection import select_best_configuration_across_studies
 Use the utility functions to compare multiple models:
 
 ```python
-from src.benchmarking import compare_models
+from evaluation.benchmarking.formatting import compare_models
 from pathlib import Path
 
 benchmark_files = [
@@ -160,7 +160,8 @@ You can also use the benchmarking functions programmatically:
 
 ```python
 from pathlib import Path
-from src.benchmarking import benchmark_model, load_test_texts
+from evaluation.benchmarking.cli import benchmark_model
+from data.loaders.benchmark_loader import load_test_texts
 
 # Load test data
 test_texts = load_test_texts(Path("dataset/test.json"))
@@ -199,12 +200,13 @@ The benchmarking module is organized with Single Responsibility Principle:
 
 - `cli.py`: CLI entry point and argument parsing
 - `model_loader.py`: Model and tokenizer loading
-- `data_loader.py`: Test data loading utilities
 - `execution.py`: Inference execution and latency measurement
 - `statistics.py`: Statistics calculation from measurements
 - `formatting.py`: Result formatting and comparison utilities
 - `orchestrator.py`: High-level orchestration for HPO trials
 - `utils.py`: Subprocess wrapper and MLflow logging
+
+**Note**: Test data loading is handled by `data.loaders.benchmark_loader` (see [`../../data/README.md`](../../data/README.md)). This module imports `load_test_texts()` from the data module to avoid duplication.
 
 ## Phase 3: Champion-Based Benchmarking
 
@@ -266,6 +268,15 @@ The following functions are deprecated but still work for legacy code:
 - `compute_grouping_tags()`: Only needed for legacy `best_trials` format
 
 **Migration**: Use `benchmark_champions()` with champions from Phase 2 selection instead.
+
+## Related Modules
+
+- [`../README.md`](../README.md) - Model evaluation and selection overview
+- [`../selection/README.md`](../selection/README.md) - Model selection logic
+- [`../../benchmarking/README.md`](../../benchmarking/README.md) - Benchmarking utilities
+- [`../../data/README.md`](../../data/README.md) - Data loading utilities
+- [`../../training/README.md`](../../training/README.md) - Training workflows
+- [`../../infrastructure/tracking/README.md`](../../infrastructure/tracking/README.md) - MLflow tracking
 
 
 

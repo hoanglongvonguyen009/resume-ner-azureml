@@ -3,10 +3,21 @@
 
 This script redirects to the new evaluation.benchmarking.cli module.
 It's kept for backward compatibility when the CLI is called directly.
+
+.. deprecated:: 
+    This module is deprecated. Use :mod:`evaluation.benchmarking` instead.
 """
 
 import sys
+import warnings
 from pathlib import Path
+
+# Emit deprecation warning when module is imported
+warnings.warn(
+    "src.benchmarking is deprecated. Use src.evaluation.benchmarking instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 # Add src to path if not already there
 _script_dir = Path(__file__).parent.parent

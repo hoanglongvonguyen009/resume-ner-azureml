@@ -186,11 +186,14 @@ def execute_conversion(
     else:
         conversion_env["PYTHONPATH"] = str(src_dir)
     
-    # Set MLflow tracking environment
-    mlflow_tracking_uri = mlflow.get_tracking_uri()
-    if mlflow_tracking_uri:
-        conversion_env["MLFLOW_TRACKING_URI"] = mlflow_tracking_uri
-        mlflow.set_tracking_uri(mlflow_tracking_uri)
+    # Set MLflow tracking environment (use SSOT for setup)
+    # Note: MLflow should already be configured, but we ensure it's set up for subprocess
+    from infrastructure.tracking.mlflow.setup import setup_mlflow
+    tracking_uri = setup_mlflow(
+        experiment_name=conversion_experiment_name,
+        fallback_to_local=True,
+    )
+    conversion_env["MLFLOW_TRACKING_URI"] = tracking_uri
     conversion_env["MLFLOW_EXPERIMENT_NAME"] = conversion_experiment_name
     
     # Create MLflow run in parent process (no active context)
@@ -211,9 +214,15 @@ def execute_conversion(
         else:
             experiment_id = experiment.experiment_id
     except Exception as e:
-        # Fallback: use mlflow API
-        mlflow.set_experiment(conversion_experiment_name)
-        experiment = mlflow.get_experiment_by_name(conversion_experiment_name)
+        # Fallback: use infrastructure setup (preferred) or mlflow API as last resort
+        try:
+            from infrastructure.tracking.mlflow.setup import setup_mlflow
+            setup_mlflow(experiment_name=conversion_experiment_name, fallback_to_local=True)
+            experiment = mlflow.get_experiment_by_name(conversion_experiment_name)
+        except Exception:
+            # Last resort: direct mlflow API
+            mlflow.set_experiment(conversion_experiment_name)
+            experiment = mlflow.get_experiment_by_name(conversion_experiment_name)
         if experiment is None:
             raise RuntimeError(
                 f"Could not get or create experiment: {conversion_experiment_name}") from e
@@ -259,7 +268,7 @@ def execute_conversion(
                 run_key_hash=run_key_hash,
                 run_id=run_id,
                 experiment_id=experiment_id,
-                tracking_uri=mlflow_tracking_uri or mlflow.get_tracking_uri(),
+                tracking_uri=tracking_uri or mlflow.get_tracking_uri(),
                 config_dir=config_dir,
             )
         except Exception as e:

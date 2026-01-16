@@ -52,7 +52,7 @@ def benchmark_model(
 ) -> Dict[str, Any]:
     """Benchmark model inference performance across different batch sizes."""
     # Use absolute imports to support both module import and direct script execution
-    from evaluation.benchmarking.data_loader import load_test_texts
+    from data.loaders.benchmark_loader import load_test_texts
     from evaluation.benchmarking.execution import run_batch_inference, run_warmup_iterations
     from evaluation.benchmarking.model_loader import load_model_from_checkpoint
     from evaluation.benchmarking.statistics import calculate_latency_stats
@@ -186,7 +186,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """CLI entry point for benchmarking script."""
     # Use absolute imports to support both module import and direct script execution
-    from evaluation.benchmarking.data_loader import load_test_texts
+    from data.loaders.benchmark_loader import load_test_texts
     
     args = parse_args()
     

@@ -569,7 +569,7 @@ class TestNotebookE2E_Core:
             import warnings
             warnings.warn(f"Could not validate HPO MLflow tags: {e}")
     
-    @patch('benchmarking.utils.subprocess.run')
+    @patch('evaluation.benchmarking.utils.subprocess.run')
     def test_benchmarking_execution_mocked(
         self,
         mock_subprocess,

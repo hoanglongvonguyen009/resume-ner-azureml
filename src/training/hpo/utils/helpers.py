@@ -183,7 +183,16 @@ def create_mlflow_run_name(
     checkpoint_enabled: bool = False,
 ) -> str:
     """
-    Create MLflow run name for HPO sweep.
+    Create MLflow run name for HPO sweep (legacy fallback).
+
+    **Note**: This is a legacy function used only as a last-resort fallback when
+    systematic naming via `infrastructure.naming` fails. The primary naming system
+    should use `infrastructure.naming.mlflow.run_names.build_mlflow_run_name()`.
+
+    This function is kept for backward compatibility and as a fallback when:
+    - Infrastructure naming fails
+    - Naming context cannot be created
+    - Policy-based naming is unavailable
 
     Args:
         backbone: Model backbone name.
@@ -194,6 +203,10 @@ def create_mlflow_run_name(
 
     Returns:
         MLflow run name string.
+
+    .. deprecated:: 
+        Prefer using `infrastructure.naming.mlflow.run_names.build_mlflow_run_name()`
+        via `training.hpo.tracking.setup.setup_hpo_mlflow_run()` which uses systematic naming.
     """
     # When checkpointing is enabled, always use study_name (for both new and resumed runs)
     if checkpoint_enabled and study_name:

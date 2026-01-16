@@ -48,6 +48,10 @@ conda activate resume-ner-training
 pip install pytest pytest-cov pytest-mock
 ```
 
+## Test Documentation Index
+
+For detailed documentation of each test module, see the [Test Documentation Index](docs/INDEX.md). The index provides navigation to all test module READMEs organized by category.
+
 ## Test Structure
 
 Tests are organized by **feature/workflow** rather than by test type, following the production code structure:

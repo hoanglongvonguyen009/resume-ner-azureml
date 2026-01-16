@@ -1,40 +1,46 @@
-# Test Data for FastAPI Local Server Tests
+# Test Data Tests
 
-This directory contains test data fixtures used for testing the FastAPI inference server.
+Test data fixtures and utilities for FastAPI inference server tests.
 
-## Structure
+## TL;DR / Quick Start
 
-- **PDF files**: `test_resume_ner_*.pdf` - PDF versions of test resumes
-- **PNG files**: `test_resume_ner_*.png` - PNG image versions of test resumes (identical content)
-- **Larger test files**: `test_resume*.pdf` and `test_resume*.png` - Larger test files for performance testing
-- **`fixtures.py`**: Python module providing programmatic access to test data
-- **`generate_test_files.py`**: Script to generate PDF and PNG files from text
+This module provides deterministic test data (text, PDF, PNG files) for API testing. Use the `fixtures.py` module to access test data programmatically.
 
-## Usage
-
-### Programmatic Access
-
-Use the `fixtures.py` module to access test data in tests:
-
-```python
-from tests.test_data.fixtures import (
-    get_text_fixture,
-    get_file_fixture,
-    get_batch_text_fixture,
-    get_batch_file_fixture,
-)
-
-# Get text fixture
-text = get_text_fixture("text_1")
-
-# Get file fixture
-pdf_path = get_file_fixture("file_1", "pdf")
-png_path = get_file_fixture("file_1", "png")
-
-# Get batch fixtures
-texts = get_batch_text_fixture("batch_text_small")
-files = get_batch_file_fixture("batch_file_small", "pdf")
+```bash
+# No tests to run - this is a test data module
+# Import fixtures in your tests:
+from tests.test_data.fixtures import get_text_fixture, get_file_fixture
 ```
+
+## Overview
+
+The `test_data/` module provides:
+
+- **Text fixtures**: Standard resume text samples, edge cases (empty, unicode, long text)
+- **File fixtures**: PDF and PNG versions of test resumes (identical content)
+- **Batch fixtures**: Pre-configured batches for batch processing tests
+- **Generation utilities**: Scripts to generate test files from text content
+
+All test data is deterministic, version-controlled, and designed for FastAPI inference server testing.
+
+## Test Structure
+
+- `fixtures.py`: Python module providing programmatic access to test data
+- `generate_test_files.py`: Script to generate PDF and PNG files from text
+- `test_resume_ner_*.pdf/png`: Standard test files (10 files)
+- `test_resume*.pdf/png`: Larger test files for performance testing (3 files)
+
+## Running Tests
+
+This module does not contain tests - it provides test data for other test modules. To verify test data works correctly, run tests that use it:
+
+```bash
+# Run API tests that use test data
+uvx pytest tests/api/ -v
+uvx pytest tests/integration/api/ -v
+```
+
+## Test Fixtures and Helpers
 
 ### Available Fixtures
 
@@ -62,6 +68,30 @@ files = get_batch_file_fixture("batch_file_small", "pdf")
 - `batch_file_medium`: 5 files
 - `batch_file_large`: 10 files
 - `batch_file_mixed_types`: Mixed PDF/PNG files
+
+### Usage Examples
+
+Use the `fixtures.py` module to access test data in tests:
+
+```python
+from tests.test_data.fixtures import (
+    get_text_fixture,
+    get_file_fixture,
+    get_batch_text_fixture,
+    get_batch_file_fixture,
+)
+
+# Get text fixture
+text = get_text_fixture("text_1")
+
+# Get file fixture
+pdf_path = get_file_fixture("file_1", "pdf")
+png_path = get_file_fixture("file_1", "png")
+
+# Get batch fixtures
+texts = get_batch_text_fixture("batch_text_small")
+files = get_batch_file_fixture("batch_file_small", "pdf")
+```
 
 ## Generating Test Files
 
@@ -109,6 +139,60 @@ print(f"Found: {len(result['found'])} files")
 - Files are generated deterministically from known text content
 - Same input produces same output (within floating-point tolerance)
 - No external network dependencies required
+
+## What Is Tested
+
+This module does not contain tests - it provides test data. However, test data is validated through its usage in other test modules:
+
+- ✅ Text fixtures provide valid resume text samples
+- ✅ File fixtures provide valid PDF and PNG files
+- ✅ Batch fixtures provide valid batch configurations
+- ✅ File generation produces deterministic output
+
+## Configuration
+
+### Generating Test Files
+
+If test files are missing, generate them using:
+
+```bash
+cd tests/test_data
+python generate_test_files.py
+```
+
+This requires:
+- `reportlab` or `fpdf2` for PDF generation
+- `Pillow` for PNG generation
+
+Install dependencies:
+
+```bash
+pip install -r requirements_generate.txt
+```
+
+### Validation
+
+To validate that all required test files exist:
+
+```python
+from tests.test_data.fixtures import validate_all_fixtures
+
+result = validate_all_fixtures()
+print(f"Missing: {result['missing']}")
+print(f"Found: {len(result['found'])} files")
+```
+
+## Dependencies
+
+- **PDF generation**: `reportlab` or `fpdf2`
+- **PNG generation**: `Pillow`
+- **File content**: Each pair of PDF/PNG files contains identical text content, matching corresponding text fixtures in `fixtures.py`
+
+## Related Test Modules
+
+- **Downstream consumers** (test modules that use this test data):
+  - [`../api/README.md`](../api/README.md) - API tests use test data fixtures
+  - [`../integration/api/README.md`](../integration/api/README.md) - Integration API tests use test data
 
 ## References
 

@@ -2,7 +2,18 @@ from __future__ import annotations
 
 """MLflow run setup utilities for HPO.
 
-Handles MLflow run name creation, context setup, and version commit.
+Handles MLflow run name creation, context setup, and version commit for HPO sweeps.
+
+**Layering**:
+- MLflow setup/configuration is handled by `infrastructure.tracking.mlflow.setup.setup_mlflow()`
+  (SSOT). HPO orchestrators should call this before using functions in this module.
+- This module focuses on HPO-specific naming context creation and run name generation.
+- Uses `infrastructure.naming` as the primary naming system, with fallback to legacy functions.
+
+**Naming Hierarchy**:
+1. Systematic naming via `infrastructure.naming.mlflow.run_names.build_mlflow_run_name()` (preferred)
+2. Policy-based naming via `infrastructure.naming.display_policy.format_run_name()` (fallback)
+3. Legacy `create_mlflow_run_name()` (last resort fallback)
 """
 
 import os

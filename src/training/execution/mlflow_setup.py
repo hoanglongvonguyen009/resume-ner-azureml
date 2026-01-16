@@ -27,10 +27,20 @@ lifecycle:
   status: active
 """
 
-"""MLflow setup utilities for training execution.
+"""MLflow run lifecycle management for training execution.
 
-This module provides functions for creating MLflow runs and setting up
-MLflow tracking for training subprocesses.
+This module provides functions for creating MLflow runs and managing run lifecycle
+for training workflows. It does NOT handle MLflow setup/configuration.
+
+**Layering**:
+- MLflow setup/configuration is handled by `infrastructure.tracking.mlflow.setup.setup_mlflow()`
+  (SSOT). Training modules should call this before using functions in this module.
+- This module focuses on run lifecycle management (creating runs, tags, parent/child relationships).
+- All functions in this module assume MLflow has already been configured via infrastructure setup.
+
+**Usage Pattern**:
+    1. Call `infrastructure.tracking.mlflow.setup.setup_mlflow()` first (in orchestrator/subprocess runner)
+    2. Then use functions from this module to create and manage runs
 """
 
 from pathlib import Path

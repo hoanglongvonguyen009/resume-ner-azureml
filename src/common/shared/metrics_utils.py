@@ -116,8 +116,9 @@ def read_metric_from_mlflow(
     """
     try:
         import mlflow
-
-        mlflow.set_experiment(experiment_name)
+        # Use infrastructure setup to ensure MLflow is configured
+        from infrastructure.tracking.mlflow.setup import setup_mlflow
+        setup_mlflow(experiment_name=experiment_name, fallback_to_local=True)
         if run_id:
             run = mlflow.get_run(run_id)
             metrics = run.data.metrics
