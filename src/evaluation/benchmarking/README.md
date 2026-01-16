@@ -260,12 +260,12 @@ benchmark_results = benchmark_champions(
 
 The `benchmark_best_trials()` function still supports the legacy `best_trials` format for backward compatibility. However, it now detects champion mode via the `_is_champion` flag and skips redundant operations when using champions.
 
-### Deprecated Functions
+### Legacy Format Support
 
-The following functions are deprecated but still work for legacy code:
-
-- `find_checkpoint_in_trial_dir()`: Only needed for legacy `best_trials` format
-- `compute_grouping_tags()`: Only needed for legacy `best_trials` format
+The benchmarking module now requires champion format from Phase 2. Legacy `best_trials` format is no longer supported. Champions must include:
+- `checkpoint_dir`: Path to checkpoint directory
+- `study_key_hash`: Study key hash
+- `trial_key_hash`: Trial key hash
 
 **Migration**: Use `benchmark_champions()` with champions from Phase 2 selection instead.
 

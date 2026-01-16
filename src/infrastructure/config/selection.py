@@ -42,9 +42,9 @@ logger = get_logger(__name__)
 
 def get_objective_direction(selection_config: Dict[str, Any]) -> str:
     """
-    Get objective direction with migration support for goal→direction.
+    Get objective direction from selection config.
     
-    Accepts both "goal" and "direction" keys during migration period.
+    Returns "maximize" as default if direction is not specified.
     
     Args:
         selection_config: Selection configuration dictionary
@@ -57,35 +57,14 @@ def get_objective_direction(selection_config: Dict[str, Any]) -> str:
         >>> get_objective_direction(config)
         'maximize'
         
-        >>> config = {"objective": {"goal": "max"}}  # Legacy
+        >>> config = {"objective": {}}  # Defaults to "maximize"
         >>> get_objective_direction(config)
         'maximize'
     """
     objective = selection_config.get("objective", {})
     
-    # Prefer new "direction" key
-    if "direction" in objective:
-        return objective["direction"]
-    
-    # Fallback to legacy "goal" key (with warning)
-    if "goal" in objective:
-        warnings.warn(
-            "Using deprecated 'objective.goal' key. "
-            "Please update config to use 'objective.direction' instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        goal = objective["goal"]
-        # Map goal values to direction
-        if goal.lower() in ["maximize", "max"]:
-            return "maximize"
-        elif goal.lower() in ["minimize", "min"]:
-            return "minimize"
-        else:
-            return goal  # Pass through if already correct format
-    
-    # Default
-    return "maximize"
+    # Get direction from objective config
+    return objective.get("direction", "maximize")
 
 
 def get_champion_selection_config(selection_config: Dict[str, Any]) -> Dict[str, Any]:

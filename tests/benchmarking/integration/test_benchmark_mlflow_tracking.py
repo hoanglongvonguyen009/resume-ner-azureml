@@ -43,7 +43,8 @@ class TestBenchmarkMlflowTrackingWithTrialId:
                 "trial_name": "trial-25d03eeb",
                 "trial_id": None,  # Not set, should use trial_name
                 "checkpoint_dir": str(checkpoint_dir),
-                "trial_dir": str(checkpoint_dir.parent),
+                "study_key_hash": "abc123def456",  # Required for champion format
+                "trial_key_hash": "xyz789uvw012",  # Required for champion format
                 "hyperparameters": {"learning_rate": 2e-5},
                 "metrics": {"macro-f1": 0.75},
             }
@@ -98,11 +99,15 @@ class TestBenchmarkMlflowTrackingWithTrialId:
         mock_hpo_config,
         sample_benchmark_config,
     ):
-        """Test that trial_id extracted from trial_info handles old format (trial_1_20251231_161745)."""
+        """Test that trial_id extracted from trial_info handles old format (trial_1_20251231_161745).
+        
+        Updated to use champion format (with study_key_hash and trial_key_hash) as legacy format
+        is no longer supported per Phase 3 refactoring.
+        """
         root_dir = tmp_path / "outputs"
         root_dir.mkdir()
         
-        # Create mock best_trials with trial_name in old format
+        # Create mock best_trials with trial_name in old format but champion data structure
         checkpoint_dir = tmp_path / "checkpoint"
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         (checkpoint_dir / "config.json").write_text('{"model_type": "distilbert"}')
@@ -112,7 +117,8 @@ class TestBenchmarkMlflowTrackingWithTrialId:
                 "trial_name": "trial_1_20251231_161745",
                 "trial_id": None,
                 "checkpoint_dir": str(checkpoint_dir),
-                "trial_dir": str(checkpoint_dir.parent),
+                "study_key_hash": "abc123def456",  # Required for champion format
+                "trial_key_hash": "xyz789uvw012",  # Required for champion format
                 "hyperparameters": {"learning_rate": 2e-5},
                 "metrics": {"macro-f1": 0.75},
             }

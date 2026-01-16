@@ -9,7 +9,6 @@ from .benchmarking import (
     benchmark_best_trials,
     benchmark_model,
     compare_models,
-    compute_grouping_tags,
     format_results_table,
     run_benchmarking,
 )
@@ -43,7 +42,6 @@ __all__ = [
     "benchmark_best_trials",
     "benchmark_model",
     "compare_models",
-    "compute_grouping_tags",
     "format_results_table",
     "run_benchmarking",
     # Selection exports

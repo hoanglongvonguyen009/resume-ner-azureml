@@ -26,66 +26,9 @@ class TestGetObjectiveDirection:
         config = {"objective": {"direction": "minimize"}}
         assert get_objective_direction(config) == "minimize"
 
-    def test_goal_key_maximize_legacy(self):
-        """Test using legacy 'goal' key with maximize (should warn)."""
-        config = {"objective": {"goal": "maximize"}}
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = get_objective_direction(config)
-            assert result == "maximize"
-            assert len(w) == 1
-            assert issubclass(w[0].category, DeprecationWarning)
-            assert "deprecated" in str(w[0].message).lower()
-
-    def test_goal_key_minimize_legacy(self):
-        """Test using legacy 'goal' key with minimize (should warn)."""
-        config = {"objective": {"goal": "minimize"}}
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = get_objective_direction(config)
-            assert result == "minimize"
-            assert len(w) == 1
-            assert issubclass(w[0].category, DeprecationWarning)
-
-    def test_goal_key_max_legacy(self):
-        """Test using legacy 'goal' key with 'max' (should map to maximize)."""
-        config = {"objective": {"goal": "max"}}
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            result = get_objective_direction(config)
-            assert result == "maximize"
-
-    def test_goal_key_min_legacy(self):
-        """Test using legacy 'goal' key with 'min' (should map to minimize)."""
-        config = {"objective": {"goal": "min"}}
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            result = get_objective_direction(config)
-            assert result == "minimize"
-
-    def test_goal_key_case_insensitive(self):
-        """Test that goal key mapping is case-insensitive."""
-        config = {"objective": {"goal": "MAX"}}
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            result = get_objective_direction(config)
-            assert result == "maximize"
-
-        config = {"objective": {"goal": "MIN"}}
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            result = get_objective_direction(config)
-            assert result == "minimize"
-
-    def test_direction_takes_precedence_over_goal(self):
-        """Test that 'direction' key takes precedence over 'goal' key."""
-        config = {"objective": {"direction": "maximize", "goal": "minimize"}}
-        # Should not warn since direction is present
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = get_objective_direction(config)
-            assert result == "maximize"
-            assert len(w) == 0  # No warning since direction is used
+    # Legacy 'goal' key tests removed - support for objective.goal was removed in Phase 2
+    # of deprecation warnings migration. Code now only supports objective.direction.
+    # The goal key is ignored and the function returns the default "maximize".
 
     def test_default_when_missing(self):
         """Test default value when objective section is missing."""
@@ -97,13 +40,7 @@ class TestGetObjectiveDirection:
         config = {"objective": {}}
         assert get_objective_direction(config) == "maximize"
 
-    def test_goal_passthrough_when_already_correct_format(self):
-        """Test that goal value is passed through if already correct format."""
-        config = {"objective": {"goal": "maximize"}}
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            result = get_objective_direction(config)
-            assert result == "maximize"
+    # Legacy 'goal' key test removed - support for objective.goal was removed in Phase 2
 
 
 class TestGetChampionSelectionConfig:

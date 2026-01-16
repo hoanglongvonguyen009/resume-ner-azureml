@@ -122,22 +122,9 @@ def create_dry_run_sweep_job_for_backbone(
         compute=compute_cluster,
     )
 
-    # Get direction with backward compatibility for "goal"
+    # Get direction from objective config
     objective_config = smoke_hpo_config["objective"]
-    if "direction" in objective_config:
-        direction = objective_config["direction"]
-    elif "goal" in objective_config:
-        import warnings
-        warnings.warn(
-            "Using deprecated 'objective.goal' key. "
-            "Please update config to use 'objective.direction' instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        goal = objective_config["goal"]
-        direction = "maximize" if goal.lower() in ["maximize", "max"] else "minimize"
-    else:
-        direction = "maximize"
+    direction = objective_config.get("direction", "maximize")
     
     objective = Objective(
         goal=direction,  # Azure ML uses "goal" parameter name
@@ -230,22 +217,9 @@ def create_hpo_sweep_job_for_backbone(
         compute=compute_cluster,
     )
 
-    # Get direction with backward compatibility for "goal"
+    # Get direction from objective config
     objective_config = hpo_config["objective"]
-    if "direction" in objective_config:
-        direction = objective_config["direction"]
-    elif "goal" in objective_config:
-        import warnings
-        warnings.warn(
-            "Using deprecated 'objective.goal' key. "
-            "Please update config to use 'objective.direction' instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        goal = objective_config["goal"]
-        direction = "maximize" if goal.lower() in ["maximize", "max"] else "minimize"
-    else:
-        direction = "maximize"
+    direction = objective_config.get("direction", "maximize")
     
     objective = Objective(
         goal=direction,  # Azure ML uses "goal" parameter name

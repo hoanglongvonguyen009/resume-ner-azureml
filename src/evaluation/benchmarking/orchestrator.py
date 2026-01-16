@@ -358,232 +358,6 @@ def get_benchmark_run_mode(
     return get_run_mode(benchmark_config, default="reuse_if_exists")
 
 
-def find_checkpoint_in_trial_dir(trial_dir: Path) -> Optional[Path]:
-    """
-    Find checkpoint directory in trial directory (LEGACY - for backward compatibility).
-
-    DEPRECATED: This function is only needed for legacy best_trials format.
-    Champions from Phase 2 already have checkpoint_path set.
-
-    Prefers:
-    1. refit/checkpoint/ (if refit training completed)
-    2. cv/foldN/checkpoint/ (best CV fold based on metrics)
-    3. checkpoint/ (fallback)
-
-    Args:
-        trial_dir: Path to trial directory
-
-    Returns:
-        Path to checkpoint directory, or None if not found
-    """
-    import warnings
-    warnings.warn(
-        "find_checkpoint_in_trial_dir() is deprecated. "
-        "Use champions from Phase 2 which already have checkpoint_path set.",
-        DeprecationWarning,
-        stacklevel=2
-    )
-    if not trial_dir.exists():
-        logger.warning(f"Trial directory does not exist: {trial_dir}")
-        return None
-
-    # 1. Check for refit checkpoint
-    refit_checkpoint = trial_dir / "refit" / CHECKPOINT_DIRNAME
-    logger.debug(
-        f"Checking refit checkpoint at: {refit_checkpoint} (exists: {refit_checkpoint.exists()})")
-    if refit_checkpoint.exists():
-        logger.info(f"Found refit checkpoint: {refit_checkpoint}")
-        return refit_checkpoint
-
-    # 2. Check for CV fold checkpoints
-    cv_dir = trial_dir / "cv"
-    logger.debug(
-        f"Checking CV directory at: {cv_dir} (exists: {cv_dir.exists()})")
-    if cv_dir.exists():
-        # Find all fold directories - handle both "fold0" and "fold_0" patterns
-        fold_dirs = []
-        for item in cv_dir.iterdir():
-            if item.is_dir():
-                # Match patterns: fold0, fold_0, fold1, fold_1, etc.
-                import re
-                if re.match(r"fold_?\d+", item.name):
-                    fold_dirs.append(item)
-
-        if fold_dirs:
-            logger.debug(
-                f"Found {len(fold_dirs)} fold directories in {cv_dir}: {[d.name for d in fold_dirs]}")
-            # Try to find the best fold by looking for metrics.json
-            best_fold = None
-            best_score = None
-
-            for fold_dir in fold_dirs:
-                metrics_file = fold_dir / "metrics.json"
-                if metrics_file.exists():
-                    try:
-                        import json
-                        with open(metrics_file, "r") as f:
-                            metrics = json.load(f)
-                        # Look for macro-f1 or first numeric metric
-                        score = metrics.get("macro-f1")
-                        if score is None:
-                            # Try to find first numeric value
-                            for key, value in metrics.items():
-                                if isinstance(value, (int, float)):
-                                    score = value
-                                    break
-
-                        if score is not None and (best_score is None or score > best_score):
-                            best_score = score
-                            best_fold = fold_dir
-                    except Exception as e:
-                        logger.debug(
-                            f"Error reading metrics from {metrics_file}: {e}")
-                        continue
-
-            # Use best fold if found
-            if best_fold:
-                checkpoint = best_fold / CHECKPOINT_DIRNAME
-                logger.debug(
-                    f"Checking best fold {best_fold.name}: checkpoint at {checkpoint} (exists: {checkpoint.exists()})")
-                if checkpoint.exists():
-                    logger.info(f"Found checkpoint in best fold: {checkpoint}")
-                    return checkpoint
-        else:
-            logger.debug(f"No fold directories found in {cv_dir}")
-    else:
-        logger.debug(f"CV directory does not exist: {cv_dir}")
-
-    # 3. Check root checkpoint
-    root_checkpoint = trial_dir / CHECKPOINT_DIRNAME
-    logger.debug(
-        f"Checking root checkpoint at: {root_checkpoint} (exists: {root_checkpoint.exists()})")
-    if root_checkpoint.exists():
-        logger.info(f"Found root checkpoint: {root_checkpoint}")
-        return root_checkpoint
-
-    return None
-
-
-def compute_grouping_tags(
-    trial_info: Dict[str, Any],
-    data_config: Dict[str, Any],
-    hpo_config: Dict[str, Any],
-    benchmark_config: Optional[Dict[str, Any]] = None,
-) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-    """
-    Compute grouping tags (study_key_hash, trial_key_hash, study_family_hash) for a trial.
-    
-    LEGACY - for backward compatibility.
-    
-    DEPRECATED: This function is only needed for legacy best_trials format.
-    Champions from Phase 2 already have study_key_hash and trial_key_hash set.
-
-    Args:
-        trial_info: Trial information dict containing hyperparameters
-        data_config: Data configuration dict
-        hpo_config: HPO configuration dict
-        benchmark_config: Optional benchmark configuration dict
-
-    Returns:
-        Tuple of (study_key_hash, trial_key_hash, study_family_hash)
-    """
-    import warnings
-    warnings.warn(
-        "compute_grouping_tags() is deprecated. "
-        "Use champions from Phase 2 which already have study_key_hash and trial_key_hash set.",
-        DeprecationWarning,
-        stacklevel=2
-    )
-    study_key_hash = None
-    trial_key_hash = None
-    study_family_hash = None
-
-    # First, try to use hashes directly from trial_info (if available from trial_meta.json)
-    study_key_hash = trial_info.get("study_key_hash")
-    trial_key_hash = trial_info.get("trial_key_hash")
-    
-    # If hashes are already present, compute study_family_hash if needed
-    if study_key_hash and trial_key_hash:
-        try:
-            from infrastructure.naming.mlflow.hpo_keys import (
-                build_hpo_study_family_key,
-                build_hpo_study_family_hash,
-            )
-            if data_config and hpo_config:
-                study_family_key = build_hpo_study_family_key(
-                    data_config=data_config,
-                    hpo_config=hpo_config,
-                    benchmark_config=benchmark_config,
-                )
-                study_family_hash = build_hpo_study_family_hash(study_family_key)
-        except Exception:
-            pass
-        
-        # Return early if we have both hashes
-        return study_key_hash, trial_key_hash, study_family_hash
-
-    # Fallback: Compute hashes from hyperparameters if not available
-    try:
-        from infrastructure.naming.mlflow.hpo_keys import (
-            build_hpo_study_key,
-            build_hpo_study_key_hash,
-            build_hpo_study_family_key,
-            build_hpo_study_family_hash,
-            build_hpo_trial_key,
-            build_hpo_trial_key_hash,
-        )
-
-        # Get hyperparameters from trial_info
-        hyperparameters = trial_info.get("hyperparameters", {})
-        backbone = trial_info.get("backbone", "unknown")
-        backbone_name = backbone.split("-")[0] if "-" in backbone else backbone
-
-        if hyperparameters and data_config and hpo_config:
-            # Compute study_key_hash
-            study_key = build_hpo_study_key(
-                data_config=data_config,
-                hpo_config=hpo_config,
-                model=backbone_name,
-                benchmark_config=benchmark_config,
-            )
-            study_key_hash = build_hpo_study_key_hash(study_key)
-
-            # Compute study_family_hash (optional, for cross-model comparison)
-            study_family_key = build_hpo_study_family_key(
-                data_config=data_config,
-                hpo_config=hpo_config,
-                benchmark_config=benchmark_config,
-            )
-            study_family_hash = build_hpo_study_family_hash(study_family_key)
-
-            # Compute trial_key_hash
-            trial_key = build_hpo_trial_key(
-                study_key_hash=study_key_hash,
-                hyperparameters=hyperparameters,
-            )
-            trial_key_hash = build_hpo_trial_key_hash(trial_key)
-
-            logger.debug(
-                f"Computed grouping tags: study_key_hash={study_key_hash[:16]}..., "
-                f"trial_key_hash={trial_key_hash[:16]}..."
-            )
-        else:
-            missing = []
-            if not hyperparameters:
-                missing.append("hyperparameters")
-            if not data_config:
-                missing.append("data_config")
-            if not hpo_config:
-                missing.append("hpo_config")
-            logger.warning(
-                f"Cannot compute grouping tags (missing: {', '.join(missing)})")
-    except Exception as e:
-        logger.warning(
-            f"Could not compute grouping tags locally: {e}", exc_info=True)
-
-    return study_key_hash, trial_key_hash, study_family_hash
-
-
 def benchmark_champions(
     champions: Dict[str, Dict[str, Any]],  # From Phase 2
     test_data_path: Path,
@@ -745,27 +519,17 @@ def benchmark_best_trials(
     for backbone, trial_info in best_trials.items():
         is_champion = trial_info.get("_is_champion", False)
         
-        # Use checkpoint_dir directly if available (champion mode)
+        # Use checkpoint_dir directly from champion data (required)
         checkpoint_dir: Optional[Path] = None
         if "checkpoint_dir" in trial_info and trial_info["checkpoint_dir"]:
             checkpoint_dir = Path(trial_info["checkpoint_dir"])
-        elif not is_champion and "trial_dir" in trial_info:
-            # Legacy mode: find checkpoint in trial_dir
-            trial_dir = Path(trial_info["trial_dir"])
-            
-            if not trial_dir.exists():
-                logger.warning(f"[BENCHMARK_BEST_TRIALS] Trial directory does not exist: {trial_dir}")
-            
-            checkpoint_dir = find_checkpoint_in_trial_dir(trial_dir)
-            if checkpoint_dir is None:
-                logger.warning(
-                    f"Checkpoint directory not found in {trial_dir} for {backbone} "
-                    f"{trial_info.get('trial_name', 'unknown')}. "
-                    f"Tried: refit/checkpoint/, cv/foldN/checkpoint/, checkpoint/"
-                )
-                continue
         else:
-            logger.warning(f"No checkpoint_dir or trial_dir for {backbone}")
+            # Legacy format no longer supported - require champion format
+                logger.warning(
+                f"Skipping {backbone}: missing 'checkpoint_dir' in trial_info. "
+                f"Legacy format (trial_dir) is no longer supported. "
+                f"Please use champion format from Phase 2."
+            )
             continue
         
         # At this point, checkpoint_dir must be a Path (not None)
@@ -785,16 +549,19 @@ def benchmark_best_trials(
         
         logger.debug(f"[BENCHMARK] Extracted trial_id: {trial_id} from trial_info (trial_id={trial_info.get('trial_id')}, trial_name={trial_info.get('trial_name')})")
 
-        # Use hashes directly if available (champion mode)
+        # Use hashes directly from champion data (required)
         study_key_hash = trial_info.get("study_key_hash")
         trial_key_hash = trial_info.get("trial_key_hash")
         
-        if not is_champion and (not study_key_hash or not trial_key_hash):
-            # Legacy mode: compute hashes from configs
-            study_key_hash, trial_key_hash, study_family_hash = compute_grouping_tags(
-                trial_info, data_config, hpo_config, benchmark_config
+        if not study_key_hash or not trial_key_hash:
+            # Legacy format no longer supported - require champion format
+            logger.warning(
+                f"Skipping {backbone}: missing 'study_key_hash' or 'trial_key_hash' in trial_info. "
+                f"Legacy format is no longer supported. "
+                f"Please use champion format from Phase 2."
             )
-        else:
+            continue
+        
             # Champion mode: hashes already available, compute study_family_hash if needed
             study_family_hash = None
             if study_key_hash and trial_key_hash:

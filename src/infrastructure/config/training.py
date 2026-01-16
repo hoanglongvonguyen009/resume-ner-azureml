@@ -86,15 +86,9 @@ def load_final_training_config(
     final_training_yaml_path = config_dir / "final_training.yaml"
 
     if not final_training_yaml_path.exists():
-        # Backward compatibility: fall back to inline config building
-        warnings.warn(
-            "config/final_training.yaml not found. Falling back to inline config building. "
-            "This is deprecated. Please create config/final_training.yaml.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        return _build_final_training_config_inline(
-            best_config, experiment_config, train_config, config_dir
+        raise FileNotFoundError(
+            f"Required config file not found: {final_training_yaml_path}. "
+            f"Please create config/final_training.yaml with the required configuration."
         )
 
     final_training_config = load_yaml(final_training_yaml_path)
@@ -885,32 +879,3 @@ def _merge_configs(
 
     return merged
 
-def _build_final_training_config_inline(
-    best_config: Dict[str, Any],
-    experiment_config: ExperimentConfig,
-    train_config: Optional[Dict[str, Any]],
-    config_dir: Path
-) -> Dict[str, Any]:
-    """
-    Backward compatibility: build config inline (deprecated).
-
-    This function replicates the old inline build_final_training_config() behavior.
-    """
-    if train_config is None:
-        train_config = load_yaml(experiment_config.train_config)
-
-    hyperparameters = best_config.get("hyperparameters", {})
-    training_defaults = train_config.get("training", {})
-
-    return {
-        "backbone": best_config.get("backbone", "unknown"),
-        "learning_rate": hyperparameters.get("learning_rate", training_defaults.get("learning_rate", 2e-5)),
-        "dropout": hyperparameters.get("dropout", training_defaults.get("dropout", 0.1)),
-        "weight_decay": hyperparameters.get("weight_decay", training_defaults.get("weight_decay", 0.01)),
-        "batch_size": training_defaults.get("batch_size", 16),
-        "epochs": training_defaults.get("epochs", 5),
-        "random_seed": training_defaults.get("random_seed", 42),
-        "early_stopping_enabled": False,
-        "use_combined_data": True,
-        "use_all_data": True,
-    }

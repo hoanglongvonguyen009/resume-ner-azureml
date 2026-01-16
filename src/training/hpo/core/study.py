@@ -162,29 +162,10 @@ class StudyManager:
 
         # Extract configuration
         self.objective_metric = hpo_config["objective"]["metric"]
-        # Support both "direction" (new) and "goal" (deprecated) keys
+        # Get direction from objective config
         objective = hpo_config["objective"]
-        if "direction" in objective:
-            self.direction = objective["direction"]
-        elif "goal" in objective:
-            import warnings
-            warnings.warn(
-                "Using deprecated 'objective.goal' key. "
-                "Please update config to use 'objective.direction' instead.",
-                DeprecationWarning,
-                stacklevel=2
-            )
-            goal = objective["goal"]
-            # Map goal values to direction
-            if goal.lower() in ["maximize", "max"]:
-                self.direction = "maximize"
-            elif goal.lower() in ["minimize", "min"]:
-                self.direction = "minimize"
-            else:
-                self.direction = goal  # Pass through if already correct format
-        else:
-            self.direction = "maximize"  # Default
-        # Keep goal for backward compatibility (deprecated)
+        self.direction = objective.get("direction", "maximize")
+        # Keep goal for backward compatibility (deprecated, but still used internally)
         self.goal = self.direction
 
         # Create pruner and sampler
