@@ -11,7 +11,7 @@ from orchestration.jobs.tracking.config.loader import (
     get_auto_increment_config,
     get_run_finder_config,
 )
-from orchestration.naming import build_mlflow_experiment_name
+from infrastructure.naming import build_mlflow_experiment_name
 
 
 @pytest.fixture

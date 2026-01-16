@@ -1,3 +1,29 @@
+"""
+@meta
+name: orchestration_facade
+type: utility
+domain: orchestration
+responsibility:
+  - Legacy orchestration module facade (backward compatibility)
+  - Re-export functions from new modular structure
+  - Provide deprecated import path orchestration.*
+inputs:
+  - (none - facade only)
+outputs:
+  - Re-exported functions from infrastructure.*, common.*, evaluation.* modules
+tags:
+  - facade
+  - compatibility
+  - deprecated
+  - legacy
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: deprecated
+"""
+
 """Legacy orchestration module facade.
 
 This module provides backward compatibility by re-exporting functions from
@@ -10,10 +36,10 @@ New modules:
 - common.constants: Shared constants
 - infrastructure.platform.azureml: Azure ML utilities
 - infrastructure.storage: Storage and backup utilities
-- selection: Configuration selection
-- benchmarking: Benchmarking orchestration
-- conversion: Conversion execution
-- training_exec: Final training execution
+- evaluation.selection: Configuration selection
+- evaluation.benchmarking: Benchmarking orchestration
+- deployment.conversion: Conversion execution
+- training.execution: Final training execution
 
 This module will be removed in 2 releases.
 """
@@ -141,8 +167,8 @@ from infrastructure.storage import (
     create_colab_store,
 )
 
-# Naming - these remain in orchestration/naming.py (facade to naming module)
-from .naming import get_stage_config, build_aml_experiment_name, build_mlflow_experiment_name
+# Naming - imported directly from infrastructure.naming (orchestration.naming facade removed)
+from infrastructure.naming import get_stage_config, build_aml_experiment_name, build_mlflow_experiment_name
 
 # Fingerprints - moved to infrastructure.fingerprints module
 from infrastructure.fingerprints import (

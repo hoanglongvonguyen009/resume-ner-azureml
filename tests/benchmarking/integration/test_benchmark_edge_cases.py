@@ -365,7 +365,7 @@ class TestBenchmarkConfigEdgeCases:
         project_root = tmp_path
         
         # Create mock benchmark script
-        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
+        benchmark_script = project_root / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         

@@ -64,7 +64,7 @@ This module is organized into the following submodules:
   - `training.py`: Training job orchestration
   - `sweeps.py`: Sweep job utilities
   - `runtime.py`: Job runtime utilities
-- `naming.py`: Deprecated facade (use `infrastructure.naming` instead)
+- `naming.py`: Removed (use `infrastructure.naming` instead)
 
 See individual submodule READMEs for detailed documentation:
 - [`jobs/README.md`](jobs/README.md) - Job orchestration

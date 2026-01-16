@@ -48,7 +48,7 @@ class TestBenchmarkOrchestratorConfigUsage:
         self._ensure_checkpoint_exists(mock_best_trials)
         
         # Create benchmark script so run_benchmarking doesn't fail
-        benchmark_script = root_dir / "src" / "benchmarking" / "cli.py"
+        benchmark_script = root_dir / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         
@@ -106,7 +106,7 @@ class TestBenchmarkOrchestratorConfigUsage:
         self._ensure_checkpoint_exists(mock_best_trials)
         
         # Create benchmark script so run_benchmarking doesn't fail
-        benchmark_script = root_dir / "src" / "benchmarking" / "cli.py"
+        benchmark_script = root_dir / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         
@@ -164,7 +164,7 @@ class TestBenchmarkOrchestratorConfigUsage:
         self._ensure_checkpoint_exists(mock_best_trials)
         
         # Create benchmark script so run_benchmarking doesn't fail
-        benchmark_script = root_dir / "src" / "benchmarking" / "cli.py"
+        benchmark_script = root_dir / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         
@@ -222,7 +222,7 @@ class TestBenchmarkOrchestratorConfigUsage:
         self._ensure_checkpoint_exists(mock_best_trials)
         
         # Create benchmark script so run_benchmarking doesn't fail
-        benchmark_script = root_dir / "src" / "benchmarking" / "cli.py"
+        benchmark_script = root_dir / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         
@@ -280,7 +280,7 @@ class TestBenchmarkOrchestratorConfigUsage:
         self._ensure_checkpoint_exists(mock_best_trials)
         
         # Create benchmark script so run_benchmarking doesn't fail
-        benchmark_script = root_dir / "src" / "benchmarking" / "cli.py"
+        benchmark_script = root_dir / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         

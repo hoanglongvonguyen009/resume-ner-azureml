@@ -21,7 +21,6 @@ This metadata explains **intent, scope, and constraints** without requiring the 
 - **Test modules**: Unit, integration, E2E
 - **Migration / cleanup scripts**: One-time or destructive logic
 - **Shared utilities**: Clarifies intent, ownership, and safe reuse boundaries
-- **Small pure helpers**: ❌ No metadata required (avoid noise)
 
 ### Metadata Format (Python)
 
@@ -81,5 +80,4 @@ tags:
 
 - Metadata **augments**, not replaces, docstrings
 - Keep metadata **minimal and truthful**
-- Do not add metadata to every file blindly (only files with behavioral weight)
 - When adding metadata to existing files, do so incrementally as you touch them

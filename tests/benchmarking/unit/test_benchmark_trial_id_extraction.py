@@ -50,7 +50,7 @@ class TestTrialIdExtraction:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
+        benchmark_script = project_root / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         
@@ -110,7 +110,7 @@ class TestTrialIdExtraction:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
+        benchmark_script = project_root / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         
@@ -183,7 +183,7 @@ class TestTrialIdExtraction:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
+        benchmark_script = project_root / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         
@@ -246,7 +246,7 @@ class TestTrialIdExtraction:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
+        benchmark_script = project_root / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         
@@ -309,7 +309,7 @@ class TestTrialIdExtraction:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
+        benchmark_script = project_root / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         
@@ -368,7 +368,7 @@ class TestTrialIdExtraction:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
+        benchmark_script = project_root / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         
@@ -434,7 +434,7 @@ class TestTrialIdExtraction:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
+        benchmark_script = project_root / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         

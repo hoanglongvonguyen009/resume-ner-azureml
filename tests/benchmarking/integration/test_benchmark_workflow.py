@@ -93,7 +93,7 @@ benchmark_config: benchmark.yaml
         (checkpoint_dir / "config.json").write_text('{"model_type": "distilbert"}')
         
         # Create benchmark script
-        benchmark_script = root_dir / "src" / "benchmarking" / "cli.py"
+        benchmark_script = root_dir / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         
@@ -175,7 +175,7 @@ output:
         mock_subprocess.return_value = mock_result
         
         # Create mock benchmark script
-        benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
+        benchmark_script = project_root / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         
@@ -283,7 +283,7 @@ env_config: env.yaml
         (checkpoint_dir / "config.json").write_text('{"model_type": "distilbert"}')
         
         # Create benchmark script
-        benchmark_script = root_dir / "src" / "benchmarking" / "cli.py"
+        benchmark_script = root_dir / "src" / "evaluation" / "benchmarking" / "cli.py"
         benchmark_script.parent.mkdir(parents=True, exist_ok=True)
         benchmark_script.write_text("# mock script")
         

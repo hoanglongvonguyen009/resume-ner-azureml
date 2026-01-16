@@ -72,7 +72,7 @@ def run_benchmarking(
         max_length: Maximum sequence length.
         device: Device to use (None = auto-detect).
         benchmark_script_path: Path to benchmark script. If None, will use
-            src/benchmarking/cli.py relative to project_root.
+            src/evaluation/benchmarking/cli.py relative to project_root.
         project_root: Project root directory. Required if benchmark_script_path is None.
         tracker: Optional MLflowBenchmarkTracker instance for logging results.
         backbone: Optional model backbone name for tracking.
@@ -93,12 +93,8 @@ def run_benchmarking(
         if project_root is None:
             raise ValueError(
                 "Either benchmark_script_path or project_root must be provided")
-        # Benchmark CLI is now at src/evaluation/benchmarking/cli.py
-        # Try new location first, fallback to old location for backward compatibility
+        # Benchmark CLI is at src/evaluation/benchmarking/cli.py
         benchmark_script = project_root / "src" / "evaluation" / "benchmarking" / "cli.py"
-        if not benchmark_script.exists():
-            # Fallback to old location (for backward compatibility)
-            benchmark_script = project_root / "src" / "benchmarking" / "cli.py"
     else:
         benchmark_script = benchmark_script_path
 

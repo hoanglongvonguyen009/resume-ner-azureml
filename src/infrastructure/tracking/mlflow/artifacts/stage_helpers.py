@@ -73,12 +73,17 @@ def upload_training_artifacts(
         artifact_path="checkpoint.tar.gz",
     )
     
-    # Upload metrics.json if provided
+    # Upload metrics.json if provided and enabled in config
     if metrics_json_path:
-        results["metrics_json"] = uploader.upload_file(
-            file_path=metrics_json_path,
-            artifact_path="metrics.json",
-        )
+        config = uploader.get_tracking_config()
+        if config.get("log_metrics_json", True):
+            results["metrics_json"] = uploader.upload_file(
+                file_path=metrics_json_path,
+                artifact_path="metrics.json",
+            )
+        else:
+            logger.debug("[Training Artifacts] Skipping metrics.json upload (log_metrics_json=false)")
+            results["metrics_json"] = False
     else:
         results["metrics_json"] = False
     

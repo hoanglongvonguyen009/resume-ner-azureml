@@ -18,7 +18,7 @@ Results are saved as `benchmark.json` files that can be automatically used by mo
 Benchmark a specific model checkpoint:
 
 ```bash
-python -m src.benchmarking.cli \
+python -m src.evaluation.benchmarking.cli \
   --checkpoint outputs/hpo/distilbert/trial_0/checkpoint \
   --test-data dataset/test.json \
   --batch-sizes 1 8 16 \
@@ -111,7 +111,7 @@ The model selection logic will:
 #    (e.g., distilbert/trial_0, deberta/trial_1)
 
 # 2. Benchmark DistilBERT best trial
-python -m src.benchmarking.cli \
+python -m src.evaluation.benchmarking.cli \
   --checkpoint outputs/hpo/distilbert/trial_0/checkpoint \
   --test-data dataset/test.json \
   --batch-sizes 1 8 16 \
@@ -119,7 +119,7 @@ python -m src.benchmarking.cli \
   --output outputs/hpo/distilbert/trial_0/benchmark.json
 
 # 3. Benchmark DeBERTa best trial
-python -m src.benchmarking.cli \
+python -m src.evaluation.benchmarking.cli \
   --checkpoint outputs/hpo/deberta/trial_1/checkpoint \
   --test-data dataset/test.json \
   --batch-sizes 1 8 16 \
@@ -273,7 +273,6 @@ The following functions are deprecated but still work for legacy code:
 
 - [`../README.md`](../README.md) - Model evaluation and selection overview
 - [`../selection/README.md`](../selection/README.md) - Model selection logic
-- [`../../benchmarking/README.md`](../../benchmarking/README.md) - Benchmarking utilities
 - [`../../data/README.md`](../../data/README.md) - Data loading utilities
 - [`../../training/README.md`](../../training/README.md) - Training workflows
 - [`../../infrastructure/tracking/README.md`](../../infrastructure/tracking/README.md) - MLflow tracking

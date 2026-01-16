@@ -517,8 +517,9 @@ def test_full_workflow_e2e(
     }
     (final_output_dir / "metadata.json").write_text(json.dumps(metadata))
     
+    # Mock execute_final_training before importing
     monkeypatch.setattr(
-        "orchestration.jobs.final_training.execute_final_training",
+        "training.execution.executor.execute_final_training",
         lambda **kwargs: fake_final_checkpoint_dir,
     )
     

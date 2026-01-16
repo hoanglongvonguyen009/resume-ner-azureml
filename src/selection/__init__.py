@@ -1,3 +1,30 @@
+"""
+@meta
+name: selection_compatibility_shim
+type: utility
+domain: selection
+responsibility:
+  - Compatibility shim for selection module (backward compatibility)
+  - Proxy submodule imports to evaluation.selection.*
+  - Re-export from evaluation.selection
+inputs:
+  - (none - shim only)
+outputs:
+  - Proxied/re-exported functions from evaluation.selection
+tags:
+  - facade
+  - shim
+  - compatibility
+  - deprecated
+  - legacy
+ci:
+  runnable: false
+  needs_gpu: false
+  needs_cloud: false
+lifecycle:
+  status: deprecated
+"""
+
 """Compatibility shim for selection module.
 
 This module provides backward compatibility by re-exporting from evaluation.selection.
