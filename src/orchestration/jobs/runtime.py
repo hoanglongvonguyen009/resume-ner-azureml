@@ -1,5 +1,26 @@
 from __future__ import annotations
 
+"""
+@meta
+name: orchestration_runtime
+type: utility
+domain: orchestration
+responsibility:
+  - Submit Azure ML jobs and wait for completion
+  - Handle job status monitoring
+inputs:
+  - Azure ML client
+  - Job objects
+outputs:
+  - Completed job instances
+tags:
+  - utility
+  - orchestration
+  - azureml
+lifecycle:
+  status: active
+"""
+
 from typing import Any
 
 from azure.ai.ml import MLClient

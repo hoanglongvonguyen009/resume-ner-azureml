@@ -1,3 +1,25 @@
+"""
+@meta
+name: training_data_combiner
+type: utility
+domain: training
+responsibility:
+  - Combine old and new datasets for continued training
+  - Support multiple combination strategies
+inputs:
+  - Old dataset paths (optional)
+  - New dataset paths
+  - Combination strategies
+outputs:
+  - Combined dataset dictionaries
+tags:
+  - utility
+  - training
+  - file-io
+lifecycle:
+  status: active
+"""
+
 """Dataset combination utilities for continued training."""
 
 import json

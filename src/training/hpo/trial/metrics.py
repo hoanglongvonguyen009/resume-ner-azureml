@@ -1,5 +1,28 @@
 from __future__ import annotations
 
+"""
+@meta
+name: trial_metrics
+type: utility
+domain: training
+responsibility:
+  - Read trial metrics from files and MLflow
+  - Store metrics in trial attributes
+inputs:
+  - Trial output directories
+  - MLflow experiment names
+outputs:
+  - Metrics dictionaries
+tags:
+  - utility
+  - training
+  - hpo
+  - file-io
+  - mlflow
+lifecycle:
+  status: active
+"""
+
 """Trial metrics reading and storage utilities."""
 
 import json

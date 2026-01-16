@@ -1,3 +1,19 @@
+"""
+@meta
+name: shared_performance
+type: utility
+domain: shared
+responsibility:
+  - Performance measurement utilities
+  - Time tracking and threshold checking
+tags:
+  - utility
+  - shared
+  - performance
+lifecycle:
+  status: active
+"""
+
 """Performance measurement utilities."""
 
 import time

@@ -1,5 +1,26 @@
 from __future__ import annotations
 
+"""
+@meta
+name: file_locking
+type: utility
+domain: orchestration
+responsibility:
+  - Cross-platform file locking for atomic writes
+  - Handle Unix and Windows compatibility
+inputs:
+  - File paths
+  - Timeout values
+outputs:
+  - File handles with locks
+tags:
+  - utility
+  - orchestration
+  - file-io
+lifecycle:
+  status: active
+"""
+
 """Cross-platform file locking utilities."""
 
 import os

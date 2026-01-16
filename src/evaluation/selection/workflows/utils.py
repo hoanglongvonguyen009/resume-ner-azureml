@@ -1,3 +1,25 @@
+"""
+@meta
+name: selection_workflows_utils
+type: utility
+domain: evaluation
+responsibility:
+  - Utility functions for selection workflows
+  - Resolve test data paths from configs
+inputs:
+  - Benchmark configuration
+  - Data configuration
+  - Config directory paths
+outputs:
+  - Resolved file paths
+tags:
+  - utility
+  - evaluation
+  - workflows
+lifecycle:
+  status: active
+"""
+
 """Utility functions for selection workflows."""
 
 from pathlib import Path

@@ -1,5 +1,28 @@
 from __future__ import annotations
 
+"""
+@meta
+name: trial_callback
+type: utility
+domain: training
+responsibility:
+  - Create trial completion callbacks for Optuna
+  - Display trial completion information
+  - Track metrics in MLflow
+inputs:
+  - Objective metric names
+  - Parent MLflow run IDs
+outputs:
+  - Callback functions for Optuna
+tags:
+  - utility
+  - training
+  - hpo
+  - mlflow
+lifecycle:
+  status: active
+"""
+
 """Trial callback utilities for HPO.
 
 Creates callbacks for displaying trial completion information.

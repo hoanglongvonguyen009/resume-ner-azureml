@@ -1,5 +1,21 @@
 from __future__ import annotations
 
+"""
+@meta
+name: shared_yaml_utils
+type: utility
+domain: shared
+responsibility:
+  - YAML file loading utilities
+  - Parse YAML files with error handling
+tags:
+  - utility
+  - shared
+  - file-io
+lifecycle:
+  status: active
+"""
+
 from pathlib import Path
 from typing import Any, Dict
 

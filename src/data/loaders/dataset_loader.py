@@ -1,3 +1,29 @@
+"""
+@meta
+name: dataset_loader
+type: utility
+domain: data
+responsibility:
+  - Load datasets from JSON files
+  - Build label lists from configuration
+  - Split datasets with optional stratification
+  - Normalize text for tokenization
+  - Encode annotations to labels
+inputs:
+  - JSON dataset files
+  - Data configuration
+outputs:
+  - Dataset dictionaries
+  - Label lists
+  - Split datasets
+tags:
+  - utility
+  - data
+  - file-io
+lifecycle:
+  status: active
+"""
+
 """Data loading and processing utilities."""
 
 import json

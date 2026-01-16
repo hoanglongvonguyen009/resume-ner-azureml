@@ -1,3 +1,25 @@
+"""
+@meta
+name: training_config
+type: utility
+domain: training
+responsibility:
+  - Load configuration files from YAML
+  - Build training configuration from arguments
+inputs:
+  - Config directories
+  - Configuration filenames
+  - Command-line arguments
+outputs:
+  - Configuration dictionaries
+tags:
+  - utility
+  - training
+  - file-io
+lifecycle:
+  status: active
+"""
+
 """Configuration loading and building utilities."""
 
 from pathlib import Path

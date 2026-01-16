@@ -1,4 +1,20 @@
 #!/usr/bin/env python
+"""
+@meta
+name: benchmarking_cli
+type: script
+domain: benchmarking
+responsibility:
+  - Compatibility wrapper for benchmarking CLI
+  - Redirects to evaluation.benchmarking.cli
+lifecycle:
+  status: deprecated
+tags:
+  - entrypoint
+  - compatibility
+  - deprecated
+"""
+
 """Compatibility wrapper for benchmarking CLI.
 
 This script redirects to the new evaluation.benchmarking.cli module.

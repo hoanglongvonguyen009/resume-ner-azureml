@@ -1,5 +1,26 @@
 from __future__ import annotations
 
+"""
+@meta
+name: optuna_integration
+type: utility
+domain: orchestration
+responsibility:
+  - Lazy import Optuna and related modules
+  - Create Optuna pruners and samplers
+inputs:
+  - HPO configuration
+outputs:
+  - Optuna components (study, pruner, sampler)
+tags:
+  - utility
+  - orchestration
+  - hpo
+  - optuna
+lifecycle:
+  status: active
+"""
+
 """Optuna integration utilities for local HPO."""
 
 import logging

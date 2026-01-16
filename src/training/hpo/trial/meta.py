@@ -1,3 +1,26 @@
+"""
+@meta
+name: trial_meta
+type: utility
+domain: training
+responsibility:
+  - Generate missing trial_meta.json files for existing HPO trials
+  - Retroactively create trial metadata
+inputs:
+  - Study folders
+  - Backbone names
+  - HPO configuration
+outputs:
+  - Trial metadata JSON files
+tags:
+  - utility
+  - training
+  - hpo
+  - file-io
+lifecycle:
+  status: active
+"""
+
 """Generate missing trial_meta.json files for existing HPO trials.
 
 This module provides utilities to retroactively create trial_meta.json files

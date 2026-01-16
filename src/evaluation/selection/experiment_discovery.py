@@ -1,5 +1,26 @@
 from __future__ import annotations
 
+"""
+@meta
+name: experiment_discovery
+type: utility
+domain: evaluation
+responsibility:
+  - Discover HPO and benchmark experiments from MLflow
+  - Serve as single source of truth for experiment discovery
+inputs:
+  - Experiment names
+  - MLflow client instances
+outputs:
+  - Experiment dictionaries
+tags:
+  - utility
+  - evaluation
+  - mlflow
+lifecycle:
+  status: active
+"""
+
 """MLflow experiment discovery utilities.
 
 This module provides functions to discover HPO and benchmark experiments

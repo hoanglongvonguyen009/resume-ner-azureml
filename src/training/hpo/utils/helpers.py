@@ -1,5 +1,30 @@
 from __future__ import annotations
 
+"""
+@meta
+name: hpo_helpers
+type: utility
+domain: training
+responsibility:
+  - Helper functions for HPO sweep orchestration
+  - Generate run IDs
+  - Setup checkpoint storage
+inputs:
+  - Output directories
+  - Checkpoint configuration
+  - Backbone names
+outputs:
+  - Run IDs
+  - Checkpoint storage paths
+tags:
+  - utility
+  - training
+  - hpo
+  - file-io
+lifecycle:
+  status: active
+"""
+
 """Helper functions for HPO sweep orchestration."""
 
 from datetime import datetime

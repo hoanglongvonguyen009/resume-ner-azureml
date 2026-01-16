@@ -1,5 +1,29 @@
 from __future__ import annotations
 
+"""
+@meta
+name: version_counter
+type: utility
+domain: orchestration
+responsibility:
+  - Run name version reservation and commit
+  - Manage version counter cache files
+inputs:
+  - Root directories
+  - Config directories
+  - Run names
+outputs:
+  - Version numbers
+  - Counter file paths
+tags:
+  - utility
+  - orchestration
+  - file-io
+  - caching
+lifecycle:
+  status: active
+"""
+
 """Run name version reservation and commit."""
 
 import sys

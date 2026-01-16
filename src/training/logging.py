@@ -1,3 +1,24 @@
+"""
+@meta
+name: training_logging
+type: utility
+domain: training
+responsibility:
+  - Log metrics to file and platform adapters
+  - Write metrics.json files
+inputs:
+  - Output directories
+  - Metrics dictionaries
+outputs:
+  - Metrics JSON files
+tags:
+  - utility
+  - training
+  - file-io
+lifecycle:
+  status: active
+"""
+
 """Metric logging utilities."""
 
 import json

@@ -1,3 +1,24 @@
+"""
+@meta
+name: hpo_paths
+type: utility
+domain: training
+responsibility:
+  - HPO-specific path resolution utilities
+  - Handle Google Drive path mapping in Colab
+inputs:
+  - HPO output directory paths
+outputs:
+  - Resolved paths (Drive or local)
+tags:
+  - utility
+  - training
+  - hpo
+  - paths
+lifecycle:
+  status: active
+"""
+
 """HPO-specific path resolution utilities.
 
 This module provides HPO-specific path resolution functions, particularly

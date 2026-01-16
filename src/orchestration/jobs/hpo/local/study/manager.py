@@ -1,5 +1,28 @@
 from __future__ import annotations
 
+"""
+@meta
+name: study_manager
+type: utility
+domain: orchestration
+responsibility:
+  - Manage Optuna study creation, loading, and resume
+  - Handle study state management
+inputs:
+  - HPO configuration
+  - Checkpoint configuration
+  - Output directories
+outputs:
+  - Study manager instances
+tags:
+  - utility
+  - orchestration
+  - hpo
+  - optuna
+lifecycle:
+  status: active
+"""
+
 """Optuna study management utilities for HPO.
 
 Handles study creation, resume, and state management.

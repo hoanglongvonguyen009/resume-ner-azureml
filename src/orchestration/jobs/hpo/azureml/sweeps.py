@@ -1,5 +1,28 @@
 from __future__ import annotations
 
+"""
+@meta
+name: azureml_sweeps
+type: utility
+domain: orchestration
+responsibility:
+  - Create Azure ML sweep jobs for HPO
+  - Build data inputs and environments
+inputs:
+  - Azure ML client
+  - HPO configuration
+  - Data assets
+outputs:
+  - Azure ML sweep job definitions
+tags:
+  - utility
+  - orchestration
+  - hpo
+  - azureml
+lifecycle:
+  status: active
+"""
+
 from pathlib import Path
 from typing import Any, Dict
 

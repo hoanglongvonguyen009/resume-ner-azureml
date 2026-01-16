@@ -1,5 +1,21 @@
 from __future__ import annotations
 
+"""
+@meta
+name: shared_json_cache
+type: utility
+domain: shared
+responsibility:
+  - JSON file I/O utilities
+  - Save and load JSON data with error handling
+tags:
+  - utility
+  - shared
+  - file-io
+lifecycle:
+  status: active
+"""
+
 from pathlib import Path
 from typing import Any, Optional
 import json
