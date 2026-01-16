@@ -4,18 +4,18 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from benchmarking.orchestrator import benchmark_best_trials
-from benchmarking.utils import run_benchmarking
+from evaluation.benchmarking.orchestrator import benchmark_best_trials
+from evaluation.benchmarking.utils import run_benchmarking
 
 
 class TestBenchmarkMlflowTrackingWithTrialId:
     """Test MLflow tracking works correctly with trial_id extraction."""
 
-    @patch("benchmarking.orchestrator.run_benchmarking")
-    @patch("benchmarking.orchestrator.create_naming_context")
-    @patch("benchmarking.orchestrator.build_output_path")
-    @patch("benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
     def test_benchmark_passes_trial_id_to_run_benchmarking(
         self,
         mock_validate_path,
@@ -80,11 +80,11 @@ class TestBenchmarkMlflowTrackingWithTrialId:
         # Should extract trial_id from trial_name (trial-25d03eeb)
         assert call_kwargs["trial_id"] == "trial-25d03eeb"
 
-    @patch("benchmarking.orchestrator.run_benchmarking")
-    @patch("benchmarking.orchestrator.create_naming_context")
-    @patch("benchmarking.orchestrator.build_output_path")
-    @patch("benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
     def test_benchmark_passes_trial_id_old_format(
         self,
         mock_validate_path,
@@ -149,7 +149,7 @@ class TestBenchmarkMlflowTrackingWithTrialId:
         # Old format: should remove "trial_" prefix
         assert call_kwargs["trial_id"] == "1_20251231_161745"
 
-    @patch("benchmarking.utils.subprocess.run")
+    @patch("evaluation.benchmarking.utils.subprocess.run")
     @patch("infrastructure.naming.create_naming_context")
     @patch("common.shared.platform_detection.detect_platform")
     def test_run_benchmarking_mlflow_tracking_with_trial_id(
@@ -220,7 +220,7 @@ class TestBenchmarkMlflowTrackingWithTrialId:
         call_kwargs = mock_create_context.call_args.kwargs
         assert call_kwargs["trial_id"] == "trial-25d03eeb"
 
-    @patch("benchmarking.utils.subprocess.run")
+    @patch("evaluation.benchmarking.utils.subprocess.run")
     @patch("infrastructure.naming.create_naming_context")
     @patch("common.shared.platform_detection.detect_platform")
     def test_run_benchmarking_mlflow_tracking_fallback_to_trial_key_hash(

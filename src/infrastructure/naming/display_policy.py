@@ -67,8 +67,8 @@ def load_naming_policy(
         _, config_dir = resolve_project_paths(config_dir=None)
         # If inference failed, fall back to infer_config_dir for backward compatibility
         if config_dir is None:
-        from infrastructure.paths.utils import infer_config_dir
-        config_dir = infer_config_dir()
+            from infrastructure.paths.utils import infer_config_dir
+            config_dir = infer_config_dir()
 
     policy_path = config_dir / "naming.yaml"
     mtime = get_file_mtime(policy_path)
@@ -236,6 +236,26 @@ def parse_parent_training_id(parent_id: str) -> Dict[str, str]:
         f"using defaults"
     )
     return {"spec_hash": "unknown", "exec_hash": "unknown", "variant": "1"}
+
+
+def build_parent_training_id(spec_fp: str, exec_fp: str, variant: int = 1) -> str:
+    """
+    Build parent training identifier for conversion.
+
+    This creates a string identifier that can be used as parent_training_id
+    in conversion contexts. The format matches the directory structure.
+
+    This is the inverse of parse_parent_training_id().
+
+    Args:
+        spec_fp: Specification fingerprint.
+        exec_fp: Execution fingerprint.
+        variant: Variant number.
+
+    Returns:
+        Parent training identifier string in format: "spec_{spec_fp}_exec_{exec_fp}/v{variant}"
+    """
+    return f"spec_{spec_fp}_exec_{exec_fp}/v{variant}"
 
 
 def sanitize_semantic_suffix(study_name: str, max_length: int = 30, model: Optional[str] = None) -> str:

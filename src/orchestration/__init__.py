@@ -60,8 +60,6 @@ from infrastructure.paths import (
     get_drive_backup_base,
     get_drive_backup_path,
 )
-# Import resolve_output_path_v2 from legacy facade (deprecated, not used)
-from .paths import resolve_output_path_v2
 
 # Storage - moved to infrastructure.storage module (no longer via deprecated facade)
 from infrastructure.storage import (
@@ -85,13 +83,13 @@ from infrastructure.fingerprints import (
     compute_hardware_fp,
 )
 
-# Naming centralized - these remain in orchestration/naming_centralized.py (facade to naming module)
-from .naming_centralized import (
+# Naming centralized - migrated to infrastructure.naming and infrastructure.paths
+from infrastructure.naming import (
     NamingContext,
     create_naming_context,
-    build_output_path,
-    build_parent_training_id,
 )
+from infrastructure.paths import build_output_path
+from infrastructure.naming import build_parent_training_id
 
 # Metadata - moved to infrastructure.metadata module
 from infrastructure.metadata import (
@@ -171,7 +169,6 @@ __all__ = [
     # Path resolution exports
     "load_paths_config",
     "resolve_output_path",
-    "resolve_output_path_v2",
     "get_cache_file_path",
     "get_timestamped_cache_filename",
     "get_cache_strategy_config",

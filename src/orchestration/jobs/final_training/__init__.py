@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Final training job modules - backward compatibility facade.
 
-This module re-exports from training_exec module for backward compatibility.
+This module re-exports from training.execution module for backward compatibility.
 """
 
 import warnings
@@ -15,7 +15,7 @@ from training.execution.tags import apply_lineage_tags
 # Issue deprecation warning
 warnings.warn(
     "Importing from 'orchestration.jobs.final_training' is deprecated. "
-    "Please import from 'training_exec' instead.",
+    "Please import from 'training.execution' instead.",
     DeprecationWarning,
     stacklevel=2
 )

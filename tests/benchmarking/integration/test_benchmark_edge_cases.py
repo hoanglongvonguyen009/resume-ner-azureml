@@ -6,8 +6,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from infrastructure.config.loader import load_all_configs, ExperimentConfig
-from benchmarking.orchestrator import benchmark_best_trials
-from benchmarking.utils import run_benchmarking
+from evaluation.benchmarking.orchestrator import benchmark_best_trials
+from evaluation.benchmarking.utils import run_benchmarking
 
 
 class TestBenchmarkConfigEdgeCases:
@@ -323,7 +323,7 @@ class TestBenchmarkConfigEdgeCases:
         assert result == {}
         assert not mock_run_benchmarking.called
 
-    @patch("benchmarking.utils.subprocess.run")
+    @patch("evaluation.benchmarking.utils.subprocess.run")
     def test_run_benchmarking_handles_missing_benchmark_script(
         self,
         mock_subprocess,
@@ -352,7 +352,7 @@ class TestBenchmarkConfigEdgeCases:
         assert success is False
         assert not mock_subprocess.called
 
-    @patch("benchmarking.utils.subprocess.run")
+    @patch("evaluation.benchmarking.utils.subprocess.run")
     def test_run_benchmarking_handles_subprocess_failure(
         self,
         mock_subprocess,

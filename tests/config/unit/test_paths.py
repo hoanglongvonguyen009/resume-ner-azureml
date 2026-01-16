@@ -291,7 +291,8 @@ class TestPathBuildingV2:
 
     def test_path_building_v2_hpo(self, tmp_path):
         """Test path building v2 for HPO with study_key_hash and trial_key_hash."""
-        from orchestration.naming_centralized import create_naming_context, build_output_path
+        from infrastructure.naming import create_naming_context
+        from infrastructure.paths import build_output_path
         
         config_dir = tmp_path / "config"
         config_dir.mkdir()
@@ -336,7 +337,8 @@ patterns:
 
     def test_path_building_v2_normalized(self, tmp_path):
         """Test that path is normalized (no invalid chars)."""
-        from orchestration.naming_centralized import create_naming_context, build_output_path
+        from infrastructure.naming import create_naming_context
+        from infrastructure.paths import build_output_path
         
         config_dir = tmp_path / "config"
         config_dir.mkdir()
@@ -380,7 +382,8 @@ normalize_paths:
 
     def test_path_building_v2_all_storage_envs(self, tmp_path):
         """Test path building v2 for all storage environments."""
-        from orchestration.naming_centralized import create_naming_context, build_output_path
+        from infrastructure.naming import create_naming_context
+        from infrastructure.paths import build_output_path
         
         config_dir = tmp_path / "config"
         config_dir.mkdir()
@@ -430,7 +433,8 @@ env_overrides:
 
     def test_path_building_v2_study8_trial8_format(self, tmp_path):
         """Test that study8 and trial8 are correctly formatted (first 8 chars)."""
-        from orchestration.naming_centralized import create_naming_context, build_output_path
+        from infrastructure.naming import create_naming_context
+        from infrastructure.paths import build_output_path
         
         config_dir = tmp_path / "config"
         config_dir.mkdir()

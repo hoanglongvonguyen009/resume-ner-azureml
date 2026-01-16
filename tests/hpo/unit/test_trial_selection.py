@@ -3,7 +3,7 @@
 import pytest
 
 from selection.selection_logic import SelectionLogic
-from orchestration.jobs.errors import SelectionError
+from training.hpo.exceptions import SelectionError
 
 
 class TestSelectionCriteria:

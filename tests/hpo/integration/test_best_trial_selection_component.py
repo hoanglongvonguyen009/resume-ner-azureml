@@ -11,7 +11,7 @@ except ImportError:
     optuna = None
     pytest.skip("optuna not available", allow_module_level=True)
 
-from hpo import extract_best_config_from_study
+from training.hpo import extract_best_config_from_study
 from selection.selection_logic import SelectionLogic
 
 

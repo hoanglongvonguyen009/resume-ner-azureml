@@ -14,7 +14,7 @@ from infrastructure.naming.mlflow.tags import (
     sanitize_tag_value,
     build_mlflow_tags,
 )
-from orchestration.naming_centralized import NamingContext
+from infrastructure.naming import NamingContext
 
 
 @pytest.fixture

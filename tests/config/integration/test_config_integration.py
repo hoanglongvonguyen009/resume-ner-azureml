@@ -4,7 +4,8 @@ import yaml
 from pathlib import Path
 import pytest
 
-from orchestration.naming_centralized import NamingContext, build_output_path
+from infrastructure.naming import NamingContext
+from infrastructure.paths import build_output_path
 from infrastructure.naming.mlflow.run_names import build_mlflow_run_name
 from infrastructure.naming.mlflow.tags import build_mlflow_tags
 from infrastructure.paths import resolve_output_path

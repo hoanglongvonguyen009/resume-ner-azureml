@@ -12,7 +12,7 @@ except ImportError:
     optuna = None
     pytest.skip("optuna not available", allow_module_level=True)
 
-from hpo import run_local_hpo_sweep, extract_best_config_from_study
+from training.hpo import run_local_hpo_sweep, extract_best_config_from_study
 from selection.selection_logic import SelectionLogic
 from common.constants import METRICS_FILENAME
 

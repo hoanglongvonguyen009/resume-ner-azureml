@@ -95,7 +95,7 @@ class TestAzureMLArtifactUploadIntegration:
 
     def test_refit_run_completion_after_upload(self, mock_azureml_workspace):
         """Test that refit run is marked as FINISHED after successful upload."""
-        from hpo import run_local_hpo_sweep
+        from training.hpo import run_local_hpo_sweep
         
         # Mock MLflow client
         with patch('mlflow.tracking.MlflowClient') as mock_client_class:
@@ -108,7 +108,7 @@ class TestAzureMLArtifactUploadIntegration:
             mock_client.get_run.return_value = mock_run
             
             # Mock tracker
-            with patch('hpo.tracking.sweep_tracker.MLflowSweepTracker') as mock_tracker_class:
+            with patch('training.hpo.tracking.sweep_tracker.MLflowSweepTracker') as mock_tracker_class:
                 mock_tracker = MagicMock()
                 mock_tracker_class.return_value = mock_tracker
                 mock_tracker.log_best_checkpoint.return_value = None  # Success

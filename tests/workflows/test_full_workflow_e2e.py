@@ -63,7 +63,7 @@ from infrastructure.config.loader import (
     load_experiment_config,
     load_all_configs,
 )
-from training_exec import extract_lineage_from_best_model
+from training.execution import extract_lineage_from_best_model
 from infrastructure.naming.mlflow.tags_registry import load_tags_registry
 from common.shared.platform_detection import detect_platform
 from common.shared.yaml_utils import load_yaml
@@ -209,7 +209,7 @@ def test_full_workflow_e2e(
         return mock_result
     
     with patch('orchestration.jobs.hpo.local.trial.execution.subprocess.run', side_effect=subprocess_side_effect):
-        from hpo import run_local_hpo_sweep
+        from training.hpo import run_local_hpo_sweep
         
         environment = detect_platform()
         output_dir = ROOT_DIR / "outputs" / "hpo" / environment / "distilbert"
@@ -522,7 +522,7 @@ def test_full_workflow_e2e(
         lambda **kwargs: fake_final_checkpoint_dir,
     )
     
-    from training_exec import execute_final_training
+    from training.execution import execute_final_training
     
     final_checkpoint_dir = execute_final_training(
         root_dir=ROOT_DIR,

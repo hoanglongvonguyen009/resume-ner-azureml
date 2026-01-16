@@ -16,7 +16,7 @@ from training.hpo.execution.local.refit import run_refit_training
 from training.hpo.trial.metrics import read_trial_metrics
 from training.hpo.core.study import StudyManager
 from selection.selection_logic import SelectionLogic
-from orchestration.jobs.errors import SelectionError
+from training.hpo.exceptions import SelectionError
 from common.constants import METRICS_FILENAME
 
 # Lazy import optuna to allow tests to be skipped if not available

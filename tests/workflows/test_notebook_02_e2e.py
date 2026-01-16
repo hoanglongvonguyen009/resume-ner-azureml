@@ -30,7 +30,7 @@ import pytest
 
 from orchestration import EXPERIMENT_NAME
 from infrastructure.config.loader import load_experiment_config
-from training_exec import extract_lineage_from_best_model
+from training.execution import extract_lineage_from_best_model
 from infrastructure.naming.mlflow.tags_registry import load_tags_registry
 from common.shared.platform_detection import detect_platform
 from common.shared.yaml_utils import load_yaml
@@ -193,14 +193,10 @@ def test_best_config_selection_e2e(tmp_path, monkeypatch):
     )
 
     # Patch final training executor to return our fake final checkpoint
-    # Note: The actual import is from training_exec, so we patch that
+    # Note: The actual import is from training.execution, so we patch that
+    # Updated after Phase 2: training_exec was removed, now use training.execution
     monkeypatch.setattr(
-        "training_exec.execute_final_training",
-        lambda **kwargs: fake_final_checkpoint_dir,
-    )
-    # Also patch at the executor level in case it's imported directly
-    monkeypatch.setattr(
-        "training_exec.executor.execute_final_training",
+        "training.execution.executor.execute_final_training",
         lambda **kwargs: fake_final_checkpoint_dir,
     )
 
@@ -282,7 +278,7 @@ def test_best_config_selection_e2e(tmp_path, monkeypatch):
     monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     
     # Final training
-    from training_exec import execute_final_training
+    from training.execution import execute_final_training
 
     training_experiment_name = f"{EXPERIMENT_NAME}-training"
     final_checkpoint_dir = execute_final_training(

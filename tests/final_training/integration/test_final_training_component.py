@@ -180,7 +180,7 @@ def test_execute_final_training_force_new_runs_training(tmp_path, monkeypatch):
     monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
     # Patch the metadata manager module since save_metadata_with_fingerprints is imported inside the function
-    import orchestration.metadata_manager as mm
+    import infrastructure.metadata.training as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 
     # Execute
@@ -257,7 +257,7 @@ def test_execute_final_training_resume_if_incomplete_continues(tmp_path, monkeyp
     monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
     # Patch the metadata manager module since save_metadata_with_fingerprints is imported inside the function
-    import orchestration.metadata_manager as mm
+    import infrastructure.metadata.training as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
@@ -367,7 +367,7 @@ def test_execute_final_training_local_path_override(tmp_path, monkeypatch):
     monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
     # Patch the metadata manager module since save_metadata_with_fingerprints is imported inside the function
-    import orchestration.metadata_manager as mm
+    import infrastructure.metadata.training as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
@@ -439,7 +439,7 @@ def test_execute_final_training_training_failure_marks_run_failed(tmp_path, monk
     monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
     # Patch the metadata manager module since save_metadata_with_fingerprints is imported inside the function
-    import orchestration.metadata_manager as mm
+    import infrastructure.metadata.training as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
@@ -506,7 +506,7 @@ def test_execute_final_training_mlflow_disabled_skips_tracking(tmp_path, monkeyp
     monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: None))
     # Patch the metadata manager module since save_metadata_with_fingerprints is imported inside the function
-    import orchestration.metadata_manager as mm
+    import infrastructure.metadata.training as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
@@ -597,7 +597,7 @@ def test_execute_final_training_source_scratch_no_checkpoint(tmp_path, monkeypat
     # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
     monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
-    import orchestration.metadata_manager as mm
+    import infrastructure.metadata.training as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
@@ -696,7 +696,7 @@ def test_execute_final_training_source_final_training_with_checkpoint(tmp_path, 
     # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
     monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
-    import orchestration.metadata_manager as mm
+    import infrastructure.metadata.training as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
@@ -796,7 +796,7 @@ def test_execute_final_training_hyperparameter_precedence(tmp_path, monkeypatch)
     # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
     monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
-    import orchestration.metadata_manager as mm
+    import infrastructure.metadata.training as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
@@ -931,7 +931,7 @@ def test_execute_final_training_mlflow_overrides(tmp_path, monkeypatch):
     # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
     monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr(executor, "mlflow", Mock(get_tracking_uri=lambda: "file:///tmp/mlflow"))
-    import orchestration.metadata_manager as mm
+    import infrastructure.metadata.training as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}

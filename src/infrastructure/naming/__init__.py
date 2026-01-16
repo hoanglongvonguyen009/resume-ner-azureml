@@ -6,6 +6,7 @@ from .context import (
 )
 from .context_tokens import build_token_values
 from .display_policy import (
+    build_parent_training_id,
     format_run_name,
     load_naming_policy,
     parse_parent_training_id,
@@ -64,6 +65,8 @@ __all__ = [
     "validate_naming_policy",
     "validate_run_name",
     "parse_parent_training_id",
+    "build_parent_training_id",
+    "build_parent_training_id",
     "sanitize_semantic_suffix",
     # Experiments
     "get_stage_config",

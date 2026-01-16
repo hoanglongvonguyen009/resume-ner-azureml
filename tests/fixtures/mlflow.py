@@ -40,13 +40,18 @@ def mock_mlflow_tracking(monkeypatch, tmp_path):
         raising=False,
     )
     
-    # Mock Azure ML client creation if attempted
-    mock_ml_client = Mock()
-    monkeypatch.setattr(
-        "azure.ai.ml.MLClient",
-        lambda **kwargs: mock_ml_client,
-        raising=False
-    )
+    # Mock Azure ML client creation if attempted (only if azure module is available)
+    try:
+        import azure.ai.ml
+        mock_ml_client = Mock()
+        monkeypatch.setattr(
+            "azure.ai.ml.MLClient",
+            lambda **kwargs: mock_ml_client,
+            raising=False
+        )
+    except ImportError:
+        # Azure ML SDK not installed - skip mocking (tests should work without it)
+        pass
     
     return tracking_uri
 

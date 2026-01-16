@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from benchmarking.utils import run_benchmarking
+from evaluation.benchmarking.utils import run_benchmarking
 
 
 def _create_mock_tracker():
@@ -28,7 +28,7 @@ def _create_mock_output_file(output_path):
 class TestTrialIdExtraction:
     """Test trial_id extraction logic in run_benchmarking."""
 
-    @patch("benchmarking.utils.subprocess.run")
+    @patch("evaluation.benchmarking.utils.subprocess.run")
     @patch("infrastructure.naming.create_naming_context")
     @patch("common.shared.platform_detection.detect_platform")
     def test_trial_id_from_parameter_old_format(
@@ -88,7 +88,7 @@ class TestTrialIdExtraction:
         call_kwargs = mock_create_context.call_args.kwargs
         assert call_kwargs["trial_id"] == trial_id
 
-    @patch("benchmarking.utils.subprocess.run")
+    @patch("evaluation.benchmarking.utils.subprocess.run")
     @patch("infrastructure.naming.create_naming_context")
     @patch("common.shared.platform_detection.detect_platform")
     def test_trial_id_from_parameter_new_format(
@@ -157,7 +157,7 @@ class TestTrialIdExtraction:
         call_kwargs = mock_create_context.call_args.kwargs
         assert call_kwargs["trial_id"] == trial_id
 
-    @patch("benchmarking.utils.subprocess.run")
+    @patch("evaluation.benchmarking.utils.subprocess.run")
     @patch("infrastructure.naming.create_naming_context")
     @patch("common.shared.platform_detection.detect_platform")
     def test_trial_id_extraction_from_path_old_format(
@@ -220,7 +220,7 @@ class TestTrialIdExtraction:
         call_kwargs = mock_create_context.call_args.kwargs
         assert call_kwargs["trial_id"] == "trial_1_20251231_161745"
 
-    @patch("benchmarking.utils.subprocess.run")
+    @patch("evaluation.benchmarking.utils.subprocess.run")
     @patch("infrastructure.naming.create_naming_context")
     @patch("common.shared.platform_detection.detect_platform")
     def test_trial_id_extraction_from_path_new_format(
@@ -283,7 +283,7 @@ class TestTrialIdExtraction:
         call_kwargs = mock_create_context.call_args.kwargs
         assert call_kwargs["trial_id"] == "trial-25d03eeb"
 
-    @patch("benchmarking.utils.subprocess.run")
+    @patch("evaluation.benchmarking.utils.subprocess.run")
     @patch("infrastructure.naming.create_naming_context")
     @patch("common.shared.platform_detection.detect_platform")
     def test_trial_id_extraction_from_refit_checkpoint_path(
@@ -346,7 +346,7 @@ class TestTrialIdExtraction:
         call_kwargs = mock_create_context.call_args.kwargs
         assert call_kwargs["trial_id"] == "trial-25d03eeb"
 
-    @patch("benchmarking.utils.subprocess.run")
+    @patch("evaluation.benchmarking.utils.subprocess.run")
     @patch("infrastructure.naming.create_naming_context")
     @patch("common.shared.platform_detection.detect_platform")
     def test_trial_id_fallback_to_trial_key_hash(
@@ -408,7 +408,7 @@ class TestTrialIdExtraction:
         # Should construct as trial-{first_8_chars_of_hash}
         assert call_kwargs["trial_id"] == f"trial-{trial_key_hash[:8]}"
 
-    @patch("benchmarking.utils.subprocess.run")
+    @patch("evaluation.benchmarking.utils.subprocess.run")
     @patch("infrastructure.naming.create_naming_context")
     @patch("common.shared.platform_detection.detect_platform")
     def test_trial_id_parameter_overrides_path_extraction(

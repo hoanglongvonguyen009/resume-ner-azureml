@@ -69,7 +69,7 @@ from infrastructure.config.loader import (
     compute_config_hashes,
     create_config_metadata,
 )
-from hpo import run_local_hpo_sweep
+from training.hpo import run_local_hpo_sweep
 from evaluation.benchmarking.orchestrator import benchmark_champions
 from evaluation.selection.trial_finder import select_champions_for_backbones
 from evaluation.selection.workflows.benchmarking_workflow import run_benchmarking_workflow

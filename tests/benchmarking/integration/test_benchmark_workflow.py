@@ -6,18 +6,18 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
 from infrastructure.config.loader import load_experiment_config, load_all_configs
-from benchmarking.orchestrator import benchmark_best_trials
-from benchmarking.utils import run_benchmarking
+from evaluation.benchmarking.orchestrator import benchmark_best_trials
+from evaluation.benchmarking.utils import run_benchmarking
 
 
 class TestBenchmarkWorkflow:
     """Test end-to-end benchmarking workflow with config loading."""
 
-    @patch("benchmarking.orchestrator.run_benchmarking")
-    @patch("benchmarking.orchestrator.create_naming_context")
-    @patch("benchmarking.orchestrator.build_output_path")
-    @patch("benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
     def test_workflow_loads_config_and_uses_all_options(
         self,
         mock_validate_path,
@@ -129,7 +129,7 @@ benchmark_config: benchmark.yaml
         assert call_args.kwargs["device"] == device
         assert call_args.kwargs["output_path"].name == filename
 
-    @patch("benchmarking.utils.subprocess.run")
+    @patch("evaluation.benchmarking.utils.subprocess.run")
     def test_workflow_custom_config_values(
         self,
         mock_subprocess,
@@ -226,11 +226,11 @@ output:
         output_idx = call_args.index("--output")
         assert Path(call_args[output_idx + 1]).name == filename
 
-    @patch("benchmarking.orchestrator.run_benchmarking")
-    @patch("benchmarking.orchestrator.create_naming_context")
-    @patch("benchmarking.orchestrator.build_output_path")
-    @patch("benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
     def test_workflow_defaults_when_config_missing(
         self,
         mock_validate_path,

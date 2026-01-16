@@ -109,31 +109,3 @@ def get_mlflow_run_id() -> Optional[str]:
         pass
     return os.environ.get("MLFLOW_RUN_ID")
 
-
-# Re-export infer_config_dir from paths.utils for backward compatibility
-import warnings
-from infrastructure.paths.utils import infer_config_dir
-
-def infer_config_dir_from_path(path: Optional[Path]) -> Path:
-    """
-    Infer config directory by searching up the parent chain from a given path.
-    
-    **DEPRECATED**: Use `infrastructure.paths.utils.infer_config_dir()` instead.
-    This function is kept for backward compatibility and re-exports the new function.
-    
-    Args:
-        path: Starting path to search from (e.g., output_dir, checkpoint_dir).
-              If None, searches from current working directory.
-    
-    Returns:
-        Path to config directory. Falls back to Path.cwd() / "config" if not found.
-    """
-    warnings.warn(
-        "infer_config_dir_from_path is deprecated. "
-        "Please use infrastructure.paths.utils.infer_config_dir() instead. "
-        "This function will be removed in a future release.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return infer_config_dir(path=path)
-

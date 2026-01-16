@@ -135,7 +135,7 @@ def test_logging_eval_interval_loaded_from_config(tmp_path, monkeypatch):
     # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
     monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr("mlflow.get_tracking_uri", lambda: "file:///tmp/mlflow")
-    import orchestration.metadata_manager as mm
+    import infrastructure.metadata.training as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
@@ -229,7 +229,7 @@ def test_logging_save_interval_loaded_from_config(tmp_path, monkeypatch):
     # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
     monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr("mlflow.get_tracking_uri", lambda: "file:///tmp/mlflow")
-    import orchestration.metadata_manager as mm
+    import infrastructure.metadata.training as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
@@ -325,7 +325,7 @@ def test_logging_intervals_both_loaded_from_config(tmp_path, monkeypatch):
     # MlflowClient is not imported in executor, patch mlflow.tracking.MlflowClient instead
     monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr("mlflow.get_tracking_uri", lambda: "file:///tmp/mlflow")
-    import orchestration.metadata_manager as mm
+    import infrastructure.metadata.training as mm
     monkeypatch.setattr(mm, "save_metadata_with_fingerprints", lambda **kwargs: None)
 
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}

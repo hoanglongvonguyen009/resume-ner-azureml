@@ -1,6 +1,6 @@
-"""Tests for MLflow utils config directory inference.
+"""Tests for config directory inference utility.
 
-Tests for the infer_config_dir_from_path utility function to ensure
+Tests for the infer_config_dir utility function to ensure
 it correctly finds config directories regardless of path depth.
 """
 
@@ -10,10 +10,10 @@ from pathlib import Path
 
 import pytest
 
-from infrastructure.tracking.mlflow.utils import infer_config_dir_from_path
+from infrastructure.paths.utils import infer_config_dir
 
 
-class TestInferConfigDirFromPath:
+class TestInferConfigDir:
     """Test config directory inference utility."""
 
     def test_finds_config_in_parent_chain(self, tmp_path: Path):
@@ -30,7 +30,7 @@ class TestInferConfigDirFromPath:
         output_dir.mkdir(parents=True)
         
         # Should find config_dir at root/config
-        result = infer_config_dir_from_path(output_dir)
+        result = infer_config_dir(path=output_dir)
         assert result == config_dir
         assert result.exists()
 
@@ -45,7 +45,7 @@ class TestInferConfigDirFromPath:
         output_dir = root / "outputs" / "hpo"
         output_dir.mkdir(parents=True)
         
-        result = infer_config_dir_from_path(output_dir)
+        result = infer_config_dir(path=output_dir)
         assert result == config_dir
 
     def test_falls_back_to_cwd_when_not_found(self, tmp_path: Path, monkeypatch):
@@ -62,7 +62,7 @@ class TestInferConfigDirFromPath:
         # Change to tmp_path as cwd
         monkeypatch.chdir(tmp_path)
         
-        result = infer_config_dir_from_path(output_dir)
+        result = infer_config_dir(path=output_dir)
         assert result == cwd_config
         assert result.exists()
 
@@ -73,7 +73,7 @@ class TestInferConfigDirFromPath:
         
         monkeypatch.chdir(tmp_path)
         
-        result = infer_config_dir_from_path(None)
+        result = infer_config_dir(path=None)
         assert result == Path.cwd() / "config"
 
     def test_finds_first_config_in_parent_chain(self, tmp_path: Path):
@@ -90,7 +90,7 @@ class TestInferConfigDirFromPath:
         output_dir.mkdir(parents=True)
         
         # Should find root/config (first config encountered going up from output_dir)
-        result = infer_config_dir_from_path(output_dir)
+        result = infer_config_dir(path=output_dir)
         assert result == root_config
         assert result.exists()
         
@@ -115,7 +115,7 @@ class TestInferConfigDirFromPath:
         output_dir = root / "outputs" / "hpo" / "local" / "distilbert"
         output_dir.mkdir(parents=True)
         
-        result = infer_config_dir_from_path(output_dir)
+        result = infer_config_dir(path=output_dir)
         
         # Should be root/config, NOT outputs/config
         assert result == root_config

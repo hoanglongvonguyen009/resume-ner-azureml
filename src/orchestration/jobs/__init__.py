@@ -4,12 +4,12 @@ This module provides backward compatibility by re-exporting functions from
 the new modular structure. All imports from this module are deprecated.
 
 New module locations:
-- training_exec/jobs.py: Training job creation
+- training.execution.jobs: Training job creation
 - hpo/execution/azureml/sweeps.py: HPO sweep job creation
 - conversion/jobs.py: Conversion job creation
 - azureml/jobs.py: Azure ML job utilities
 - hpo/exceptions.py: HPO exceptions
-- training_exec/tags.py: Training tags
+- training.execution.tags: Training tags
 - selection/local_selection_v2.py: Improved selection logic
 - tracking/mlflow/trackers/: MLflow trackers
 - tracking/mlflow/finder.py: Run finder
@@ -29,9 +29,9 @@ warnings.warn(
     stacklevel=2
 )
 
-# Training job creation - moved to training_exec/jobs.py
+# Training job creation - moved to training.execution.jobs
 try:
-    from training_exec.jobs import (
+    from training.execution.jobs import (
         build_final_training_config,
         submit_training_job,
         prepare_training_input,
@@ -91,9 +91,9 @@ except ImportError:
     StudyLoadError = None
     MetricsReadError = None
 
-# Training tags - moved to training_exec/tags.py
+# Training tags - moved to training.execution.tags
 try:
-    from training_exec.tags import apply_lineage_tags
+    from training.execution.tags import apply_lineage_tags
 except ImportError:
     apply_lineage_tags = None
 

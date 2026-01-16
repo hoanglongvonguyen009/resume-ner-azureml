@@ -12,7 +12,7 @@ from infrastructure.naming.mlflow.policy import (
     format_run_name,
     validate_run_name,
 )
-from orchestration.naming_centralized import NamingContext
+from infrastructure.naming import NamingContext
 
 
 @pytest.fixture

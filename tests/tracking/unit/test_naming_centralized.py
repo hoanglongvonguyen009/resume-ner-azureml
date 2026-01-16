@@ -7,7 +7,7 @@ from infrastructure.naming import (
     create_naming_context,
 )
 from infrastructure.paths import build_output_path
-from orchestration.naming_centralized import build_parent_training_id
+from infrastructure.naming import build_parent_training_id
 
 
 def test_naming_context_validation():

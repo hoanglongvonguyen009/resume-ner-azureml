@@ -41,6 +41,7 @@ dependencies:
     - pytest-cov>=4.0.0
     - pytest-mock>=3.10.0
     - pytest-xdist>=3.0.0  # Optional: parallel test execution
+    - pytest-asyncio>=0.21.0  # Required for async test support
     - httpx>=0.24.0  # Required by fastapi.testclient.TestClient for API tests
     - pymupdf>=1.23.0  # PDF text extraction (default extractor)
     - pdfplumber>=0.10.0  # Alternative PDF text extraction
