@@ -93,18 +93,57 @@ E2E_SKIP_GPU_CHECKS=true E2E_TEST_SCOPE=core uvx pytest tests/workflows/ -v
 
 ### Available Fixtures
 
+#### Shared Fixtures (from `fixtures/`)
+
 - `tiny_dataset`: Creates minimal test dataset (from `fixtures.datasets`)
 - `mock_mlflow_tracking`: Sets up local file-based MLflow tracking (from `fixtures.mlflow`)
-- `mock_mlflow`: Mock MLflow module for tests (module-specific)
-- `mock_subprocess`: Mock subprocess execution for tests (module-specific)
+  - Configures MLflow to use local file-based tracking
+  - Mocks Azure ML client creation
+- `config_dir`: Creates temporary config directory with required YAML files (from `fixtures.config_dirs`)
+  - Provides `paths.yaml`, `naming.yaml`, `tags.yaml`, `mlflow.yaml`, `data.yaml`
+  - Used for path structure, run name, and tag validation
 
-### Validation Helpers
+#### Module-Specific Fixtures
+
+- `mock_mlflow`: Mock MLflow module for tests
+- `mock_subprocess`: Mock subprocess execution for tests
+
+### Validation Helpers (from `fixtures.validators`)
 
 - `validate_path_structure(path, pattern_type, config_dir)`: Validates paths against `paths.yaml` v2 patterns
+  - Returns `True` if path matches expected pattern structure
 - `validate_run_name(run_name, process_type, config_dir)`: Validates run names against `naming.yaml` patterns
+  - Returns `True` if run name matches naming policy
 - `validate_tags(tags, process_type, config_dir)`: Validates tags against `tags.yaml` definitions
+  - Returns tuple of `(is_valid, missing_tags_list)`
 
-See [`../fixtures/README.md`](../fixtures/README.md) for shared fixtures.
+### Usage Example
+
+```python
+from fixtures import (
+    tiny_dataset,
+    mock_mlflow_tracking,
+    validate_path_structure,
+    validate_run_name,
+    validate_tags,
+)
+
+def test_workflow_validation(tiny_dataset, mock_mlflow_tracking, config_dir):
+    # Validate path structure
+    test_path = Path("outputs/hpo_v2/study-123")
+    assert validate_path_structure(test_path, "hpo_v2", config_dir)
+    
+    # Validate run name
+    run_name = "hpo_study-123_trial-1"
+    assert validate_run_name(run_name, "hpo", config_dir)
+    
+    # Validate tags
+    tags = {"tags.process.stage": "hpo", "tags.process.type": "trial"}
+    is_valid, missing = validate_tags(tags, "hpo", config_dir)
+    assert is_valid
+```
+
+See [`../fixtures/README.md`](../fixtures/README.md) for complete fixture documentation and usage examples.
 
 ## What Is Tested
 

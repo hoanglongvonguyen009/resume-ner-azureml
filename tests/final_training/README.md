@@ -75,10 +75,14 @@ uvx pytest tests/final_training/ -m "slow" -v
 
 ### Available Fixtures
 
+#### Shared Fixtures (from `fixtures/`)
+
 - `tiny_dataset`: Creates minimal test dataset (from `fixtures.datasets`)
 - `mock_mlflow_tracking`: Sets up local file-based MLflow tracking (from `fixtures.mlflow`)
+  - Configures MLflow to use local file-based tracking
+  - Mocks Azure ML client creation
 
-See [`../fixtures/README.md`](../fixtures/README.md) for shared fixtures.
+See [`../fixtures/README.md`](../fixtures/README.md) for complete fixture documentation and usage examples.
 
 ## What Is Tested
 

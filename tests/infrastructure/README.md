@@ -85,7 +85,7 @@ uvx pytest tests/infrastructure/ -m "slow" -v
 
 - `tmp_path`: Pytest temporary directory fixture (used for creating test configs)
 
-See [`../fixtures/README.md`](../fixtures/README.md) for shared fixtures.
+See [`../fixtures/README.md`](../fixtures/README.md) for complete fixture documentation and usage examples.
 
 ## What Is Tested
 

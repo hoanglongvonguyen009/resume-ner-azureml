@@ -33,7 +33,7 @@ This test module is organized into the following categories:
 - `unit/`: Unit tests for HPO components (search space, trial selection, variant generation)
 - `integration/`: Integration tests with real components (sweep execution, checkpoint resume, refit training, early termination, path structure)
 - `e2e/`: Full HPO workflow tests (`test_hpo_workflow.py`)
-- `conftest.py`: Module-specific fixtures (tmp_config_dir, mock_mlflow_client, hpo_config fixtures)
+- `conftest.py`: Module-specific fixtures (tmp_project_structure, tmp_output_dir, train_config_minimal, data_config_minimal, mock_training_subprocess) and imports shared fixtures
 
 ## Test Categories
 
@@ -97,19 +97,38 @@ uvx pytest tests/hpo/integration/ -v
 
 ### Available Fixtures
 
+#### Shared Fixtures (from `fixtures/`)
+
 - `tiny_dataset`: Creates minimal test dataset (from `fixtures.datasets`)
-- `tmp_config_dir`: Creates temporary config directory with required YAML files (paths.yaml, naming.yaml, tags.yaml)
+- `config_dir` (aliased as `tmp_config_dir`): Creates temporary config directory with required YAML files (from `fixtures.config_dirs`)
+  - Provides `paths.yaml`, `naming.yaml`, `tags.yaml`, `mlflow.yaml`, `data.yaml`
+  - Use `config_dir_minimal` for tests that only need essential files
+  - Use `config_dir_full` for tests that need complete configuration structure
+- `mock_mlflow_client`: Provides mocked MLflow client with common operations (from `fixtures.mlflow`)
+  - Returns tuple of `(mock_client, mock_parent_run)`
+- `mock_mlflow_setup`: Sets up MLflow mocks for HPO tests (from `fixtures.mlflow`)
+  - Returns dictionary with `{"client": ..., "parent_run": ...}`
+- `clean_mlflow_db`: Cleans MLflow SQLite database between tests to prevent state pollution (from `fixtures.mlflow`)
+  - Automatically used in `tests/hpo/integration/conftest.py` with `autouse=True`
+  - Prevents Alembic migration errors and database locking issues
+- `hpo_config_smoke`: Loads and returns smoke.yaml HPO config structure (from `fixtures.configs`)
+  - Full HPO config with all options (search space, sampling, checkpoint, mlflow, early_termination, objective, selection, k_fold, refit, cleanup)
+- `hpo_config_minimal`: Minimal HPO config for simple tests (from `fixtures.configs`)
+
+#### Module-Specific Fixtures
+
 - `tmp_project_structure`: Creates temporary project structure with src/training module
 - `tmp_output_dir`: Creates temporary output directory for HPO
-- `mock_mlflow_client`: Provides mocked MLflow client with common operations
-- `mock_mlflow_setup`: Sets up MLflow mocks for HPO tests
-- `hpo_config_smoke`: Loads and returns smoke.yaml HPO config structure
-- `hpo_config_minimal`: Minimal HPO config for simple tests
 - `train_config_minimal`: Minimal training config for HPO tests
 - `data_config_minimal`: Minimal data config for HPO tests
 - `mock_training_subprocess`: Mocks training subprocess to return success and create metrics.json
 
-See [`../fixtures/README.md`](../fixtures/README.md) for shared fixtures.
+### Config Helper Functions
+
+- `create_minimal_training_config(config_dir)`: Creates minimal training config files (from `fixtures.config_helpers`)
+  - Creates `train.yaml`, `model/distilbert.yaml`, `data/resume_v1.yaml` needed for training subprocess
+
+See [`../fixtures/README.md`](../fixtures/README.md) for complete fixture documentation and usage examples.
 
 ## What Is Tested
 

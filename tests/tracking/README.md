@@ -99,9 +99,34 @@ python tests/tracking/scripts/test_artifact_upload_manual.py
 
 ### Available Fixtures
 
-- `mock_mlflow_tracking`: Sets up local file-based MLflow tracking (from `fixtures.mlflow`)
+#### Shared Fixtures (from `fixtures/`)
 
-See [`../fixtures/README.md`](../fixtures/README.md) for shared fixtures.
+- `mock_mlflow_tracking`: Sets up local file-based MLflow tracking (from `fixtures.mlflow`)
+  - Configures MLflow to use local file-based tracking
+  - Mocks Azure ML client creation
+- `clean_mlflow_db`: Cleans MLflow SQLite database between tests to prevent state pollution (from `fixtures.mlflow`)
+  - Used in `tests/tracking/integration/test_tracking_config_enabled.py` with `autouse=True`
+  - Prevents Alembic migration errors (e.g., "Can't locate revision") and database locking issues
+  - Ensures test isolation by cleaning MLflow database before and after each test
+- `config_dir`: Creates temporary config directory with required YAML files (from `fixtures.config_dirs`)
+  - Used in integration tests for config validation
+  - Provides `paths.yaml`, `naming.yaml`, `tags.yaml`, `mlflow.yaml`
+
+### Usage Example
+
+```python
+from fixtures.mlflow import mock_mlflow_tracking, clean_mlflow_db
+
+def test_tracking_with_clean_db(clean_mlflow_db, mock_mlflow_tracking):
+    # MLflow database is clean here - no Alembic errors
+    tracking_uri = mock_mlflow_tracking
+    import mlflow
+    mlflow.set_tracking_uri(tracking_uri)
+    mlflow.set_experiment("test_experiment")
+    # Your test code here
+```
+
+See [`../fixtures/README.md`](../fixtures/README.md) for complete fixture documentation and usage examples.
 
 ## What Is Tested
 

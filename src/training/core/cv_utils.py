@@ -110,7 +110,13 @@ def create_kfold_splits(
             splitter = StratifiedKFold(
                 n_splits=k, shuffle=shuffle, random_state=random_seed
             )
-            label_source = labels
+            # Convert tuple labels to strings for StratifiedKFold compatibility
+            # sklearn requires homogeneous arrays, but tuples of different lengths
+            # (e.g., ('SKILL',) vs ()) are inhomogeneous. Convert to strings.
+            label_source = np.array([
+                "_".join(sorted(label)) if label else "_empty"
+                for label in labels
+            ])
         else:
             splitter = KFold(n_splits=k, shuffle=shuffle, random_state=random_seed)
             label_source = None

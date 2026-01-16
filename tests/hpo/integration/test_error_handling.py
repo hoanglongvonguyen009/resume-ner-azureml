@@ -27,25 +27,12 @@ except ImportError:
     pytest.skip("optuna not available", allow_module_level=True)
 
 
-def _create_minimal_training_config(config_dir: Path):
-    """Create minimal config files needed for training subprocess to start."""
-    # train.yaml - needs early_stopping section
-    train_yaml = config_dir / "train.yaml"
-    train_yaml.write_text("""training:
-  epochs: 1
-  early_stopping:
-    enabled: false
-""")
-    # model/distilbert.yaml
-    model_dir = config_dir / "model"
-    model_dir.mkdir(exist_ok=True)
-    model_yaml = model_dir / "distilbert.yaml"
-    model_yaml.write_text("model:\n  name: distilbert\n")
-    # data/resume_v1.yaml
-    data_dir = config_dir / "data"
-    data_dir.mkdir(exist_ok=True)
-    data_yaml = data_dir / "resume_v1.yaml"
-    data_yaml.write_text("data:\n  name: resume_v1\n")
+# Import shared config helper
+import sys
+from pathlib import Path
+_fixtures_path = Path(__file__).parent.parent.parent / "fixtures"
+sys.path.insert(0, str(_fixtures_path.parent))
+from fixtures.config_helpers import create_minimal_training_config
 
 
 class TestTrialExecutionErrors:
@@ -113,7 +100,7 @@ class TestTrialExecutionErrors:
         (src_dir / "common" / "__init__.py").write_text("")
         
         # Create minimal config files needed for subprocess to start
-        _create_minimal_training_config(config_dir)
+        create_minimal_training_config(config_dir)
         # Create dataset directory (needed for subprocess)
         dataset_dir = tmp_path / "dataset"
         dataset_dir.mkdir()
@@ -307,7 +294,7 @@ class TestRefitExecutionErrors:
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         # Create minimal config files needed for refit to start
-        _create_minimal_training_config(config_dir)
+        create_minimal_training_config(config_dir)
         output_dir = tmp_path / "outputs" / "hpo" / "local" / "distilbert" / "study-aaaaaaaa"
         output_dir.mkdir(parents=True)
         

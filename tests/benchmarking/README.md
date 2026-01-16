@@ -81,10 +81,20 @@ uvx pytest tests/benchmarking/ -m "slow" -v
 
 ### Available Fixtures
 
+#### Shared Fixtures (from `fixtures/`)
+
 - `tiny_dataset`: Creates minimal test dataset (from `fixtures.datasets`)
 - `mock_mlflow_tracking`: Sets up local file-based MLflow tracking (from `fixtures.mlflow`)
+  - Configures MLflow to use local file-based tracking
+  - Mocks Azure ML client creation
+- `mock_benchmark_run`: Creates a benchmark run with latency and throughput metrics (from `fixtures.mlflow`)
+  - Includes latency and throughput metrics
+  - Includes benchmark-specific tags
+- `config_dir`: Creates temporary config directory with required YAML files (from `fixtures.config_dirs`)
+  - May be used for config validation tests
+  - Provides `paths.yaml`, `naming.yaml`, `tags.yaml`, `mlflow.yaml`, `data.yaml`
 
-See [`../fixtures/README.md`](../fixtures/README.md) for shared fixtures.
+See [`../fixtures/README.md`](../fixtures/README.md) for complete fixture documentation and usage examples.
 
 ## What Is Tested
 

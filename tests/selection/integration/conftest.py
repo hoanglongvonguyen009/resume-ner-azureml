@@ -1,9 +1,21 @@
 """Shared fixtures for best model selection tests."""
 
 import pytest
+import sys
 from pathlib import Path
 from unittest.mock import Mock, MagicMock
 from typing import Dict, Any, Optional
+
+# Import clean_mlflow_db fixture for automatic cleanup
+_fixtures_path = Path(__file__).parent.parent.parent / "fixtures"
+sys.path.insert(0, str(_fixtures_path.parent))
+from fixtures.mlflow import clean_mlflow_db
+
+# Auto-clean MLflow database to prevent Alembic errors
+@pytest.fixture(autouse=True)
+def auto_clean_mlflow_db(clean_mlflow_db):
+    """Automatically clean MLflow database for all tests in this module."""
+    yield
 
 
 @pytest.fixture

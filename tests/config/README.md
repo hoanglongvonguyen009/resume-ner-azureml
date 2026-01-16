@@ -82,9 +82,53 @@ uvx pytest tests/config/ -m "slow" -v
 
 ### Available Fixtures
 
+#### Shared Fixtures (from `fixtures/`)
+
+- `config_dir`: Creates temporary config directory with required YAML files (from `fixtures.config_dirs`)
+  - Provides `paths.yaml`, `naming.yaml`, `tags.yaml`, `mlflow.yaml`, `data.yaml`
+  - Used extensively in config tests for YAML validation
+- `config_dir_minimal`: Creates minimal config directory with only essential files (from `fixtures.config_dirs`)
+  - Provides only `paths.yaml`, `naming.yaml`, `tags.yaml`
+  - Use for tests that don't need full config structure
+- `config_dir_full`: Creates full config directory with complete configuration structure (from `fixtures.config_dirs`)
+  - Provides all config files with complete options
+  - Use for tests that need comprehensive config validation
+
+#### Config Helper Functions (from `fixtures.config_helpers`)
+
+- `create_minimal_training_config(config_dir)`: Creates minimal training config files
+  - Creates `train.yaml`, `model/distilbert.yaml`, `data/resume_v1.yaml`
+- `create_minimal_data_config(config_dir, dataset_name, dataset_version)`: Creates minimal data.yaml config file
+- `create_minimal_experiment_config(config_dir, experiment_name)`: Creates minimal experiment.yaml config file
+- `create_minimal_model_config(config_dir, model_name)`: Creates minimal model config file
+
+#### Pytest Fixtures
+
 - `tmp_path`: Pytest temporary directory fixture (used for creating test configs)
 
-See [`../fixtures/README.md`](../fixtures/README.md) for shared fixtures.
+### Usage Example
+
+```python
+from fixtures.config_dirs import config_dir, config_dir_minimal
+from fixtures.config_helpers import create_minimal_training_config
+
+def test_config_loading(config_dir):
+    # config_dir is a Path to a temporary config directory with YAML files
+    paths_yaml = config_dir / "paths.yaml"
+    assert paths_yaml.exists()
+    
+def test_minimal_config(config_dir_minimal):
+    # Only essential files are created
+    assert (config_dir_minimal / "paths.yaml").exists()
+    
+def test_custom_config(tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    create_minimal_training_config(config_dir)
+    assert (config_dir / "train.yaml").exists()
+```
+
+See [`../fixtures/README.md`](../fixtures/README.md) for complete fixture documentation and usage examples.
 
 ## What Is Tested
 

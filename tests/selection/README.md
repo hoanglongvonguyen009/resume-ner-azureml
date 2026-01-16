@@ -85,10 +85,43 @@ uvx pytest tests/selection/ -m "slow" -v
 
 ### Available Fixtures
 
+#### Shared Fixtures (from `fixtures/`)
+
 - `tiny_dataset`: Creates minimal test dataset (from `fixtures.datasets`)
 - `mock_mlflow_tracking`: Sets up local file-based MLflow tracking (from `fixtures.mlflow`)
+  - Configures MLflow to use local file-based tracking
+  - Mocks Azure ML client creation
+- `mock_mlflow_run`: Creates a basic MLflow run with common tags and metrics (from `fixtures.mlflow`)
+- `mock_hpo_trial_run`: Creates an HPO trial run with macro-f1 metric and HPO tags (from `fixtures.mlflow`)
+  - Includes `tags.process.stage: "hpo"` and `tags.process.type: "trial"`
+  - Includes `macro-f1` metric
+- `mock_benchmark_run`: Creates a benchmark run with latency and throughput metrics (from `fixtures.mlflow`)
+  - Includes latency and throughput metrics
+  - Includes benchmark-specific tags
+- `mock_refit_run`: Creates a refit run with checkpoint tags (from `fixtures.mlflow`)
+  - Includes checkpoint tags (no macro-f1 metric)
+- `clean_mlflow_db`: Cleans MLflow SQLite database between tests to prevent state pollution (from `fixtures.mlflow`)
+  - Automatically used in `tests/selection/integration/conftest.py` with `autouse=True`
+  - Prevents Alembic migration errors and database locking issues
 
-See [`../fixtures/README.md`](../fixtures/README.md) for shared fixtures.
+### Usage Example
+
+```python
+from fixtures.mlflow import (
+    mock_mlflow_tracking,
+    mock_hpo_trial_run,
+    mock_benchmark_run,
+    mock_refit_run,
+)
+
+def test_selection_with_runs(mock_mlflow_tracking, mock_hpo_trial_run, mock_benchmark_run):
+    # Use mock runs for selection tests
+    trial_run = mock_hpo_trial_run
+    benchmark_run = mock_benchmark_run
+    # Test selection logic with these runs
+```
+
+See [`../fixtures/README.md`](../fixtures/README.md) for complete fixture documentation and usage examples.
 
 ## What Is Tested
 

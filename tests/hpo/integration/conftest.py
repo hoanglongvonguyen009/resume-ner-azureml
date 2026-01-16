@@ -1,40 +1,27 @@
 """Shared pytest fixtures for HPO integration tests."""
 
 import json
+import sys
 import pytest
 from pathlib import Path
 from unittest.mock import Mock
 from typing import Dict, Any
 
+# Import shared fixtures
+_fixtures_path = Path(__file__).parent.parent.parent / "fixtures"
+sys.path.insert(0, str(_fixtures_path.parent))
+from fixtures.configs import hpo_config_smoke, hpo_config_minimal
+from fixtures.config_dirs import config_dir
+from fixtures.mlflow import mock_mlflow_client, mock_mlflow_setup, clean_mlflow_db
 
-@pytest.fixture
-def tmp_config_dir(tmp_path):
-    """Create temporary config directory with all required YAML files."""
-    config_dir = tmp_path / "config"
-    config_dir.mkdir()
-    
-    # Create minimal config files required for HPO tests
-    (config_dir / "data.yaml").write_text("dataset_name: test_data\ndataset_version: v1")
-    (config_dir / "mlflow.yaml").write_text("experiment_name: test_exp")
-    (config_dir / "paths.yaml").write_text("""schema_version: 2
-base:
-  outputs: "outputs"
-outputs:
-  hpo: "hpo"
-patterns:
-  hpo_v2: '{storage_env}/{model}/study-{study8}'
-  final_training_v2: '{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}'
-  conversion_v2: '{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}/conv-{conv8}'
-  best_config_v2: '{model}/spec-{spec8}'
-  benchmarking_v2: '{storage_env}/{model}/study-{study8}/trial-{trial8}/bench-{bench8}'""")
-    (config_dir / "naming.yaml").write_text("run_name_templates:\n  hpo: 'hpo_{model}_{stage}'")
-    (config_dir / "tags.yaml").write_text("project_name: test_project")
-    
-    return config_dir
+
+# Use shared config_dir fixture from fixtures.config_dirs
+# Alias for backward compatibility
+tmp_config_dir = config_dir
 
 
 @pytest.fixture
-def tmp_project_structure(tmp_path, tmp_config_dir):
+def tmp_project_structure(tmp_path, config_dir):
     """Create temporary project structure with src/training module."""
     # Create src/training module structure (required for trial execution)
     src_dir = tmp_path / "src" / "training"
@@ -73,115 +60,17 @@ def tmp_output_dir(tmp_path):
     return output_dir
 
 
-@pytest.fixture
-def mock_mlflow_client():
-    """Provide mocked MLflow client with common operations."""
-    mock_parent_run = Mock()
-    mock_parent_run.info.run_id = "hpo_parent_123"
-    mock_parent_run.info.experiment_id = "exp_123"
-    mock_parent_run.info.status = "RUNNING"
-    
-    def get_run_side_effect(run_id):
-        if run_id == "hpo_parent_123" or isinstance(run_id, str):
-            # Set up tags with string values (not Mock objects)
-            mock_parent_run.data.tags = {
-                "code.study_key_hash": "a" * 64,
-                "code.study_family_hash": "b" * 64,
-            }
-            return mock_parent_run
-        return mock_parent_run
-    
-    mock_client = Mock()
-    mock_client.get_run.side_effect = get_run_side_effect
-    mock_client.create_run = Mock()
-    mock_client.set_tag = Mock()
-    mock_client.log_metric = Mock()
-    mock_client.log_param = Mock()
-    mock_client.set_terminated = Mock()
-    
-    return mock_client, mock_parent_run
+# Use shared MLflow fixtures from fixtures.mlflow
+# mock_mlflow_client and mock_mlflow_setup are imported above
 
+# Auto-clean MLflow database to prevent Alembic errors
+@pytest.fixture(autouse=True)
+def auto_clean_mlflow_db(clean_mlflow_db):
+    """Automatically clean MLflow database for all tests in this module."""
+    yield
 
-@pytest.fixture
-def mock_mlflow_setup(mock_mlflow_client):
-    """Set up MLflow mocks for HPO tests."""
-    mock_client, mock_parent_run = mock_mlflow_client
-    
-    # This fixture can be used with @patch to set up MLflow
-    # Return the mocks so tests can use them
-    return {
-        "client": mock_client,
-        "parent_run": mock_parent_run,
-    }
-
-
-@pytest.fixture
-def hpo_config_smoke():
-    """Load and return smoke.yaml HPO config structure."""
-    return {
-        "search_space": {
-            "backbone": {"type": "choice", "values": ["distilbert"]},
-            "learning_rate": {"type": "loguniform", "min": 1e-5, "max": 5e-5},
-            "batch_size": {"type": "choice", "values": [4]},
-            "dropout": {"type": "uniform", "min": 0.1, "max": 0.3},
-            "weight_decay": {"type": "loguniform", "min": 0.001, "max": 0.1},
-        },
-        "sampling": {"algorithm": "random", "max_trials": 1, "timeout_minutes": 20},
-        "checkpoint": {
-            "enabled": True,
-            "study_name": "hpo_distilbert_smoke_test",
-            "storage_path": "{study_name}/study.db",
-            "auto_resume": True,
-            "save_only_best": True,
-        },
-        "mlflow": {"log_best_checkpoint": True},
-        "early_termination": {
-            "policy": "bandit",
-            "evaluation_interval": 1,
-            "slack_factor": 0.2,
-            "delay_evaluation": 2,
-        },
-        "objective": {"metric": "macro-f1", "goal": "maximize"},
-        "selection": {
-            "accuracy_threshold": 0.015,
-            "use_relative_threshold": True,
-            "min_accuracy_gain": 0.02,
-        },
-        "k_fold": {
-            "enabled": True,
-            "n_splits": 2,
-            "random_seed": 42,
-            "shuffle": True,
-            "stratified": True,
-        },
-        "refit": {"enabled": True},
-        "cleanup": {
-            "disable_auto_cleanup": False,
-            "disable_auto_optuna_mark": False,
-        },
-    }
-
-
-@pytest.fixture
-def hpo_config_minimal():
-    """Minimal HPO config for simple tests."""
-    return {
-        "search_space": {
-            "backbone": {"type": "choice", "values": ["distilbert"]},
-            "learning_rate": {"type": "loguniform", "min": 1e-5, "max": 5e-5},
-            "batch_size": {"type": "choice", "values": [4]},
-        },
-        "sampling": {"algorithm": "random", "max_trials": 1, "timeout_minutes": 20},
-        "checkpoint": {
-            "enabled": True,
-            "study_name": "hpo_test",
-            "storage_path": "{study_name}/study.db",
-            "auto_resume": True,
-        },
-        "objective": {"metric": "macro-f1", "goal": "maximize"},
-        "k_fold": {"enabled": False},
-        "refit": {"enabled": False},
-    }
+# Use shared HPO config fixtures from fixtures.configs
+# hpo_config_smoke and hpo_config_minimal are imported above
 
 
 @pytest.fixture

@@ -1,9 +1,20 @@
 """Shared fixtures for best model selection tests."""
 
+import sys
 import pytest
 from pathlib import Path
 from unittest.mock import Mock, MagicMock
 from typing import Dict, Any, Optional
+
+# Import shared fixtures
+_fixtures_path = Path(__file__).parent.parent / "fixtures"
+sys.path.insert(0, str(_fixtures_path.parent))
+from fixtures.mlflow import (
+    mock_mlflow_run,
+    mock_hpo_trial_run,
+    mock_benchmark_run,
+    mock_refit_run,
+)
 
 
 @pytest.fixture
@@ -107,111 +118,11 @@ def mock_hpo_experiments():
     }
 
 
-@pytest.fixture
-def mock_mlflow_run():
-    """Create a mock MLflow run with required tags and metrics."""
-    run = Mock()
-    run.info.run_id = "test_run_id_123"
-    run.info.experiment_id = "test_experiment_id"
-    run.info.status = "FINISHED"
-    run.info.start_time = 1234567890
-    
-    # Mock tags
-    run.data.tags = {
-        "tags.grouping.study_key_hash": "study_hash_123",
-        "tags.grouping.trial_key_hash": "trial_hash_456",
-        "tags.process.stage": "hpo",
-        "tags.process.backbone": "distilbert"
-    }
-    
-    # Mock metrics
-    run.data.metrics = {
-        "macro-f1": 0.75,
-        "latency_batch_1_ms": 5.0
-    }
-    
-    # Mock params
-    run.data.params = {
-        "backbone": "distilbert",
-        "learning_rate": "2e-5"
-    }
-    
-    return run
+# Use shared MLflow run fixtures from fixtures.mlflow
+# mock_mlflow_run, mock_hpo_trial_run, mock_benchmark_run, mock_refit_run are imported above
 
-
-@pytest.fixture
-def mock_benchmark_run(mock_mlflow_run):
-    """Create a mock benchmark MLflow run."""
-    benchmark_run = Mock()
-    benchmark_run.info.run_id = "benchmark_run_id_123"
-    benchmark_run.info.experiment_id = "benchmark_experiment_id"
-    benchmark_run.info.status = "FINISHED"
-    benchmark_run.info.start_time = 1234567890
-    
-    benchmark_run.data.tags = {
-        "tags.grouping.study_key_hash": "study_hash_123",
-        "tags.grouping.trial_key_hash": "trial_hash_456",
-        "tags.process.backbone": "distilbert"
-    }
-    
-    benchmark_run.data.metrics = {
-        "latency_batch_1_ms": 5.0,
-        "throughput_samples_per_sec": 200.0
-    }
-    
-    return benchmark_run
-
-
-@pytest.fixture
-def mock_trial_run(mock_mlflow_run):
-    """Create a mock trial run (has macro-f1 metric)."""
-    trial_run = Mock()
-    trial_run.info.run_id = "trial_run_id_123"
-    trial_run.info.experiment_id = "hpo_experiment_id"
-    trial_run.info.status = "FINISHED"
-    trial_run.info.start_time = 1234567890
-    
-    trial_run.data.tags = {
-        "tags.grouping.study_key_hash": "study_hash_123",
-        "tags.grouping.trial_key_hash": "trial_hash_456",
-        "tags.process.stage": "hpo",
-        "tags.process.backbone": "distilbert"
-    }
-    
-    trial_run.data.metrics = {
-        "macro-f1": 0.75
-    }
-    
-    trial_run.data.params = {
-        "backbone": "distilbert"
-    }
-    
-    return trial_run
-
-
-@pytest.fixture
-def mock_refit_run(mock_mlflow_run):
-    """Create a mock refit run (has checkpoint artifacts)."""
-    refit_run = Mock()
-    refit_run.info.run_id = "refit_run_id_123"
-    refit_run.info.experiment_id = "hpo_experiment_id"
-    refit_run.info.status = "FINISHED"
-    refit_run.info.start_time = 1234567890
-    
-    refit_run.data.tags = {
-        "tags.grouping.study_key_hash": "study_hash_123",
-        "tags.grouping.trial_key_hash": "trial_hash_456",
-        "tags.process.stage": "hpo_refit",
-        "tags.process.backbone": "distilbert"
-    }
-    
-    refit_run.data.metrics = {}  # Refit runs don't have macro-f1
-    
-    refit_run.data.params = {
-        "backbone": "distilbert"
-    }
-    
-    return refit_run
+# Alias for backward compatibility (mock_trial_run -> mock_hpo_trial_run)
+mock_trial_run = mock_hpo_trial_run
 
 
 @pytest.fixture
