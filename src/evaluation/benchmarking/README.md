@@ -269,6 +269,21 @@ The benchmarking module now requires champion format from Phase 2. Legacy `best_
 
 **Migration**: Use `benchmark_champions()` with champions from Phase 2 selection instead.
 
+## Troubleshooting
+
+### Colab Path Resolution Issues
+
+If you see warnings like "Could not find project root. Using /content as fallback" when running benchmarking in Colab, this is typically resolved by ensuring `root_dir` and `config_dir` are explicitly passed to benchmarking functions.
+
+The benchmarking orchestrator automatically derives `config_dir` from `root_dir` when not explicitly provided, which avoids path inference issues when checkpoints are stored in Google Drive (`/content/drive/MyDrive/...`) while the project code is at `/content/resume-ner-azureml/`.
+
+**Functions that handle this automatically:**
+- `benchmark_champions()` - Accepts `root_dir` and derives `config_dir` internally
+- `filter_missing_benchmarks()` - Accepts `root_dir` and derives `config_dir` internally
+- `benchmark_already_exists()` - Accepts optional `config_dir` parameter (derived from `root_dir` if not provided)
+
+**Best practice:** Always pass `root_dir` explicitly when calling benchmarking functions. The `config_dir` will be automatically derived as `root_dir / "config"` if not provided.
+
 ## Related Modules
 
 - [`../README.md`](../README.md) - Model evaluation and selection overview
@@ -276,6 +291,7 @@ The benchmarking module now requires champion format from Phase 2. Legacy `best_
 - [`../../data/README.md`](../../data/README.md) - Data loading utilities
 - [`../../training/README.md`](../../training/README.md) - Training workflows
 - [`../../infrastructure/tracking/README.md`](../../infrastructure/tracking/README.md) - MLflow tracking
+- [`../../infrastructure/paths/README.md`](../../infrastructure/paths/README.md) - Path resolution utilities
 
 
 

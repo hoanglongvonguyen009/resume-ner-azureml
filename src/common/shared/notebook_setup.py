@@ -89,7 +89,7 @@ def detect_notebook_environment() -> NotebookEnvironment:
     )
 
 
-def find_repository_root(start_dir: Optional[Path] = None) -> Path:
+def find_repository_root(start_dir: Optional[Path] = None) -> Optional[Path]:
     """
     Find repository root directory by searching for config/ and src/ directories.
 
@@ -101,10 +101,7 @@ def find_repository_root(start_dir: Optional[Path] = None) -> Path:
         start_dir: Directory to start searching from. If None, uses current working directory.
 
     Returns:
-        Path to repository root directory.
-
-    Raises:
-        ValueError: If repository root cannot be found.
+        Path to repository root directory, or None if not found.
     """
     if start_dir is None:
         start_dir = Path.cwd()
@@ -137,10 +134,7 @@ def find_repository_root(start_dir: Optional[Path] = None) -> Path:
                     if subdir.is_dir() and (subdir / "config").exists() and (subdir / "src").exists():
                         return subdir
 
-    raise ValueError(
-        f"Could not find repository root. Searched from: {start_dir}\n"
-        "Please ensure you're running from within the repository or a subdirectory."
-    )
+    return None
 
 
 @dataclass
@@ -171,6 +165,10 @@ def setup_notebook_paths(
     # Find repository root if not provided
     if root_dir is None:
         root_dir = find_repository_root()
+        if root_dir is None:
+            raise ValueError(
+                "Could not find repository root. Please ensure you're running from within the repository or a subdirectory."
+            )
 
     root_dir = Path(root_dir).resolve()
     config_dir = root_dir / "config"
@@ -228,12 +226,11 @@ def ensure_src_in_path() -> Optional[Path]:
     Returns:
         Repository root Path if found and added to path, None otherwise.
     """
-    try:
-        repo_root = find_repository_root()
-        src_dir = repo_root / "src"
-        if str(src_dir) not in sys.path:
-            sys.path.insert(0, str(src_dir))
-        return repo_root
-    except ValueError:
+    repo_root = find_repository_root()
+    if repo_root is None:
         return None
+    src_dir = repo_root / "src"
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+    return repo_root
 

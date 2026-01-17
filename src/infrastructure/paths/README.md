@@ -148,6 +148,23 @@ save_cache_with_dual_strategy(
 
 For detailed signatures, see source code.
 
+#### Colab-Specific Behavior
+
+When running in Colab, checkpoints and outputs are often stored in Google Drive (`/content/drive/MyDrive/...`) while the project code is at `/content/resume-ner-azureml/`. This can cause path inference to fail when searching from Drive paths.
+
+**Best Practice:** When calling functions that use path inference (e.g., `infer_config_dir()`, `find_project_root()`), prefer passing explicit `config_dir` or `root_dir` parameters instead of relying on inference from checkpoint/output paths.
+
+**Example:**
+```python
+# ❌ May fail in Colab if checkpoint_dir is in Drive
+config_dir = infer_config_dir(path=checkpoint_dir)  # checkpoint_dir = /content/drive/MyDrive/...
+
+# ✅ Preferred: Pass explicit config_dir
+config_dir = root_dir / "config"  # root_dir = /content/resume-ner-azureml
+```
+
+Functions that accept explicit `config_dir` or `root_dir` parameters will use them directly, avoiding inference issues.
+
 ## Integration Points
 
 ### Used By

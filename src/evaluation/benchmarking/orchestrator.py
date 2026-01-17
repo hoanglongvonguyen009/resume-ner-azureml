@@ -123,6 +123,7 @@ def benchmark_already_exists(
     mlflow_client: Optional[Any] = None,
     trial_key_hash: Optional[str] = None,
     study_key_hash: Optional[str] = None,
+    config_dir: Optional[Path] = None,
 ) -> bool:
     """
     Check if benchmark exists (MLflow or disk).
@@ -133,10 +134,18 @@ def benchmark_already_exists(
         root_dir: Root directory of the project
         environment: Platform environment (local, colab, kaggle)
         mlflow_client: Optional MLflow client instance
+        trial_key_hash: Optional trial key hash (fallback only)
+        study_key_hash: Optional study key hash (fallback only)
+        config_dir: Optional config directory path. If provided, used directly instead of inferring.
+                    This avoids issues when checkpoint_dir is in Drive but project root is elsewhere (e.g., Colab).
         
     Returns:
         True if benchmark already exists, False otherwise
     """
+    # Derive config_dir from root_dir if not provided
+    if config_dir is None:
+        config_dir = root_dir / "config"
+    
     # Check MLflow first (authoritative)
     if mlflow_client:
         try:
@@ -146,6 +155,7 @@ def benchmark_already_exists(
                 mlflow_client,
                 trial_key_hash=trial_key_hash,
                 study_key_hash=study_key_hash,
+                config_dir=config_dir,
             ):
                 return True
         except Exception as e:
@@ -164,6 +174,7 @@ def _benchmark_exists_in_mlflow(
     mlflow_client: Any,
     trial_key_hash: Optional[str] = None,  # Fallback only
     study_key_hash: Optional[str] = None,  # Fallback only
+    config_dir: Optional[Path] = None,
 ) -> bool:
     """
     Check if benchmark run exists in MLflow with matching benchmark_key.
@@ -178,6 +189,8 @@ def _benchmark_exists_in_mlflow(
         mlflow_client: MLflow client instance
         trial_key_hash: Optional trial key hash (fallback only)
         study_key_hash: Optional study key hash (fallback only)
+        config_dir: Optional config directory path. If provided, used directly instead of inferring.
+                    This avoids issues when checkpoint_dir is in Drive but project root is elsewhere (e.g., Colab).
         
     Returns:
         True if benchmark run exists and is finished, False otherwise
@@ -207,7 +220,7 @@ def _benchmark_exists_in_mlflow(
             
             try:
                 from infrastructure.naming.mlflow.tags_registry import load_tags_registry
-                tags_registry = load_tags_registry()
+                tags_registry = load_tags_registry(config_dir=config_dir)
                 trial_key_tag = tags_registry.key("grouping", "trial_key_hash")
                 study_key_tag = tags_registry.key("grouping", "study_key_hash")
             except Exception:
@@ -328,6 +341,7 @@ def filter_missing_benchmarks(
             mlflow_client,
             trial_key_hash=trial_key_hash,
             study_key_hash=study_key_hash,
+            config_dir=root_dir / "config",
         ):
             logger.info(f"Skipping {backbone} - benchmark already exists (trial_key_hash={trial_key_hash[:16] if trial_key_hash else 'N/A'}...)")
             continue
@@ -525,7 +539,7 @@ def benchmark_best_trials(
             checkpoint_dir = Path(trial_info["checkpoint_dir"])
         else:
             # Legacy format no longer supported - require champion format
-                logger.warning(
+            logger.warning(
                 f"Skipping {backbone}: missing 'checkpoint_dir' in trial_info. "
                 f"Legacy format (trial_dir) is no longer supported. "
                 f"Please use champion format from Phase 2."
@@ -562,23 +576,23 @@ def benchmark_best_trials(
             )
             continue
         
-            # Champion mode: hashes already available, compute study_family_hash if needed
-            study_family_hash = None
-            if study_key_hash and trial_key_hash:
-                try:
-                    from infrastructure.naming.mlflow.hpo_keys import (
-                        build_hpo_study_family_key,
-                        build_hpo_study_family_hash,
+        # Champion mode: hashes already available, compute study_family_hash if needed
+        study_family_hash = None
+        if study_key_hash and trial_key_hash:
+            try:
+                from infrastructure.naming.mlflow.hpo_keys import (
+                    build_hpo_study_family_key,
+                    build_hpo_study_family_hash,
+                )
+                if data_config and hpo_config:
+                    study_family_key = build_hpo_study_family_key(
+                        data_config=data_config,
+                        hpo_config=hpo_config,
+                        benchmark_config=benchmark_config,
                     )
-                    if data_config and hpo_config:
-                        study_family_key = build_hpo_study_family_key(
-                            data_config=data_config,
-                            hpo_config=hpo_config,
-                            benchmark_config=benchmark_config,
-                        )
-                        study_family_hash = build_hpo_study_family_hash(study_family_key)
-                except Exception:
-                    pass
+                    study_family_hash = build_hpo_study_family_hash(study_family_key)
+            except Exception:
+                pass
 
         # Compute benchmark_config_hash if benchmark_config is available
         benchmark_config_hash = None

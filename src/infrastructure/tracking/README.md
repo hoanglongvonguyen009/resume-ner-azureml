@@ -157,8 +157,18 @@ For detailed signatures, see source code.
 3. **Use trackers**: Use specialized trackers for different process types
 4. **Consistent naming**: Use naming utilities for consistent run names
 5. **Tag management**: Use tag utilities for consistent tagging
+6. **Explicit path parameters**: When calling tracker methods that upload artifacts (e.g., `log_best_checkpoint()`), pass explicit `config_dir` parameter to avoid path inference issues in Colab where checkpoints may be in Drive while project code is elsewhere
 
 **Note**: Training modules (e.g., `training.execution.mlflow_setup`) extend this module's setup with training-specific run lifecycle management. They assume MLflow has already been configured via `setup_mlflow()`.
+
+### Colab-Specific Considerations
+
+When running in Colab, checkpoints are often stored in Google Drive (`/content/drive/MyDrive/...`) while the project code is at `/content/resume-ner-azureml/`. To avoid path inference warnings:
+
+- **Pass explicit `config_dir`**: When calling `MLflowSweepTracker.log_best_checkpoint()`, pass `config_dir` explicitly (e.g., `config_dir=root_dir / "config"`)
+- **Use known paths**: Prefer passing `root_dir` and `config_dir` that are already known in the calling context rather than inferring from checkpoint paths
+
+This prevents warnings like "Could not find project root. Using /content as fallback" during checkpoint upload.
 
 ## Testing
 

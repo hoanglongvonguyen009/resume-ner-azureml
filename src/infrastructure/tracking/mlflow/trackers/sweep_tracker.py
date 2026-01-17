@@ -881,6 +881,7 @@ class MLflowSweepTracker(BaseTracker):
         refit_ok: Optional[bool] = None,
         parent_run_id: Optional[str] = None,
         refit_run_id: Optional[str] = None,
+        config_dir: Optional[Path] = None,
     ) -> None:
         """
         Log best trial checkpoint to MLflow run.
@@ -899,6 +900,9 @@ class MLflowSweepTracker(BaseTracker):
             refit_ok: Whether refit completed successfully. Used for tagging.
             parent_run_id: MLflow parent run ID (fallback if refit_run_id not provided).
             refit_run_id: Optional refit run ID. If provided, artifacts will be uploaded to refit run.
+            config_dir: Optional config directory path. If provided, used directly instead of inferring
+                       from checkpoint_dir. This avoids issues when checkpoint_dir is in Drive but
+                       project root is elsewhere (e.g., Colab).
         """
         if study.best_trial is None:
             logger.warning("No best trial found, skipping checkpoint logging")
@@ -952,8 +956,9 @@ class MLflowSweepTracker(BaseTracker):
             )
             return
 
-        # Infer config_dir from checkpoint_dir
-        config_dir = infer_config_dir(path=checkpoint_dir)
+        # Use provided config_dir if available, otherwise infer from checkpoint_dir
+        if config_dir is None:
+            config_dir = infer_config_dir(path=checkpoint_dir)
 
         # Use ArtifactUploader for unified checkpoint upload
         try:

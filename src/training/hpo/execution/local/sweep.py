@@ -1311,6 +1311,7 @@ def run_local_hpo_sweep(
                                 refit_ok=refit_ok,
                                 parent_run_id=parent_run_id,
                                 refit_run_id=refit_run_id,  # Upload to refit run
+                                config_dir=project_config_dir,  # Pass known config_dir to avoid inference issues in Colab
                             )
                             upload_succeeded = True
                             # Note: artifact.available tag is updated inside log_best_checkpoint() method

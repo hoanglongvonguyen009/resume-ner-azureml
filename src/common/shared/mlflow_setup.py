@@ -157,12 +157,11 @@ def _check_azureml_mlflow_available():
         return False
 
 try:
-    import mlflow
+    import mlflow  # noqa: F401
+    _MLFLOW_AVAILABLE = True
 except ImportError:
-    raise ImportError(
-        "mlflow is required for experiment tracking. "
-        "Install it with: pip install mlflow"
-    )
+    _MLFLOW_AVAILABLE = False
+    # Don't raise here - allow import to succeed, functions will check availability
 
 from .platform_detection import detect_platform
 from .yaml_utils import load_yaml
