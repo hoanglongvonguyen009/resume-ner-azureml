@@ -279,7 +279,7 @@ def run_checkpoint_resolution(
                 selection_config=selection_config,
                 platform=detect_platform(),
                 restore_from_drive=None,
-                drive_store=None,
+                backup_to_drive=None,
                 in_colab=False,
             )
             

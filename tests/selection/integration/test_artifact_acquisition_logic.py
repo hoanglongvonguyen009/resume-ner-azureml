@@ -49,7 +49,7 @@ class TestArtifactAcquisitionConfig:
             selection_config={},
             platform="local",
             restore_from_drive=None,
-            drive_store=None,
+            backup_to_drive=None,
             in_colab=False,
         )
         
@@ -99,7 +99,7 @@ class TestArtifactAcquisitionConfig:
             selection_config={},
             platform="local",
             restore_from_drive=None,
-            drive_store=None,
+            backup_to_drive=None,
             in_colab=False,
         )
         
@@ -152,7 +152,7 @@ class TestArtifactAcquisitionConfig:
             selection_config={},
             platform="local",
             restore_from_drive=None,
-            drive_store=None,
+            backup_to_drive=None,
             in_colab=False,
         )
         
@@ -182,7 +182,7 @@ class TestArtifactAcquisitionConfig:
             selection_config={},
             platform="local",
             restore_from_drive=None,
-            drive_store=None,
+            backup_to_drive=None,
             in_colab=False,
         )
         
@@ -211,7 +211,7 @@ class TestArtifactAcquisitionConfig:
         config_dir.mkdir()
         
         # Setup mocks
-        mock_drive_store = Mock()
+        mock_backup_to_drive = Mock()
         mock_restore_from_drive = Mock(return_value=True)
         
         # Mock successful acquisition from drive
@@ -239,7 +239,7 @@ class TestArtifactAcquisitionConfig:
             selection_config={},
             platform="colab",
             restore_from_drive=mock_restore_from_drive,
-            drive_store=mock_drive_store,
+            backup_to_drive=mock_backup_to_drive,
             in_colab=True,
         )
         
@@ -267,7 +267,7 @@ class TestArtifactAcquisitionConfig:
             selection_config={},
             platform="colab",
             restore_from_drive=mock_restore_from_drive,
-            drive_store=mock_drive_store,
+            backup_to_drive=mock_backup_to_drive,
             in_colab=True,
         )
         
@@ -293,7 +293,7 @@ class TestArtifactAcquisitionConfig:
         config_dir.mkdir()
         
         # Setup mocks
-        mock_drive_store = Mock()
+        mock_backup_to_drive = Mock()
         mock_restore_from_drive = Mock(return_value=True)
         
         # Mock successful acquisition from drive
@@ -322,7 +322,7 @@ class TestArtifactAcquisitionConfig:
             selection_config={},
             platform="colab",
             restore_from_drive=mock_restore_from_drive,
-            drive_store=mock_drive_store,
+            backup_to_drive=mock_backup_to_drive,
             in_colab=True,
         )
         
@@ -352,7 +352,7 @@ class TestArtifactAcquisitionConfig:
             selection_config={},
             platform="colab",
             restore_from_drive=mock_restore_from_drive,
-            drive_store=mock_drive_store,
+            backup_to_drive=mock_backup_to_drive,
             in_colab=True,
         )
         
@@ -405,7 +405,7 @@ class TestArtifactAcquisitionConfig:
             selection_config={},
             platform="local",
             restore_from_drive=None,
-            drive_store=None,
+            backup_to_drive=None,
             in_colab=False,
         )
         
@@ -433,7 +433,7 @@ class TestArtifactAcquisitionConfig:
                 selection_config={},
                 platform="local",
                 restore_from_drive=None,
-                drive_store=None,
+                backup_to_drive=None,
                 in_colab=False,
             )
 
@@ -480,7 +480,7 @@ class TestArtifactAcquisitionConfig:
             selection_config={},
             platform="local",
             restore_from_drive=None,
-            drive_store=None,
+            backup_to_drive=None,
             in_colab=False,
         )
         
@@ -535,7 +535,7 @@ class TestArtifactAcquisitionConfig:
             selection_config={},
             platform="local",
             restore_from_drive=None,
-            drive_store=None,
+            backup_to_drive=None,
             in_colab=False,
         )
         
@@ -587,7 +587,7 @@ class TestArtifactAcquisitionConfig:
                 selection_config={},
                 platform="local",
                 restore_from_drive=None,
-                drive_store=None,
+                backup_to_drive=None,
                 in_colab=False,
             )
 

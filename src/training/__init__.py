@@ -9,7 +9,7 @@ This module provides a unified interface for training operations, including:
 For new code, prefer importing directly from submodules:
     from training.core import train_model
     from training.hpo import run_local_hpo_sweep
-    from training.execution import execute_final_training
+    from training.execution import run_final_training_workflow
 
 The top-level imports are maintained for backward compatibility.
 """
@@ -50,7 +50,8 @@ __all__ = [
     "extract_best_config_from_study",
     "create_search_space",
     # Execution (lazy)
-    "execute_final_training",
+    "run_final_training_workflow",
+    "execute_final_training",  # Backward compatibility alias
     "extract_lineage_from_best_model",
 ]
 
@@ -103,9 +104,13 @@ def __getattr__(name: str):
         from .hpo import create_search_space
         return create_search_space
     # Execution utilities
+    elif name == "run_final_training_workflow":
+        from .execution import run_final_training_workflow
+        return run_final_training_workflow
     elif name == "execute_final_training":
-        from .execution import execute_final_training
-        return execute_final_training
+        # Backward compatibility alias
+        from .execution import run_final_training_workflow
+        return run_final_training_workflow
     elif name == "extract_lineage_from_best_model":
         from .execution import extract_lineage_from_best_model
         return extract_lineage_from_best_model

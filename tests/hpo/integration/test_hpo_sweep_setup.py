@@ -476,3 +476,57 @@ run_names:
         # completes successfully with project1's config_dir when inference would find project2
         # demonstrates that it trusts the provided parameter
 
+    def test_setup_hpo_mlflow_run_infers_config_dir_when_none(self, tmp_path, monkeypatch):
+        """Test that setup_hpo_mlflow_run infers config_dir when config_dir=None."""
+        # Create project structure
+        project = tmp_path / "project"
+        project_config = project / "config"
+        project_config.mkdir(parents=True)
+        project_src = project / "src"
+        project_src.mkdir()
+        project_outputs = project / "outputs" / "hpo"
+        project_outputs.mkdir(parents=True)
+        
+        (project_config / "paths.yaml").write_text("base:\n  outputs: outputs")
+        (project_config / "naming.yaml").write_text("schema_version: 1")
+        (project_config / "mlflow.yaml").write_text("naming:\n  project_name: test_project")
+        (project_config / "tags.yaml").write_text("schema_version: 1")
+        
+        # Change to project directory so inference will find it
+        monkeypatch.chdir(project)
+        
+        backbone = "distilbert"
+        study_name = "hpo_distilbert_test"
+        output_dir = project_outputs
+        run_id = "test"
+        
+        data_config = {"name": "test", "version": "1.0"}
+        hpo_config = {"search_space": {}, "objective": {"metric": "macro-f1"}}
+        
+        from infrastructure.naming.mlflow.hpo_keys import (
+            build_hpo_study_key,
+            build_hpo_study_key_hash,
+        )
+        study_key = build_hpo_study_key(data_config, hpo_config, backbone, None)
+        study_key_hash = build_hpo_study_key_hash(study_key)
+        
+        # Call with config_dir=None explicitly (should trigger inference)
+        context, run_name = setup_hpo_mlflow_run(
+            backbone=backbone,
+            study_name=study_name,
+            output_dir=output_dir,
+            run_id=run_id,
+            should_resume=False,
+            checkpoint_enabled=True,
+            data_config=data_config,
+            hpo_config=hpo_config,
+            study_key_hash=study_key_hash,
+            config_dir=None,  # Explicitly None - should trigger inference
+        )
+        
+        # Verify: function should complete successfully (inference worked)
+        assert context is not None
+        assert run_name is not None
+        # The fact that it completes successfully when config_dir=None and cwd is project
+        # demonstrates that inference is working correctly
+

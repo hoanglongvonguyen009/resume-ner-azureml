@@ -393,7 +393,7 @@ def discover_artifact_drive(
     request: ArtifactRequest,
     root_dir: Path,
     config_dir: Path,
-    drive_store: Optional[Any] = None,
+    backup_to_drive: Optional[Any] = None,
     validate: bool = True,
 ) -> Optional[ArtifactLocation]:
     """
@@ -403,7 +403,7 @@ def discover_artifact_drive(
         request: Artifact request
         root_dir: Project root directory
         config_dir: Config directory
-        drive_store: DriveBackupStore instance for Drive access
+        backup_to_drive: DriveBackupStore instance for Drive access
         validate: If True, validate artifact integrity
         
     Returns:
@@ -413,7 +413,7 @@ def discover_artifact_drive(
         # Only checkpoints are supported for Drive discovery currently
         return None
     
-    if not drive_store:
+    if not backup_to_drive:
         return None
     
     if not request.study_key_hash or not request.trial_key_hash:
@@ -428,7 +428,7 @@ def discover_artifact_drive(
         
         # Compute Drive path
         try:
-            drive_hpo_dir = drive_store.drive_path_for(hpo_output_dir)
+            drive_hpo_dir = backup_to_drive.drive_path_for(hpo_output_dir)
         except ValueError:
             return None
         

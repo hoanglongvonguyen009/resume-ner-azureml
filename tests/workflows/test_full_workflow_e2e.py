@@ -379,7 +379,7 @@ def test_full_workflow_e2e(
             benchmark_tracker=benchmark_tracker,
             backup_enabled=False,
             backup_to_drive=None,
-            ensure_restored_from_drive=None,
+            restore_from_drive=None,
         )
         
         assert benchmark_results is not None
@@ -498,7 +498,7 @@ def test_full_workflow_e2e(
         selection_config=selection_config,
         platform=platform,
         restore_from_drive=None,
-        drive_store=None,
+        backup_to_drive=None,
         in_colab=(platform == "colab"),
     )
     assert best_checkpoint_dir == fake_checkpoint_dir
@@ -524,15 +524,15 @@ def test_full_workflow_e2e(
     }
     (final_output_dir / "metadata.json").write_text(json.dumps(metadata))
     
-    # Mock execute_final_training before importing
+    # Mock run_final_training_workflow before importing
     monkeypatch.setattr(
-        "training.execution.executor.execute_final_training",
+        "training.execution.executor.run_final_training_workflow",
         lambda **kwargs: fake_final_checkpoint_dir,
     )
     
-    from training.execution import execute_final_training
+    from training.execution import run_final_training_workflow
     
-    final_checkpoint_dir = execute_final_training(
+    final_checkpoint_dir = run_final_training_workflow(
         root_dir=ROOT_DIR,
         config_dir=CONFIG_DIR,
         best_model=best_model,
@@ -577,13 +577,13 @@ def test_full_workflow_e2e(
     (onnx_dir / "model.onnx").write_bytes(b"fake-onnx-model")
     
     monkeypatch.setattr(
-        "orchestration.jobs.conversion.execute_conversion",
+        "orchestration.jobs.conversion.run_conversion_workflow",
         lambda **kwargs: fake_conversion_output_dir,
     )
     
-    from deployment.conversion import execute_conversion
+    from deployment.conversion import run_conversion_workflow
     
-    conversion_output_dir = execute_conversion(
+    conversion_output_dir = run_conversion_workflow(
         root_dir=ROOT_DIR,
         config_dir=CONFIG_DIR,
         parent_training_output_dir=final_output_dir,

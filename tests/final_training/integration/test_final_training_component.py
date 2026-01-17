@@ -113,7 +113,7 @@ def test_execute_final_training_reuse_if_exists_skips_training(tmp_path, monkeyp
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
     experiment_config = DummyExperimentConfig()
 
-    result = executor.execute_final_training(
+    result = executor.run_final_training_workflow(
         root_dir=root_dir,
         config_dir=config_dir,
         best_model=best_model,
@@ -187,7 +187,7 @@ def test_execute_final_training_force_new_runs_training(tmp_path, monkeypatch):
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
     experiment_config = DummyExperimentConfig()
 
-    result = executor.execute_final_training(
+    result = executor.run_final_training_workflow(
         root_dir=root_dir,
         config_dir=config_dir,
         best_model=best_model,
@@ -263,7 +263,7 @@ def test_execute_final_training_resume_if_incomplete_continues(tmp_path, monkeyp
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
     experiment_config = DummyExperimentConfig()
 
-    result = executor.execute_final_training(
+    result = executor.run_final_training_workflow(
         root_dir=root_dir,
         config_dir=config_dir,
         best_model=best_model,
@@ -311,7 +311,7 @@ def test_execute_final_training_missing_dataset_raises_error(tmp_path, monkeypat
     experiment_config = DummyExperimentConfig(data_config=None)
 
     with pytest.raises(FileNotFoundError, match="Dataset path not found"):
-        executor.execute_final_training(
+        executor.run_final_training_workflow(
             root_dir=root_dir,
             config_dir=config_dir,
             best_model=best_model,
@@ -373,7 +373,7 @@ def test_execute_final_training_local_path_override(tmp_path, monkeypatch):
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
     experiment_config = DummyExperimentConfig()
 
-    result = executor.execute_final_training(
+    result = executor.run_final_training_workflow(
         root_dir=root_dir,
         config_dir=config_dir,
         best_model=best_model,
@@ -446,7 +446,7 @@ def test_execute_final_training_training_failure_marks_run_failed(tmp_path, monk
     experiment_config = DummyExperimentConfig()
 
     with pytest.raises(RuntimeError, match="Training failed"):
-        executor.execute_final_training(
+        executor.run_final_training_workflow(
             root_dir=root_dir,
             config_dir=config_dir,
             best_model=best_model,
@@ -513,7 +513,7 @@ def test_execute_final_training_mlflow_disabled_skips_tracking(tmp_path, monkeyp
     experiment_config = DummyExperimentConfig()
 
     # Should not raise even if MLflow fails
-    result = executor.execute_final_training(
+    result = executor.run_final_training_workflow(
         root_dir=root_dir,
         config_dir=config_dir,
         best_model=best_model,
@@ -603,7 +603,7 @@ def test_execute_final_training_source_scratch_no_checkpoint(tmp_path, monkeypat
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
     experiment_config = DummyExperimentConfig()
 
-    result = executor.execute_final_training(
+    result = executor.run_final_training_workflow(
         root_dir=root_dir,
         config_dir=config_dir,
         best_model=best_model,
@@ -702,7 +702,7 @@ def test_execute_final_training_source_final_training_with_checkpoint(tmp_path, 
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
     experiment_config = DummyExperimentConfig()
 
-    result = executor.execute_final_training(
+    result = executor.run_final_training_workflow(
         root_dir=root_dir,
         config_dir=config_dir,
         best_model=best_model,
@@ -802,7 +802,7 @@ def test_execute_final_training_hyperparameter_precedence(tmp_path, monkeypatch)
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
     experiment_config = DummyExperimentConfig()
 
-    result = executor.execute_final_training(
+    result = executor.run_final_training_workflow(
         root_dir=root_dir,
         config_dir=config_dir,
         best_model=best_model,
@@ -937,7 +937,7 @@ def test_execute_final_training_mlflow_overrides(tmp_path, monkeypatch):
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
     experiment_config = DummyExperimentConfig()
 
-    result = executor.execute_final_training(
+    result = executor.run_final_training_workflow(
         root_dir=root_dir,
         config_dir=config_dir,
         best_model=best_model,

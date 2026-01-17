@@ -389,7 +389,7 @@ def benchmark_champions(
     benchmark_tracker: Optional[Any] = None,
     backup_enabled: bool = True,
     backup_to_drive: Optional[Callable[[Path, bool], bool]] = None,
-    ensure_restored_from_drive: Optional[Callable[[Path, bool], bool]] = None,
+    restore_from_drive: Optional[Callable[[Path, bool], bool]] = None,
     mlflow_client: Optional[Any] = None,
 ) -> Dict[str, Path]:
     """
@@ -418,7 +418,7 @@ def benchmark_champions(
         benchmark_tracker: Optional MLflowBenchmarkTracker instance
         backup_enabled: Whether backup is enabled
         backup_to_drive: Function to backup files to Drive
-        ensure_restored_from_drive: Function to restore files from Drive
+        restore_from_drive: Function to restore files from Drive
         mlflow_client: Optional MLflow client instance
         
     Returns:
@@ -471,7 +471,7 @@ def benchmark_champions(
         benchmark_tracker=benchmark_tracker,
         backup_enabled=backup_enabled,
         backup_to_drive=backup_to_drive,
-        ensure_restored_from_drive=ensure_restored_from_drive,
+        restore_from_drive=restore_from_drive,
     )
 
 
@@ -491,7 +491,7 @@ def benchmark_best_trials(
     benchmark_tracker: Optional[Any] = None,
     backup_enabled: bool = True,
     backup_to_drive: Optional[Callable[[Path, bool], bool]] = None,
-    ensure_restored_from_drive: Optional[Callable[[Path, bool], bool]] = None,
+    restore_from_drive: Optional[Callable[[Path, bool], bool]] = None,
 ) -> Dict[str, Path]:
     """
     Run benchmarking on best trial checkpoints from HPO runs.
@@ -516,7 +516,7 @@ def benchmark_best_trials(
         benchmark_tracker: Optional MLflowBenchmarkTracker instance
         backup_enabled: Whether backup is enabled
         backup_to_drive: Function to backup files to Drive
-        ensure_restored_from_drive: Function to restore files from Drive
+        restore_from_drive: Function to restore files from Drive
 
     Returns:
         Dictionary mapping backbone names to benchmark output paths
@@ -549,7 +549,8 @@ def benchmark_best_trials(
         # At this point, checkpoint_dir must be a Path (not None)
         assert checkpoint_dir is not None, "checkpoint_dir should be set by this point"
 
-        backbone_name = backbone.split("-")[0] if "-" in backbone else backbone
+        from infrastructure.naming.utils import extract_short_backbone_name
+        backbone_name = extract_short_backbone_name(backbone)
 
         trial_id_raw = trial_info.get(
             "trial_id") or trial_info.get("trial_name", "unknown")
@@ -648,7 +649,8 @@ def benchmark_best_trials(
             continue
 
         # Check if benchmark already exists (handle both local and Drive paths)
-        if str(benchmark_output).startswith("/content/drive"):
+        from common.shared.platform_detection import is_drive_path
+        if is_drive_path(benchmark_output):
             # File is in Drive - check directly
             if benchmark_output.exists():
                 logger.info(
@@ -659,7 +661,7 @@ def benchmark_best_trials(
                 continue
         else:
             # File is local - check and restore from Drive if needed
-            if ensure_restored_from_drive and ensure_restored_from_drive(
+            if restore_from_drive and restore_from_drive(
                 benchmark_output, False
             ):
                 logger.info(
@@ -840,12 +842,15 @@ def benchmark_best_trials(
 
             # Note: On Colab, benchmark_output is already in Drive (via resolve_output_path_for_colab)
             # No need to backup again unless it's a local path
-            if backup_enabled and backup_to_drive and not str(benchmark_output).startswith("/content/drive"):
-                backup_to_drive(benchmark_output, False)
-                logger.info("Backed up benchmark results to Drive")
-            elif str(benchmark_output).startswith("/content/drive"):
-                logger.info(
-                    "Benchmark results are already in Drive (no backup needed)")
+            # Use centralized backup utility (standardized backup pattern)
+            if backup_to_drive and backup_enabled and benchmark_output:
+                from orchestration.jobs.hpo.local.backup import immediate_backup_if_needed
+                immediate_backup_if_needed(
+                    target_path=benchmark_output,
+                    backup_to_drive=backup_to_drive,
+                    backup_enabled=backup_enabled,
+                    is_directory=False,
+                )
         else:
             logger.error(f"Benchmark failed for {backbone}")
 

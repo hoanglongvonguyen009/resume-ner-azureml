@@ -1,7 +1,7 @@
 """
 @meta
 name: selection_workflow
-type: utility
+type: script
 domain: selection
 responsibility:
   - Orchestrate best model selection from MLflow
@@ -57,8 +57,9 @@ def run_selection_workflow(
     experiment_name: str,
     acquisition_config: Dict[str, Any],
     platform: str = "local",
+    backup_enabled: bool = True,
+    backup_to_drive: Optional[Callable[[Path, bool], bool]] = None,
     restore_from_drive: Optional[Callable[[Path, bool], bool]] = None,
-    drive_store: Optional[Callable[[Path, bool], bool]] = None,
     in_colab: bool = False,
     benchmarked_champions_by_refit: Optional[Dict[str, Dict[str, Any]]] = None,
     benchmarked_champions_by_keys: Optional[Dict[Tuple[str, str, str], Dict[str, Any]]] = None,
@@ -83,8 +84,9 @@ def run_selection_workflow(
         experiment_name: Experiment name
         acquisition_config: Artifact acquisition configuration dict
         platform: Platform name (local, colab, kaggle)
+        backup_enabled: Whether backup is enabled
+        backup_to_drive: Function to backup files to Drive
         restore_from_drive: Function to restore files from Drive
-        drive_store: Function to backup files to Drive
         in_colab: Whether running in Colab
         benchmarked_champions_by_refit: Optional dict mapping refit_run_id -> champion data
         benchmarked_champions_by_keys: Optional dict mapping (backbone, study_hash, trial_hash) -> champion data
@@ -105,11 +107,15 @@ def run_selection_workflow(
     run_mode = selection_config.get("run", {}).get("mode", "reuse_if_exists")
     logger.info(f"Best Model Selection Mode: {run_mode}")
     
+    # Get tracking URI once at function start using SSOT (reuse later)
+    # Note: We use get_tracking_uri() here because selection workflow doesn't create experiments,
+    # it only queries existing ones. setup_mlflow() would require an experiment_name which we don't have.
+    tracking_uri = mlflow.get_tracking_uri()
+    
     best_model = None
     cache_data = None
     
     if run_mode == "reuse_if_exists":
-        tracking_uri = mlflow.get_tracking_uri()
         cache_data = load_cached_best_model(
             root_dir=root_dir,
             config_dir=config_dir,
@@ -250,8 +256,7 @@ def run_selection_workflow(
             
             raise ValueError(error_msg)
         
-        # Step 3: Save to cache
-        tracking_uri = mlflow.get_tracking_uri()
+        # Step 3: Save to cache (reuse tracking_uri from function start)
         inputs_summary: Dict[str, Any] = {}
         
         save_best_model_cache(
@@ -323,7 +328,7 @@ def run_selection_workflow(
             selection_config=selection_config,
             platform=platform,
             restore_from_drive=restore_from_drive,
-            drive_store=drive_store,
+            backup_to_drive=backup_to_drive,
             in_colab=in_colab,
         )
     

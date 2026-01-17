@@ -50,7 +50,7 @@ __all__ = [
     "detect_hardware",
     "should_use_ddp",
     "init_process_group_if_needed",
-    "execute_final_training",
+    "run_final_training_workflow",
     "extract_lineage_from_best_model",
     "apply_lineage_tags",
 ]
@@ -58,9 +58,13 @@ __all__ = [
 
 def __getattr__(name: str):
     """Lazy import for executor, distributed, and jobs modules to avoid circular dependency and optional dependency requirements."""
+    if name == "run_final_training_workflow":
+        from .executor import run_final_training_workflow
+        return run_final_training_workflow
+    # Backward compatibility alias
     if name == "execute_final_training":
-        from .executor import execute_final_training
-        return execute_final_training
+        from .executor import run_final_training_workflow
+        return run_final_training_workflow
     # Distributed imports require torch
     elif name == "RunContext":
         from .distributed import RunContext

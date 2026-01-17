@@ -7,11 +7,11 @@ Model deployment module for converting models to ONNX format and serving predict
 Convert models to ONNX and serve predictions via FastAPI API.
 
 ```python
-from src.deployment.conversion.orchestration import execute_conversion
+from src.deployment.conversion.orchestration import run_conversion_workflow
 from src.deployment.api import app
 
 # Convert model to ONNX
-onnx_path = execute_conversion(
+onnx_path = run_conversion_workflow(
     root_dir=Path("."),
     config_dir=Path("config/"),
     parent_training_output_dir=Path("outputs/final_training/model"),
@@ -63,10 +63,10 @@ See individual submodule READMEs for detailed documentation:
 
 ```python
 from pathlib import Path
-from src.deployment.conversion.orchestration import execute_conversion
+from src.deployment.conversion.orchestration import run_conversion_workflow
 
 # Convert model to ONNX
-onnx_path = execute_conversion(
+onnx_path = run_conversion_workflow(
     root_dir=Path("."),
     config_dir=Path("config/"),
     parent_training_output_dir=Path("outputs/final_training/model"),
@@ -111,7 +111,7 @@ response = requests.post(
 
 ### Conversion
 
-- `execute_conversion(...)`: Execute model conversion to ONNX
+- `run_conversion_workflow(...)`: Execute model conversion to ONNX
 - `create_conversion_job(...)`: Create AzureML conversion job (optional)
 - `validate_conversion_job(...)`: Validate conversion job completion (optional)
 
@@ -141,10 +141,10 @@ For detailed signatures, see source code or submodule documentation.
 
 ```python
 from pathlib import Path
-from src.deployment.conversion.orchestration import execute_conversion
+from src.deployment.conversion.orchestration import run_conversion_workflow
 
 # 1. Convert model
-onnx_path = execute_conversion(...)
+onnx_path = run_conversion_workflow(...)
 
 # 2. Start API (via CLI or uvicorn)
 # uvicorn src.deployment.api:app --host 0.0.0.0 --port 8000

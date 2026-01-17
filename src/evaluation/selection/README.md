@@ -128,8 +128,19 @@ best_trials = find_best_trials_for_backbones(
 ### Artifact Acquisition
 
 - `acquire_best_model_checkpoint(...)`: Acquire best model checkpoint
+  - **Standard parameters**: `backup_to_drive`, `restore_from_drive`, `backup_enabled`, `in_colab`, `platform`
+  - Uses unified artifact acquisition with fallback strategy (local → drive → MLflow)
 - `load_best_trial_from_disk(...)`: Load best trial from disk
 - `load_cached_best_model(...)`: Load cached best model
+
+### Workflows
+
+- `run_benchmarking_workflow(...)`: Run complete benchmarking workflow on champions
+  - **Standard parameters**: `backup_enabled`, `backup_to_drive`, `restore_from_drive`, `in_colab`, `platform`
+  - Selects champions, runs benchmarks, tracks results in MLflow
+- `run_selection_workflow(...)`: Run complete best model selection workflow
+  - **Standard parameters**: `backup_enabled`, `backup_to_drive`, `restore_from_drive`, `in_colab`, `platform`
+  - Queries MLflow, selects best model, acquires checkpoint
 
 ### Study Analysis
 

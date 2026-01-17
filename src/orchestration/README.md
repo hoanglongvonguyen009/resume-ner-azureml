@@ -59,10 +59,15 @@ This module is organized into the following submodules:
 - `jobs/`: Job orchestration (active)
   - `hpo/`: HPO job orchestration (local, AzureML)
     - `local/`: Local HPO orchestration (Optuna sweeps, Drive backup)
-      - `backup.py`: HPO study.db and study folder backup to Google Drive
-        - Correctly handles v2 study folders (`study-{hash}/study.db`)
-        - Verifies actual file existence in Drive (not just path mapping)
-        - Supports both v2 and legacy folder structures
+      - `backup.py`: Centralized backup utilities (standardized across all workflows)
+        - **Immediate backup** (`immediate_backup_if_needed()`): Generic utility for immediate post-creation backup
+          - Used by HPO, training, conversion, and benchmarking workflows
+          - Checks: backup_enabled, path exists, path not already in Drive
+          - Standardized pattern: All workflows use this same utility
+        - **Incremental backup** (HPO-specific): Optuna callbacks back up `study.db` after each completed trial
+        - **Drive path rejection**: Prevents crashes by rejecting Drive paths early (via `is_drive_path()`)
+        - **Simplified logic**: Uses v2 study folders directly (`study-{hash}/study.db`)
+        - **Centralized callbacks**: Reusable backup callbacks for any Optuna study
   - `tracking/`: Tracking job orchestration (MLflow indexing, finding)
   - `benchmarking/`: Benchmarking job orchestration
   - `conversion/`: Conversion job orchestration
@@ -148,11 +153,14 @@ conversion_job = create_conversion_job(
 - `create_hpo_sweep_job_for_backbone(...)`: Create AzureML HPO sweep job
 - `create_dry_run_sweep_job_for_backbone(...)`: Create dry-run HPO sweep job
 - `backup_hpo_study_to_drive(...)`: Backup HPO study.db and study folders to Google Drive (Colab)
-  - Automatically detects v2 study folders (`study-{hash}/study.db`)
-  - Verifies actual file existence in Drive (not just path mapping)
-  - Supports both v2 and legacy folder structures
+  - Simplified logic using v2 study folders directly
+  - Skips backup for paths already in Drive
   - See `jobs/hpo/local/backup.py` for implementation details
-- See `jobs/hpo/` for local HPO orchestration
+- `create_incremental_backup_callback(...)`: Create Optuna callback for incremental backup
+  - Backs up target path after each completed trial
+  - Handles Drive paths, nonexistent paths, and errors gracefully
+- `create_study_db_backup_callback(...)`: Convenience wrapper for `study.db` backup callback
+- See `jobs/hpo/local/backup.py` for backup implementation details
 
 ### Training Jobs
 

@@ -63,6 +63,9 @@ This module is organized into the following submodules:
 - `naming/`: Naming conventions and policies
 - `platform/`: Platform adapters (AzureML, local)
 - `storage/`: Storage abstractions
+  - `drive.py`: Google Drive backup/restore for Colab environments
+    - `DriveBackupStore`: Core backup/restore operations with Drive path rejection
+    - Rejects Drive paths early to prevent crashes when attempting to backup paths already in Drive
 - `fingerprints/`: Fingerprinting utilities
 - `metadata/`: Metadata management
 - `setup/`: Setup utilities
@@ -163,6 +166,18 @@ run_name = format_run_name(context=context, policy=policy)
 
 - `get_platform_adapter(...)`: Get platform adapter for current platform
 - See `platform/adapters/` for platform-specific operations
+
+### Storage
+
+- `DriveBackupStore`: Google Drive backup/restore store for Colab environments
+  - `backup(local_path, expect="any")`: Backup file or directory to Drive
+  - `restore(local_path)`: Restore file or directory from Drive
+  - `drive_path_for(local_path)`: Compute Drive path for local path
+  - **Drive Path Rejection**: Both `backup()` and `drive_path_for()` reject Drive paths early to prevent crashes
+  - `as_backup_callback()`: Create callback function for backup operations
+  - `as_restore_callback()`: Create callback function for restore operations
+- `create_colab_store(...)`: Create Drive backup store for Colab environment
+- `mount_colab_drive(...)`: Mount Google Drive in Colab (if available)
 
 For detailed signatures, see source code or submodule documentation.
 

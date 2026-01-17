@@ -153,6 +153,7 @@ See [`../fixtures/README.md`](../fixtures/README.md) for complete fixture docume
 - ✅ Trial execution with real components
 - ✅ Error handling
 - ✅ Assertions and validation
+- ✅ Backup functionality (Drive backup, incremental backup callbacks)
 
 ### E2E Tests
 

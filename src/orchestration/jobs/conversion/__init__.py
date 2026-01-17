@@ -2,9 +2,13 @@ from __future__ import annotations
 
 """Conversion job modules."""
 
-from deployment.conversion.orchestration import execute_conversion
+from deployment.conversion.orchestration import run_conversion_workflow
+
+# Backward compatibility alias
+execute_conversion = run_conversion_workflow
 
 __all__ = [
-    "execute_conversion",
+    "run_conversion_workflow",
+    "execute_conversion",  # Backward compatibility
 ]
 

@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from deployment.conversion.orchestration import execute_conversion
+from deployment.conversion.orchestration import run_conversion_workflow
 from infrastructure.config.conversion import load_conversion_config
 from infrastructure.config.loader import ExperimentConfig
 
@@ -73,7 +73,7 @@ class TestConversionConfig:
             (parent_training_dir / "checkpoint").mkdir()
             
             try:
-                execute_conversion(
+                run_conversion_workflow(
                     root_dir=root_dir,
                     config_dir=config_dir,
                     parent_training_output_dir=parent_training_dir,
@@ -153,7 +153,7 @@ class TestConversionConfig:
             (parent_training_dir / "checkpoint").mkdir()
             
             try:
-                execute_conversion(
+                run_conversion_workflow(
                     root_dir=root_dir,
                     config_dir=config_dir,
                     parent_training_output_dir=parent_training_dir,
@@ -231,7 +231,7 @@ class TestConversionConfig:
             (parent_training_dir / "checkpoint").mkdir()
             
             try:
-                execute_conversion(
+                run_conversion_workflow(
                     root_dir=root_dir,
                     config_dir=config_dir,
                     parent_training_output_dir=parent_training_dir,
@@ -309,7 +309,7 @@ class TestConversionConfig:
             (parent_training_dir / "checkpoint").mkdir()
             
             try:
-                execute_conversion(
+                run_conversion_workflow(
                     root_dir=root_dir,
                     config_dir=config_dir,
                     parent_training_output_dir=parent_training_dir,
@@ -387,7 +387,7 @@ class TestConversionConfig:
             (parent_training_dir / "checkpoint").mkdir()
             
             try:
-                execute_conversion(
+                run_conversion_workflow(
                     root_dir=root_dir,
                     config_dir=config_dir,
                     parent_training_output_dir=parent_training_dir,
@@ -465,7 +465,7 @@ class TestConversionConfig:
             (parent_training_dir / "checkpoint").mkdir()
             
             try:
-                execute_conversion(
+                run_conversion_workflow(
                     root_dir=root_dir,
                     config_dir=config_dir,
                     parent_training_output_dir=parent_training_dir,

@@ -151,11 +151,24 @@ Functions:
 
 **Path Resolution**: The system prioritizes v2 hash-based paths when `study_key_hash` is available, ensuring deterministic study folder names based on study configuration. Legacy `study_name` format is supported for backward compatibility.
 
-**Drive Backup**: The backup system (`orchestration.jobs.hpo.local.backup.backup_hpo_study_to_drive()`) correctly handles v2 study folders by:
-- Checking for v2 study folders first using `find_study_folder_in_backbone_dir()` before any fallback
-- Using v2 folder paths directly (not `resolve_storage_path()` which maps to Drive)
-- Verifying actual file existence in Drive, not just path string matching
-- This ensures `study.db` files in v2 folders are properly backed up to Drive in Colab environments
+**Drive Backup**: The backup system (`orchestration.jobs.hpo.local.backup`) provides centralized backup utilities for all workflows:
+
+- **Standardized Immediate Backup**: `immediate_backup_if_needed()` provides generic immediate backup functionality:
+  - Used by HPO, training, conversion, and benchmarking workflows
+  - Checks: backup_enabled, path exists, path not already in Drive (via `is_drive_path()`)
+  - Prevents crashes by rejecting Drive paths early
+  - Consistent behavior across all workflows (standardized pattern)
+- **HPO-Specific Incremental Backup**: 
+  - **Immediate Backup**: `study.db` is backed up immediately after study creation/loading in `run_local_hpo_sweep()` using `immediate_backup_if_needed()`
+  - **Incremental Backup**: An Optuna callback (`create_incremental_backup_callback()`) backs up `study.db` after each completed trial
+  - **Simplified Logic**: The backup system (`backup_hpo_study_to_drive()`) uses v2 study folders directly:
+    - Checks for v2 study folders first using `find_study_folder_in_backbone_dir()` before any fallback
+    - Uses v2 folder paths directly (not `resolve_storage_path()` which maps to Drive)
+    - Verifies actual file existence before backup
+    - Skips backup for paths already in Drive (detected via `is_drive_path()`)
+  - **Centralized Callbacks**: Reusable backup callbacks (`create_incremental_backup_callback()`, `create_study_db_backup_callback()`) can be used for any Optuna study
+- **Drive Path Rejection**: The backup API (`infrastructure.storage.drive.DriveBackupStore`) rejects Drive paths early to prevent crashes
+- This ensures all workflow outputs (study.db, checkpoints, ONNX models) are properly backed up to Drive in Colab environments with minimal data loss risk
 
 For detailed signatures, see source code.
 

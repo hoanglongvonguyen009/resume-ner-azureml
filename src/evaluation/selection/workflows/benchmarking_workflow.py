@@ -1,7 +1,7 @@
 """
 @meta
 name: benchmarking_workflow
-type: utility
+type: script
 domain: benchmarking
 responsibility:
   - Orchestrate benchmarking of champion models
@@ -49,7 +49,6 @@ from infrastructure.naming.mlflow.hpo_keys import (
 )
 from infrastructure.tracking.mlflow.hash_utils import derive_eval_config
 from common.shared.platform_detection import detect_platform
-from common.shared.yaml_utils import load_yaml
 from common.shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -71,6 +70,7 @@ def run_benchmarking_workflow(
     backup_to_drive: Optional[Callable[[Path, bool], bool]] = None,
     restore_from_drive: Optional[Callable[[Path, bool], bool]] = None,
     in_colab: bool = False,
+    platform: str = "local",
 ) -> Dict[str, Dict[str, Any]]:
     """
     Run complete benchmarking workflow for champions.
@@ -99,6 +99,7 @@ def run_benchmarking_workflow(
         backup_to_drive: Function to backup files to Drive
         restore_from_drive: Function to restore files from Drive
         in_colab: Whether running in Colab
+        platform: Platform name (local, colab, kaggle)
         
     Returns:
         Dict mapping backbone -> champion data with checkpoint_path for reuse
@@ -138,7 +139,7 @@ def run_benchmarking_workflow(
     
     # Step 4: Filter missing benchmarks
     run_mode = get_benchmark_run_mode(benchmark_config, hpo_config)
-    environment = detect_platform()
+    environment = platform
     
     # benchmark_experiment is guaranteed to be set at this point
     assert benchmark_experiment is not None, "benchmark_experiment should be set by now"
@@ -178,9 +179,12 @@ def run_benchmarking_workflow(
     benchmark_device = benchmark_params.get("device")
     
     # Step 7: Acquire checkpoints for champions
-    acquisition_config = load_yaml(config_dir / "artifact_acquisition.yaml")
-    acquisition_config = acquisition_config.copy()
-    acquisition_config["output_base_dir"] = "artifacts"
+    # Load artifact acquisition config using standard loader pattern
+    from infrastructure.config.selection import load_artifact_acquisition_config
+    acquisition_config = load_artifact_acquisition_config(
+        config_dir=config_dir,
+        output_base_dir="artifacts",
+    )
     
     for backbone, champion_data in champions_to_benchmark.items():
         champion = champion_data["champion"]
@@ -204,9 +208,9 @@ def run_benchmarking_workflow(
             config_dir=config_dir,
             acquisition_config=acquisition_config,
             selection_config=selection_config,
-            platform=detect_platform(),
+            platform=platform,
             restore_from_drive=restore_from_drive,
-            drive_store=backup_to_drive,
+            backup_to_drive=backup_to_drive,
             in_colab=in_colab,
         )
         
@@ -240,7 +244,7 @@ def run_benchmarking_workflow(
         benchmark_tracker=benchmark_tracker,
         backup_enabled=backup_enabled,
         backup_to_drive=backup_to_drive,
-        ensure_restored_from_drive=restore_from_drive,
+        restore_from_drive=restore_from_drive,
         mlflow_client=mlflow_client,
     )
     

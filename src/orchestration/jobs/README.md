@@ -33,6 +33,10 @@ The `jobs` module provides job orchestration for:
 
 - `hpo/`: HPO job orchestration
   - `local/`: Local HPO orchestration (Optuna)
+    - `backup.py`: Centralized backup utilities for HPO and all workflows
+      - **Immediate backup**: `immediate_backup_if_needed()` for immediate post-creation backup (standardized)
+      - **Incremental backup**: Optuna callbacks for `study.db` backup after each trial
+      - **Standardized pattern**: Used by HPO, training, conversion, and benchmarking workflows
   - `azureml/`: AzureML HPO sweep job creation
 - `tracking/`: Tracking job orchestration
   - MLflow indexing, run finding, artifact management
@@ -111,6 +115,15 @@ if completed_job.status == "Completed":
 - `create_hpo_sweep_job_for_backbone(...)`: Create AzureML HPO sweep job
 - `create_dry_run_sweep_job_for_backbone(...)`: Create dry-run HPO sweep job
 - See `hpo/local/` for local HPO orchestration
+  - `backup.py`: Centralized backup utilities (standardized across all workflows)
+    - **Immediate Backup**:
+      - `immediate_backup_if_needed(...)`: Generic immediate backup utility (file/directory)
+      - Used by HPO, training, conversion, and benchmarking workflows
+      - Checks: backup_enabled, path exists, path not in Drive
+    - **Incremental Backup** (HPO-specific):
+      - `backup_hpo_study_to_drive(...)`: Backup HPO study database and folder to Drive
+      - `create_incremental_backup_callback(...)`: Create Optuna callback for incremental backup
+      - `create_study_db_backup_callback(...)`: Convenience wrapper for `study.db` backup callback
 
 ### Training Jobs
 

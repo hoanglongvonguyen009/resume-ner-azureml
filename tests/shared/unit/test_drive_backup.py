@@ -355,6 +355,33 @@ class TestDriveBackupStore:
         assert callback(test_file) is True
         assert (backup_root / "outputs" / "test" / "test.txt").exists()
 
+    def test_drive_path_for_rejects_drive_paths(self, store, temp_dirs):
+        """Test that drive_path_for() raises ValueError for Drive paths."""
+        drive_path = Path("/content/drive/MyDrive/resume-ner-azureml/outputs/hpo/study.db")
+        
+        with pytest.raises(ValueError, match="Cannot compute Drive path for path already in Drive"):
+            store.drive_path_for(drive_path)
+
+    def test_backup_rejects_drive_paths(self, store, temp_dirs):
+        """Test that backup() rejects Drive paths with error result."""
+        # Create a path that will be detected as Drive path by is_drive_path
+        # Use tmp_path but mock is_drive_path to return True
+        root_dir, _ = temp_dirs
+        drive_path = root_dir / "outputs" / "hpo" / "study.db"
+        drive_path.parent.mkdir(parents=True, exist_ok=True)
+        drive_path.write_text("test content")
+        
+        # Mock is_drive_path to return True for this path
+        with patch("infrastructure.storage.drive.is_drive_path") as mock_is_drive:
+            mock_is_drive.return_value = True
+            
+            result = store.backup(drive_path)
+        
+        assert result.ok is False
+        assert result.action == BackupAction.ERROR
+        assert "Cannot backup path already in Drive" in result.reason
+        assert "Drive paths cannot be backed up to Drive" in result.reason
+
 
 class TestEnsureLocalOptions:
     """Test EnsureLocalOptions dataclass."""

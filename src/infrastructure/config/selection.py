@@ -33,8 +33,10 @@ including champion selection settings and objective direction (with migration su
 """
 
 import warnings
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Dict, Optional
 
+from common.shared.yaml_utils import load_yaml
 from common.shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -106,4 +108,46 @@ def get_champion_selection_config(selection_config: Dict[str, Any]) -> Dict[str,
         "prefer_schema_version": champion_config.get("prefer_schema_version", "auto"),
         "allow_mixed_schema_groups": champion_config.get("allow_mixed_schema_groups", False),
     }
+
+
+def load_artifact_acquisition_config(
+    config_dir: Path,
+    output_base_dir: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Load artifact acquisition configuration from YAML.
+    
+    This function:
+    1. Loads config/artifact_acquisition.yaml
+    2. Optionally overrides output_base_dir
+    3. Returns resolved config dict
+    
+    Args:
+        config_dir: Config directory (root_dir / "config")
+        output_base_dir: Optional override for output_base_dir (e.g., "artifacts" for benchmarking)
+        
+    Returns:
+        Artifact acquisition configuration dictionary
+        
+    Raises:
+        FileNotFoundError: If artifact_acquisition.yaml doesn't exist
+    """
+    acquisition_config_path = config_dir / "artifact_acquisition.yaml"
+    
+    if not acquisition_config_path.exists():
+        raise FileNotFoundError(
+            f"Required config file not found: {acquisition_config_path}. "
+            f"Please create config/artifact_acquisition.yaml with the required configuration."
+        )
+    
+    acquisition_config = load_yaml(acquisition_config_path)
+    
+    # Create a copy to avoid mutating the original
+    acquisition_config = acquisition_config.copy()
+    
+    # Override output_base_dir if provided
+    if output_base_dir is not None:
+        acquisition_config["output_base_dir"] = output_base_dir
+    
+    return acquisition_config
 

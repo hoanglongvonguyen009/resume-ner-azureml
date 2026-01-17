@@ -141,7 +141,7 @@ def test_logging_eval_interval_loaded_from_config(tmp_path, monkeypatch):
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
     experiment_config = DummyExperimentConfig()
 
-    result = executor.execute_final_training(
+    result = executor.run_final_training_workflow(
         root_dir=root_dir,
         config_dir=config_dir,
         best_model=best_model,
@@ -235,7 +235,7 @@ def test_logging_save_interval_loaded_from_config(tmp_path, monkeypatch):
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
     experiment_config = DummyExperimentConfig()
 
-    result = executor.execute_final_training(
+    result = executor.run_final_training_workflow(
         root_dir=root_dir,
         config_dir=config_dir,
         best_model=best_model,
@@ -331,7 +331,7 @@ def test_logging_intervals_both_loaded_from_config(tmp_path, monkeypatch):
     best_model = {"backbone": "distilbert-base-uncased", "params": {}}
     experiment_config = DummyExperimentConfig()
 
-    result = executor.execute_final_training(
+    result = executor.run_final_training_workflow(
         root_dir=root_dir,
         config_dir=config_dir,
         best_model=best_model,

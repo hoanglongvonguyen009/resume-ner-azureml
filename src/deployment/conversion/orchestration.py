@@ -44,14 +44,14 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Callable
 
 import mlflow
 from mlflow.tracking import MlflowClient
 
 from infrastructure.config.loader import ExperimentConfig
 from infrastructure.config.conversion import load_conversion_config
-from infrastructure.naming import create_naming_context
+from infrastructure.naming import create_naming_context, extract_short_backbone_name
 from infrastructure.paths import build_output_path
 from infrastructure.naming.mlflow.run_names import build_mlflow_run_name
 from infrastructure.naming.mlflow.tags import build_mlflow_tags
@@ -61,11 +61,11 @@ from infrastructure.naming.mlflow.run_keys import (
 )
 from orchestration.jobs.tracking.index.run_index import update_mlflow_index
 from common.shared.platform_detection import detect_platform
-from common.shared.logging_utils import get_script_logger
+from common.shared.logging_utils import get_logger
 
-_log = get_script_logger("conversion.orchestration")
+logger = get_logger(__name__)
 
-def execute_conversion(
+def run_conversion_workflow(
     root_dir: Path,
     config_dir: Path,
     parent_training_output_dir: Path,
@@ -75,6 +75,10 @@ def execute_conversion(
     conversion_experiment_name: str,
     platform: str,
     parent_training_run_id: Optional[str] = None,
+    backup_enabled: bool = True,
+    backup_to_drive: Optional[Callable[[Path, bool], bool]] = None,
+    restore_from_drive: Optional[Callable[[Path, bool], bool]] = None,
+    in_colab: bool = False,
 ) -> Path:
     """
     Execute model conversion to ONNX format.
@@ -96,6 +100,11 @@ def execute_conversion(
         conversion_experiment_name: MLflow experiment name for conversion runs.
         platform: Platform name (local, colab, kaggle).
         parent_training_run_id: Optional MLflow run ID of parent training run.
+        backup_enabled: Whether backup is enabled (default: True).
+        backup_to_drive: Optional function to backup files to Drive.
+                        Function should take (Path, bool) and return bool (True if backed up).
+        restore_from_drive: Optional function to restore files from Drive.
+        in_colab: Whether running in Colab.
     
     Returns:
         Path to conversion output directory (contains ONNX model).
@@ -120,12 +129,9 @@ def execute_conversion(
     backbone = conversion_config.get("backbone")  # Canonical backbone from metadata
     
     # Build conversion context (executor computes output dir - single source of truth)
-    environment = detect_platform()
+    environment = platform
     # Use short name only for UI naming, keep canonical backbone for model loading
-    if "-" in backbone:
-        backbone_short = backbone.split("-")[0]
-    else:
-        backbone_short = backbone
+    backbone_short = extract_short_backbone_name(backbone)
     
     conversion_context = create_naming_context(
         process_type="conversion",
@@ -141,7 +147,7 @@ def execute_conversion(
     conversion_output_dir = build_output_path(root_dir, conversion_context)
     conversion_output_dir.mkdir(parents=True, exist_ok=True)
     
-    _log.info(f"Output directory: {conversion_output_dir}")
+    logger.info(f"Output directory: {conversion_output_dir}")
     
     # Get conversion parameters
     checkpoint_path = conversion_config["checkpoint_path"]
@@ -272,19 +278,19 @@ def execute_conversion(
                 config_dir=config_dir,
             )
         except Exception as e:
-            _log.debug(f"Could not update MLflow index: {e}")
+            logger.debug(f"Could not update MLflow index: {e}")
         
-        _log.info(f"Created MLflow run: {run_name} ({run_id[:12]}...)")
+        logger.info(f"Created MLflow run: {run_name} ({run_id[:12]}...)")
         
         # Pass run_id to subprocess (CRITICAL: subprocess must use this)
         conversion_env["MLFLOW_RUN_ID"] = run_id
     except Exception as e:
-        _log.warning(f"Could not create MLflow run: {e}")
+        logger.warning(f"Could not create MLflow run: {e}")
         # Continue without MLflow run (conversion will still work, just no tracking)
         run_id = None
     
     # Execute conversion (stream output instead of capture_output=True)
-    _log.info(f"Running conversion: {' '.join(conversion_args)}")
+    logger.info(f"Running conversion: {' '.join(conversion_args)}")
     process = subprocess.Popen(
         conversion_args,
         cwd=root_dir,
@@ -304,19 +310,19 @@ def execute_conversion(
         """Read stdout in a separate thread."""
         try:
             for line in process.stdout:
-                _log.info(line.rstrip())
+                logger.info(line.rstrip())
                 stdout_lines.append(line.rstrip())
         except Exception as e:
-            _log.debug(f"Error reading stdout: {e}")
+            logger.debug(f"Error reading stdout: {e}")
     
     def read_stderr():
         """Read stderr in a separate thread."""
         try:
             for line in process.stderr:
-                _log.warning(line.rstrip())
+                logger.warning(line.rstrip())
                 stderr_lines.append(line.rstrip())
         except Exception as e:
-            _log.debug(f"Error reading stderr: {e}")
+            logger.debug(f"Error reading stderr: {e}")
     
     # Start threads to read stdout and stderr concurrently
     stdout_thread = threading.Thread(target=read_stdout, daemon=True)
@@ -358,12 +364,26 @@ def execute_conversion(
                 from infrastructure.tracking.mlflow import ensure_run_terminated
                 ensure_run_terminated(run_id, expected_status="FINISHED")
             except Exception as e:
-                _log.debug(f"Could not verify run status: {e}")
+                logger.debug(f"Could not verify run status: {e}")
     
     # Find ONNX model file (respect filename_pattern)
     onnx_model_path = _find_onnx_model(conversion_output_dir, quantization, filename_pattern)
     
-    _log.info(f"Conversion completed. ONNX model: {onnx_model_path}")
+    logger.info(f"Conversion completed. ONNX model: {onnx_model_path}")
+    
+    # Backup conversion output if enabled (standardized backup pattern)
+    if backup_to_drive and backup_enabled and conversion_output_dir:
+        try:
+            from orchestration.jobs.hpo.local.backup import immediate_backup_if_needed
+            immediate_backup_if_needed(
+                target_path=conversion_output_dir,
+                backup_to_drive=backup_to_drive,
+                backup_enabled=backup_enabled,
+                is_directory=True,
+            )
+        except Exception as e:
+            # Log error but don't crash - backup is optional
+            logger.warning(f"Could not backup conversion output to Drive: {e}")
     
     return conversion_output_dir
 

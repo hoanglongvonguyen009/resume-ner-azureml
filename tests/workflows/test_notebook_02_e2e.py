@@ -21,9 +21,18 @@ Validation includes:
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any, Dict
 from unittest.mock import patch
+
+# Setup Python path before imports
+ROOT_DIR = Path(__file__).parent.parent.parent
+SRC_DIR = ROOT_DIR / "src"
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 import mlflow
 import pytest
@@ -36,13 +45,10 @@ from common.shared.platform_detection import detect_platform
 from common.shared.yaml_utils import load_yaml
 
 # Import shared validators
-import sys
 _fixtures_path = Path(__file__).parent.parent / "fixtures"
 sys.path.insert(0, str(_fixtures_path.parent))
 from fixtures import validate_path_structure, validate_run_name, validate_tags
 
-
-ROOT_DIR = Path(__file__).parent.parent.parent
 CONFIG_DIR = ROOT_DIR / "config"
 
 
@@ -196,18 +202,18 @@ def test_best_config_selection_e2e(tmp_path, monkeypatch):
     # Note: The actual import is from training.execution, so we patch that
     # Updated after Phase 2: training_exec was removed, now use training.execution
     monkeypatch.setattr(
-        "training.execution.executor.execute_final_training",
+        "training.execution.executor.run_final_training_workflow",
         lambda **kwargs: fake_final_checkpoint_dir,
     )
 
     # Patch conversion executor to return our fake conversion directory
     # Patch at multiple import paths to ensure it works
     monkeypatch.setattr(
-        "orchestration.jobs.conversion.execute_conversion",
+        "orchestration.jobs.conversion.run_conversion_workflow",
         lambda **kwargs: fake_conversion_output_dir,
     )
     monkeypatch.setattr(
-        "deployment.conversion.orchestration.execute_conversion",
+        "deployment.conversion.orchestration.run_conversion_workflow",
         lambda **kwargs: fake_conversion_output_dir,
     )
 
@@ -244,7 +250,7 @@ def test_best_config_selection_e2e(tmp_path, monkeypatch):
         selection_config=selection_config,
         platform=platform,
         restore_from_drive=None,
-        drive_store=None,
+        backup_to_drive=None,
         in_colab=(platform == "colab"),
     )
     assert best_checkpoint_dir == fake_checkpoint_dir
@@ -278,10 +284,10 @@ def test_best_config_selection_e2e(tmp_path, monkeypatch):
     monkeypatch.setattr("mlflow.tracking.MlflowClient", lambda *args, **kwargs: mock_client)
     
     # Final training
-    from training.execution import execute_final_training
+    from training.execution import run_final_training_workflow
 
     training_experiment_name = f"{EXPERIMENT_NAME}-training"
-    final_checkpoint_dir = execute_final_training(
+    final_checkpoint_dir = run_final_training_workflow(
         root_dir=ROOT_DIR,
         config_dir=CONFIG_DIR,
         best_model=best_model,
@@ -306,7 +312,7 @@ def test_best_config_selection_e2e(tmp_path, monkeypatch):
     assert "mlflow" in metadata, "metadata.json missing mlflow section"
     
     # Validate final training run name and tags (if MLflow was used)
-    # Note: Since we're mocking execute_final_training, we can't check real MLflow runs
+    # Note: Since we're mocking run_final_training_workflow, we can't check real MLflow runs
     # But we can validate the structure of what would be created
     if "mlflow" in metadata and "run_id" in metadata["mlflow"]:
         run_id = metadata["mlflow"]["run_id"]
@@ -359,7 +365,7 @@ def test_best_config_selection_e2e(tmp_path, monkeypatch):
     monkeypatch.setattr("subprocess.Popen", mock_popen)
     
     # Mock conversion function to return fake output directory
-    def fake_execute_conversion(
+    def fake_run_conversion_workflow(
         root_dir,
         config_dir,
         parent_training_output_dir,
@@ -375,14 +381,14 @@ def test_best_config_selection_e2e(tmp_path, monkeypatch):
 
     # Mock at multiple levels to ensure it works
     monkeypatch.setattr(
-        "deployment.conversion.orchestration.execute_conversion",
-        fake_execute_conversion,
+        "deployment.conversion.orchestration.run_conversion_workflow",
+        fake_run_conversion_workflow,
     )
     
-    from deployment.conversion import execute_conversion
+    from deployment.conversion import run_conversion_workflow
 
-    # Call execute_conversion - it should return fake_conversion_output_dir due to our mock
-    conversion_output_dir = execute_conversion(
+    # Call run_conversion_workflow - it should return fake_conversion_output_dir due to our mock
+    conversion_output_dir = run_conversion_workflow(
         root_dir=ROOT_DIR,
         config_dir=CONFIG_DIR,
         parent_training_output_dir=final_output_dir,
@@ -409,7 +415,7 @@ def test_best_config_selection_e2e(tmp_path, monkeypatch):
         f"Conversion path {conversion_output_dir} does not match conversion_v2 pattern"
     
     # Validate conversion run name and tags (if MLflow was used)
-    # Note: Since we're mocking execute_conversion, we can't check real MLflow runs
+    # Note: Since we're mocking run_conversion_workflow, we can't check real MLflow runs
     # But we can validate the structure of what would be created
     # Check if conversion metadata exists (some implementations may create this)
     conversion_metadata_path = conversion_output_dir / "metadata.json"

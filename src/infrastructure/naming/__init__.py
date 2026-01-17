@@ -53,6 +53,7 @@ from .mlflow.tags_registry import (
     TagsRegistry,
     load_tags_registry,
 )
+from .utils import extract_short_backbone_name
 
 __all__ = [
     # Context
@@ -101,5 +102,7 @@ __all__ = [
     "build_hpo_trial_key_hash",
     # MLflow Refit Keys
     "compute_refit_protocol_fp",
+    # Utils
+    "extract_short_backbone_name",
 ]
 

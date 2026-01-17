@@ -16,17 +16,16 @@ Implement centralized incremental backup for `study.db` that:
 
 ### Completed Steps
 
-- ⏳ None yet
+- ✅ Step 1: Add Drive path rejection in drive.py
+- ✅ Step 2: Create centralized backup callback
+- ✅ Step 3: Add immediate backup after study creation
+- ✅ Step 4: Update sweep.py to use backup callback
+- ✅ Step 5: Simplify backup_hpo_study_to_drive function
+- ✅ Step 6: Update function signatures
 
 ### Pending Steps
 
-- ⏳ Step 1: Add Drive path rejection in drive.py
-- ⏳ Step 2: Create centralized backup callback
-- ⏳ Step 3: Add immediate backup after study creation
-- ⏳ Step 4: Update sweep.py to use backup callback
-- ⏳ Step 5: Simplify backup_hpo_study_to_drive function
-- ⏳ Step 6: Update function signatures
-- ⏳ Step 7: Update tests
+- ✅ Step 7: Update tests
 
 ## Preconditions
 

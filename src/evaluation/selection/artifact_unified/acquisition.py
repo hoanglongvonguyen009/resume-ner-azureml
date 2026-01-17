@@ -76,7 +76,7 @@ def acquire_artifact(
     mlflow_client: Optional[MlflowClient] = None,
     experiment_id: Optional[str] = None,
     restore_from_drive: Optional[Callable[[Path, bool], bool]] = None,
-    drive_store: Optional[Any] = None,
+    backup_to_drive: Optional[Any] = None,
     in_colab: bool = False,
 ) -> ArtifactResult:
     """
@@ -96,7 +96,7 @@ def acquire_artifact(
         mlflow_client: Optional MLflow client (created if not provided)
         experiment_id: Optional MLflow experiment ID
         restore_from_drive: Optional function to restore from Drive backup
-        drive_store: Optional DriveBackupStore instance
+        backup_to_drive: Optional DriveBackupStore instance
         in_colab: Whether running in Google Colab
         
     Returns:
@@ -192,14 +192,14 @@ def acquire_artifact(
                 discovered_location = location
                 break
         
-        elif source_name == "drive" and in_colab and drive_store:
+        elif source_name == "drive" and in_colab and backup_to_drive:
             if not acquisition_config.get("drive", {}).get("enabled", True):
                 continue
             location = discover_artifact_drive(
                 request=request,
                 root_dir=root_dir,
                 config_dir=config_dir,
-                drive_store=drive_store,
+                backup_to_drive=backup_to_drive,
                 validate=acquisition_config.get("drive", {}).get("validate", True),
             )
             if location and location.status == AvailabilityStatus.VERIFIED:
@@ -253,7 +253,7 @@ def acquire_artifact(
             acquisition_config=acquisition_config,
             mlflow_client=mlflow_client,
             restore_from_drive=restore_from_drive,
-            drive_store=drive_store,
+            backup_to_drive=backup_to_drive,
             in_colab=in_colab,
         )
         
@@ -315,7 +315,7 @@ def _acquire_from_location(
     acquisition_config: Dict[str, Any],
     mlflow_client: MlflowClient,
     restore_from_drive: Optional[Callable[[Path, bool], bool]] = None,
-    drive_store: Optional[Any] = None,
+    backup_to_drive: Optional[Any] = None,
     in_colab: bool = False,
 ) -> Optional[Path]:
     """
@@ -330,7 +330,7 @@ def _acquire_from_location(
         acquisition_config: Acquisition configuration
         mlflow_client: MLflow client
         restore_from_drive: Optional function to restore from Drive
-        drive_store: Optional DriveBackupStore
+        backup_to_drive: Optional DriveBackupStore
         in_colab: Whether in Colab
         
     Returns:

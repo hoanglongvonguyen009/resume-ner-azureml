@@ -81,6 +81,7 @@ assert is_correct, error
 ## What Is Tested
 
 - ✅ Google Drive backup store functionality (backup, restore, ensure_local)
+- ✅ Drive path rejection (prevents crashes when attempting to backup paths already in Drive)
 - ✅ Backup result string representation
 - ✅ Path mapping and validation
 - ✅ Colab-specific mounting functions

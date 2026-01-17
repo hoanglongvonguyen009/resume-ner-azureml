@@ -723,7 +723,7 @@ class TestNotebookE2E_Core:
             benchmark_tracker=benchmark_tracker,
             backup_enabled=False,
             backup_to_drive=None,
-            ensure_restored_from_drive=None,
+            restore_from_drive=None,
         )
         
         # Verify benchmark results

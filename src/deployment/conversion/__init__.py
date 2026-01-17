@@ -11,7 +11,10 @@ This module provides:
 - CLI argument parsing
 """
 
-from .orchestration import execute_conversion
+from .orchestration import run_conversion_workflow
+
+# Backward compatibility alias
+execute_conversion = run_conversion_workflow
 
 # Azure ML functions (optional - only available if azure.ai.ml is installed)
 try:
@@ -21,7 +24,8 @@ try:
         validate_conversion_job,
     )
     __all__ = [
-        "execute_conversion",
+        "run_conversion_workflow",
+        "execute_conversion",  # Backward compatibility
         "get_checkpoint_output_from_training_job",
         "create_conversion_job",
         "validate_conversion_job",
@@ -29,6 +33,7 @@ try:
 except ImportError:
     # Azure ML not available - export only orchestration function
     __all__ = [
-        "execute_conversion",
+        "run_conversion_workflow",
+        "execute_conversion",  # Backward compatibility
     ]
 

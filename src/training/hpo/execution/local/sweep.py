@@ -763,26 +763,15 @@ def run_local_hpo_sweep(
             output_dir, run_id, v2_study_folder=v2_study_folder, study_key_hash=study_key_hash)
     )
 
-    # Immediate backup of study.db after creation/loading
+    # Immediate backup of study.db after creation/loading (using centralized utility)
     if backup_to_drive and backup_enabled and storage_path:
-        from common.shared.platform_detection import is_drive_path
-        try:
-            # Only backup if path exists and is local (not Drive)
-            if storage_path.exists() and not is_drive_path(storage_path):
-                result = backup_to_drive(storage_path, is_directory=False)
-                if result:
-                    logger.info(
-                        f"Immediate backup successful: {storage_path.name}")
-                else:
-                    logger.warning(
-                        f"Immediate backup failed: {storage_path.name}")
-            elif is_drive_path(storage_path):
-                logger.debug(
-                    f"Skipping immediate backup - path is already in Drive: {storage_path}")
-        except Exception as e:
-            # Log error but don't crash HPO
-            logger.warning(
-                f"Immediate backup error for {storage_path.name if storage_path else 'study.db'}: {e}")
+        from orchestration.jobs.hpo.local.backup import immediate_backup_if_needed
+        immediate_backup_if_needed(
+            target_path=storage_path,
+            backup_to_drive=backup_to_drive,
+            backup_enabled=backup_enabled,
+            is_directory=False,
+        )
 
     # Check if HPO is already complete (early return)
     # Always check completion - if user wants to resume, they should clear the flags

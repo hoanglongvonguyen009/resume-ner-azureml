@@ -39,6 +39,92 @@ from training.hpo.core.optuna_integration import import_optuna as _import_optuna
 logger = get_logger(__name__)
 
 
+def _should_skip_backup(
+    target_path: Path,
+    backup_enabled: bool,
+) -> bool:
+    """
+    Check if backup should be skipped.
+    
+    Centralized logic for determining if backup should be skipped.
+    Used by both immediate backup and incremental backup callbacks.
+    
+    Args:
+        target_path: Path to file or directory to backup
+        backup_enabled: Whether backup is enabled
+    
+    Returns:
+        True if backup should be skipped, False otherwise
+    """
+    if not backup_enabled:
+        return True
+    if is_drive_path(target_path):
+        return True
+    if not target_path.exists():
+        return True
+    return False
+
+
+def immediate_backup_if_needed(
+    target_path: Path,
+    backup_to_drive: Callable[[Path, bool], bool],
+    backup_enabled: bool = True,
+    is_directory: bool = False,
+) -> bool:
+    """
+    Perform immediate backup if conditions are met.
+    
+    This is a reusable utility for backing up files/directories immediately after
+    they are created or modified. Used by training, conversion, and HPO workflows.
+    
+    Checks: backup_enabled, path exists, path is not Drive path.
+    Returns True if backup succeeded, False otherwise.
+    
+    Args:
+        target_path: Path to file or directory to backup
+        backup_to_drive: Function to backup files to Drive (takes Path and bool)
+        backup_enabled: Whether backup is enabled (if False, does nothing)
+        is_directory: Whether target_path is a directory (False for files)
+    
+    Returns:
+        True if backup succeeded, False otherwise (or if skipped)
+    """
+    if not backup_to_drive:
+        return False
+    
+    # Use centralized skip logic
+    if _should_skip_backup(target_path, backup_enabled):
+        if is_drive_path(target_path):
+            logger.debug(
+                f"Skipping immediate backup - path is already in Drive: {target_path}"
+            )
+        elif not target_path.exists():
+            logger.debug(
+                f"Skipping immediate backup - target path does not exist: {target_path}"
+            )
+        return False
+    
+    # Perform backup
+    try:
+        result = backup_to_drive(target_path, is_directory=is_directory)
+        if result:
+            logger.info(
+                f"Immediate backup successful: {target_path.name}"
+            )
+            return True
+        else:
+            logger.warning(
+                f"Immediate backup failed: {target_path.name}"
+            )
+            return False
+    except Exception as e:
+        # Log error but don't crash the workflow
+        logger.warning(
+            f"Immediate backup error for {target_path.name}: {e}"
+        )
+        return False
+
+
 def create_incremental_backup_callback(
     target_path: Path,
     backup_to_drive: Callable[[Path, bool], bool],
@@ -62,9 +148,6 @@ def create_incremental_backup_callback(
     """
     def trial_complete_callback(study: Any, trial: Any) -> None:
         """Callback to backup target path after trial completes."""
-        if not backup_enabled:
-            return
-
         # Import Optuna to check trial state
         optuna_module, _, _, _ = _import_optuna()
 
@@ -72,18 +155,16 @@ def create_incremental_backup_callback(
         if trial.state != optuna_module.trial.TrialState.COMPLETE:
             return
 
-        # Skip backup if path is already in Drive
-        if is_drive_path(target_path):
-            logger.debug(
-                f"Skipping backup - path is already in Drive: {target_path}"
-            )
-            return
-
-        # Skip backup if target doesn't exist
-        if not target_path.exists():
-            logger.debug(
-                f"Skipping backup - target path does not exist: {target_path}"
-            )
+        # Use centralized skip logic
+        if _should_skip_backup(target_path, backup_enabled):
+            if is_drive_path(target_path):
+                logger.debug(
+                    f"Skipping backup - path is already in Drive: {target_path}"
+                )
+            elif not target_path.exists():
+                logger.debug(
+                    f"Skipping backup - target path does not exist: {target_path}"
+                )
             return
 
         # Perform backup
@@ -161,14 +242,18 @@ def backup_hpo_study_to_drive(
     if not backup_enabled:
         return
 
-    # Find canonical study folder in backbone_output_dir (v2 structure)
+    # Resolve HPO output directory (checks Drive on Colab if local doesn't exist/has content)
+    from training.hpo.utils.paths import resolve_hpo_output_dir
+    resolved_backbone_dir = resolve_hpo_output_dir(backbone_output_dir)
+
+    # Find canonical study folder in resolved backbone_output_dir (v2 structure)
     from evaluation.selection.trial_finder import find_study_folder_in_backbone_dir
 
-    study_folder = find_study_folder_in_backbone_dir(backbone_output_dir)
+    study_folder = find_study_folder_in_backbone_dir(resolved_backbone_dir)
 
     # If study folder not found, skip backup
     if not study_folder or not study_folder.exists():
-        logger.warning(f"Study folder not found in {backbone_output_dir}")
+        logger.warning(f"Study folder not found in {resolved_backbone_dir} (resolved from {backbone_output_dir})")
         return
 
     # Check if canonical folder is Drive or local

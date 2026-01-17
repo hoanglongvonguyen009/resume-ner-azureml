@@ -33,7 +33,7 @@ lifecycle:
 """Final training execution module."""
 import subprocess
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Callable
 
 import mlflow
 from .subprocess_runner import (
@@ -75,12 +75,15 @@ from infrastructure.naming.mlflow.run_keys import (
     build_mlflow_run_key_hash,
 )
 from orchestration.jobs.tracking.index.run_index import update_mlflow_index
-from infrastructure.naming import create_naming_context
+from infrastructure.naming import create_naming_context, extract_short_backbone_name
 from infrastructure.paths import build_output_path
 from common.shared.platform_detection import detect_platform
 from common.shared.yaml_utils import load_yaml
+from common.shared.logging_utils import get_logger
 
-def execute_final_training(
+logger = get_logger(__name__)
+
+def run_final_training_workflow(
     root_dir: Path,
     config_dir: Path,
     best_model: Dict[str, Any],
@@ -88,6 +91,10 @@ def execute_final_training(
     lineage: Dict[str, Any],
     training_experiment_name: str,
     platform: str,
+    backup_enabled: bool = True,
+    backup_to_drive: Optional[Callable[[Path, bool], bool]] = None,
+    restore_from_drive: Optional[Callable[[Path, bool], bool]] = None,
+    in_colab: bool = False,
 ) -> Path:
     """
     Execute final training with best configuration.
@@ -108,6 +115,11 @@ def execute_final_training(
         lineage: Lineage dictionary from extract_lineage_from_best_model().
         training_experiment_name: MLflow experiment name for training runs.
         platform: Platform name (local, colab, kaggle).
+        backup_enabled: Whether backup is enabled (default: True).
+        backup_to_drive: Optional function to backup files to Drive.
+                        Function should take (Path, bool) and return bool (True if backed up).
+        restore_from_drive: Optional function to restore files from Drive.
+        in_colab: Whether running in Colab.
 
     Returns:
         Path to final training checkpoint directory.
@@ -133,7 +145,7 @@ def execute_final_training(
 
     # Build training context and output directory
     all_configs = load_all_configs(experiment_config)
-    environment = detect_platform()
+    environment = platform
 
     # Get fingerprints from config (already computed by load_final_training_config)
     spec_fp = final_training_config.get("spec_fp")
@@ -164,9 +176,9 @@ def execute_final_training(
         )
 
     # Create training context
-    backbone_name = final_training_config.get("backbone", "distilbert")
-    if "-" in backbone_name:
-        backbone_name = backbone_name.split("-")[0]
+    backbone_name = extract_short_backbone_name(
+        final_training_config.get("backbone", "distilbert")
+    )
 
     training_context = create_naming_context(
         process_type="final_training",
@@ -179,8 +191,8 @@ def execute_final_training(
 
     final_output_dir = build_output_path(root_dir, training_context)
 
-    print(f"✓ Final training config loaded from final_training.yaml")
-    print(f"✓ Output directory: {final_output_dir}")
+    logger.info("Final training config loaded from final_training.yaml")
+    logger.info(f"Output directory: {final_output_dir}")
 
     # Resolve dataset path from final_training.yaml config
     # Check for local_path_override first (from final_training.yaml)
@@ -233,10 +245,10 @@ def execute_final_training(
     )
     
     if should_reuse:
-        print(f"✓ Found existing completed final training run")
-        print(f"  Output directory: {final_output_dir}")
-        print(f"  Checkpoint: {final_checkpoint_dir}")
-        print(f"  Reusing existing checkpoint (run.mode: {final_training_yaml.get('run', {}).get('mode', 'reuse_if_exists')})")
+        logger.info("Found existing completed final training run")
+        logger.info(f"  Output directory: {final_output_dir}")
+        logger.info(f"  Checkpoint: {final_checkpoint_dir}")
+        logger.info(f"  Reusing existing checkpoint (run.mode: {final_training_yaml.get('run', {}).get('mode', 'reuse_if_exists')})")
         return final_checkpoint_dir
 
     # Second check: search for any complete variant with same spec_fp + exec_fp
@@ -277,18 +289,14 @@ def execute_final_training(
                             )
                             
                             if should_reuse_variant:
-                                print(
-                                    f"✓ Found existing completed final training run")
-                                print(
-                                    f"  Output directory: {variant_dir}")
-                                print(
-                                    f"  Checkpoint: {variant_checkpoint}")
-                                print(
-                                    f"  Reusing existing checkpoint (run.mode: {final_training_yaml.get('run', {}).get('mode', 'reuse_if_exists')})")
+                                logger.info("Found existing completed final training run")
+                                logger.info(f"  Output directory: {variant_dir}")
+                                logger.info(f"  Checkpoint: {variant_checkpoint}")
+                                logger.info(f"  Reusing existing checkpoint (run.mode: {final_training_yaml.get('run', {}).get('mode', 'reuse_if_exists')})")
                                 return variant_checkpoint
                         break  # Only check the matching spec_exec directory
         except Exception as e:
-            print(f"⚠ Warning: Could not search for existing runs: {e}")
+            logger.warning(f"Could not search for existing runs: {e}")
             # Continue with training if search fails
     dataset_config_yaml = final_training_yaml.get("dataset", {})
     local_path_override = dataset_config_yaml.get("local_path_override")
@@ -362,8 +370,14 @@ def execute_final_training(
         training_options=training_options,
     )
 
+    # Set up MLflow tracking (SSOT)
+    from infrastructure.tracking.mlflow.setup import setup_mlflow
+    mlflow_tracking_uri = setup_mlflow(
+        experiment_name=training_experiment_name,
+        fallback_to_local=True,
+    )
+
     # Set up environment variables using shared infrastructure
-    mlflow_tracking_uri = mlflow.get_tracking_uri()
     mlflow_config = MLflowConfig(
         experiment_name=training_experiment_name,
         tracking_uri=mlflow_tracking_uri,
@@ -418,19 +432,19 @@ def execute_final_training(
             tracking_uri=mlflow_tracking_uri,
         )
         experiment_id = created_run.info.experiment_id
-        print(f"✓ Created MLflow run: {run_name} ({run_id[:12]}...)")
+        logger.info(f"Created MLflow run: {run_name} ({run_id[:12]}...)")
 
         # Pass run_id to subprocess
         training_env["MLFLOW_RUN_ID"] = run_id
     except Exception as e:
-        print(f"⚠ Could not create MLflow run: {e}")
+        logger.warning(f"Could not create MLflow run: {e}")
         import traceback
         traceback.print_exc()
         # Continue without MLflow run (training will still work, just no tracking)
         run_id = None
 
     # Execute training using shared infrastructure
-    print("🔄 Running final training...")
+    logger.info("Running final training...")
     try:
         result = execute_training_subprocess(
             command=training_args,
@@ -488,16 +502,30 @@ def execute_final_training(
             status_updates=status_updates,
             mlflow_info=mlflow_info_dict,  # Pass as keyword argument
         )
-        print(f"✓ Saved metadata to: {metadata_path}")
+        logger.info(f"Saved metadata to: {metadata_path}")
     except Exception as e:
-        print(f"⚠ Warning: Could not save metadata.json: {e}")
+        logger.warning(f"Could not save metadata.json: {e}")
         import traceback
         traceback.print_exc()
         # Continue even if metadata save fails
 
-    print(f"✓ Final training completed. Checkpoint: {final_checkpoint_dir}")
+    logger.info(f"Final training completed. Checkpoint: {final_checkpoint_dir}")
     if run_id:
-        print(f"✓ MLflow run: {run_id[:12]}...")
+        logger.info(f"MLflow run: {run_id[:12]}...")
+
+    # Backup checkpoint if enabled (standardized backup pattern)
+    if backup_to_drive and backup_enabled and final_checkpoint_dir:
+        try:
+            from orchestration.jobs.hpo.local.backup import immediate_backup_if_needed
+            immediate_backup_if_needed(
+                target_path=final_checkpoint_dir,
+                backup_to_drive=backup_to_drive,
+                backup_enabled=backup_enabled,
+                is_directory=True,
+            )
+        except Exception as e:
+            # Log error but don't crash - backup is optional
+            logger.warning(f"Could not backup checkpoint to Drive: {e}")
 
     # Tags are already set during run creation, no need to apply lineage tags post-hoc
     return final_checkpoint_dir

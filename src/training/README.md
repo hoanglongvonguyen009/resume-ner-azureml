@@ -9,7 +9,7 @@ Train models, run HPO sweeps, and execute training workflows with MLflow trackin
 ```python
 from src.training.core.trainer import train_model
 from src.training.hpo import run_local_hpo_sweep
-from src.training.execution import execute_final_training
+from src.training.execution import run_final_training_workflow
 
 # Train a model
 train_model(
@@ -27,7 +27,7 @@ run_local_hpo_sweep(
 )
 
 # Execute final training
-execute_final_training(
+run_final_training_workflow(
     config=best_config,
     output_dir=Path("outputs/final_model")
 )
@@ -151,7 +151,7 @@ python -m src.training.cli.train \
 - `create_model_and_tokenizer(...)`: Create model and tokenizer from config
 - `compute_metrics(...)`: Compute evaluation metrics from predictions
 - `run_local_hpo_sweep(...)`: Run local HPO sweep using Optuna
-- `execute_final_training(...)`: Execute final training with best config
+- `run_final_training_workflow(...)`: Execute final training with best config
 - `extract_lineage_from_best_model(...)`: Extract lineage information from best model
 
 ### Configuration

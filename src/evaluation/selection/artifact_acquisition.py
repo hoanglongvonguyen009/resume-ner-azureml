@@ -191,7 +191,7 @@ def acquire_best_model_checkpoint(
     selection_config: Dict[str, Any],
     platform: str,
     restore_from_drive: Optional[Callable[[Path, bool], bool]] = None,
-    drive_store: Optional[Any] = None,
+    backup_to_drive: Optional[Any] = None,
     in_colab: bool = False,
 ) -> Path:
     """
@@ -213,7 +213,7 @@ def acquire_best_model_checkpoint(
         selection_config: Best model selection configuration
         platform: Platform name (local, colab, kaggle)
         restore_from_drive: Optional function to restore from Drive backup
-        drive_store: Optional DriveBackupStore instance for direct Drive access
+        backup_to_drive: Optional DriveBackupStore instance for direct Drive access
         in_colab: Whether running in Google Colab
 
     Returns:
@@ -231,6 +231,6 @@ def acquire_best_model_checkpoint(
         selection_config=selection_config,
         platform=platform,
         restore_from_drive=restore_from_drive,
-        drive_store=drive_store,
+        backup_to_drive=backup_to_drive,
         in_colab=in_colab,
     )

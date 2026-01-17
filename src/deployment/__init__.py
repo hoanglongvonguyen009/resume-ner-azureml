@@ -5,7 +5,7 @@ This module provides functionality for deploying models, including:
 - API: FastAPI service for serving model predictions
 """
 
-from .conversion import execute_conversion
+from .conversion import run_conversion_workflow, execute_conversion
 
 # Azure ML functions (optional - only available if azure.ai.ml is installed)
 try:
@@ -15,7 +15,8 @@ try:
         validate_conversion_job,
     )
     _conversion_exports = [
-        "execute_conversion",
+        "run_conversion_workflow",
+        "execute_conversion",  # Backward compatibility
         "get_checkpoint_output_from_training_job",
         "create_conversion_job",
         "validate_conversion_job",
@@ -23,7 +24,8 @@ try:
 except ImportError:
     # Azure ML not available - export only orchestration function
     _conversion_exports = [
-        "execute_conversion",
+        "run_conversion_workflow",
+        "execute_conversion",  # Backward compatibility
     ]
 
 # API exports - lazy import to avoid requiring FastAPI dependencies at module load time

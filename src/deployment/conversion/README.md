@@ -7,10 +7,10 @@ Model conversion utilities for converting PyTorch models to ONNX format for prod
 Convert trained PyTorch models to ONNX format for efficient production inference.
 
 ```python
-from src.deployment.conversion.orchestration import execute_conversion
+from src.deployment.conversion.orchestration import run_conversion_workflow
 
 # Convert model to ONNX
-onnx_path = execute_conversion(
+onnx_path = run_conversion_workflow(
     root_dir=Path("."),
     config_dir=Path("config/"),
     parent_training_output_dir=Path("outputs/final_training/model"),
@@ -49,10 +49,10 @@ Conversion enables efficient production inference by converting PyTorch models t
 
 ```python
 from pathlib import Path
-from src.deployment.conversion.orchestration import execute_conversion
+from src.deployment.conversion.orchestration import run_conversion_workflow
 
 # Convert model to ONNX
-onnx_path = execute_conversion(
+onnx_path = run_conversion_workflow(
     root_dir=Path("."),
     config_dir=Path("config/"),
     parent_training_output_dir=Path("outputs/final_training/model"),
@@ -95,9 +95,13 @@ conversion_job = create_conversion_job(
 
 ### Orchestration
 
-- `execute_conversion(...)`: Execute model conversion to ONNX
+- `run_conversion_workflow(...)`: Execute model conversion to ONNX
   - Loads conversion config
   - Builds output directories
+  - **Backup support**: Accepts `backup_to_drive` and `backup_enabled` parameters
+  - Uses standardized immediate backup pattern (`immediate_backup_if_needed()` from `orchestration.jobs.hpo.local.backup`)
+  - Backs up conversion output directory immediately after conversion completion
+  - Consistent backup behavior with HPO, training, and benchmarking workflows
   - Creates MLflow runs
   - Executes conversion subprocess
   - Returns ONNX model directory path

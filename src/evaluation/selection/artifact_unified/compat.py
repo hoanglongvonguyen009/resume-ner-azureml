@@ -51,7 +51,7 @@ def acquire_best_model_checkpoint(
     selection_config: Dict[str, Any],
     platform: str,
     restore_from_drive: Optional[Callable[[Path, bool], bool]] = None,
-    drive_store: Optional[Any] = None,
+    backup_to_drive: Optional[Any] = None,
     in_colab: bool = False,
 ) -> Path:
     """
@@ -68,7 +68,7 @@ def acquire_best_model_checkpoint(
         selection_config: Best model selection configuration (unused, kept for compatibility)
         platform: Platform name (local, colab, kaggle)
         restore_from_drive: Optional function to restore from Drive backup
-        drive_store: Optional DriveBackupStore instance for direct Drive access
+        backup_to_drive: Optional DriveBackupStore instance for direct Drive access
         in_colab: Whether running in Google Colab
         
     Returns:
@@ -158,7 +158,7 @@ def acquire_best_model_checkpoint(
         mlflow_client=mlflow_client,
         experiment_id=experiment_id,
         restore_from_drive=restore_from_drive,
-        drive_store=drive_store,
+        backup_to_drive=backup_to_drive,
         in_colab=in_colab,
     )
     
@@ -182,13 +182,13 @@ def acquire_best_model_checkpoint(
         raise ValueError(error_msg)
     
     # Backup to Drive if in Colab and checkpoint was successfully acquired
-    if result.path and in_colab and drive_store and acquisition_config.get("drive", {}).get("enabled", False):
+    if result.path and in_colab and backup_to_drive and acquisition_config.get("drive", {}).get("enabled", False):
         try:
             checkpoint_path = Path(result.path).resolve()
             
             if checkpoint_path.exists() and checkpoint_path.is_dir():
                 print(f"\n📦 Backing up best model checkpoint to Google Drive...")
-                result_backup = drive_store.backup(checkpoint_path, expect="dir")
+                result_backup = backup_to_drive.backup(checkpoint_path, expect="dir")
                 if result_backup.ok:
                     print(f"✓ Successfully backed up checkpoint to Google Drive")
                     print(f"  Drive path: {result_backup.dst}")

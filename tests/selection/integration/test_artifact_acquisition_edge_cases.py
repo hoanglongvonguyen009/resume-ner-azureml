@@ -128,7 +128,7 @@ class TestArtifactAcquisitionEdgeCases:
             selection_config={},
             platform="local",
             restore_from_drive=None,
-            drive_store=None,
+            backup_to_drive=None,
             in_colab=False,
         )
         
@@ -181,7 +181,7 @@ class TestArtifactAcquisitionEdgeCases:
                 selection_config={},
                 platform="local",
                 restore_from_drive=None,
-                drive_store=None,
+                backup_to_drive=None,
                 in_colab=False,
             )
 
@@ -272,7 +272,7 @@ class TestArtifactAcquisitionEdgeCases:
                 selection_config={},
                 platform="local",
                 restore_from_drive=None,
-                drive_store=None,
+                backup_to_drive=None,
                 in_colab=False,
             )
 

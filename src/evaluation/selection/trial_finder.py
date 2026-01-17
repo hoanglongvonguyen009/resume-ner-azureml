@@ -42,6 +42,7 @@ import numpy as np
 from mlflow.tracking import MlflowClient
 
 from common.shared.logging_utils import get_logger
+from common.shared.platform_detection import is_drive_path
 
 # MLflow query limits
 DEFAULT_MLFLOW_MAX_RESULTS = 1000  # Default limit for MLflow run queries
@@ -475,14 +476,17 @@ def find_study_folder_in_backbone_dir(backbone_dir: Path) -> Optional[Path]:
     Returns:
         Path to study folder if found, else None
     """
-    if not backbone_dir.exists():
+    # Resolve HPO output directory (checks Drive on Colab if local doesn't exist/has content)
+    resolved_backbone_dir = resolve_hpo_output_dir(backbone_dir)
+    
+    if not resolved_backbone_dir.exists():
         logger.warning(
-            f"Backbone directory does not exist: {backbone_dir}")
+            f"Backbone directory does not exist: {resolved_backbone_dir} (resolved from {backbone_dir})")
         return None
 
     v2_folders = []
 
-    for item in backbone_dir.iterdir():
+    for item in resolved_backbone_dir.iterdir():
         if not item.is_dir():
             continue
 
@@ -500,7 +504,7 @@ def find_study_folder_in_backbone_dir(backbone_dir: Path) -> Optional[Path]:
         return v2_folders[0]
 
     logger.warning(
-        f"No v2 study folders found in {backbone_dir}")
+        f"No v2 study folders found in {resolved_backbone_dir} (resolved from {backbone_dir})")
     return None
 
 
@@ -815,7 +819,7 @@ def find_best_trials_for_backbones(
                         if best_trial_info:
                             best_trial_info["study_name"] = study_folder.name
                             best_trial_info["backbone"] = backbone_name
-                elif str(old_backbone_dir).startswith("/content/drive"):
+                elif is_drive_path(old_backbone_dir):
                     best_trial_info = load_best_trial_from_disk(
                         old_backbone_dir.parent,
                         backbone,
