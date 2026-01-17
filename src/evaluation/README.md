@@ -101,7 +101,7 @@ benchmark_best_trials(
 
 - `select_best_configuration_across_studies(...)`: Select best configuration across multiple backbone studies
 - `select_best_configuration(...)`: Select best configuration from AzureML sweep job
-- `extract_best_config_from_study(...)`: Extract best config from Optuna study
+- `extract_best_config_from_study(...)`: **Import from `training.hpo.core.study`** - Extract best config from Optuna study (canonical location)
 - `find_best_trials_for_backbones(...)`: Find best trials for each backbone
 - `acquire_best_model_checkpoint(...)`: Acquire best model checkpoint
 - `SelectionLogic`: Selection logic class with threshold application

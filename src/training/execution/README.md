@@ -114,6 +114,8 @@ apply_lineage_tags(lineage, mlflow_run)
 
 ### MLflow Setup
 
+**Note**: Always call `infrastructure.tracking.mlflow.setup.setup_mlflow()` (SSOT) before using these functions.
+
 - `create_training_mlflow_run(...)`: Create MLflow run for training
 - `create_training_child_run(...)`: Create child MLflow run
 - `setup_mlflow_tracking_env(...)`: Setup MLflow tracking environment

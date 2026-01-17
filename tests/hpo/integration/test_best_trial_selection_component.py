@@ -12,7 +12,7 @@ except ImportError:
     pytest.skip("optuna not available", allow_module_level=True)
 
 from training.hpo import extract_best_config_from_study
-from selection.selection_logic import SelectionLogic
+from evaluation.selection.selection_logic import SelectionLogic
 
 
 class TestBestTrialSelection:

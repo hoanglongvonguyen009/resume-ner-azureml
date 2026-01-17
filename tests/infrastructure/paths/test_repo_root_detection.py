@@ -6,7 +6,7 @@ import pytest
 
 from infrastructure.paths.repo import detect_repo_root, validate_repo_root
 from infrastructure.paths.config import load_repository_root_config
-from infrastructure.paths.utils import find_project_root, infer_root_dir, infer_config_dir, resolve_project_paths
+from infrastructure.paths.utils import infer_config_dir, resolve_project_paths
 
 # Clear module-level cache before each test
 @pytest.fixture(autouse=True)
@@ -248,58 +248,8 @@ class TestValidateRepoRoot:
         assert is_valid is False
 
 
-class TestDeprecatedWrappers:
-    """Test deprecated wrapper functions (backward compatibility)."""
-    
-    def test_find_project_root_still_works(self, tmp_path, monkeypatch):
-        """Test that deprecated find_project_root() still works."""
-        # Change to tmp_path to avoid finding actual project root
-        monkeypatch.chdir(tmp_path)
-        
-        # Create project structure
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        src_dir = tmp_path / "src"
-        src_dir.mkdir()
-        
-        root = find_project_root(config_dir=config_dir)
-        
-        assert root == tmp_path
-        assert root.exists()
-    
-    def test_infer_root_dir_still_works(self, tmp_path, monkeypatch):
-        """Test that deprecated infer_root_dir() still works."""
-        # Change to tmp_path to avoid finding actual project root
-        monkeypatch.chdir(tmp_path)
-        
-        # Create project structure
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        src_dir = tmp_path / "src"
-        src_dir.mkdir()
-        
-        root = infer_root_dir(config_dir=config_dir)
-        
-        assert root == tmp_path
-        assert root.exists()
-    
-    def test_deprecated_functions_are_wrappers(self, tmp_path, monkeypatch):
-        """Test that deprecated functions are thin wrappers."""
-        # Change to tmp_path to avoid finding actual project root
-        monkeypatch.chdir(tmp_path)
-        
-        # Create project structure
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        src_dir = tmp_path / "src"
-        src_dir.mkdir()
-        
-        # Both should return same result
-        root1 = find_project_root(config_dir=config_dir)
-        root2 = infer_root_dir(config_dir=config_dir)
-        root3 = detect_repo_root(config_dir=config_dir)
-        
-        assert root1 == root2 == root3 == tmp_path
+# Note: TestDeprecatedWrappers class removed - deprecated functions (find_project_root, infer_root_dir)
+# were removed as part of consolidation plan (Step 1). All code should use detect_repo_root() directly.
 
 
 class TestHelperFunctions:

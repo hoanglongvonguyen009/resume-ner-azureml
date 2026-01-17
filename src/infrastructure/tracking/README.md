@@ -37,7 +37,11 @@ The `tracking` module provides MLflow tracking integration:
 - **Tracking utilities**: Hash computation, URL generation, lifecycle management
 - **Trackers**: Specialized trackers for different process types (sweep, training, benchmark, conversion)
 
-**Layering**: This module provides the SSOT for MLflow setup. Training, deployment, and other modules should call `infrastructure.tracking.mlflow.setup.setup_mlflow()` first, then use domain-specific extensions (e.g., `training.execution.mlflow_setup` for run lifecycle management).
+**Layering**: This module provides the SSOT for MLflow setup. The layering is:
+- **SSOT (High-level)**: `infrastructure.tracking.mlflow.setup.setup_mlflow()` - Use this for all MLflow setup
+- **Low-level (Internal)**: `common.shared.mlflow_setup.setup_mlflow_cross_platform()` - Internal implementation detail, do not call directly
+
+Training, deployment, and other modules should call `infrastructure.tracking.mlflow.setup.setup_mlflow()` first, then use domain-specific extensions (e.g., `training.execution.mlflow_setup` for run lifecycle management).
 
 ## Module Structure
 

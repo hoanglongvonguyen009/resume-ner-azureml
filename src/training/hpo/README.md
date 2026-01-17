@@ -84,7 +84,11 @@ study = run_local_hpo_sweep(
 ### Basic Example: Extract Best Config
 
 ```python
+# Canonical import path
 from src.training.hpo.core.study import extract_best_config_from_study
+
+# Or use convenience import from training.hpo
+from src.training.hpo import extract_best_config_from_study
 
 # Extract best configuration from study
 best_config = extract_best_config_from_study(study)
@@ -124,7 +128,13 @@ search_space = create_search_space({
 
 ### Checkpoint Management
 
-- `resolve_storage_path(...)`: Resolve checkpoint storage path with platform awareness
+**Layering**:
+- **Low-level**: `common.shared.platform_detection.resolve_platform_checkpoint_path()` - Platform-specific path resolution (Colab Drive, Kaggle, local)
+- **Mid-level**: `training.hpo.checkpoint.storage.resolve_storage_path()` - HPO-specific checkpoint storage path resolution (uses low-level function, handles v2/legacy formats)
+- **High-level**: `training.hpo.utils.helpers.setup_checkpoint_storage()` - Complete checkpoint setup orchestration (uses mid-level function, handles Drive restore, resume logic)
+
+Functions:
+- `resolve_storage_path(...)`: Resolve checkpoint storage path with platform awareness (uses `resolve_platform_checkpoint_path()` internally)
   - **V2 mode**: When `study_key_hash` is provided, uses v2 hash-based folder structure: `{backbone}/study-{study8}/study.db`
     - `study8` is the first 8 characters of `study_key_hash`
     - Example: `distilbert/study-c3659fea/study.db`
@@ -133,11 +143,19 @@ search_space = create_search_space({
 - `get_storage_uri(...)`: Get checkpoint storage URI
 - `setup_checkpoint_storage(...)`: Set up checkpoint storage with Drive restore support
   - Accepts optional `study_key_hash` parameter for v2 path resolution
+  - **V2 folder detection**: When `study_key_hash` is provided, checks for v2 study folder first using `find_study_folder_in_backbone_dir()` before falling back to `resolve_storage_path()`
+  - This ensures v2 folders are used directly (local paths) rather than being mapped to Drive paths, preventing false positives in restore logic
 - `CheckpointCleanupManager`: Manage checkpoint cleanup
 
 **Note**: When checkpoints are stored in Google Drive (Colab), the system automatically detects Drive paths and skips redundant `restore_from_drive()` calls to prevent path resolution errors.
 
 **Path Resolution**: The system prioritizes v2 hash-based paths when `study_key_hash` is available, ensuring deterministic study folder names based on study configuration. Legacy `study_name` format is supported for backward compatibility.
+
+**Drive Backup**: The backup system (`orchestration.jobs.hpo.local.backup.backup_hpo_study_to_drive()`) correctly handles v2 study folders by:
+- Checking for v2 study folders first using `find_study_folder_in_backbone_dir()` before any fallback
+- Using v2 folder paths directly (not `resolve_storage_path()` which maps to Drive)
+- Verifying actual file existence in Drive, not just path string matching
+- This ensures `study.db` files in v2 folders are properly backed up to Drive in Colab environments
 
 For detailed signatures, see source code.
 

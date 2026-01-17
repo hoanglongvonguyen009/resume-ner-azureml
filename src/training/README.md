@@ -52,7 +52,12 @@ This module is organized into submodules that handle specific aspects of trainin
 - **MLflow integration**: Automatic tracking of metrics, parameters, and artifacts
 - **Lineage tracking**: Track model provenance from HPO trials to final models
 
-**MLflow Setup Layering**: Training modules use `infrastructure.tracking.mlflow.setup.setup_mlflow()` (SSOT) for MLflow configuration, then extend with training-specific run lifecycle management via `training.execution.mlflow_setup`.
+**MLflow Setup Layering**: 
+- **SSOT**: `infrastructure.tracking.mlflow.setup.setup_mlflow()` - Use this for MLflow configuration
+- **Internal**: `common.shared.mlflow_setup.setup_mlflow_cross_platform()` - Internal implementation detail, do not call directly
+- **Training-specific**: `training.execution.mlflow_setup` - Extends SSOT with training-specific run lifecycle management
+
+Training modules should call `infrastructure.tracking.mlflow.setup.setup_mlflow()` first, then use `training.execution.mlflow_setup` for run lifecycle management.
 
 **Naming Hierarchy**: Training run names use `infrastructure.naming` as the primary system, with training-specific fallbacks when systematic naming is unavailable.
 

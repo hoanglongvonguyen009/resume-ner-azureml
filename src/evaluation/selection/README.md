@@ -86,7 +86,8 @@ best_config = select_best_configuration(
 ### Basic Example: Extract Best from Study
 
 ```python
-from src.evaluation.selection import extract_best_config_from_study
+# Use canonical import from training.hpo (where the function is implemented)
+from src.training.hpo.core.study import extract_best_config_from_study
 import optuna
 
 # Extract best config from Optuna study
@@ -112,7 +113,7 @@ best_trials = find_best_trials_for_backbones(
 
 - `select_best_configuration_across_studies(...)`: Select best configuration across multiple backbone studies
 - `select_best_configuration(...)`: Select best configuration from AzureML sweep job
-- `extract_best_config_from_study(...)`: Extract best config from Optuna study
+- `extract_best_config_from_study(...)`: **Import from `training.hpo.core.study`** - Extract best config from Optuna study (canonical location)
 - `select_production_configuration(...)`: Alias for `select_best_configuration`
 
 ### Trial Finding
@@ -197,7 +198,6 @@ uvx pytest tests/evaluation/selection/
 
 ## Notes
 
-- `src/selection/` module is deprecated (compatibility shim, use `evaluation.selection` instead)
 - Selection supports both local (Optuna) and AzureML HPO results
 - Speed scores are automatically normalized relative to fastest model
 - Selection cache improves performance for repeated selections

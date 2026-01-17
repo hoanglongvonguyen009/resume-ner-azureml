@@ -22,7 +22,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(1, str(ROOT_DIR))  # Insert after SRC_DIR
 
 # Install compatibility shim import finders early to handle submodule imports
-# This ensures that imports like "from selection.selection_logic import ..." work
+# This ensures that imports like "from evaluation.selection.selection_logic import ..." work
 # even when selection module hasn't been imported yet
 try:
     import importlib

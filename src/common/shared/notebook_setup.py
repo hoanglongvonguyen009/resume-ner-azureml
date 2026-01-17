@@ -94,7 +94,7 @@ def find_repository_root(start_dir: Optional[Path] = None) -> Optional[Path]:
     Backward-compatible wrapper for detect_repo_root().
     
     .. deprecated::
-        Use `detect_repo_root()` from `infrastructure.paths` instead.
+        Use `detect_repo_root()` from `infrastructure.paths.repo` instead.
         This function is kept for backward compatibility with notebooks.
     
     Args:

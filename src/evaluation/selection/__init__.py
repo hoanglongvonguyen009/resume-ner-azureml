@@ -8,7 +8,6 @@ supporting both local (Optuna) and Azure ML selection methods.
 
 from .disk_loader import load_benchmark_speed_score, load_best_trial_from_disk
 from .local_selection import (
-    extract_best_config_from_study,
     load_best_trial_from_disk as load_best_trial,
     select_best_configuration_across_studies,
 )
@@ -48,7 +47,6 @@ __all__ = [
     "load_best_trial_from_disk",
     "load_best_trial",
     # Local selection
-    "extract_best_config_from_study",
     "select_best_configuration_across_studies",
     # Azure ML selection
     "select_best_configuration",

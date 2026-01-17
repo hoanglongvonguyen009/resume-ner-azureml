@@ -78,7 +78,12 @@ checkpoint_path = resolve_checkpoint_path(
 
 ### Checkpoint Resolution
 
-- `resolve_checkpoint_path(...)`: Resolve checkpoint path across platforms
+**Note**: For checkpoint path resolution, use:
+- **Low-level**: `common.shared.platform_detection.resolve_platform_checkpoint_path()` - Platform-specific path resolution
+- **HPO-specific**: `training.hpo.checkpoint.storage.resolve_storage_path()` - HPO checkpoint storage paths
+- **HPO setup**: `training.hpo.utils.helpers.setup_checkpoint_storage()` - Complete HPO checkpoint setup
+
+This module provides platform adapters for abstracting platform-specific operations, but checkpoint path resolution is handled by the functions above.
 
 For detailed signatures, see source code.
 

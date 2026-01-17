@@ -153,9 +153,6 @@ save_cache_with_dual_strategy(
 - `detect_repo_root(start_path: Optional[Path] = None, config_dir: Optional[Path] = None, output_dir: Optional[Path] = None, use_cache: Optional[bool] = None) -> Path`: **Unified repository root detection function** (canonical function). Uses configurable search strategies from `config/paths.yaml`. Returns `Path` (raises `ValueError` if not found).
 - `validate_repo_root(candidate: Path, config: Optional[dict] = None) -> bool`: Validate candidate directory is repository root. Checks required markers (config/, src/) and optional markers (.git, pyproject.toml).
 
-**Deprecated functions** (kept for backward compatibility):
-- `find_project_root(config_dir: Optional[Path] = None, output_dir: Optional[Path] = None, start_path: Optional[Path] = None) -> Path`: **Deprecated** - Use `detect_repo_root()` instead. Now a thin wrapper.
-- `infer_root_dir(config_dir: Optional[Path] = None, output_dir: Optional[Path] = None, start_path: Optional[Path] = None) -> Path`: **Deprecated** - Use `detect_repo_root()` instead. Now a thin wrapper.
 
 ### Project Path Utilities
 

@@ -139,6 +139,12 @@ if is_drive_path(checkpoint_path):
     print("Path is in Google Drive")
     # Skip restore_from_drive() calls (path is already in Drive)
 
+# Important: For v2 study folders (study-{hash}/study.db), always check
+# for the v2 folder first using find_study_folder_in_backbone_dir() before
+# using resolve_platform_checkpoint_path(). This prevents false positives
+# where resolve_platform_checkpoint_path() maps local paths to Drive paths
+# even when the file doesn't actually exist in Drive.
+
 # Advanced: Provide config_dir to load project name from config/paths.yaml
 # This enables single source of truth for project name
 from infrastructure.paths.utils import resolve_project_paths
@@ -228,7 +234,7 @@ set_seed(DEFAULT_RANDOM_SEED)
 ### Platform Detection
 
 - `detect_platform() -> str`: Detect platform ("colab", "kaggle", "azure", or "local")
-- `resolve_platform_checkpoint_path(base_path: Path, relative_path: str, config_dir: Optional[Path] = None) -> Path`: Resolve checkpoint path with platform-specific optimizations (e.g., maps to Google Drive in Colab). Optionally accepts `config_dir` to load project name from `config/paths.yaml` (falls back to detection if not provided).
+- `resolve_platform_checkpoint_path(base_path: Path, relative_path: str, config_dir: Optional[Path] = None) -> Path`: **Low-level** platform-specific checkpoint path resolution. Maps paths to Google Drive in Colab, `/kaggle/working` in Kaggle, or uses provided path locally. This is the foundation for checkpoint path resolution - higher-level functions (e.g., `training.hpo.checkpoint.storage.resolve_storage_path()`) use this internally.
 - `is_drive_path(path: Path | str) -> bool`: Check if a path is already in Google Drive (starts with `/content/drive`)
 
 ### Notebook Setup
@@ -240,21 +246,19 @@ set_seed(DEFAULT_RANDOM_SEED)
 - `ensure_mlflow_installed() -> None`: Install mlflow if needed (Colab/Kaggle only)
 - `ensure_src_in_path() -> Optional[Path]`: Ensure src/ is in Python path
 
-**Note**: `find_repository_root()` in `notebook_setup.py` is now a thin wrapper around the unified `detect_repo_root()` function in `infrastructure.paths.repo`. For new code, prefer using `detect_repo_root()` directly:
+**Note**: `find_repository_root()` in `notebook_setup.py` is a backward-compatible wrapper around `detect_repo_root()` that returns `None` instead of raising. For new code, use `detect_repo_root()` directly:
 
 ```python
 # ✅ Recommended for new code
 from infrastructure.paths.repo import detect_repo_root
-root_dir = detect_repo_root()
-
-# ⚠️ Still works (backward compatibility)
-from common.shared.notebook_setup import find_repository_root
-root_dir = find_repository_root()  # Returns None if not found
+root_dir = detect_repo_root()  # Raises ValueError if not found
 ```
 
 ### MLflow Setup
 
-- `setup_mlflow_cross_platform(config: Dict) -> None`: Setup MLflow for current platform
+**Note**: These functions are internal implementation details. For MLflow setup, use `infrastructure.tracking.mlflow.setup.setup_mlflow()` (SSOT) instead.
+
+- `setup_mlflow_cross_platform(config: Dict) -> None`: **Internal** - Low-level MLflow setup (used by infrastructure layer)
 - `setup_mlflow_from_config(config_path: Path) -> None`: Setup MLflow from config file
 - `create_ml_client_from_config(config: Dict) -> Optional[MLClient]`: Create AzureML client
 

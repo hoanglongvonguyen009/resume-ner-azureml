@@ -58,6 +58,11 @@ This module is organized into the following submodules:
 
 - `jobs/`: Job orchestration (active)
   - `hpo/`: HPO job orchestration (local, AzureML)
+    - `local/`: Local HPO orchestration (Optuna sweeps, Drive backup)
+      - `backup.py`: HPO study.db and study folder backup to Google Drive
+        - Correctly handles v2 study folders (`study-{hash}/study.db`)
+        - Verifies actual file existence in Drive (not just path mapping)
+        - Supports both v2 and legacy folder structures
   - `tracking/`: Tracking job orchestration (MLflow indexing, finding)
   - `benchmarking/`: Benchmarking job orchestration
   - `conversion/`: Conversion job orchestration
@@ -142,6 +147,11 @@ conversion_job = create_conversion_job(
 
 - `create_hpo_sweep_job_for_backbone(...)`: Create AzureML HPO sweep job
 - `create_dry_run_sweep_job_for_backbone(...)`: Create dry-run HPO sweep job
+- `backup_hpo_study_to_drive(...)`: Backup HPO study.db and study folders to Google Drive (Colab)
+  - Automatically detects v2 study folders (`study-{hash}/study.db`)
+  - Verifies actual file existence in Drive (not just path mapping)
+  - Supports both v2 and legacy folder structures
+  - See `jobs/hpo/local/backup.py` for implementation details
 - See `jobs/hpo/` for local HPO orchestration
 
 ### Training Jobs
@@ -189,7 +199,12 @@ sweep_job = create_hpo_sweep_job_for_backbone(...)
 completed_sweep = submit_and_wait_for_job(ml_client, sweep_job)
 
 # 2. Extract best config (from evaluation/selection)
-best_config = extract_best_config_from_sweep(completed_sweep)
+from src.evaluation.selection import select_best_configuration
+best_config = select_best_configuration(
+    sweep_job=completed_sweep,
+    ml_client=ml_client,
+    objective_metric="macro-f1"
+)
 
 # 3. Run final training
 final_config = build_final_training_config(best_config, train_config)

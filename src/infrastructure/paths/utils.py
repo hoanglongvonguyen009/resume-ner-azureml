@@ -33,54 +33,6 @@ from common.shared.logging_utils import get_logger
 logger = get_logger(__name__)
 
 
-def find_project_root(
-    config_dir: Optional[Path] = None,
-    output_dir: Optional[Path] = None,
-    start_path: Optional[Path] = None,
-) -> Path:
-    """
-    .. deprecated::
-        Use `detect_repo_root()` from `infrastructure.paths.repo` instead.
-        This function is kept for backward compatibility during migration.
-    
-    Find project root directory using multiple strategies.
-    """
-    from infrastructure.paths.repo import detect_repo_root
-    return detect_repo_root(
-        start_path=start_path,
-        config_dir=config_dir,
-        output_dir=output_dir,
-    )
-
-
-def infer_root_dir(
-    config_dir: Optional[Path] = None,
-    output_dir: Optional[Path] = None,
-    start_path: Optional[Path] = None,
-) -> Path:
-    """
-    .. deprecated::
-        Use `detect_repo_root()` from `infrastructure.paths.repo` instead.
-        This function is kept for backward compatibility during migration.
-    
-    Infer project root directory using the best available strategy.
-    
-    Args:
-        config_dir: Optional config directory path.
-        output_dir: Optional output directory path.
-        start_path: Optional starting path for search.
-    
-    Returns:
-        Path to project root directory.
-    """
-    from infrastructure.paths.repo import detect_repo_root
-    return detect_repo_root(
-        start_path=start_path,
-        config_dir=config_dir,
-        output_dir=output_dir,
-    )
-
-
 def infer_config_dir(
     config_dir: Optional[Path] = None,
     path: Optional[Path] = None,

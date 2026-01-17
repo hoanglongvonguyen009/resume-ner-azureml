@@ -2,7 +2,7 @@
 
 import pytest
 
-from selection.selection_logic import SelectionLogic
+from evaluation.selection.selection_logic import SelectionLogic
 from training.hpo.exceptions import SelectionError
 
 

@@ -73,25 +73,63 @@ def backup_hpo_study_to_drive(
     study_folder = find_study_folder_in_backbone_dir(backbone_output_dir)
     
     # Get the actual storage path from v2 folder
+    actual_storage_path = None
     if study_folder and study_folder.exists():
+        # V2 folder found - use it directly (don't use resolve_storage_path which maps to Drive)
         actual_storage_path = study_folder / "study.db"
+        if not actual_storage_path.exists():
+            # study.db doesn't exist in v2 folder - might not be created yet
+            logger.debug(f"study.db not found in v2 folder: {actual_storage_path}")
+            actual_storage_path = None
     else:
-        # Fallback: try to resolve using legacy method (for backward compatibility)
-        from training.hpo.checkpoint.storage import resolve_storage_path
-        actual_storage_path = resolve_storage_path(
-            output_dir=backbone_output_dir,
-            checkpoint_config=checkpoint_config,
-            backbone=backbone,
-            study_name=study_name,
-            create_dirs=False,  # Read-only path resolution
-        )
-        if actual_storage_path and actual_storage_path.exists():
-            study_folder = actual_storage_path.parent
-        else:
-            study_folder = None
+        # V2 folder not found locally - check Drive for v2 folder before legacy fallback
+        from infrastructure.paths import get_drive_backup_path
+        from infrastructure.paths.repo import detect_repo_root
+        
+        try:
+            root_dir = detect_repo_root(output_dir=backbone_output_dir)
+            config_dir = root_dir / "config" if root_dir else None
+            
+            if root_dir and config_dir:
+                drive_dir = get_drive_backup_path(
+                    local_path=backbone_output_dir,
+                    root_dir=root_dir,
+                    config_dir=config_dir,
+                )
+                if drive_dir and drive_dir.exists():
+                    study_folder = find_study_folder_in_backbone_dir(drive_dir)
+                    if study_folder and study_folder.exists():
+                        actual_storage_path = study_folder / "study.db"
+                        if actual_storage_path.exists():
+                            logger.debug(f"Found v2 study.db in Drive: {actual_storage_path}")
+        except Exception as e:
+            logger.debug(f"Could not search Drive for v2 study folder: {e}")
+        
+        # Only use legacy resolve_storage_path if v2 folder truly doesn't exist
+        if not actual_storage_path:
+            # Fallback: try to resolve using legacy method (for backward compatibility)
+            from training.hpo.checkpoint.storage import resolve_storage_path
+            actual_storage_path = resolve_storage_path(
+                output_dir=backbone_output_dir,
+                checkpoint_config=checkpoint_config,
+                backbone=backbone,
+                study_name=study_name,
+                create_dirs=False,  # Read-only path resolution
+            )
+            if actual_storage_path and actual_storage_path.exists():
+                study_folder = actual_storage_path.parent
+            else:
+                study_folder = None
 
     # Backup study.db
-    if actual_storage_path and str(actual_storage_path).startswith("/content/drive"):
+    # Check if file is actually in Drive (not just a mapped path from resolve_storage_path)
+    is_actually_in_drive = (
+        actual_storage_path is not None
+        and str(actual_storage_path).startswith("/content/drive")
+        and actual_storage_path.exists()
+    )
+    
+    if is_actually_in_drive:
         # File is already in Drive - no need to backup, just log
         logger.info(
             f"HPO checkpoint is already in Drive: {actual_storage_path}")
@@ -109,9 +147,8 @@ def backup_hpo_study_to_drive(
             logger.warning(f"  Study name: {study_name}")
 
     # Backup entire study folder (v2 structure: outputs/hpo/{env}/{model}/study-{hash}/...)
-    # Check if checkpoint is already in Drive - if so, study folder is also in Drive
-    checkpoint_in_drive = actual_storage_path and str(
-        actual_storage_path).startswith("/content/drive")
+    # Check if checkpoint is actually in Drive (file exists, not just path mapping)
+    checkpoint_in_drive = is_actually_in_drive
 
     # If we didn't find study_folder yet, search in Drive as well
     if not study_folder or not study_folder.exists():

@@ -15,7 +15,7 @@ from training.hpo.execution.local.cv import run_training_trial_with_cv
 from training.hpo.execution.local.refit import run_refit_training
 from training.hpo.trial.metrics import read_trial_metrics
 from training.hpo.core.study import StudyManager
-from selection.selection_logic import SelectionLogic
+from evaluation.selection.selection_logic import SelectionLogic
 from training.hpo.exceptions import SelectionError
 from common.constants import METRICS_FILENAME
 
@@ -440,7 +440,7 @@ class TestBestTrialSelectionErrors:
     def test_selection_logic_with_empty_candidates(self):
         """Test that SelectionLogic handles empty candidates gracefully."""
         # Import here to avoid module path conflicts with tests/selection
-        from selection.selection_logic import SelectionLogic
+        from evaluation.selection.selection_logic import SelectionLogic
         
         candidates = []
         accuracy_threshold = 0.01

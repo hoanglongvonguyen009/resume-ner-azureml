@@ -148,8 +148,9 @@ run_name = format_run_name(context=context, policy=policy)
 
 ### Tracking
 
-- `setup_mlflow(...)`: Setup MLflow tracking
-- See `tracking/mlflow/` for detailed MLflow utilities
+- `setup_mlflow(...)`: **SSOT** for MLflow setup - Use this for all MLflow configuration
+  - **Layering**: This is the high-level SSOT that wraps `common.shared.mlflow_setup.setup_mlflow_cross_platform()` (internal)
+  - See `tracking/mlflow/` for detailed MLflow utilities
 
 ### Naming
 
@@ -212,17 +213,20 @@ setup_mlflow(config={
 ## Best Practices
 
 1. **Use configuration files**: Always load configs from YAML files, don't hardcode
-2. **Resolve paths through infrastructure**: Use `resolve_output_path` instead of hardcoding paths
-3. **Use naming policies**: Generate names using naming policies for consistency
-4. **Platform abstraction**: Use platform adapters instead of platform-specific code
-5. **MLflow setup**: Always use infrastructure MLflow setup for cross-platform compatibility
+2. **Repository root detection**: Use `detect_repo_root()` from `infrastructure.paths.repo` (canonical function)
+3. **Resolve paths through infrastructure**: Use `resolve_output_path` instead of hardcoding paths
+4. **Use naming policies**: Generate names using naming policies for consistency
+5. **Platform abstraction**: Use platform adapters instead of platform-specific code
+6. **MLflow setup**: Always use `infrastructure.tracking.mlflow.setup.setup_mlflow()` (SSOT) for MLflow configuration
 
 ## Notes
 
 - Infrastructure modules are designed to have no circular dependencies
+- **Repository root detection**: Use `detect_repo_root()` from `infrastructure.paths.repo` (canonical function, replaces deprecated wrappers)
 - Path resolution uses pattern-based approach for flexibility
 - Naming policies are cached for performance
 - Platform adapters abstract away platform differences
+- **MLflow setup**: `infrastructure.tracking.mlflow.setup.setup_mlflow()` is the SSOT (wraps `common.shared.mlflow_setup.setup_mlflow_cross_platform()` internally)
 
 ## Testing
 

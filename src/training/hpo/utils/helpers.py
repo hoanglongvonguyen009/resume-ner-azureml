@@ -74,19 +74,36 @@ def setup_checkpoint_storage(
     from training.hpo.checkpoint.storage import get_storage_uri, resolve_storage_path
 
     checkpoint_config = checkpoint_config or {}
-    storage_path = resolve_storage_path(
-        output_dir=output_dir,
-        checkpoint_config=checkpoint_config,
-        backbone=backbone,
-        study_name=study_name,
-        study_key_hash=study_key_hash,
-    )
+    
+    # Check for v2 study folder first (don't use resolve_storage_path which maps to Drive)
+    storage_path = None
+    if study_key_hash:
+        # Try to find v2 study folder locally
+        from evaluation.selection.trial_finder import find_study_folder_in_backbone_dir
+        study_folder = find_study_folder_in_backbone_dir(output_dir)
+        if study_folder and study_folder.exists():
+            # Use v2 folder path directly (local path, not mapped to Drive)
+            storage_path = study_folder / "study.db"
+            logger.debug(f"Using v2 study folder for storage: {storage_path}")
+    
+    # Fallback to legacy resolve_storage_path if v2 folder not found
+    if storage_path is None:
+        storage_path = resolve_storage_path(
+            output_dir=output_dir,
+            checkpoint_config=checkpoint_config,
+            backbone=backbone,
+            study_name=study_name,
+            study_key_hash=study_key_hash,
+        )
+    
     storage_uri = get_storage_uri(storage_path)
 
     # If local checkpoint missing and restore_from_drive provided, attempt restore
     if storage_path is not None and not storage_path.exists() and restore_from_drive is not None:
         # Only attempt restore if path is NOT already in Drive
         # (restore_from_drive expects local paths, not Drive paths)
+        # Note: If storage_path came from v2 folder, it's already a local path
+        # If it came from resolve_storage_path, it might be mapped to Drive in Colab
         if not is_drive_path(storage_path):
             try:
                 restored = restore_from_drive(storage_path)
