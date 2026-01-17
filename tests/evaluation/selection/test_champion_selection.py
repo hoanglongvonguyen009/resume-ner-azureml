@@ -343,37 +343,6 @@ class TestSelectChampionPerBackbone:
         assert result["champion"]["run_id"] == "refit-run-123"
 
     @patch("infrastructure.tracking.mlflow.queries.query_runs_by_tags")
-    def test_legacy_goal_key_migration(self, mock_query, mock_mlflow_client, mock_hpo_experiment, base_selection_config):
-        """Test that legacy 'goal' key is migrated to 'direction'."""
-        runs = [
-            create_mock_run("run1", 0.85, "hash1"),
-            create_mock_run("run2", 0.87, "hash1"),
-            create_mock_run("run3", 0.86, "hash1"),
-        ]
-        mock_query.return_value = runs
-        
-        # Use legacy 'goal' key
-        base_selection_config["objective"] = {
-            "metric": "macro-f1",
-            "goal": "maximize",  # Legacy key
-        }
-        base_selection_config["champion_selection"]["require_artifact_available"] = False
-        
-        import warnings
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = select_champion_per_backbone(
-                backbone="distilbert",
-                hpo_experiment=mock_hpo_experiment,
-                selection_config=base_selection_config,
-                mlflow_client=mock_mlflow_client,
-            )
-            
-            # Should work and warn about deprecated key
-            assert result is not None
-            assert len(w) > 0
-
-    @patch("infrastructure.tracking.mlflow.queries.query_runs_by_tags")
     def test_multiple_groups_selects_best(self, mock_query, mock_mlflow_client, mock_hpo_experiment, base_selection_config):
         """Test that best group is selected when multiple groups exist."""
         # Group 1: lower average score

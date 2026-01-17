@@ -126,7 +126,10 @@ search_space = create_search_space({
 
 - `resolve_storage_path(...)`: Resolve checkpoint storage path
 - `get_storage_uri(...)`: Get checkpoint storage URI
+- `setup_checkpoint_storage(...)`: Set up checkpoint storage with Drive restore support
 - `CheckpointCleanupManager`: Manage checkpoint cleanup
+
+**Note**: When checkpoints are stored in Google Drive (Colab), the system automatically detects Drive paths and skips redundant `restore_from_drive()` calls to prevent path resolution errors.
 
 For detailed signatures, see source code.
 

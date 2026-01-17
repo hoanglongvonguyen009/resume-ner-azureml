@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
 
 from common.shared.logging_utils import get_logger
+from common.shared.platform_detection import is_drive_path
 
 logger = get_logger(__name__)
 
@@ -81,16 +82,24 @@ def setup_checkpoint_storage(
 
     # If local checkpoint missing and restore_from_drive provided, attempt restore
     if storage_path is not None and not storage_path.exists() and restore_from_drive is not None:
-        try:
-            restored = restore_from_drive(storage_path)
-            if restored:
-                logger.info(
-                    f"Restored HPO checkpoint from Drive: {storage_path}")
-            else:
-                logger.debug(
-                    f"Drive backup not found for checkpoint: {storage_path}")
-        except Exception as e:
-            logger.warning(f"Failed to restore checkpoint from Drive: {e}")
+        # Only attempt restore if path is NOT already in Drive
+        # (restore_from_drive expects local paths, not Drive paths)
+        if not is_drive_path(storage_path):
+            try:
+                restored = restore_from_drive(storage_path)
+                if restored:
+                    logger.info(
+                        f"Restored HPO checkpoint from Drive: {storage_path}")
+                else:
+                    logger.debug(
+                        f"Drive backup not found for checkpoint: {storage_path}")
+            except Exception as e:
+                logger.warning(f"Failed to restore checkpoint from Drive: {e}")
+        else:
+            logger.debug(
+                f"Checkpoint path is already in Drive: {storage_path}. "
+                f"File does not exist - will create new study."
+            )
 
     # Determine if we should resume
     auto_resume = (

@@ -113,16 +113,29 @@ merged = deep_merge(defaults, overrides)
 ### Basic Example: Platform Detection
 
 ```python
-from src.common.shared.platform_detection import detect_platform, resolve_platform_checkpoint_path
+from pathlib import Path
+from src.common.shared.platform_detection import (
+    detect_platform,
+    resolve_platform_checkpoint_path,
+    is_drive_path,
+)
 
 # Detect current platform
-platform = detect_platform()  # "azureml" or "local"
+platform = detect_platform()  # "colab", "kaggle", "azure", or "local"
 
 # Resolve checkpoint path based on platform
+# For Colab: Maps to Google Drive if available
+# For Kaggle: Uses /kaggle/working/
+# For Local: Uses provided base path
 checkpoint_path = resolve_platform_checkpoint_path(
-    local_path="outputs/checkpoint",
-    azureml_path="azureml://workspace/checkpoint"
+    base_path=Path("outputs/hpo"),
+    relative_path="distilbert/study.db"
 )
+
+# Check if path is already in Google Drive
+if is_drive_path(checkpoint_path):
+    print("Path is in Google Drive")
+    # Skip restore_from_drive() calls (path is already in Drive)
 ```
 
 ### Basic Example: Notebook Setup
@@ -202,8 +215,9 @@ set_seed(DEFAULT_RANDOM_SEED)
 
 ### Platform Detection
 
-- `detect_platform() -> str`: Detect platform ("azureml" or "local")
-- `resolve_platform_checkpoint_path(local_path: str, azureml_path: str) -> str`: Resolve checkpoint path by platform
+- `detect_platform() -> str`: Detect platform ("colab", "kaggle", "azure", or "local")
+- `resolve_platform_checkpoint_path(base_path: Path, relative_path: str) -> Path`: Resolve checkpoint path with platform-specific optimizations (e.g., maps to Google Drive in Colab)
+- `is_drive_path(path: Path | str) -> bool`: Check if a path is already in Google Drive (starts with `/content/drive`)
 
 ### Notebook Setup
 

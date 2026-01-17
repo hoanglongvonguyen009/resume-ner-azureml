@@ -12,6 +12,7 @@ uvx pytest tests/shared/ -v
 
 # Run specific test file
 uvx pytest tests/shared/unit/test_drive_backup.py -v
+uvx pytest tests/shared/unit/test_platform_detection.py -v
 ```
 
 ## Overview
@@ -27,6 +28,7 @@ These utilities help prevent common bugs (like the HPO studies indentation bug) 
 
 - `validate_hpo_studies.py`: Validation utilities for HPO studies dictionary
 - `unit/test_drive_backup.py`: Unit tests for Google Drive backup functionality
+- `unit/test_platform_detection.py`: Unit tests for platform detection utilities (including `is_drive_path()`)
 
 ## Running Tests
 
@@ -41,6 +43,7 @@ uvx pytest tests/shared/unit/ -v
 
 # Run specific test file
 uvx pytest tests/shared/unit/test_drive_backup.py -v
+uvx pytest tests/shared/unit/test_platform_detection.py -v
 ```
 
 ## Test Fixtures and Helpers
@@ -81,6 +84,7 @@ assert is_correct, error
 - ✅ Backup result string representation
 - ✅ Path mapping and validation
 - ✅ Colab-specific mounting functions
+- ✅ Platform detection utilities (`detect_platform()`, `resolve_platform_checkpoint_path()`, `is_drive_path()`)
 - ✅ HPO studies dictionary validation (preventing indentation bugs)
 - ✅ Notebook indentation validation
 

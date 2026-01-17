@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 from common.shared.logging_utils import get_logger
+from common.shared.platform_detection import is_drive_path
 
 from .optuna_integration import (
     create_optuna_pruner,
@@ -231,14 +232,22 @@ class StudyManager:
 
             # If not found in v2 folder, check if legacy folder has it (for migration)
             if not storage_exists and self.restore_from_drive is not None:
-                try:
-                    restored = self.restore_from_drive(storage_path)
-                    if restored:
-                        logger.info(
-                            f"Restored HPO checkpoint from Drive: {storage_path}")
-                        storage_exists = True
-                except Exception as e:
-                    logger.debug(f"Drive backup not found for checkpoint: {e}")
+                # Only attempt restore if path is NOT already in Drive
+                # (restore_from_drive expects local paths, not Drive paths)
+                if not is_drive_path(storage_path):
+                    try:
+                        restored = self.restore_from_drive(storage_path)
+                        if restored:
+                            logger.info(
+                                f"Restored HPO checkpoint from Drive: {storage_path}")
+                            storage_exists = True
+                    except Exception as e:
+                        logger.debug(f"Drive backup not found for checkpoint: {e}")
+                else:
+                    logger.debug(
+                        f"Checkpoint path is already in Drive: {storage_path}. "
+                        f"File does not exist - will create new study."
+                    )
         else:
             # Use legacy storage path resolution
             storage_path, storage_uri, _ = setup_checkpoint_storage(

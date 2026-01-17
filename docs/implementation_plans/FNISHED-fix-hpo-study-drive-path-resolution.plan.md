@@ -12,14 +12,14 @@ Fix path resolution mismatch in HPO study loading when checkpoints are stored in
 
 ### Completed Steps
 
-- ⏳ None yet
+- ✅ Step 1: Add `is_drive_path()` utility to `platform_detection.py`
+- ✅ Step 2: Update `setup_checkpoint_storage()` in `helpers.py`
+- ✅ Step 3: Update `create_or_load_study()` in `study.py`
+- ✅ Step 4: Verify fixes with mypy and tests
 
 ### Pending Steps
 
-- ⏳ Step 1: Add `is_drive_path()` utility to `platform_detection.py`
-- ⏳ Step 2: Update `setup_checkpoint_storage()` in `helpers.py`
-- ⏳ Step 3: Update `create_or_load_study()` in `study.py`
-- ⏳ Step 4: Verify fixes with mypy and tests
+- None (all steps completed)
 
 ## Preconditions
 

@@ -199,6 +199,8 @@ root_dir = detect_repo_root(start_path=Path("src/training/core/trainer.py"))
 
 When running in Colab, checkpoints and outputs are often stored in Google Drive (`/content/drive/MyDrive/...`) while the project code is at `/content/resume-ner-azureml/`. The unified `detect_repo_root()` function handles this automatically by checking platform-specific locations from config.
 
+**Drive Path Detection**: Use `is_drive_path()` from `common.shared.platform_detection` to check if a path is already in Google Drive before calling `restore_from_drive()` functions. This prevents path resolution errors when checkpoints are already mapped to Drive paths.
+
 **Best Practice:** When calling functions that use path inference (e.g., `infer_config_dir()`, `detect_repo_root()`), prefer passing explicit `config_dir` or `root_dir` parameters instead of relying on inference from checkpoint/output paths.
 
 **Example:**

@@ -179,6 +179,13 @@ from fixtures import (
 def mock_gpu_detection(monkeypatch):
     """Mock GPU detection for CI compatibility."""
     if should_skip_gpu_checks():
+        # Check if torch is available before trying to patch it
+        try:
+            import torch
+        except ImportError:
+            # torch not installed - skip GPU mocking
+            return
+        
         # Mock torch.cuda.is_available to always return False
         def mock_cuda_is_available():
             return False

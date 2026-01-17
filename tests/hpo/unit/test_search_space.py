@@ -1,7 +1,12 @@
 """Unit tests for HPO search space translation."""
 
+import sys
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, patch
+
+# Mock optuna module before importing the module under test
+mock_optuna = MagicMock()
+sys.modules['optuna'] = mock_optuna
 
 from training.hpo import (
     translate_search_space_to_optuna,
