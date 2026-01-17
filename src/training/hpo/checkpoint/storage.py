@@ -37,16 +37,22 @@ def resolve_storage_path(
     checkpoint_config: Dict[str, Any],
     backbone: str,
     study_name: Optional[str] = None,
+    study_key_hash: Optional[str] = None,
     create_dirs: bool = True,
 ) -> Optional[Path]:
     """
     Resolve checkpoint storage path with platform awareness.
 
+    Supports both v2 hash-based folder structure (study-{hash}) and legacy
+    study_name format. When study_key_hash is provided, uses v2 structure.
+    Otherwise falls back to legacy study_name format for backward compatibility.
+
     Args:
         output_dir: Base output directory for HPO trials
         checkpoint_config: Checkpoint configuration from HPO config
         backbone: Model backbone name (for placeholder substitution)
-        study_name: Optional resolved study name (for {study_name} placeholder)
+        study_name: Optional resolved study name (for {study_name} placeholder in legacy mode)
+        study_key_hash: Optional study key hash for v2 folder structure (study-{hash})
         create_dirs: Whether to create parent directories (default: True)
                     Set to False for read-only path resolution
 
@@ -58,16 +64,24 @@ def resolve_storage_path(
     if not enabled:
         return None
 
-    # Get storage path from config or use default
-    storage_path_template = checkpoint_config.get(
-        "storage_path",
-        f"{{backbone}}/study.db"  # Default: relative to output_dir
-    )
+    # V2 mode: Use hash-based folder structure when study_key_hash is provided
+    if study_key_hash:
+        # Compute study8 token (first 8 characters of hash)
+        study8 = study_key_hash[:8] if len(study_key_hash) >= 8 else study_key_hash
+        # Build v2 path: {backbone}/study-{study8}/study.db
+        storage_path_str = f"{backbone}/study-{study8}/study.db"
+    else:
+        # Legacy mode: Use study_name format
+        # Get storage path from config or use default
+        storage_path_template = checkpoint_config.get(
+            "storage_path",
+            f"{{backbone}}/study.db"  # Default: relative to output_dir
+        )
 
-    # Replace placeholders in order: {backbone} first, then {study_name}
-    storage_path_str = storage_path_template.replace("{backbone}", backbone)
-    if study_name:
-        storage_path_str = storage_path_str.replace("{study_name}", study_name)
+        # Replace placeholders in order: {backbone} first, then {study_name}
+        storage_path_str = storage_path_template.replace("{backbone}", backbone)
+        if study_name:
+            storage_path_str = storage_path_str.replace("{study_name}", study_name)
 
     # Resolve with platform-specific optimizations
     platform = detect_platform()

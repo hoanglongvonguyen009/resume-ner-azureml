@@ -539,19 +539,7 @@ def find_best_trial_from_study(
             study, backbone_name, dataset_version, objective_metric
         )
 
-        # Use resolve_storage_path to find the correct study folder (same logic as trial_meta_generator)
-        from training.hpo.checkpoint.storage import resolve_storage_path
-
-        checkpoint_config = hpo_config.get(
-            "checkpoint", {}) if hpo_config else {}
-        study_name_template = checkpoint_config.get("study_name") or (
-            hpo_config.get("study_name") if hpo_config else None)
-        study_name = None
-        if study_name_template:
-            study_name = study_name_template.replace(
-                "{backbone}", backbone_name)
-
-        # Find v2 study folder
+        # Find v2 study folder using v2 folder discovery
         study_folder = find_study_folder_in_backbone_dir(hpo_backbone_dir)
 
         if not study_folder:

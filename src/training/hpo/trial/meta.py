@@ -284,7 +284,7 @@ def generate_missing_trial_meta_for_all_studies(
     total_updated = 0
 
     from training.hpo.utils.paths import resolve_hpo_output_dir
-    from training.hpo.checkpoint.storage import resolve_storage_path
+    from evaluation.selection.trial_finder import find_study_folder_in_backbone_dir
 
     # Process all backbones from backbone_values, not just those in hpo_studies
     # This ensures we process all backbones even if studies are no longer in memory
@@ -304,38 +304,8 @@ def generate_missing_trial_meta_for_all_studies(
             logger.debug(f"Skipping {backbone_name}: backbone directory not found")
             continue
 
-        # Resolve storage path to get study folder
-        checkpoint_config = hpo_config.get("checkpoint", {})
-        study_name_template = checkpoint_config.get("study_name") or hpo_config.get("study_name")
-        study_name = None
-        if study_name_template:
-            study_name = study_name_template.replace("{backbone}", backbone_name)
-
-        actual_storage_path = resolve_storage_path(
-            output_dir=backbone_output_dir,
-            checkpoint_config=checkpoint_config,
-            backbone=backbone_name,
-            study_name=study_name,
-        )
-
-        if actual_storage_path and actual_storage_path.exists():
-            study_folder = actual_storage_path.parent
-        else:
-            # Fallback: construct from study name
-            study_folder = backbone_output_dir / study_name if study_name else backbone_output_dir
-            # Try to find existing study folder
-            if not study_folder.exists():
-                # Look for any study folder in backbone dir
-                if backbone_output_dir.exists():
-                    study_folders = [
-                        d
-                        for d in backbone_output_dir.iterdir()
-                        if d.is_dir()
-                        and not d.name.startswith("trial_")
-                        and d.name != ".ipynb_checkpoints"
-                    ]
-                    if study_folders:
-                        study_folder = study_folders[0]
+        # Use v2 folder discovery to find study folder
+        study_folder = find_study_folder_in_backbone_dir(hpo_backbone_dir)
 
         if study_folder and study_folder.exists():
             logger.info(f"Processing {backbone_name}: {study_folder.name}")
@@ -361,38 +331,8 @@ def generate_missing_trial_meta_for_all_studies(
             logger.debug(f"Skipping {backbone_name}: backbone directory not found")
             continue
 
-        # Resolve storage path to get study folder
-        checkpoint_config = hpo_config.get("checkpoint", {})
-        study_name_template = checkpoint_config.get("study_name") or hpo_config.get("study_name")
-        study_name = None
-        if study_name_template:
-            study_name = study_name_template.replace("{backbone}", backbone_name)
-
-        actual_storage_path = resolve_storage_path(
-            output_dir=backbone_output_dir,
-            checkpoint_config=checkpoint_config,
-            backbone=backbone_name,
-            study_name=study_name,
-        )
-
-        if actual_storage_path and actual_storage_path.exists():
-            study_folder = actual_storage_path.parent
-        else:
-            # Fallback: construct from study name
-            study_folder = backbone_output_dir / study_name if study_name else backbone_output_dir
-            # Try to find existing study folder
-            if not study_folder.exists():
-                # Look for any study folder in backbone dir
-                if backbone_output_dir.exists():
-                    study_folders = [
-                        d
-                        for d in backbone_output_dir.iterdir()
-                        if d.is_dir()
-                        and not d.name.startswith("trial_")
-                        and d.name != ".ipynb_checkpoints"
-                    ]
-                    if study_folders:
-                        study_folder = study_folders[0]
+        # Use v2 folder discovery to find study folder
+        study_folder = find_study_folder_in_backbone_dir(hpo_backbone_dir)
 
         if study_folder and study_folder.exists():
             logger.info(f"Processing {backbone_name}: {study_folder.name} (study not in memory, loading from disk)")

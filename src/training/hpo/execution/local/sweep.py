@@ -754,7 +754,7 @@ def run_local_hpo_sweep(
     # Create or load study - pass v2_study_folder if available to use for study.db
     study, study_name, storage_path, storage_uri, should_resume = (
         study_manager.create_or_load_study(
-            output_dir, run_id, v2_study_folder=v2_study_folder)
+            output_dir, run_id, v2_study_folder=v2_study_folder, study_key_hash=study_key_hash)
     )
 
     # Check if HPO is already complete (early return)

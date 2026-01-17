@@ -298,6 +298,80 @@ run_names:
         
         assert storage_path.exists()
 
+    def test_checkpoint_file_created_v2_hash_based(self, tmp_path):
+        """Test that checkpoint file is created at study-{hash}/study.db when study_key_hash is provided."""
+        from training.hpo.checkpoint.storage import (
+            resolve_storage_path,
+        )
+        
+        output_dir = tmp_path / "outputs" / "hpo"
+        output_dir.mkdir(parents=True)
+        
+        checkpoint_config = {
+            "enabled": True,
+        }
+        
+        backbone = "distilbert"
+        study_key_hash = "c3659feaead8e1ec1234567890abcdef1234567890abcdef1234567890abcdef12"
+        
+        storage_path = resolve_storage_path(
+            output_dir=output_dir,
+            checkpoint_config=checkpoint_config,
+            backbone=backbone,
+            study_key_hash=study_key_hash,
+        )
+        
+        # Verify v2 path resolves correctly
+        assert storage_path is not None
+        # Should use v2 format: {backbone}/study-{study8}/study.db
+        assert "distilbert" in str(storage_path)
+        assert "study-c3659fea" in str(storage_path)  # First 8 chars of hash
+        assert "study.db" in str(storage_path)
+        
+        # Verify parent directory structure
+        assert storage_path.parent.name == "study-c3659fea"
+        assert storage_path.parent.parent.name == "distilbert"
+        
+        # Create the checkpoint file
+        storage_path.parent.mkdir(parents=True, exist_ok=True)
+        storage_path.touch()
+        
+        assert storage_path.exists()
+
+    def test_checkpoint_path_fallback_to_legacy_when_no_hash(self, tmp_path):
+        """Test that resolve_storage_path falls back to legacy study_name format when study_key_hash is None."""
+        from training.hpo.checkpoint.storage import (
+            resolve_storage_path,
+        )
+        
+        output_dir = tmp_path / "outputs" / "hpo"
+        output_dir.mkdir(parents=True)
+        
+        checkpoint_config = {
+            "enabled": True,
+            "study_name": "hpo_{backbone}_test",
+            "storage_path": "{study_name}/study.db",
+        }
+        
+        backbone = "distilbert"
+        study_name = "hpo_distilbert_test"
+        
+        # Call without study_key_hash - should use legacy format
+        storage_path = resolve_storage_path(
+            output_dir=output_dir,
+            checkpoint_config=checkpoint_config,
+            backbone=backbone,
+            study_name=study_name,
+            study_key_hash=None,  # Explicitly None
+        )
+        
+        # Verify legacy path format
+        assert storage_path is not None
+        assert "hpo_distilbert_test" in str(storage_path)
+        assert "study.db" in str(storage_path)
+        # Should NOT use v2 format
+        assert "study-" not in str(storage_path.parent.name)
+
     def test_study_key_hash_and_family_hash_computed(self, tmp_path):
         """Test that study_key_hash and study_family_hash are computed and can be tagged."""
         from infrastructure.naming.mlflow.hpo_keys import (

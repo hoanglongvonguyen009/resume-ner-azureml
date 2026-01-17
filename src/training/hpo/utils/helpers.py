@@ -52,6 +52,7 @@ def setup_checkpoint_storage(
     checkpoint_config: Optional[Dict[str, Any]],
     backbone: str,
     study_name: Optional[str] = None,
+    study_key_hash: Optional[str] = None,
     restore_from_drive: Optional[Callable[[Path], bool]] = None,
 ) -> Tuple[Optional[Path], Optional[str], bool]:
     """
@@ -61,7 +62,8 @@ def setup_checkpoint_storage(
         output_dir: Base output directory.
         checkpoint_config: Checkpoint configuration dictionary.
         backbone: Model backbone name.
-        study_name: Optional resolved study name (for {study_name} placeholder).
+        study_name: Optional resolved study name (for Optuna study name, not path resolution).
+        study_key_hash: Optional study key hash for v2 folder structure (study-{hash}).
         restore_from_drive: Optional function to restore checkpoint from Drive if missing.
                           Function should take a Path and return bool (True if restored).
 
@@ -77,6 +79,7 @@ def setup_checkpoint_storage(
         checkpoint_config=checkpoint_config,
         backbone=backbone,
         study_name=study_name,
+        study_key_hash=study_key_hash,
     )
     storage_uri = get_storage_uri(storage_path)
 

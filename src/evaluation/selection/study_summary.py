@@ -108,14 +108,7 @@ def load_study_from_disk(
     if not hpo_backbone_dir.exists():
         return None
 
-    checkpoint_config = hpo_config.get("checkpoint", {})
-    study_name_template = checkpoint_config.get(
-        "study_name") or hpo_config.get("study_name")
-    study_name = None
-    if study_name_template:
-        study_name = study_name_template.replace("{backbone}", backbone_name)
-
-    # Find v2 study folder
+    # Find v2 study folder using v2 folder discovery
     from .trial_finder import find_study_folder_in_backbone_dir
     study_folder = find_study_folder_in_backbone_dir(backbone_output_dir)
 

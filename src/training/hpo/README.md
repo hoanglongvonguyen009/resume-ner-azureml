@@ -124,12 +124,20 @@ search_space = create_search_space({
 
 ### Checkpoint Management
 
-- `resolve_storage_path(...)`: Resolve checkpoint storage path
+- `resolve_storage_path(...)`: Resolve checkpoint storage path with platform awareness
+  - **V2 mode**: When `study_key_hash` is provided, uses v2 hash-based folder structure: `{backbone}/study-{study8}/study.db`
+    - `study8` is the first 8 characters of `study_key_hash`
+    - Example: `distilbert/study-c3659fea/study.db`
+  - **Legacy mode**: When `study_key_hash` is None, falls back to legacy `study_name` format: `{backbone}/{study_name}/study.db`
+    - Maintains backward compatibility with existing configurations
 - `get_storage_uri(...)`: Get checkpoint storage URI
 - `setup_checkpoint_storage(...)`: Set up checkpoint storage with Drive restore support
+  - Accepts optional `study_key_hash` parameter for v2 path resolution
 - `CheckpointCleanupManager`: Manage checkpoint cleanup
 
 **Note**: When checkpoints are stored in Google Drive (Colab), the system automatically detects Drive paths and skips redundant `restore_from_drive()` calls to prevent path resolution errors.
+
+**Path Resolution**: The system prioritizes v2 hash-based paths when `study_key_hash` is available, ensuring deterministic study folder names based on study configuration. Legacy `study_name` format is supported for backward compatibility.
 
 For detailed signatures, see source code.
 

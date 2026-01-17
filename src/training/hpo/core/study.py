@@ -187,6 +187,7 @@ class StudyManager:
         output_dir: Path,
         run_id: str,
         v2_study_folder: Optional[Path] = None,
+        study_key_hash: Optional[str] = None,
     ) -> Tuple[Any, str, Path, str, bool]:
         """
         Create or load Optuna study with proper resume handling.
@@ -249,12 +250,13 @@ class StudyManager:
                         f"File does not exist - will create new study."
                     )
         else:
-            # Use legacy storage path resolution
+            # Use storage path resolution (v2 if study_key_hash provided, else legacy)
             storage_path, storage_uri, _ = setup_checkpoint_storage(
                 output_dir,
                 self.checkpoint_config,
                 self.backbone,
-                study_name,
+                study_name=study_name,
+                study_key_hash=study_key_hash,
                 restore_from_drive=self.restore_from_drive,
             )
             # Check if storage exists (legacy function may have already checked, but we verify)

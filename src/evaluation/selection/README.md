@@ -118,7 +118,10 @@ best_trials = find_best_trials_for_backbones(
 ### Trial Finding
 
 - `find_best_trials_for_backbones(...)`: Find best trials for each backbone
-- `find_study_folder_in_backbone_dir(...)`: Find study folder in backbone directory
+- `find_study_folder_in_backbone_dir(...)`: Find v2 study folder in backbone directory
+  - Searches for v2 format folders: `study-{study8}` (e.g., `study-c3659fea`)
+  - Returns the first v2 study folder found, or None if not found
+  - Supports v2 hash-based folder structure only
 - `get_trial_hash_info(...)`: Get trial hash information
 
 ### Artifact Acquisition

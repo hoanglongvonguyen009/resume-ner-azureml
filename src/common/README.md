@@ -124,18 +124,30 @@ from src.common.shared.platform_detection import (
 platform = detect_platform()  # "colab", "kaggle", "azure", or "local"
 
 # Resolve checkpoint path based on platform
-# For Colab: Maps to Google Drive if available
+# For Colab: Maps to Google Drive if available (preserves project structure)
 # For Kaggle: Uses /kaggle/working/
 # For Local: Uses provided base path
+# Project name is loaded from config/paths.yaml when config_dir is provided
 checkpoint_path = resolve_platform_checkpoint_path(
     base_path=Path("outputs/hpo"),
-    relative_path="distilbert/study.db"
+    relative_path="distilbert/study.db",
+    config_dir=Path("config"),  # Optional: enables project name loading from config
 )
 
 # Check if path is already in Google Drive
 if is_drive_path(checkpoint_path):
     print("Path is in Google Drive")
     # Skip restore_from_drive() calls (path is already in Drive)
+
+# Advanced: Provide config_dir to load project name from config/paths.yaml
+# This enables single source of truth for project name
+from infrastructure.paths.utils import resolve_project_paths
+_, config_dir = resolve_project_paths()
+checkpoint_path = resolve_platform_checkpoint_path(
+    base_path=Path("outputs/hpo"),
+    relative_path="distilbert/study.db",
+    config_dir=config_dir,  # Loads project.name from config/paths.yaml
+)
 ```
 
 ### Basic Example: Notebook Setup
@@ -216,7 +228,7 @@ set_seed(DEFAULT_RANDOM_SEED)
 ### Platform Detection
 
 - `detect_platform() -> str`: Detect platform ("colab", "kaggle", "azure", or "local")
-- `resolve_platform_checkpoint_path(base_path: Path, relative_path: str) -> Path`: Resolve checkpoint path with platform-specific optimizations (e.g., maps to Google Drive in Colab)
+- `resolve_platform_checkpoint_path(base_path: Path, relative_path: str, config_dir: Optional[Path] = None) -> Path`: Resolve checkpoint path with platform-specific optimizations (e.g., maps to Google Drive in Colab). Optionally accepts `config_dir` to load project name from `config/paths.yaml` (falls back to detection if not provided).
 - `is_drive_path(path: Path | str) -> bool`: Check if a path is already in Google Drive (starts with `/content/drive`)
 
 ### Notebook Setup
