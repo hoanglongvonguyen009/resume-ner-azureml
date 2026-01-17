@@ -51,6 +51,7 @@ These utilities are used extensively across training, evaluation, infrastructure
   - `file_utils.py`: File operations
   - `platform_detection.py`: Platform detection
   - `mlflow_setup.py`: MLflow configuration
+  - `notebook_setup.py`: Notebook environment detection and path setup
   - `yaml_utils.py`: YAML loading
   - `json_cache.py`: JSON caching
   - `tokenization_utils.py`: Tokenization helpers
@@ -124,6 +125,40 @@ checkpoint_path = resolve_platform_checkpoint_path(
 )
 ```
 
+### Basic Example: Notebook Setup
+
+```python
+from src.common.shared.notebook_setup import (
+    detect_notebook_environment,
+    find_repository_root,
+    setup_notebook_paths,
+    get_platform_vars,
+    ensure_src_in_path,
+    ensure_mlflow_installed,
+)
+
+# Detect notebook environment
+env = detect_notebook_environment()
+print(f"Platform: {env.platform}, Colab: {env.is_colab}, Kaggle: {env.is_kaggle}")
+
+# Find repository root (with platform-specific search)
+repo_root = find_repository_root()
+
+# Setup paths and add src to Python path
+paths = setup_notebook_paths(add_src_to_path=True)
+print(f"Root: {paths.root_dir}, Config: {paths.config_dir}, Src: {paths.src_dir}")
+
+# Get platform variables as dict
+platform_vars = get_platform_vars()
+# {'platform': 'colab', 'is_colab': True, 'is_kaggle': False, ...}
+
+# Ensure mlflow is installed (Colab/Kaggle only)
+ensure_mlflow_installed()
+
+# Ensure src is in path (returns repo root if found)
+repo_root = ensure_src_in_path()
+```
+
 ### Basic Example: Constants
 
 ```python
@@ -167,6 +202,15 @@ set_seed(DEFAULT_RANDOM_SEED)
 
 - `detect_platform() -> str`: Detect platform ("azureml" or "local")
 - `resolve_platform_checkpoint_path(local_path: str, azureml_path: str) -> str`: Resolve checkpoint path by platform
+
+### Notebook Setup
+
+- `detect_notebook_environment() -> NotebookEnvironment`: Detect notebook execution environment (Colab, Kaggle, local)
+- `find_repository_root(start_dir: Optional[Path] = None) -> Path`: Find repository root directory with platform-specific search
+- `setup_notebook_paths(root_dir: Optional[Path] = None, add_src_to_path: bool = True) -> NotebookPaths`: Setup notebook paths (root, config, src)
+- `get_platform_vars() -> dict[str, str | bool | Optional[Path]]`: Get platform variables as a dict (convenience function)
+- `ensure_mlflow_installed() -> None`: Install mlflow if needed (Colab/Kaggle only)
+- `ensure_src_in_path() -> Optional[Path]`: Ensure src/ is in Python path
 
 ### MLflow Setup
 

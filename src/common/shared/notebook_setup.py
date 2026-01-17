@@ -93,8 +93,9 @@ def find_repository_root(start_dir: Optional[Path] = None) -> Path:
     """
     Find repository root directory by searching for config/ and src/ directories.
 
-    Searches from the current working directory (or start_dir if provided) upward
-    until it finds a directory containing both `config/` and `src/` subdirectories.
+    Searches:
+    1. Current directory and parents
+    2. Platform-specific common locations (Colab/Kaggle)
 
     Args:
         start_dir: Directory to start searching from. If None, uses current working directory.
@@ -118,6 +119,23 @@ def find_repository_root(start_dir: Optional[Path] = None) -> Path:
     for parent in current_dir.parents:
         if (parent / "config").exists() and (parent / "src").exists():
             return parent
+
+    # Platform-specific common locations
+    platform = detect_platform()
+    search_locations: list[Path] = []
+    if platform == "colab":
+        search_locations = [Path("/content/resume-ner-azureml"), Path("/content")]
+    elif platform == "kaggle":
+        search_locations = [Path("/kaggle/working/resume-ner-azureml"), Path("/kaggle/working")]
+
+    for location in search_locations:
+        if location.exists():
+            if (location / "config").exists() and (location / "src").exists():
+                return location
+            if location.is_dir():
+                for subdir in location.iterdir():
+                    if subdir.is_dir() and (subdir / "config").exists() and (subdir / "src").exists():
+                        return subdir
 
     raise ValueError(
         f"Could not find repository root. Searched from: {start_dir}\n"
@@ -171,4 +189,51 @@ def setup_notebook_paths(
             sys.path.insert(0, src_str)
 
     return NotebookPaths(root_dir=root_dir, config_dir=config_dir, src_dir=src_dir)
+
+
+def get_platform_vars() -> dict[str, str | bool | Optional[Path]]:
+    """
+    Get platform variables as a dict (convenience function).
+
+    Returns:
+        Dictionary with keys: platform, is_colab, is_kaggle, is_local, base_dir, backup_enabled
+    """
+    env = detect_notebook_environment()
+    return {
+        "platform": env.platform,
+        "is_colab": env.is_colab,
+        "is_kaggle": env.is_kaggle,
+        "is_local": env.is_local,
+        "base_dir": env.base_dir,
+        "backup_enabled": env.backup_enabled,
+    }
+
+
+def ensure_mlflow_installed() -> None:
+    """Install mlflow if needed (Colab/Kaggle only)."""
+    import subprocess
+
+    env = detect_notebook_environment()
+    if not env.is_local:
+        try:
+            import mlflow  # noqa: F401
+        except ImportError:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "mlflow", "--quiet"])
+
+
+def ensure_src_in_path() -> Optional[Path]:
+    """
+    Ensure src/ is in Python path.
+
+    Returns:
+        Repository root Path if found and added to path, None otherwise.
+    """
+    try:
+        repo_root = find_repository_root()
+        src_dir = repo_root / "src"
+        if str(src_dir) not in sys.path:
+            sys.path.insert(0, str(src_dir))
+        return repo_root
+    except ValueError:
+        return None
 
