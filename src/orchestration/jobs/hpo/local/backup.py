@@ -122,17 +122,41 @@ def backup_hpo_study_to_drive(
     study_folder = None
 
     # Search for v2 study folder in both Drive and local locations
+    # Use unified path mapping instead of hardcoded string replacement
     search_dirs = []
+    drive_dir = None
+    
+    # Get Drive path using unified function (relative path computation)
+    from infrastructure.paths import get_drive_backup_path
+    from infrastructure.paths.repo import detect_repo_root
+    
+    try:
+        # Auto-detect root_dir and config_dir
+        root_dir = detect_repo_root(output_dir=backbone_output_dir)
+        config_dir = root_dir / "config"
+        
+        # Map local path to Drive path using unified function
+        drive_dir = get_drive_backup_path(
+            local_path=backbone_output_dir,
+            root_dir=root_dir,
+            config_dir=config_dir,
+        )
+    except Exception as e:
+        logger.debug(f"Could not map to Drive path: {e}")
+        drive_dir = None
+    
     if checkpoint_in_drive:
         # Checkpoint is in Drive - prioritize Drive, then local
-        drive_dir = Path(str(backbone_output_dir).replace(
-            "/content/resume-ner-azureml", "/content/drive/MyDrive/resume-ner-azureml"))
-        search_dirs = [drive_dir, backbone_output_dir]
+        if drive_dir:
+            search_dirs = [drive_dir, backbone_output_dir]
+        else:
+            search_dirs = [backbone_output_dir]
     else:
         # Checkpoint is local - prioritize local, then Drive
-        drive_dir = Path(str(backbone_output_dir).replace(
-            "/content/resume-ner-azureml", "/content/drive/MyDrive/resume-ner-azureml"))
-        search_dirs = [backbone_output_dir, drive_dir]
+        if drive_dir:
+            search_dirs = [backbone_output_dir, drive_dir]
+        else:
+            search_dirs = [backbone_output_dir]
 
     # Look for v2 study folder (study-{hash}) in search directories
     for search_dir in search_dirs:
@@ -185,14 +209,21 @@ def backup_hpo_study_to_drive(
                     trial_meta_path = trial_dir / "trial_meta.json"
                     if trial_meta_path.exists():
                         # Check if it was backed up (Drive path should exist)
-                        drive_trial_meta = Path(str(trial_meta_path).replace(str(
-                            backbone_output_dir), "/content/drive/MyDrive/resume-ner-azureml/outputs/hpo"))
-                        if drive_trial_meta.exists():
-                            logger.debug(
-                                f"Verified trial_meta.json backed up: {trial_dir.name}/trial_meta.json")
-                        else:
-                            logger.warning(
-                                f"trial_meta.json not found in backup: {trial_dir.name}/trial_meta.json")
+                        # Use unified path mapping instead of hardcoded string replacement
+                        try:
+                            drive_trial_meta = get_drive_backup_path(
+                                local_path=trial_meta_path,
+                                root_dir=root_dir,
+                                config_dir=config_dir,
+                            )
+                            if drive_trial_meta and drive_trial_meta.exists():
+                                logger.debug(
+                                    f"Verified trial_meta.json backed up: {trial_dir.name}/trial_meta.json")
+                            else:
+                                logger.warning(
+                                    f"trial_meta.json not found in backup: {trial_dir.name}/trial_meta.json")
+                        except Exception as e:
+                            logger.debug(f"Could not verify Drive path for trial_meta.json: {e}")
             else:
                 logger.warning(
                     f"Failed to backup study folder: {study_folder.name}")

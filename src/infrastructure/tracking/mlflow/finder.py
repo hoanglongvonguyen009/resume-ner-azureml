@@ -158,9 +158,9 @@ def find_mlflow_run(
         if run_key_hash:
             # Determine root_dir if not provided
             if not root_dir and output_dir:
-                # Use find_project_root to locate project root from output_dir
-                from infrastructure.paths.utils import find_project_root
-                root_dir = find_project_root(output_dir=output_dir)
+                # Use detect_repo_root to locate project root from output_dir
+                from infrastructure.paths.repo import detect_repo_root
+                root_dir = detect_repo_root(output_dir=output_dir)
             
             if root_dir:
                 index_result = find_in_mlflow_index(

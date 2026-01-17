@@ -83,13 +83,19 @@ def mock_test_data_file(tmp_path):
 
 @pytest.fixture
 def mock_best_trial_info(mock_checkpoint_dir):
-    """Create mock best trial information dict."""
+    """Create mock best trial information dict in Phase 2 format (champion format).
+    
+    Phase 2 format requires study_key_hash and trial_key_hash.
+    Legacy format (without these fields) is no longer supported.
+    """
     return {
         "backbone": "distilbert",
         "trial_id": "0",
         "trial_name": "trial_0",
         "checkpoint_dir": str(mock_checkpoint_dir),
         "trial_dir": str(mock_checkpoint_dir.parent),
+        "study_key_hash": "a" * 64,  # 64-char hash (Phase 2 format)
+        "trial_key_hash": "b" * 64,  # 64-char hash (Phase 2 format)
         "hyperparameters": {
             "learning_rate": 2e-5,
             "batch_size": 4,

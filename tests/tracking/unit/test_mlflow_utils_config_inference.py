@@ -18,12 +18,14 @@ class TestInferConfigDir:
 
     def test_finds_config_in_parent_chain(self, tmp_path: Path):
         """Test that config_dir is found by searching up parent chain."""
-        # Create structure: root/config/ and root/outputs/hpo/...
+        # Create structure: root/config/ and root/src/ (required for repo root validation)
         root = tmp_path / "workspace"
         root.mkdir()
         config_dir = root / "config"
         config_dir.mkdir()
         (config_dir / "tags.yaml").write_text("schema_version: 1")
+        src_dir = root / "src"
+        src_dir.mkdir()  # Required for repository root validation
         
         # Create deep output structure
         output_dir = root / "outputs" / "hpo" / "local" / "distilbert" / "study-abc" / "trial-xyz"
@@ -40,6 +42,8 @@ class TestInferConfigDir:
         root.mkdir()
         config_dir = root / "config"
         config_dir.mkdir()
+        src_dir = root / "src"
+        src_dir.mkdir()  # Required for repository root validation
         
         # Simple output structure
         output_dir = root / "outputs" / "hpo"
@@ -54,10 +58,12 @@ class TestInferConfigDir:
         output_dir = tmp_path / "outputs" / "hpo"
         output_dir.mkdir(parents=True)
         
-        # Create config in cwd
+        # Create config in cwd with src/ for repo root validation
         cwd_config = tmp_path / "config"
         cwd_config.mkdir()
         (cwd_config / "tags.yaml").write_text("schema_version: 1")
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()  # Required for repository root validation
         
         # Change to tmp_path as cwd
         monkeypatch.chdir(tmp_path)
@@ -70,6 +76,8 @@ class TestInferConfigDir:
         """Test that handles None path by falling back to cwd/config."""
         cwd_config = tmp_path / "config"
         cwd_config.mkdir()
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()  # Required for repository root validation
         
         monkeypatch.chdir(tmp_path)
         
@@ -84,6 +92,8 @@ class TestInferConfigDir:
         # Create config at root level
         root_config = root / "config"
         root_config.mkdir()
+        src_dir = root / "src"
+        src_dir.mkdir()  # Required for repository root validation
         
         # Output dir
         output_dir = root / "outputs" / "hpo" / "local" / "distilbert"
@@ -106,6 +116,8 @@ class TestInferConfigDir:
         root_config = root / "config"
         root_config.mkdir()
         (root_config / "tags.yaml").write_text("schema_version: 1")
+        src_dir = root / "src"
+        src_dir.mkdir()  # Required for repository root validation
         
         # Ensure outputs/config/ does NOT exist
         outputs_config = root / "outputs" / "config"

@@ -208,6 +208,99 @@ def validate_paths_config(config: Dict[str, Any], config_path: Optional[Path] = 
                 )
 
 
+def load_repository_root_config(config_dir: Path) -> Dict[str, Any]:
+    """
+    Load and validate repository root detection configuration.
+    
+    Loads the `repository_root` section from paths.yaml and derives markers
+    from the `base.*` section (single source of truth).
+    
+    Args:
+        config_dir: Config directory path.
+    
+    Returns:
+        Dictionary with repository root config (validated).
+    
+    Raises:
+        FileNotFoundError: If config/paths.yaml not found.
+        ValueError: If config is invalid.
+    """
+    paths_config = load_paths_config(config_dir)
+    repo_config = paths_config.get("repository_root", {})
+    
+    # Get base section to derive markers
+    base = paths_config.get("base", {})
+    if not isinstance(base, dict):
+        raise ValueError(
+            f"[paths.yaml] 'base' section must be a mapping (config_dir: {config_dir})"
+        )
+    
+    # Derive markers from base.* section
+    config_marker = base.get("config", "config")
+    src_marker = base.get("src", "src")
+    
+    # Build markers list
+    required_markers = [config_marker, src_marker]
+    extra_markers = repo_config.get("extra_markers", [".git", "pyproject.toml"])
+    
+    # Validate config structure
+    if not isinstance(repo_config, dict):
+        raise ValueError(
+            f"[paths.yaml] 'repository_root' section must be a mapping (config_dir: {config_dir})"
+        )
+    
+    # Build validated config
+    validated_config: Dict[str, Any] = {
+        "markers_from_base": repo_config.get("markers_from_base", True),
+        "required_markers": required_markers,
+        "extra_markers": extra_markers if isinstance(extra_markers, list) else [],
+        "workspace_candidates": repo_config.get("workspace_candidates", []),
+        "platform_candidates": repo_config.get("platform_candidates", {}),
+        "search": {
+            "max_depth": repo_config.get("search", {}).get("max_depth", 10),
+            "fallback_to_cwd": repo_config.get("search", {}).get("fallback_to_cwd", True),
+            "warn_on_fallback": repo_config.get("search", {}).get("warn_on_fallback", True),
+        },
+        "cache": {
+            "enabled": repo_config.get("cache", {}).get("enabled", True),
+        },
+    }
+    
+    # Validate platform candidates structure
+    platform_candidates = validated_config["platform_candidates"]
+    if not isinstance(platform_candidates, dict):
+        raise ValueError(
+            f"[paths.yaml] 'repository_root.platform_candidates' must be a mapping (config_dir: {config_dir})"
+        )
+    
+    # Validate each platform's candidate list
+    for platform, candidates in platform_candidates.items():
+        if not isinstance(candidates, list):
+            raise ValueError(
+                f"[paths.yaml] 'repository_root.platform_candidates.{platform}' must be a list (config_dir: {config_dir})"
+            )
+        # Validate each candidate is a string
+        for candidate in candidates:
+            if not isinstance(candidate, str):
+                raise ValueError(
+                    f"[paths.yaml] 'repository_root.platform_candidates.{platform}' must contain strings (config_dir: {config_dir})"
+                )
+    
+    # Validate workspace candidates
+    workspace_candidates = validated_config["workspace_candidates"]
+    if not isinstance(workspace_candidates, list):
+        raise ValueError(
+            f"[paths.yaml] 'repository_root.workspace_candidates' must be a list (config_dir: {config_dir})"
+        )
+    for candidate in workspace_candidates:
+        if not isinstance(candidate, str):
+            raise ValueError(
+                f"[paths.yaml] 'repository_root.workspace_candidates' must contain strings (config_dir: {config_dir})"
+            )
+    
+    return validated_config
+
+
 def _get_default_paths() -> Dict[str, Any]:
     """Default paths (backward compatible)."""
     return {

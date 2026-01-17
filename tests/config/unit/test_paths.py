@@ -481,6 +481,8 @@ class TestResolveProjectPaths:
         """Test that provided config_dir is trusted and returned directly."""
         config_dir = tmp_path / "config"
         config_dir.mkdir()
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()  # Required for repository root validation
         
         root_dir, resolved_config_dir = resolve_project_paths(
             output_dir=tmp_path / "outputs" / "hpo" / "local" / "distilbert",
@@ -544,8 +546,8 @@ class TestResolveProjectPaths:
         config_dir = tmp_path / "my_config"
         config_dir.mkdir()
         src_dir = tmp_path / "src"
-        src_dir.mkdir()
-        # Also create standard config dir so find_project_root can find it
+        src_dir.mkdir()  # Required for repository root validation
+        # Also create standard config dir so detect_repo_root can find it
         standard_config_dir = tmp_path / "config"
         standard_config_dir.mkdir()
         
@@ -576,14 +578,17 @@ class TestResolveProjectPaths:
         assert isinstance(root_dir, (type(None), Path))
         assert isinstance(config_dir, (type(None), Path))
     
-    def test_prioritizes_config_dir_over_output_dir(self, tmp_path):
+    def test_prioritizes_config_dir_over_output_dir(self, tmp_path, monkeypatch):
         """Test that provided config_dir takes priority over output_dir."""
+        # Change to tmp_path to avoid finding actual project root
+        monkeypatch.chdir(tmp_path)
+        
         # Create two different project structures
         project1 = tmp_path / "project1"
         project1_config = project1 / "config"
         project1_config.mkdir(parents=True)
         project1_src = project1 / "src"
-        project1_src.mkdir()
+        project1_src.mkdir()  # Required for repository root validation
         
         project2 = tmp_path / "project2"
         project2_outputs = project2 / "outputs"
@@ -591,7 +596,7 @@ class TestResolveProjectPaths:
         project2_config = project2 / "config"
         project2_config.mkdir()
         project2_src = project2 / "src"
-        project2_src.mkdir()
+        project2_src.mkdir()  # Required for repository root validation
         
         output_dir = project2_outputs / "hpo" / "local" / "distilbert"
         output_dir.mkdir(parents=True)

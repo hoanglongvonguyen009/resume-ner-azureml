@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import mlflow
-from infrastructure.paths import find_project_root
+from infrastructure.paths.repo import detect_repo_root
 from common.shared.logging_utils import get_logger
 from training.execution import (
     FoldConfig,
@@ -104,7 +104,7 @@ class TrialExecutor:
             Objective metric value (e.g., macro-f1).
         """
         # Find project root (parent of config_dir)
-        root_dir = find_project_root(self.config_dir)
+        root_dir = detect_repo_root(config_dir=self.config_dir)
         src_dir = root_dir / "src"
 
         # Build command using shared infrastructure

@@ -10,6 +10,7 @@ from .cache import (
 from .config import (
     apply_env_overrides,
     load_paths_config,
+    load_repository_root_config,
     validate_paths_config,
 )
 from .drive import (
@@ -28,6 +29,10 @@ from .resolve import (
     build_output_path,
     resolve_output_path,
 )
+from .repo import (
+    detect_repo_root,
+    validate_repo_root,
+)
 from .utils import (
     find_project_root,
     infer_config_dir,
@@ -42,8 +47,12 @@ from .validation import (
 __all__ = [
     # Config
     "load_paths_config",
+    "load_repository_root_config",
     "apply_env_overrides",
     "validate_paths_config",
+    # Repo root detection
+    "detect_repo_root",
+    "validate_repo_root",
     # Resolve
     "PROCESS_PATTERN_KEYS",
     "resolve_output_path",

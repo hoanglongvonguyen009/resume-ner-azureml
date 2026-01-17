@@ -38,7 +38,9 @@ This test module is organized into the following categories:
   - Experiment config loading
   - Data config loading
   - Model config loading
-  - Paths YAML tests
+  - Paths YAML tests (including repository root detection configuration)
+  - Project path resolution (`resolve_project_paths`)
+  - Config directory inference (`infer_config_dir`)
   - Naming YAML tests
   - MLflow YAML tests
   - Fingerprints and placeholder fallback
@@ -66,6 +68,7 @@ uvx pytest tests/config/integration/ -v
 # Run specific test file
 uvx pytest tests/config/unit/test_config_loader.py -v
 uvx pytest tests/config/unit/test_paths_yaml.py -v
+uvx pytest tests/config/unit/test_paths.py -v
 ```
 
 ### Advanced Execution
@@ -138,7 +141,9 @@ See [`../fixtures/README.md`](../fixtures/README.md) for complete fixture docume
 - ✅ Experiment config loading
 - ✅ Data config loading
 - ✅ Model config loading
-- ✅ Paths YAML tests
+- ✅ Paths YAML tests (including repository root detection configuration)
+- ✅ Project path resolution (`resolve_project_paths`) - trusts provided config_dir, infers from output_dir/start_path
+- ✅ Config directory inference (`infer_config_dir`) - searches up from path, validates with src/ directory
 - ✅ Naming YAML tests
 - ✅ MLflow YAML tests
 - ✅ Fingerprints and placeholder fallback

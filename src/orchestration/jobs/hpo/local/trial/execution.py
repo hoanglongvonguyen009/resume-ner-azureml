@@ -41,7 +41,7 @@ from typing import Any, Dict, Optional
 
 import mlflow
 from common.shared.logging_utils import get_logger
-from infrastructure.paths import find_project_root
+from infrastructure.paths.repo import detect_repo_root
 
 # Lazy import to avoid circular dependency
 def _get_read_trial_metrics():
@@ -101,7 +101,7 @@ class TrialExecutor:
             Objective metric value (e.g., macro-f1).
         """
         # Find project root (parent of config_dir)
-        root_dir = find_project_root(self.config_dir)
+        root_dir = detect_repo_root(config_dir=self.config_dir)
         src_dir = root_dir / "src"
 
         # Build command

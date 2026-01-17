@@ -4,15 +4,21 @@ Filesystem path management and resolution with pattern-based path building.
 
 ## TL;DR / Quick Start
 
-Resolve output paths using patterns and placeholders.
+Detect repository root and resolve output paths using patterns and placeholders.
 
 ```python
-from src.infrastructure.paths.resolve import resolve_output_path, build_output_path
+from pathlib import Path
+from infrastructure.paths.repo import detect_repo_root
+from infrastructure.paths.resolve import resolve_output_path, build_output_path
+
+# Detect repository root (unified function)
+root_dir = detect_repo_root()
+config_dir = root_dir / "config"
 
 # Resolve output path from config
 output_path = resolve_output_path(
-    root_dir=Path("."),
-    config_dir=Path("config/"),
+    root_dir=root_dir,
+    config_dir=config_dir,
     category="hpo",
     backbone="distilbert",
     study_hash="abc123"
@@ -30,23 +36,25 @@ path = build_output_path(
 
 The `paths` module provides path resolution and management:
 
+- **Repository root detection**: Unified `detect_repo_root()` function with configurable search strategies
 - **Path resolution**: Resolve output paths from configuration patterns
 - **Path building**: Build paths from patterns with placeholders
 - **Path validation**: Validate paths before creation
 - **Path parsing**: Parse paths to extract components (study hash, trial hash, etc.)
 - **Cache management**: Manage cache file paths and strategies
 - **Drive integration**: Handle Google Drive paths for Colab
-- **Project path resolution**: Find and resolve project root and config directories
+- **Project path utilities**: Infer config directories and resolve project paths
 
 ## Module Structure
 
 - `resolve.py`: Main path resolution functions
 - `config.py`: Path configuration loading
+- `repo.py`: Unified repository root detection
 - `parse.py`: Path parsing utilities
 - `validation.py`: Path validation
 - `cache.py`: Cache file path management
 - `drive.py`: Google Drive path resolution
-- `utils.py`: Project path utilities
+- `utils.py`: Project path utilities (includes deprecated wrappers)
 
 ## Usage
 
@@ -140,19 +148,58 @@ save_cache_with_dual_strategy(
 - `save_cache_with_dual_strategy(...)`: Save cache with local + drive backup
 - `load_cache_file(...)`: Load cache file
 
-### Project Paths
+### Repository Root Detection
 
-- `find_project_root(...)`: Find project root directory
-- `infer_config_dir(...)`: Infer config directory
-- `resolve_project_paths(...)`: Resolve project paths
+- `detect_repo_root(start_path: Optional[Path] = None, config_dir: Optional[Path] = None, output_dir: Optional[Path] = None, use_cache: Optional[bool] = None) -> Path`: **Unified repository root detection function** (canonical function). Uses configurable search strategies from `config/paths.yaml`. Returns `Path` (raises `ValueError` if not found).
+- `validate_repo_root(candidate: Path, config: Optional[dict] = None) -> bool`: Validate candidate directory is repository root. Checks required markers (config/, src/) and optional markers (.git, pyproject.toml).
+
+**Deprecated functions** (kept for backward compatibility):
+- `find_project_root(config_dir: Optional[Path] = None, output_dir: Optional[Path] = None, start_path: Optional[Path] = None) -> Path`: **Deprecated** - Use `detect_repo_root()` instead. Now a thin wrapper.
+- `infer_root_dir(config_dir: Optional[Path] = None, output_dir: Optional[Path] = None, start_path: Optional[Path] = None) -> Path`: **Deprecated** - Use `detect_repo_root()` instead. Now a thin wrapper.
+
+### Project Path Utilities
+
+- `infer_config_dir(config_dir: Optional[Path] = None, path: Optional[Path] = None, root_dir: Optional[Path] = None) -> Path`: Infer config directory. Uses `detect_repo_root()` internally if needed.
+- `resolve_project_paths(output_dir: Optional[Path] = None, config_dir: Optional[Path] = None, start_path: Optional[Path] = None) -> tuple[Path, Path]`: Resolve both root_dir and config_dir. Uses `detect_repo_root()` internally.
 
 For detailed signatures, see source code.
 
+## Repository Root Detection
+
+The unified `detect_repo_root()` function provides configurable repository root detection across all platforms:
+
+```python
+from infrastructure.paths.repo import detect_repo_root
+
+# Auto-detect from current directory
+root_dir = detect_repo_root()
+
+# From config directory
+root_dir = detect_repo_root(config_dir=Path("config"))
+
+# From output directory
+root_dir = detect_repo_root(output_dir=Path("outputs/hpo/local/distilbert"))
+
+# From start path
+root_dir = detect_repo_root(start_path=Path("src/training/core/trainer.py"))
+```
+
+**Search Strategy** (from config):
+1. From `config_dir` (if provided)
+2. From `output_dir` (find "outputs" directory, use parent)
+3. From `start_path` (search up directory tree)
+4. Workspace directories (from config)
+5. Platform-specific repo locations (Colab, Kaggle, AzureML)
+6. Current directory and parents (using markers from `base.*`)
+7. Fallback to cwd with warning
+
+**Configuration**: Repository root detection is configured in `config/paths.yaml` under the `repository_root` section. Markers are derived from the `base.*` section (single source of truth).
+
 #### Colab-Specific Behavior
 
-When running in Colab, checkpoints and outputs are often stored in Google Drive (`/content/drive/MyDrive/...`) while the project code is at `/content/resume-ner-azureml/`. This can cause path inference to fail when searching from Drive paths.
+When running in Colab, checkpoints and outputs are often stored in Google Drive (`/content/drive/MyDrive/...`) while the project code is at `/content/resume-ner-azureml/`. The unified `detect_repo_root()` function handles this automatically by checking platform-specific locations from config.
 
-**Best Practice:** When calling functions that use path inference (e.g., `infer_config_dir()`, `find_project_root()`), prefer passing explicit `config_dir` or `root_dir` parameters instead of relying on inference from checkpoint/output paths.
+**Best Practice:** When calling functions that use path inference (e.g., `infer_config_dir()`, `detect_repo_root()`), prefer passing explicit `config_dir` or `root_dir` parameters instead of relying on inference from checkpoint/output paths.
 
 **Example:**
 ```python
@@ -160,7 +207,8 @@ When running in Colab, checkpoints and outputs are often stored in Google Drive 
 config_dir = infer_config_dir(path=checkpoint_dir)  # checkpoint_dir = /content/drive/MyDrive/...
 
 # ✅ Preferred: Pass explicit config_dir
-config_dir = root_dir / "config"  # root_dir = /content/resume-ner-azureml
+root_dir = detect_repo_root()  # Uses platform-specific locations from config
+config_dir = root_dir / "config"
 ```
 
 Functions that accept explicit `config_dir` or `root_dir` parameters will use them directly, avoiding inference issues.

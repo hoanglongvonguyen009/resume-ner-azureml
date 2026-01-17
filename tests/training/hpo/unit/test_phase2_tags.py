@@ -297,21 +297,16 @@ class TestSetPhase2HpoTags:
         mock_build_hash.return_value = "hash123"
         
         # Use legacy 'goal' key
-        mock_hpo_config["objective"] = {"metric": "macro-f1", "goal": "maximize"}
+        # Use objective.direction (current format) - goal key was removed per FINISHED deprecation plan
+        mock_hpo_config["objective"] = {"metric": "macro-f1", "direction": "maximize"}
         
-        import warnings
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            _set_phase2_hpo_tags(
-                parent_run_id="run123",
-                data_config=mock_data_config,
-                hpo_config=mock_hpo_config,
-                train_config=mock_train_config,
-                backbone="distilbert",
-            )
-            
-            # Should warn about deprecated key
-            assert len(w) > 0
+        _set_phase2_hpo_tags(
+            parent_run_id="run123",
+            data_config=mock_data_config,
+            hpo_config=mock_hpo_config,
+            train_config=mock_train_config,
+            backbone="distilbert",
+        )
         
         # Check that maximize was set (from goal)
         call_args_list = mock_client.set_tag.call_args_list

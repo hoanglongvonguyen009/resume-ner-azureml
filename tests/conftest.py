@@ -236,6 +236,16 @@ def pytest_runtest_logstart(nodeid, location):
             pass
 
 
+# Clear repository root cache before each test to ensure test isolation
+@pytest.fixture(autouse=True)
+def clear_repo_root_cache():
+    """Clear repository root cache before each test to ensure test isolation."""
+    import infrastructure.paths.repo as repo_module
+    repo_module._detected_root_cache = None
+    yield
+    repo_module._detected_root_cache = None
+
+
 def pytest_runtest_logreport(report):
     """Log test results and output to file."""
     global _pytest_tee, _pytest_log_file

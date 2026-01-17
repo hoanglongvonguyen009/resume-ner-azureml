@@ -6,24 +6,43 @@ globs:
 alwaysApply: true
 ---
 
+
 # Implementation Plan Rules
 
 Implementation plans document multi-step refactoring, feature work, or architectural changes. They must be structured, trackable, and avoid common failure modes.
 
 ## Location and Naming
 
-- **Location**: All plans must be placed in `docs/implementation_plans/`
-- **Naming template**: Use one of these patterns:
-  - **Master/ongoing plans**: `MASTER-<kebab-case-description>.plan.md`
-    - Example: `MASTER-mypy-type-safety-rollout.plan.md`
-  - **Feature-specific plans**: `<kebab-case-description>-<short-hash>.plan.md`
-    - Example: `consolidate-paths-and-naming-to-src-level-c536724f.plan.md`
-  - **Completed plans**: Prefix with `FINISHED-` when ALL steps are complete
-    - Example: `FINISHED-MASTER-mypy-type-safety-rollout.plan.md`
-    - Preferred format: `FINISHED-MASTER-<kebab-case-description>.plan.md`
-    - Alternative: `MASTER-<kebab-case-description>-FINISHED.plan.md` (less preferred)
+- **Location**: All implementation plans must be placed in `docs/implementation_plans/`
 
-### Required Structure
+- **Timestamp requirement**: All plan filenames **must include a date and time component placed immediately after the leading plan type marker**.
+  - **Format**: `YYYYMMDD-HHMM` (24-hour clock, zero-padded)
+  - **Timezone**: Author’s local timezone (or UTC if the repository standardizes on UTC)
+- **Naming templates**:
+
+### Master / ongoing plans
+
+- **Pattern**: `MASTER-<YYYYMMDD-HHMM>-<kebab-case-description>.plan.md`
+- **Example**: `MASTER-20260117-1412-mypy-type-safety-rollout.plan.md`
+
+### Feature-specific plans
+
+- Feature plans **do not use `MASTER`**, so the timestamp is placed at the **front**.
+- **Pattern**: `<YYYYMMDD-HHMM>-<kebab-case-description>-<short-hash>.plan.md`
+- **Example**: `20260117-1412-consolidate-repo-root-detection-c536724f.plan.md`
+
+### Completed plans
+
+- When **all steps are complete**, rename the file by adding a `FINISHED-` prefix.
+- The timestamp must appear **immediately after `FINISHED`**.
+- **Preferred patterns**:
+  - `FINISHED-<YYYYMMDD-HHMM>-MASTER-<kebab-case-description>.plan.md`
+  - `FINISHED-<YYYYMMDD-HHMM>-<kebab-case-description>-<short-hash>.plan.md`
+- **Examples**:
+  - `FINISHED-20260117-1412-MASTER-mypy-type-safety-rollout.plan.md`
+  - `FINISHED-20260117-1412-consolidate-repo-root-detection-c536724f.plan.md`
+
+## Required Structure
 
 Every plan must include:
 
@@ -32,7 +51,7 @@ Every plan must include:
 3. **Steps section**: Broken down into discrete, actionable steps
 4. **Success criteria**: Measurable outcomes for each step and overall goal
 
-### Step Tracking
+## Step Tracking
 
 - **Mark steps with status indicators**:
   - ✅ `[x]` or `✅` for completed steps
@@ -42,7 +61,7 @@ Every plan must include:
 - **Update status section** at the top of the document when steps are completed
 - **Rename file** to include `FINISHED-` prefix when ALL steps are complete
 
-### Summary Documents
+## Summary Documents
 
 Summary documents capture the final outcome of a completed implementation plan.
 
@@ -76,8 +95,7 @@ Summary documents capture the final outcome of a completed implementation plan.
   - One summary per completed plan
   - Do **not** edit summaries after completion except for minor clarifications
 
-
-### Step Definition Requirements
+## Step Definition Requirements
 
 Each step must:
 
@@ -108,21 +126,21 @@ Each step must:
 - Refactor the codebase to improve structure
 ```
 
-### Avoid Common Failure Modes
+## Avoid Common Failure Modes
 
 - **❌ Do not write "fluffy" steps**: Avoid vague descriptions like "refactor code", "improve structure", "clean up" without defining what "done" means
 - **❌ Do not create overlapping plans**: Before creating a new plan, search `docs/implementation_plans/` for existing plans covering the same goal. Update the existing plan instead (reuse-first principle)
 - **❌ Do not skip verification**: Every step must have a way to verify completion
 - **❌ Do not mix concerns**: Keep each plan focused on one coherent goal
 
-### Plan Lifecycle
+## Plan Lifecycle
 
 1. **Create**: When starting a new multi-step effort, create a plan following this structure
 2. **Update**: As steps are completed, mark them and update the status section
 3. **Complete**: When all steps are done, rename the file to include `FINISHED-` prefix
 4. **Archive**: Completed plans remain in the directory for reference
 
-### Example Plan Structure
+## Example Plan Structure
 
 ```markdown
 # Plan Title
@@ -167,7 +185,7 @@ Detailed description of what needs to be done.
 - Overall goal 2 achieved
 ```
 
-### Reuse-First for Plans
+## Reuse-First for Plans
 
 Before creating a new plan:
 

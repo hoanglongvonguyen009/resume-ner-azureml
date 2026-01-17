@@ -29,17 +29,22 @@ def auto_clean_mlflow_db(clean_mlflow_db):
 
 @pytest.fixture
 def tmp_config_dir(tmp_path):
-    """Create a temporary config directory with mlflow.yaml."""
+    """Create a temporary config directory with mlflow.yaml and proper project structure."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()  # Required for repository root validation
     return config_dir
 
 
 class TestBenchmarkTrackingEnabled:
     """Test tracking.benchmark.enabled option."""
 
-    def test_benchmark_tracking_enabled_creates_run(self, tmp_config_dir, tmp_path):
+    def test_benchmark_tracking_enabled_creates_run(self, tmp_config_dir, tmp_path, monkeypatch):
         """Test that benchmark tracking creates run when enabled=true."""
+        # Change to tmp_path to avoid finding actual project root
+        monkeypatch.chdir(tmp_path)
+        
         # Create mlflow.yaml with benchmark enabled
         mlflow_yaml = tmp_config_dir / "mlflow.yaml"
         mlflow_yaml.write_text("""
@@ -74,8 +79,11 @@ tracking:
             # Should have created a run
             assert mock_start_run.called
 
-    def test_benchmark_tracking_disabled_skips_run(self, tmp_config_dir, tmp_path):
+    def test_benchmark_tracking_disabled_skips_run(self, tmp_config_dir, tmp_path, monkeypatch):
         """Test that benchmark tracking skips run creation when enabled=false."""
+        # Change to tmp_path to avoid finding actual project root
+        monkeypatch.chdir(tmp_path)
+        
         # Create mlflow.yaml with benchmark disabled
         mlflow_yaml = tmp_config_dir / "mlflow.yaml"
         mlflow_yaml.write_text("""
@@ -106,7 +114,7 @@ tracking:
 class TestTrainingTrackingEnabled:
     """Test tracking.training.enabled option."""
 
-    def test_training_tracking_enabled_creates_run(self, tmp_config_dir, tmp_path):
+    def test_training_tracking_enabled_creates_run(self, tmp_config_dir, tmp_path, monkeypatch):
         """Test that training tracking creates run when enabled=true."""
         # Create mlflow.yaml with training enabled
         mlflow_yaml = tmp_config_dir / "mlflow.yaml"
@@ -143,7 +151,7 @@ tracking:
             # Should have created a run
             assert mock_start_run.called
 
-    def test_training_tracking_disabled_skips_run(self, tmp_config_dir, tmp_path):
+    def test_training_tracking_disabled_skips_run(self, tmp_config_dir, tmp_path, monkeypatch):
         """Test that training tracking skips run creation when enabled=false."""
         # Create mlflow.yaml with training disabled
         mlflow_yaml = tmp_config_dir / "mlflow.yaml"
@@ -176,7 +184,7 @@ tracking:
 class TestConversionTrackingEnabled:
     """Test tracking.conversion.enabled option."""
 
-    def test_conversion_tracking_enabled_creates_run(self, tmp_config_dir, tmp_path):
+    def test_conversion_tracking_enabled_creates_run(self, tmp_config_dir, tmp_path, monkeypatch):
         """Test that conversion tracking creates run when enabled=true."""
         # Create mlflow.yaml with conversion enabled
         mlflow_yaml = tmp_config_dir / "mlflow.yaml"
@@ -213,7 +221,7 @@ tracking:
             # Should have created a run
             assert mock_start_run.called
 
-    def test_conversion_tracking_disabled_skips_run(self, tmp_config_dir, tmp_path):
+    def test_conversion_tracking_disabled_skips_run(self, tmp_config_dir, tmp_path, monkeypatch):
         """Test that conversion tracking skips run creation when enabled=false."""
         # Create mlflow.yaml with conversion disabled
         mlflow_yaml = tmp_config_dir / "mlflow.yaml"
@@ -246,8 +254,11 @@ tracking:
 class TestLogArtifactsOptions:
     """Test tracking.*.log_* options control artifact logging."""
 
-    def test_benchmark_log_artifacts_disabled_skips_logging(self, tmp_config_dir, tmp_path):
+    def test_benchmark_log_artifacts_disabled_skips_logging(self, tmp_config_dir, tmp_path, monkeypatch):
         """Test that benchmark artifact logging is skipped when log_artifacts=false."""
+        # Change to tmp_path to avoid finding actual project root
+        monkeypatch.chdir(tmp_path)
+        
         mlflow_yaml = tmp_config_dir / "mlflow.yaml"
         mlflow_yaml.write_text("""
 tracking:
@@ -291,8 +302,11 @@ tracking:
                     # Should NOT have logged artifact
                     assert not mock_log_artifact.called
 
-    def test_training_log_checkpoint_disabled_skips_logging(self, tmp_config_dir, tmp_path):
+    def test_training_log_checkpoint_disabled_skips_logging(self, tmp_config_dir, tmp_path, monkeypatch):
         """Test that training checkpoint logging is skipped when log_checkpoint=false."""
+        # Change to tmp_path to avoid finding actual project root
+        monkeypatch.chdir(tmp_path)
+        
         mlflow_yaml = tmp_config_dir / "mlflow.yaml"
         mlflow_yaml.write_text("""
 tracking:
@@ -330,8 +344,11 @@ tracking:
                     # Should NOT have logged checkpoint
                     assert not mock_log_artifacts.called
 
-    def test_training_log_metrics_json_disabled_skips_logging(self, tmp_config_dir, tmp_path):
+    def test_training_log_metrics_json_disabled_skips_logging(self, tmp_config_dir, tmp_path, monkeypatch):
         """Test that training metrics.json logging is skipped when log_metrics_json=false."""
+        # Change to tmp_path to avoid finding actual project root
+        monkeypatch.chdir(tmp_path)
+        
         mlflow_yaml = tmp_config_dir / "mlflow.yaml"
         mlflow_yaml.write_text("""
 tracking:
@@ -375,8 +392,11 @@ tracking:
                     artifact_calls = [call for call in mock_log_artifact.call_args_list if "metrics.json" in str(call)]
                     assert len(artifact_calls) == 0
 
-    def test_conversion_log_onnx_model_disabled_skips_logging(self, tmp_config_dir, tmp_path):
+    def test_conversion_log_onnx_model_disabled_skips_logging(self, tmp_config_dir, tmp_path, monkeypatch):
         """Test that conversion ONNX model logging is skipped when log_onnx_model=false."""
+        # Change to tmp_path to avoid finding actual project root
+        monkeypatch.chdir(tmp_path)
+        
         mlflow_yaml = tmp_config_dir / "mlflow.yaml"
         mlflow_yaml.write_text("""
 tracking:
@@ -417,8 +437,11 @@ tracking:
                     onnx_calls = [call for call in mock_log_artifact.call_args_list if "model.onnx" in str(call) or "onnx" in str(call).lower()]
                     assert len(onnx_calls) == 0
 
-    def test_conversion_log_conversion_log_disabled_skips_logging(self, tmp_config_dir, tmp_path):
+    def test_conversion_log_conversion_log_disabled_skips_logging(self, tmp_config_dir, tmp_path, monkeypatch):
         """Test that conversion log logging is skipped when log_conversion_log=false."""
+        # Change to tmp_path to avoid finding actual project root
+        monkeypatch.chdir(tmp_path)
+        
         mlflow_yaml = tmp_config_dir / "mlflow.yaml"
         mlflow_yaml.write_text("""
 tracking:

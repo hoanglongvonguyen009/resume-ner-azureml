@@ -91,50 +91,24 @@ def detect_notebook_environment() -> NotebookEnvironment:
 
 def find_repository_root(start_dir: Optional[Path] = None) -> Optional[Path]:
     """
-    Find repository root directory by searching for config/ and src/ directories.
-
-    Searches:
-    1. Current directory and parents
-    2. Platform-specific common locations (Colab/Kaggle)
-
+    Backward-compatible wrapper for detect_repo_root().
+    
+    .. deprecated::
+        Use `detect_repo_root()` from `infrastructure.paths` instead.
+        This function is kept for backward compatibility with notebooks.
+    
     Args:
-        start_dir: Directory to start searching from. If None, uses current working directory.
-
+        start_dir: Directory to start searching from (mapped to start_path).
+    
     Returns:
         Path to repository root directory, or None if not found.
     """
-    if start_dir is None:
-        start_dir = Path.cwd()
-
-    current_dir = Path(start_dir).resolve()
-
-    # Check current directory first
-    if (current_dir / "config").exists() and (current_dir / "src").exists():
-        return current_dir
-
-    # Search up the directory tree
-    for parent in current_dir.parents:
-        if (parent / "config").exists() and (parent / "src").exists():
-            return parent
-
-    # Platform-specific common locations
-    platform = detect_platform()
-    search_locations: list[Path] = []
-    if platform == "colab":
-        search_locations = [Path("/content/resume-ner-azureml"), Path("/content")]
-    elif platform == "kaggle":
-        search_locations = [Path("/kaggle/working/resume-ner-azureml"), Path("/kaggle/working")]
-
-    for location in search_locations:
-        if location.exists():
-            if (location / "config").exists() and (location / "src").exists():
-                return location
-            if location.is_dir():
-                for subdir in location.iterdir():
-                    if subdir.is_dir() and (subdir / "config").exists() and (subdir / "src").exists():
-                        return subdir
-
-    return None
+    from infrastructure.paths.repo import detect_repo_root
+    
+    try:
+        return detect_repo_root(start_path=start_dir)
+    except ValueError:
+        return None
 
 
 @dataclass

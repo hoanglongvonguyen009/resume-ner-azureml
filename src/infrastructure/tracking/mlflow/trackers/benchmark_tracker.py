@@ -288,8 +288,8 @@ class MLflowBenchmarkTracker(BaseTracker):
                                 # Infer root_dir from output_dir
                                 root_dir = None
                                 if output_dir:
-                                    from infrastructure.paths.utils import find_project_root
-                                    root_dir = find_project_root(output_dir=output_dir)
+                                    from infrastructure.paths.repo import detect_repo_root
+                                    root_dir = detect_repo_root(output_dir=output_dir)
 
                                 if root_dir is None:
                                     # Fallback: try to find project root by looking for config directory
@@ -346,8 +346,8 @@ class MLflowBenchmarkTracker(BaseTracker):
                         # Derive project root correctly by finding "outputs" directory
                         root_dir = None
                         if output_dir:
-                            from infrastructure.paths.utils import find_project_root
-                            root_dir = find_project_root(output_dir=output_dir)
+                            from infrastructure.paths.repo import detect_repo_root
+                            root_dir = detect_repo_root(output_dir=output_dir)
                         
                         if root_dir is None:
                             # Fallback: try to find project root by looking for config directory

@@ -25,12 +25,14 @@ def _make_mlflow_run(*, run_id: str, experiment_id: str = "exp-1", tags: dict[st
 
 @pytest.fixture
 def root_dir_with_config(tmp_path: Path) -> Path:
-    """Create a root directory with config/ directory."""
+    """Create a root directory with config/ and src/ directories (required for repo root validation)."""
     root = tmp_path / "workspace"
     root.mkdir()
     config_dir = root / "config"
     config_dir.mkdir()
     (config_dir / "tags.yaml").write_text("schema_version: 1")
+    src_dir = root / "src"
+    src_dir.mkdir()  # Required for repository root validation
     return root
 
 

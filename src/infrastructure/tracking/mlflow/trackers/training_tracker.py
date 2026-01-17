@@ -168,8 +168,8 @@ class MLflowTrainingTracker(BaseTracker):
                         from infrastructure.metadata.training import save_metadata_with_fingerprints
 
                         # Build root_dir from output_dir
-                        from infrastructure.paths.utils import find_project_root
-                        root_dir = find_project_root(output_dir=output_dir)
+                        from infrastructure.paths.repo import detect_repo_root
+                        root_dir = detect_repo_root(output_dir=output_dir)
 
                         # Save MLflow run information to metadata
                         mlflow_info = {

@@ -100,8 +100,8 @@ def build_mlflow_run_name(
     """
     # Infer root_dir from output_dir or config_dir if not provided
     if root_dir is None:
-        from infrastructure.paths.utils import find_project_root
-        root_dir = find_project_root(config_dir=config_dir, output_dir=output_dir)
+        from infrastructure.paths.repo import detect_repo_root
+        root_dir = detect_repo_root(config_dir=config_dir, output_dir=output_dir)
 
     naming_config = get_naming_config(config_dir)
     run_name_config = naming_config.get("run_name", {})

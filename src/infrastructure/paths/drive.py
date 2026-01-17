@@ -46,12 +46,13 @@ def get_drive_backup_base(config_dir: Path) -> Optional[Path]:
         config_dir: Config directory.
 
     Returns:
-        Base Drive backup path (e.g., /content/drive/MyDrive/resume-ner-checkpoints), 
+        Base Drive backup path (e.g., /content/drive/MyDrive/resume-ner-azureml), 
         or None if not configured.
+        The backup_base_dir comes from config and references project.name.
 
     Examples:
         get_drive_backup_base(CONFIG_DIR)
-        # -> Path("/content/drive/MyDrive/resume-ner-checkpoints")
+        # -> Path("/content/drive/MyDrive/resume-ner-azureml")
     """
     paths_config = load_paths_config(config_dir)
     drive_config = paths_config.get("drive", {})
@@ -66,9 +67,9 @@ def get_drive_backup_base(config_dir: Path) -> Optional[Path]:
 
 
 def get_drive_backup_path(
-    root_dir: Path,
-    config_dir: Path,
-    local_path: Path
+    local_path: Path,
+    root_dir: Optional[Path] = None,
+    config_dir: Optional[Path] = None,
 ) -> Optional[Path]:
     """
     Convert local output path to Drive backup path, mirroring structure.
@@ -78,22 +79,31 @@ def get_drive_backup_path(
 
     This function uses DriveBackupStore.drive_path_for() internally to eliminate
     code duplication while maintaining backward compatibility.
+    Auto-detects root_dir and config_dir if not provided.
 
     Args:
-        root_dir: Project root directory.
-        config_dir: Config directory.
         local_path: Local file or directory path to backup (must be within outputs/).
+        root_dir: Optional project root directory (auto-detected if not provided).
+        config_dir: Optional config directory (auto-detected if not provided).
 
     Returns:
         Equivalent Drive backup path, or None if Drive not configured or path outside outputs/.
 
     Examples:
         Local: outputs/hpo/distilbert/trial_0/checkpoint/
-        Drive:  /content/drive/MyDrive/resume-ner-checkpoints/outputs/hpo/distilbert/trial_0/checkpoint/
+        Drive:  /content/drive/MyDrive/resume-ner-azureml/outputs/hpo/distilbert/trial_0/checkpoint/
 
         Local: outputs/cache/best_configurations/latest_best_configuration.json
-        Drive:  /content/drive/MyDrive/resume-ner-checkpoints/outputs/cache/best_configurations/latest_best_configuration.json
+        Drive:  /content/drive/MyDrive/resume-ner-azureml/outputs/cache/best_configurations/latest_best_configuration.json
     """
+    # Auto-detect root_dir and config_dir if not provided
+    if root_dir is None or config_dir is None:
+        from infrastructure.paths.repo import detect_repo_root
+        if root_dir is None:
+            root_dir = detect_repo_root()
+        if config_dir is None:
+            config_dir = root_dir / "config"
+    
     # Get Drive base directory from config
     drive_base = get_drive_backup_base(config_dir)
     if not drive_base:

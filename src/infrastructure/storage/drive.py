@@ -85,7 +85,7 @@ class DriveBackupStore:
     """
 
     root_dir: Path  # Project root (e.g., /content/resume-ner-azureml)
-    # Drive backup base (e.g., /content/drive/MyDrive/resume-ner-checkpoints)
+    # Drive backup base (e.g., /content/drive/MyDrive/resume-ner-azureml)
     backup_root: Path
     only_outputs: bool = True  # Enforce outputs/ restriction
     dry_run: bool = False  # For testing
@@ -395,23 +395,32 @@ def mount_colab_drive(mount_point: str = "/content/drive") -> Path:
 
 
 def create_colab_store(
-    root_dir: Path,
-    config_dir: Path,
+    root_dir: Optional[Path] = None,
+    config_dir: Optional[Path] = None,
     mount_point: str = "/content/drive",
 ) -> Optional[DriveBackupStore]:
     """
     Factory function to create DriveBackupStore for Colab environment.
 
     Handles mounting and configuration reading.
+    Auto-detects root_dir and config_dir if not provided.
 
     Args:
-        root_dir: Project root directory
-        config_dir: Config directory (for paths.yaml)
+        root_dir: Optional project root directory (auto-detected if not provided)
+        config_dir: Optional config directory (auto-detected if not provided)
         mount_point: Drive mount point
 
     Returns:
         DriveBackupStore if configured, None if backup disabled
     """
+    # Auto-detect root_dir and config_dir if not provided
+    if root_dir is None or config_dir is None:
+        from infrastructure.paths.repo import detect_repo_root
+        if root_dir is None:
+            root_dir = detect_repo_root()
+        if config_dir is None:
+            config_dir = root_dir / "config"
+    
     # Mount Drive
     try:
         drive_root = mount_colab_drive(mount_point)
@@ -426,8 +435,10 @@ def create_colab_store(
 
     if not backup_base:
         # Fallback to default (use project name to preserve structure)
-        # Try to infer project name from root_dir, default to "resume-ner-azureml"
-        project_name = root_dir.name if root_dir.name else "resume-ner-azureml"
+        # Try to infer project name from root_dir, or get from config
+        from infrastructure.paths.config import load_paths_config
+        paths_config = load_paths_config(config_dir)
+        project_name = paths_config.get("project", {}).get("name", root_dir.name if root_dir else "resume-ner-azureml")
         backup_base = drive_root / project_name
         backup_base.mkdir(parents=True, exist_ok=True)
         print(f"Using default backup location: {backup_base}")

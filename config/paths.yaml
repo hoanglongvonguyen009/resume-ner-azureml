@@ -17,6 +17,19 @@ schema_version: 2
 # ============================================================================
 
 # ----------------------------------------------------------------------------
+# Project Configuration
+# ----------------------------------------------------------------------------
+# Single source of truth for project name and identifiers.
+# This is referenced throughout the config to avoid duplication.
+#
+# NOTE: For paths that contain the project name as part of a string,
+# the project name is hardcoded but should match this value.
+# Consider using a post-processing step to replace placeholders if needed.
+#
+project:
+  name: &project_name "resume-ner-azureml"  # Project name used in paths and identifiers
+
+# ----------------------------------------------------------------------------
 # Base Directories
 # ----------------------------------------------------------------------------
 # Top-level directories relative to project root.
@@ -45,6 +58,7 @@ base:
 env_overrides:
   colab:
     base:
+      # NOTE: Project name "resume-ner-azureml" should match project.name above
       outputs: "/content/drive/MyDrive/resume-ner-azureml/outputs"
   azureml:
     base:
@@ -280,88 +294,124 @@ patterns:
 #   cache = load_cache_file(ROOT_DIR, CONFIG_DIR, "final_training", 
 #                          specific_identifier="20251228_000723")
 #
+# Default cache strategy settings (applied to all strategies unless overridden)
+# These anchors are used to avoid duplication across cache strategies
+cache_strategy_defaults: &cache_strategy_defaults
+  strategy: "dual"
+  timestamped: &cache_timestamped_defaults
+    enabled: true
+    keep_all: true
+    max_files: null  # null = keep all, or set number (e.g., 50) to limit
+  latest: &cache_latest_defaults
+    enabled: true
+    include_timestamped_ref: true
+  index: &cache_index_defaults
+    enabled: true
+    max_entries: 20  # Keep last N entries in index (oldest entries removed)
+    include_metadata: true  # Include full metadata in index entries
+
 cache_strategies:
   # Best configurations cache (from HPO selection)
   best_configurations:
-    # Strategy type: "dual" = timestamped + latest + index
-    # Other options: "latest_only", "timestamped_only" (not commonly used)
-    strategy: "dual"
-    
-    # Timestamped file settings
-    # These are the historical records, one per save operation
+    <<: *cache_strategy_defaults
     timestamped:
-      enabled: true
+      <<: *cache_timestamped_defaults
       pattern: "best_config_{backbone}_{trial}_{timestamp}.json"
-      # Keep all timestamped files (no auto-cleanup)
-      # Set to false to enable cleanup, or set max_files to limit count
-      keep_all: true
-      max_files: null  # null = keep all, or set number (e.g., 50) to limit
-    
-    # Latest pointer file settings
-    # This file always points to the most recent timestamped file
     latest:
-      enabled: true
+      <<: *cache_latest_defaults
       filename: "latest_best_configuration.json"
-      # Include reference to which timestamped file this is pointing to
-      include_timestamped_ref: true
-    
-    # Index file settings
-    # Maintains a searchable list of all cache entries
     index:
-      enabled: true
+      <<: *cache_index_defaults
       filename: "index.json"
-      max_entries: 20  # Keep last N entries in index (oldest entries removed)
-      include_metadata: true  # Include full metadata (metrics, params) in index entries
   
   # Final training cache strategy
   # Stores metadata about final training runs (checkpoint paths, metrics, config)
   final_training:
-    strategy: "dual"
-    
-    # Timestamped file settings
+    <<: *cache_strategy_defaults
     timestamped:
-      enabled: true
+      <<: *cache_timestamped_defaults
       pattern: "final_training_{backbone}_{run_id}_{timestamp}.json"
-      keep_all: true
-      max_files: null
-    
-    # Latest pointer file settings
     latest:
-      enabled: true
+      <<: *cache_latest_defaults
       filename: "latest_final_training_cache.json"
-      include_timestamped_ref: true
-    
-    # Index file settings
     index:
-      enabled: true
+      <<: *cache_index_defaults
       filename: "final_training_index.json"
-      max_entries: 20  # Keep last 20 training runs in index
-      include_metadata: true  # Include metrics, config, checkpoint path in index
+      # max_entries and include_metadata inherited from cache_index_defaults
   
   # Best model selection cache strategy
   # Stores metadata about best model selection results (run_id, metrics, config)
   best_model_selection:
-    strategy: "dual"
-    
-    # Timestamped file settings
+    <<: *cache_strategy_defaults
     timestamped:
-      enabled: true
+      <<: *cache_timestamped_defaults
       pattern: "best_model_selection_{backbone}_{identifier}_{timestamp}.json"
-      keep_all: true
-      max_files: null
-    
-    # Latest pointer file settings
     latest:
-      enabled: true
+      <<: *cache_latest_defaults
       filename: "latest_best_model_selection_cache.json"
-      include_timestamped_ref: true
-    
-    # Index file settings
     index:
-      enabled: true
+      <<: *cache_index_defaults
       filename: "best_model_selection_index.json"
-      max_entries: 20  # Keep last 20 selections in index
-      include_metadata: true  # Include experiment info, cache key, best model in index
+      # max_entries and include_metadata inherited from cache_index_defaults
+
+# ----------------------------------------------------------------------------
+# Repository Root Detection Configuration
+# ----------------------------------------------------------------------------
+# Configuration for unified repository root detection.
+# 
+# This section defines how to detect the repository root directory across
+# different platforms and environments. It reuses markers from the `base.*`
+# section (single source of truth) and adds platform-specific search locations.
+#
+# Key Principles:
+#   - Markers derived from `base.*` section (no duplication)
+#   - Platform repo locations ≠ output locations (outputs in env_overrides)
+#   - Focus only on repo root discovery, not output routing
+#
+# Usage:
+#   from infrastructure.paths.repo import detect_repo_root
+#   root_dir = detect_repo_root()
+#
+repository_root:
+  # Derive markers from existing base section (single source of truth)
+  # Uses base.config, base.src, etc. - no duplication
+  markers_from_base: true
+  
+  # Optional extra markers for stricter validation
+  # At least one of these should exist to prevent false positives
+  extra_markers:
+    - ".git"
+    - "pyproject.toml"
+    - "setup.cfg"
+  
+  # Workspace candidates (for VS Code/Cursor workspaces)
+  # These are checked when running in local environments
+  # NOTE: Project name "resume-ner-azureml" should match project.name above
+  workspace_candidates:
+    - "/workspaces/resume-ner-azureml"
+    - "/workspace/resume-ner-azureml"
+  
+  # Platform-specific REPO locations (NOT outputs - those are in env_overrides)
+  # These are where the repository code itself lives, not where outputs go
+  # Output routing is handled separately via env_overrides
+  # NOTE: Project name "resume-ner-azureml" should match project.name above
+  platform_candidates:
+    colab:
+      - "/content/resume-ner-azureml"
+    kaggle:
+      - "/kaggle/working/resume-ner-azureml"
+    azureml:
+      - "/mnt/resume-ner-azureml"
+  
+  # Search strategy configuration
+  search:
+    max_depth: 10  # Maximum depth to search up directory tree
+    fallback_to_cwd: true  # Fallback to current working directory if not found
+    warn_on_fallback: true  # Log warning when falling back to cwd
+  
+  # Optional caching
+  cache:
+    enabled: true  # Cache detected repository root (per process)
 
 # ----------------------------------------------------------------------------
 # Google Drive Backup Configuration (Colab only)
@@ -402,11 +452,8 @@ drive:
   # Base backup directory in Google Drive
   # Full path: {mount_point}/MyDrive/{backup_base_dir}
   # Changed from "resume-ner-checkpoints" to "resume-ner-azureml" to preserve project structure
-  backup_base_dir: "resume-ner-azureml"
-  
-  # Optional: Auto-restore from Drive on startup (default: false)
-  # When enabled, checks Drive for missing local files and restores them
-  auto_restore_on_startup: false
+  # Uses project.name from project section (single source of truth)
+  backup_base_dir: *project_name  # References project.name anchor
 
 # ----------------------------------------------------------------------------
 # Path normalization policy (for filesystem safety)
@@ -427,4 +474,3 @@ normalize_paths:
   lowercase: false
   max_component_length: 255
   max_path_length: 260
-
