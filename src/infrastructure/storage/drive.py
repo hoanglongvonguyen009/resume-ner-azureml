@@ -36,6 +36,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Callable, Literal, Optional
 
+from common.shared.platform_detection import is_drive_path
+
 
 class BackupAction(str, Enum):
     """Action taken during backup/restore operation."""
@@ -106,8 +108,15 @@ class DriveBackupStore:
             Equivalent path in backup_root
 
         Raises:
-            ValueError: If path is outside allowed scope
+            ValueError: If path is outside allowed scope or is a Drive path
         """
+        # Reject Drive paths early to prevent crashes
+        if is_drive_path(local_path):
+            raise ValueError(
+                f"Cannot compute Drive path for path already in Drive: {local_path}. "
+                f"Drive paths cannot be backed up to Drive."
+            )
+        
         # Ensure path is absolute and resolved
         local_path = Path(local_path).resolve()
         root_dir_resolved = self.root_dir.resolve()
@@ -141,6 +150,17 @@ class DriveBackupStore:
         Returns:
             BackupResult with operation details
         """
+        # Reject Drive paths early to prevent crashes
+        if is_drive_path(local_path):
+            # Cannot compute drive_path_for for Drive paths, so use local_path as dst
+            return BackupResult(
+                ok=False,
+                action=BackupAction.ERROR,
+                src=local_path,
+                dst=local_path,
+                reason="Cannot backup path already in Drive. Drive paths cannot be backed up to Drive.",
+            )
+        
         # Validate local_path exists
         if not local_path.exists():
             return BackupResult(

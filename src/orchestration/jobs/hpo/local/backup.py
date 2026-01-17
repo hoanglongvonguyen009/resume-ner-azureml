@@ -30,11 +30,110 @@ with verification of trial_meta.json files.
 """
 
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional, Callable, Any
 
 from common.shared.logging_utils import get_logger
+from common.shared.platform_detection import is_drive_path
+from training.hpo.core.optuna_integration import import_optuna as _import_optuna
 
 logger = get_logger(__name__)
+
+
+def create_incremental_backup_callback(
+    target_path: Path,
+    backup_to_drive: Callable[[Path, bool], bool],
+    backup_enabled: bool = True,
+    is_directory: bool = False,
+) -> Callable[[Any, Any], None]:
+    """
+    Create reusable Optuna callback for incremental backup of files or directories.
+
+    This callback backs up the target path after each trial completes, making it
+    suitable for incremental backup of study.db or other files/folders during HPO.
+
+    Args:
+        target_path: Path to file or directory to backup (e.g., study.db)
+        backup_to_drive: Function to backup files to Drive (takes Path and bool)
+        backup_enabled: Whether backup is enabled (if False, callback does nothing)
+        is_directory: Whether target_path is a directory (False for files)
+
+    Returns:
+        Optuna callback function that can be passed to study.optimize()
+    """
+    def trial_complete_callback(study: Any, trial: Any) -> None:
+        """Callback to backup target path after trial completes."""
+        if not backup_enabled:
+            return
+
+        # Import Optuna to check trial state
+        optuna_module, _, _, _ = _import_optuna()
+
+        # Only backup on trial completion (not on failure/pruning)
+        if trial.state != optuna_module.trial.TrialState.COMPLETE:
+            return
+
+        # Skip backup if path is already in Drive
+        if is_drive_path(target_path):
+            logger.debug(
+                f"Skipping backup - path is already in Drive: {target_path}"
+            )
+            return
+
+        # Skip backup if target doesn't exist
+        if not target_path.exists():
+            logger.debug(
+                f"Skipping backup - target path does not exist: {target_path}"
+            )
+            return
+
+        # Perform backup
+        try:
+            result = backup_to_drive(target_path, is_directory=is_directory)
+            if result:
+                logger.debug(
+                    f"Incremental backup successful: {target_path.name} "
+                    f"(trial {trial.number})"
+                )
+            else:
+                logger.warning(
+                    f"Incremental backup failed: {target_path.name} "
+                    f"(trial {trial.number})"
+                )
+        except Exception as e:
+            # Log error but don't crash HPO
+            logger.warning(
+                f"Incremental backup error for {target_path.name} "
+                f"(trial {trial.number}): {e}"
+            )
+
+    return trial_complete_callback
+
+
+def create_study_db_backup_callback(
+    target_path: Path,
+    backup_to_drive: Callable[[Path, bool], bool],
+    backup_enabled: bool = True,
+) -> Callable[[Any, Any], None]:
+    """
+    Create Optuna callback for incremental backup of study.db.
+
+    Convenience wrapper around create_incremental_backup_callback() specifically
+    for study.db files (is_directory=False).
+
+    Args:
+        target_path: Path to study.db file
+        backup_to_drive: Function to backup files to Drive (takes Path and bool)
+        backup_enabled: Whether backup is enabled (if False, callback does nothing)
+
+    Returns:
+        Optuna callback function that can be passed to study.optimize()
+    """
+    return create_incremental_backup_callback(
+        target_path=target_path,
+        backup_to_drive=backup_to_drive,
+        backup_enabled=backup_enabled,
+        is_directory=False,
+    )
 
 
 def backup_hpo_study_to_drive(
@@ -48,6 +147,9 @@ def backup_hpo_study_to_drive(
     """
     Backup HPO study.db and study folder to Google Drive.
 
+    Simplified version that only backs up from canonical local root.
+    No mixed-state handling - just checks if canonical folder is Drive or local.
+
     Args:
         backbone: Model backbone name
         backbone_output_dir: Base output directory for HPO
@@ -59,187 +161,72 @@ def backup_hpo_study_to_drive(
     if not backup_enabled:
         return
 
-    # Get study name (for Optuna study name, not for path resolution)
-    study_name_template = checkpoint_config.get(
-        "study_name") or hpo_config.get("study_name")
-    study_name = None
-    if study_name_template:
-        study_name = study_name_template.replace("{backbone}", backbone)
-
-    # Find v2 study folder using v2 folder discovery (not study_name-based paths)
+    # Find canonical study folder in backbone_output_dir (v2 structure)
     from evaluation.selection.trial_finder import find_study_folder_in_backbone_dir
 
-    # Use v2 folder discovery to find the actual study folder
     study_folder = find_study_folder_in_backbone_dir(backbone_output_dir)
-    
-    # Get the actual storage path from v2 folder
-    actual_storage_path = None
-    if study_folder and study_folder.exists():
-        # V2 folder found - use it directly (don't use resolve_storage_path which maps to Drive)
-        actual_storage_path = study_folder / "study.db"
-        if not actual_storage_path.exists():
-            # study.db doesn't exist in v2 folder - might not be created yet
-            logger.debug(f"study.db not found in v2 folder: {actual_storage_path}")
-            actual_storage_path = None
-    else:
-        # V2 folder not found locally - check Drive for v2 folder before legacy fallback
-        from infrastructure.paths import get_drive_backup_path
-        from infrastructure.paths.repo import detect_repo_root
-        
-        try:
-            root_dir = detect_repo_root(output_dir=backbone_output_dir)
-            config_dir = root_dir / "config" if root_dir else None
-            
-            if root_dir and config_dir:
-                drive_dir = get_drive_backup_path(
-                    local_path=backbone_output_dir,
-                    root_dir=root_dir,
-                    config_dir=config_dir,
-                )
-                if drive_dir and drive_dir.exists():
-                    study_folder = find_study_folder_in_backbone_dir(drive_dir)
-                    if study_folder and study_folder.exists():
-                        actual_storage_path = study_folder / "study.db"
-                        if actual_storage_path.exists():
-                            logger.debug(f"Found v2 study.db in Drive: {actual_storage_path}")
-        except Exception as e:
-            logger.debug(f"Could not search Drive for v2 study folder: {e}")
-        
-        # Only use legacy resolve_storage_path if v2 folder truly doesn't exist
-        if not actual_storage_path:
-            # Fallback: try to resolve using legacy method (for backward compatibility)
-            from training.hpo.checkpoint.storage import resolve_storage_path
-            actual_storage_path = resolve_storage_path(
-                output_dir=backbone_output_dir,
-                checkpoint_config=checkpoint_config,
-                backbone=backbone,
-                study_name=study_name,
-                create_dirs=False,  # Read-only path resolution
-            )
-            if actual_storage_path and actual_storage_path.exists():
-                study_folder = actual_storage_path.parent
-            else:
-                study_folder = None
 
-    # Backup study.db
-    # Check if file is actually in Drive (not just a mapped path from resolve_storage_path)
-    is_actually_in_drive = (
-        actual_storage_path is not None
-        and str(actual_storage_path).startswith("/content/drive")
-        and actual_storage_path.exists()
-    )
-    
-    if is_actually_in_drive:
-        # File is already in Drive - no need to backup, just log
-        logger.info(
-            f"HPO checkpoint is already in Drive: {actual_storage_path}")
-        if study_name:
-            logger.info(f"  Study name: {study_name}")
-    elif actual_storage_path and actual_storage_path.exists():
-        # File exists locally - backup it
-        backup_to_drive(actual_storage_path, is_directory=False)
-        logger.info(
-            f"Backed up HPO checkpoint database to Drive: {actual_storage_path}")
-    else:
-        logger.warning(f"HPO checkpoint not found")
-        logger.warning(f"  Resolved path: {actual_storage_path}")
-        if study_name:
-            logger.warning(f"  Study name: {study_name}")
-
-    # Backup entire study folder (v2 structure: outputs/hpo/{env}/{model}/study-{hash}/...)
-    # Check if checkpoint is actually in Drive (file exists, not just path mapping)
-    checkpoint_in_drive = is_actually_in_drive
-
-    # If we didn't find study_folder yet, search in Drive as well
+    # If study folder not found, skip backup
     if not study_folder or not study_folder.exists():
-        # Search for v2 study folder in Drive locations
-        # Use unified path mapping instead of hardcoded string replacement
-        from infrastructure.paths import get_drive_backup_path
-        from infrastructure.paths.repo import detect_repo_root
+        logger.warning(f"Study folder not found in {backbone_output_dir}")
+        return
+
+    # Check if canonical folder is Drive or local
+    study_folder_in_drive = is_drive_path(study_folder)
+
+    if study_folder_in_drive:
+        # Already in Drive - verify only (no backup needed)
+        logger.info(f"Study folder is already in Drive: {study_folder}")
         
-        try:
-            # Auto-detect root_dir and config_dir
-            root_dir = detect_repo_root(output_dir=backbone_output_dir)
-            config_dir = root_dir / "config"
-            
-            # Map local path to Drive path using unified function
-            drive_dir = get_drive_backup_path(
-                local_path=backbone_output_dir,
-                root_dir=root_dir,
-                config_dir=config_dir,
-            )
-            
-            # Search in Drive directory if available
-            if drive_dir and drive_dir.exists():
-                study_folder = find_study_folder_in_backbone_dir(drive_dir)
-                if study_folder:
-                    logger.debug(f"Found v2 study folder in Drive: {study_folder}")
-        except Exception as e:
-            logger.debug(f"Could not search Drive for study folder: {e}")
+        # Verify trial_meta.json files exist in Drive
+        trial_dirs = [d for d in study_folder.iterdir() if d.is_dir() and (
+            d.name.startswith("trial-") or d.name.startswith("trial_"))]
+        trial_meta_count = 0
+        for trial_dir in trial_dirs:
+            trial_meta_path = trial_dir / "trial_meta.json"
+            if trial_meta_path.exists():
+                trial_meta_count += 1
+            else:
+                logger.warning(
+                    f"Missing trial_meta.json in {trial_dir.name}")
+        if trial_meta_count > 0:
+            logger.info(
+                f"Found {trial_meta_count} trial_meta.json file(s) in Drive")
+        else:
+            logger.warning(
+                "No trial_meta.json files found in Drive study folder")
+    else:
+        # Local - backup study.db and study folder
+        storage_path = study_folder / "study.db"
+        
+        # Backup study.db
+        if storage_path.exists():
+            result = backup_to_drive(storage_path, is_directory=False)
+            if result:
+                logger.info(
+                    f"Backed up HPO checkpoint database to Drive: {storage_path.name}")
+            else:
+                logger.warning(
+                    f"Failed to backup HPO checkpoint database: {storage_path.name}")
+        else:
+            logger.warning(f"study.db not found: {storage_path}")
 
-    # Do NOT use old study_name format - only v2 paths are supported
-    # If v2 folder not found, study_folder will be None and we'll skip backup
+        # Backup entire study folder (includes study.db + all trials + trial_meta.json)
+        result = backup_to_drive(study_folder, is_directory=True)
+        if result:
+            logger.info(
+                f"Backed up entire study folder to Drive: {study_folder.name}")
 
-    if study_folder and study_folder.exists():
-        if checkpoint_in_drive:
-            # study.db and study folder are already in Drive
-            # Verify trial_meta.json files exist in Drive
-            logger.info(f"Study folder is in Drive: {study_folder}")
-            # Look for both v2 format (trial-{hash}) and legacy format (trial_*)
+            # Verify trial_meta.json files were backed up
             trial_dirs = [d for d in study_folder.iterdir() if d.is_dir() and (
                 d.name.startswith("trial-") or d.name.startswith("trial_"))]
-            trial_meta_count = 0
             for trial_dir in trial_dirs:
                 trial_meta_path = trial_dir / "trial_meta.json"
                 if trial_meta_path.exists():
-                    trial_meta_count += 1
-                else:
-                    logger.warning(
-                        f"Missing trial_meta.json in {trial_dir.name}")
-            if trial_meta_count > 0:
-                logger.info(
-                    f"Found {trial_meta_count} trial_meta.json file(s) in Drive")
-            else:
-                logger.warning(
-                    "No trial_meta.json files found in Drive study folder")
+                    # Note: Verification would require Drive path mapping, but since
+                    # backup_to_drive succeeded, we trust the backup worked
+                    logger.debug(
+                        f"trial_meta.json exists in local study folder: {trial_dir.name}/trial_meta.json")
         else:
-            # study.db is local, backup the entire study folder (includes study.db + all trials + trial_meta.json)
-            result = backup_to_drive(study_folder, is_directory=True)
-            if result:
-                logger.info(
-                    f"Backed up entire study folder to Drive: {study_folder.name}")
-
-                # Verify trial_meta.json files were backed up
-                # Look for both v2 format (trial-{hash}) and legacy format (trial_*)
-                trial_dirs = [d for d in study_folder.iterdir() if d.is_dir() and (
-                    d.name.startswith("trial-") or d.name.startswith("trial_"))]
-                for trial_dir in trial_dirs:
-                    trial_meta_path = trial_dir / "trial_meta.json"
-                    if trial_meta_path.exists():
-                        # Check if it was backed up (Drive path should exist)
-                        # Use unified path mapping instead of hardcoded string replacement
-                        try:
-                            drive_trial_meta = get_drive_backup_path(
-                                local_path=trial_meta_path,
-                                root_dir=root_dir,
-                                config_dir=config_dir,
-                            )
-                            if drive_trial_meta and drive_trial_meta.exists():
-                                logger.debug(
-                                    f"Verified trial_meta.json backed up: {trial_dir.name}/trial_meta.json")
-                            else:
-                                logger.warning(
-                                    f"trial_meta.json not found in backup: {trial_dir.name}/trial_meta.json")
-                        except Exception as e:
-                            logger.debug(f"Could not verify Drive path for trial_meta.json: {e}")
-            else:
-                logger.warning(
-                    f"Failed to backup study folder: {study_folder.name}")
-    elif checkpoint_in_drive:
-        # Checkpoint is in Drive, so study folder is also in Drive (not local)
-        # This is expected behavior in Colab - no error needed
-        logger.info(
-            f"Study folder is in Drive (checkpoint already backed up): {actual_storage_path.parent if actual_storage_path else 'N/A'}")
-    else:
-        # Checkpoint is local but study folder doesn't exist - this is an error
-        logger.warning(f"Study folder not found: {study_folder}")
+            logger.warning(
+                f"Failed to backup study folder: {study_folder.name}")

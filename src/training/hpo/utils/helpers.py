@@ -89,12 +89,12 @@ def setup_checkpoint_storage(
     # Fallback to legacy resolve_storage_path if v2 folder not found
     if storage_path is None:
         storage_path = resolve_storage_path(
-            output_dir=output_dir,
-            checkpoint_config=checkpoint_config,
-            backbone=backbone,
-            study_name=study_name,
-            study_key_hash=study_key_hash,
-        )
+        output_dir=output_dir,
+        checkpoint_config=checkpoint_config,
+        backbone=backbone,
+        study_name=study_name,
+        study_key_hash=study_key_hash,
+    )
     
     storage_uri = get_storage_uri(storage_path)
 

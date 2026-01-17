@@ -29,7 +29,7 @@ class TestSetupCheckpointStorage:
         study_key_hash = "c3659feaead8e1ec1234567890abcdef"
 
         # Mock resolve_storage_path to verify it's NOT called for v2 paths
-        with patch("training.hpo.utils.helpers.resolve_storage_path") as mock_resolve:
+        with patch("training.hpo.checkpoint.storage.resolve_storage_path") as mock_resolve:
             storage_path, storage_uri, should_resume = setup_checkpoint_storage(
                 output_dir=output_dir,
                 checkpoint_config=checkpoint_config,
@@ -63,7 +63,7 @@ class TestSetupCheckpointStorage:
         expected_path.parent.mkdir(parents=True)
         expected_path.write_text("test database content")
 
-        with patch("training.hpo.utils.helpers.resolve_storage_path") as mock_resolve:
+        with patch("training.hpo.checkpoint.storage.resolve_storage_path") as mock_resolve:
             mock_resolve.return_value = expected_path
             
             storage_path, storage_uri, should_resume = setup_checkpoint_storage(
@@ -116,9 +116,9 @@ class TestSetupCheckpointStorage:
     def test_restore_skips_when_path_is_in_drive(self, tmp_path):
         """Test that restore is skipped when path is already in Drive."""
         # Setup: Create path in Drive location
-        drive_base = tmp_path / "content" / "drive" / "MyDrive" / "resume-ner-azureml"
-        output_dir = drive_base / "outputs" / "hpo" / "colab" / "distilbert"
-        output_dir.mkdir(parents=True)
+        drive_path = tmp_path / "content" / "drive" / "MyDrive" / "resume-ner-azureml" / "outputs" / "hpo" / "colab" / "distilbert" / "hpo_distilbert_test_v3" / "study.db"
+        output_dir = tmp_path / "content" / "drive" / "MyDrive" / "resume-ner-azureml" / "outputs" / "hpo" / "colab" / "distilbert"
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         checkpoint_config = {
             "enabled": True,
@@ -126,12 +126,17 @@ class TestSetupCheckpointStorage:
         }
 
         # Mock resolve_storage_path to return Drive path
-        drive_path = output_dir / "hpo_distilbert_test_v3" / "study.db"
-        drive_path.parent.mkdir(parents=True)
+        drive_path.parent.mkdir(parents=True, exist_ok=True)
         # Note: study.db does NOT exist
 
-        with patch("training.hpo.utils.helpers.resolve_storage_path") as mock_resolve:
+        # Mock is_drive_path to return True for this path (since tmp_path doesn't start with /content/drive)
+        with patch("training.hpo.checkpoint.storage.resolve_storage_path") as mock_resolve, \
+             patch("training.hpo.utils.helpers.is_drive_path") as mock_is_drive:
             mock_resolve.return_value = drive_path
+            # Make is_drive_path return True for the drive_path
+            def is_drive_side_effect(path):
+                return path == drive_path or str(path) == str(drive_path)
+            mock_is_drive.side_effect = is_drive_side_effect
             
             restore_mock = MagicMock(return_value=True)
             

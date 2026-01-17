@@ -57,6 +57,7 @@ from training.hpo.utils.helpers import (
 
 # Import from extracted modules
 from training.hpo.core.optuna_integration import import_optuna as _import_optuna, create_optuna_pruner
+from orchestration.jobs.hpo.local.backup import create_incremental_backup_callback
 # optuna imported lazily when needed (in run_local_hpo_sweep function)
 from .trial import run_training_trial
 from .cv import run_training_trial_with_cv
@@ -595,6 +596,8 @@ def run_local_hpo_sweep(
     fold_splits_file: Optional[Path] = None,
     checkpoint_config: Optional[Dict[str, Any]] = None,
     restore_from_drive: Optional[Callable[[Path], bool]] = None,
+    backup_to_drive: Optional[Callable[[Path, bool], bool]] = None,
+    backup_enabled: bool = True,
     data_config: Optional[Dict[str, Any]] = None,
     benchmark_config: Optional[Dict[str, Any]] = None,
 ) -> Any:
@@ -615,6 +618,9 @@ def run_local_hpo_sweep(
                           'storage_path', and 'auto_resume' keys.
         restore_from_drive: Optional function to restore checkpoint from Drive if missing.
                           Function should take a Path and return bool (True if restored).
+        backup_to_drive: Optional function to backup files to Drive.
+                        Function should take (Path, bool) and return bool (True if backed up).
+        backup_enabled: Whether incremental backup is enabled (default: True).
         data_config: Optional data configuration dictionary (for grouping tags).
         benchmark_config: Optional benchmark configuration dictionary (for grouping tags).
 
@@ -756,6 +762,27 @@ def run_local_hpo_sweep(
         study_manager.create_or_load_study(
             output_dir, run_id, v2_study_folder=v2_study_folder, study_key_hash=study_key_hash)
     )
+
+    # Immediate backup of study.db after creation/loading
+    if backup_to_drive and backup_enabled and storage_path:
+        from common.shared.platform_detection import is_drive_path
+        try:
+            # Only backup if path exists and is local (not Drive)
+            if storage_path.exists() and not is_drive_path(storage_path):
+                result = backup_to_drive(storage_path, is_directory=False)
+                if result:
+                    logger.info(
+                        f"Immediate backup successful: {storage_path.name}")
+                else:
+                    logger.warning(
+                        f"Immediate backup failed: {storage_path.name}")
+            elif is_drive_path(storage_path):
+                logger.debug(
+                    f"Skipping immediate backup - path is already in Drive: {storage_path}")
+        except Exception as e:
+            # Log error but don't crash HPO
+            logger.warning(
+                f"Immediate backup error for {storage_path.name if storage_path else 'study.db'}: {e}")
 
     # Check if HPO is already complete (early return)
     # Always check completion - if user wants to resume, they should clear the flags
@@ -1031,6 +1058,21 @@ def run_local_hpo_sweep(
             trial_callback = create_trial_callback(
                 objective_metric, parent_run_id)
 
+            # Create incremental backup callback for study.db
+            backup_callback = None
+            if backup_to_drive and backup_enabled and storage_path:
+                backup_callback = create_incremental_backup_callback(
+                    target_path=storage_path,
+                    backup_to_drive=backup_to_drive,
+                    backup_enabled=backup_enabled,
+                    is_directory=False,
+                )
+
+            # Combine callbacks
+            all_callbacks = [trial_callback]
+            if backup_callback:
+                all_callbacks.append(backup_callback)
+
             if should_resume:
                 completed_trials = len(
                     [
@@ -1046,7 +1088,7 @@ def run_local_hpo_sweep(
                         n_trials=remaining_trials,
                         timeout=timeout_seconds,
                         show_progress_bar=True,
-                        callbacks=[trial_callback],
+                        callbacks=all_callbacks,
                     )
             else:
                 study.optimize(
@@ -1054,7 +1096,7 @@ def run_local_hpo_sweep(
                     n_trials=max_trials,
                     timeout=timeout_seconds,
                     show_progress_bar=True,
-                    callbacks=[trial_callback],
+                    callbacks=all_callbacks,
                 )
 
             if parent_run_id and parent_run_handle:
