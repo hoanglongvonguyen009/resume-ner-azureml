@@ -375,6 +375,22 @@ def create_run_safe(
     Returns:
         Run ID if successful, None otherwise.
     """
+    # CRITICAL: Validate run_name before creating run
+    # MLflow will auto-generate names (e.g., dynamic_duck_32f4qb48) if run_name is None/empty
+    if not run_name or not run_name.strip():
+        error_msg = (
+            f"CRITICAL: Cannot create run: run_name is None or empty. "
+            f"This would cause MLflow to auto-generate a name like 'dynamic_duck_32f4qb48'. "
+            f"run_name={run_name}, experiment_id={experiment_id}, parent_run_id={parent_run_id[:12] if parent_run_id else 'None'}..."
+        )
+        logger.error(error_msg)
+        import traceback
+        logger.error(f"Call stack:\n{''.join(traceback.format_stack()[-10:-1])}")
+        # Return None instead of raising to maintain "safe" behavior, but log error
+        return None
+    
+    logger.debug(f"[create_run_safe] Creating run with name: '{run_name}' (experiment_id: {experiment_id}, parent: {parent_run_id[:12] if parent_run_id else 'None'}...)")
+    
     try:
         from infrastructure.tracking.mlflow.client import create_mlflow_client
         client = create_mlflow_client()
