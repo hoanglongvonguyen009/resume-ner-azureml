@@ -87,7 +87,7 @@ class MLflowConversionTracker(BaseTracker):
         config_dir = infer_config_dir(path=output_dir)
 
         # Check if tracking is enabled for conversion stage BEFORE creating run
-        from orchestration.jobs.tracking.config.loader import get_tracking_config
+        from infrastructure.naming.mlflow.config import get_tracking_config
         tracking_config = get_tracking_config(config_dir=config_dir, stage="conversion")
         if not tracking_config.get("enabled", True):
             logger.info("[Conversion Tracker] MLflow tracking disabled for conversion stage (tracking.conversion.enabled=false)")
@@ -219,7 +219,7 @@ class MLflowConversionTracker(BaseTracker):
             if config_dir is None:
                 config_dir = infer_config_dir()
             
-            from orchestration.jobs.tracking.config.loader import get_tracking_config
+            from infrastructure.naming.mlflow.config import get_tracking_config
             tracking_config = get_tracking_config(config_dir=config_dir, stage="conversion")
 
             # Use MLflow for artifact upload (works for both Azure ML and non-Azure ML backends)

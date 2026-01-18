@@ -521,9 +521,9 @@ def train_model(
             print(f"  [Training] Skipping artifact logging (MLFLOW_SKIP_ARTIFACT_LOGGING=true) - HPO trial artifacts will be logged only for best trial refit", file=sys.stderr, flush=True)
         else:
             try:
-                # Use resolve_project_paths() to consolidate path resolution
-                from infrastructure.paths.utils import resolve_project_paths
-                root_dir_for_config, config_dir = resolve_project_paths(output_dir=output_dir, config_dir=None)
+                # Use resolve_project_paths_with_fallback() to consolidate path resolution
+                from infrastructure.paths.utils import resolve_project_paths_with_fallback
+                root_dir_for_config, config_dir = resolve_project_paths_with_fallback(output_dir=output_dir, config_dir=None)
                 
                 from infrastructure.tracking.mlflow.artifacts.stage_helpers import upload_training_artifacts
                 from infrastructure.tracking.mlflow.utils import get_mlflow_run_id

@@ -131,13 +131,19 @@ def run_refit_training(
         f"trial_number={trial_number}"
     )
 
-    # Use resolve_project_paths_with_fallback() to consolidate path resolution
-    # (needed for v2 path construction)
-    from infrastructure.paths.utils import resolve_project_paths_with_fallback
-    
-    root_dir, config_dir = resolve_project_paths_with_fallback(
-        config_dir=config_dir,  # Use provided config_dir
-    )
+    # Trust provided config_dir parameter (DRY principle)
+    # Only infer when explicitly None
+    if config_dir is not None:
+        # Derive root_dir from config_dir directly (trust provided value)
+        from infrastructure.paths.repo import detect_repo_root
+        root_dir = detect_repo_root(config_dir=config_dir)
+    else:
+        # Only infer when explicitly None
+        from infrastructure.paths.utils import resolve_project_paths_with_fallback
+        root_dir, config_dir = resolve_project_paths_with_fallback(
+            output_dir=output_dir,
+            config_dir=None,
+        )
     
     # Use consolidated utilities for hash computation (follows SSOT pattern)
     from infrastructure.tracking.mlflow.hash_utils import (

@@ -265,6 +265,13 @@ The following functions are SSOT for common operations:
 - **Path Building**: `infrastructure.paths.resolve.build_output_path()` - SSOT for building paths from patterns
 - **Project Paths**: `infrastructure.paths.utils.resolve_project_paths_with_fallback()` - **Preferred SSOT** for resolving root_dir and config_dir with standardized fallback logic
   - **Legacy**: `infrastructure.paths.utils.resolve_project_paths()` - Still available but prefer `resolve_project_paths_with_fallback()` for consistency
+- **MLflow Config Loading**: `infrastructure.naming.mlflow.config.load_mlflow_config()` - SSOT for loading MLflow configuration
+- **Naming Config**: `infrastructure.naming.mlflow.config.get_naming_config()` - SSOT for naming configuration access
+- **Tracking Config**: `infrastructure.naming.mlflow.config.get_tracking_config()` - SSOT for tracking configuration access
+- **Index Config**: `infrastructure.naming.mlflow.config.get_index_config()` - SSOT for index configuration access
+- **Auto-Increment Config**: `infrastructure.naming.mlflow.config.get_auto_increment_config()` - SSOT for auto-increment configuration access
+- **Run Finder Config**: `infrastructure.naming.mlflow.config.get_run_finder_config()` - SSOT for run finder configuration access
+  - **Deprecated**: `orchestration.jobs.tracking.config.loader.*` - Use `infrastructure.naming.mlflow.config.*` instead
 - **Hash Computation**: `infrastructure.tracking.mlflow.hash_utils.get_or_compute_study_key_hash()` - SSOT for study key hash retrieval/computation
 - **Hash Computation**: `infrastructure.tracking.mlflow.hash_utils.get_or_compute_trial_key_hash()` - SSOT for trial key hash retrieval/computation
 - **Tags Registry**: `infrastructure.naming.mlflow.tags_registry.load_tags_registry()` - SSOT for loading tags registry

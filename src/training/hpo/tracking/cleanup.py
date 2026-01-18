@@ -155,12 +155,19 @@ def cleanup_interrupted_runs(
         from infrastructure.naming.mlflow.config import get_naming_config
         from infrastructure.paths.utils import resolve_project_paths_with_fallback
 
-        # Use resolve_project_paths_with_fallback() with provided config_dir if available
-        # Trust provided config_dir parameter, only infer if None
-        _, config_dir = resolve_project_paths_with_fallback(
-            output_dir=output_dir, 
-            config_dir=config_dir  # Use provided config_dir if available
-        )
+        # Trust provided config_dir parameter (DRY principle)
+        # Only infer when explicitly None
+        if config_dir is not None:
+            # Derive root_dir from config_dir directly (trust provided value)
+            from infrastructure.paths.repo import detect_repo_root
+            root_dir = detect_repo_root(config_dir=config_dir)
+        else:
+            # Only infer when explicitly None
+            from infrastructure.paths.utils import resolve_project_paths_with_fallback
+            root_dir, config_dir = resolve_project_paths_with_fallback(
+                output_dir=output_dir,
+                config_dir=None,
+            )
         naming_config = get_naming_config(config_dir)
 
         # Get current run start_time for legacy run validation

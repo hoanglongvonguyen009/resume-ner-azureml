@@ -156,9 +156,9 @@ save_cache_with_dual_strategy(
 
 ### Project Path Utilities
 
-- `infer_config_dir(config_dir: Optional[Path] = None, path: Optional[Path] = None, root_dir: Optional[Path] = None) -> Path`: Infer config directory. Uses `detect_repo_root()` internally if needed.
-- `resolve_project_paths(output_dir: Optional[Path] = None, config_dir: Optional[Path] = None, start_path: Optional[Path] = None) -> tuple[Path, Path]`: **SSOT for resolving both root_dir and config_dir**. Uses `detect_repo_root()` internally. **Trusts provided `config_dir` parameter** - only infers when `None`.
-- `resolve_project_paths_with_fallback(output_dir: Optional[Path] = None, config_dir: Optional[Path] = None) -> tuple[Path, Path]`: **Consolidated utility for path resolution with standardized fallback logic**. This function consolidates the common "standardized fallback" pattern used across HPO and training execution scripts. It:
+- `infer_config_dir(config_dir: Optional[Path] = None, path: Optional[Path] = None, root_dir: Optional[Path] = None) -> Path`: Infer config directory. Uses `detect_repo_root()` internally if needed. **Use only for direct inference without needing root_dir**.
+- `resolve_project_paths(output_dir: Optional[Path] = None, config_dir: Optional[Path] = None, start_path: Optional[Path] = None) -> tuple[Path, Path]`: **SSOT for resolving both root_dir and config_dir**. Uses `detect_repo_root()` internally. **Trusts provided `config_dir` parameter** - only infers when `None`. **Use only when fallback logic is explicitly not desired**.
+- `resolve_project_paths_with_fallback(output_dir: Optional[Path] = None, config_dir: Optional[Path] = None) -> tuple[Path, Path]`: **Preferred SSOT** for path resolution with standardized fallback logic. This function consolidates the common "standardized fallback" pattern used across HPO and training execution scripts. **Use this for most call sites**. It:
   1. Calls `resolve_project_paths()` to resolve paths
   2. Applies standardized fallback logic:
      - If `root_dir` is None, uses `Path.cwd()`

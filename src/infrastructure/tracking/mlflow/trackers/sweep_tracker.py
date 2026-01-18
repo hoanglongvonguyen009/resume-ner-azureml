@@ -94,6 +94,7 @@ class MLflowSweepTracker(BaseTracker):
         data_config: Optional[Dict[str, Any]] = None,
         benchmark_config: Optional[Dict[str, Any]] = None,
         train_config: Optional[Dict[str, Any]] = None,
+        config_dir: Optional[Path] = None,
     ):
         """
         Start a parent MLflow run for HPO sweep.
@@ -112,6 +113,7 @@ class MLflowSweepTracker(BaseTracker):
             data_config: Optional data configuration dictionary (for grouping tags).
             benchmark_config: Optional benchmark configuration dictionary (for grouping tags).
             train_config: Optional training configuration dictionary (for v2 hash computation).
+            config_dir: Optional config directory path. If provided, used directly without inference.
 
         Yields:
             RunHandle with run information.
@@ -122,8 +124,10 @@ class MLflowSweepTracker(BaseTracker):
                 experiment_id = parent_run.info.experiment_id
                 tracking_uri = mlflow.get_tracking_uri()
 
-                # Infer config_dir from output_dir
-                config_dir = infer_config_dir(path=output_dir)
+                # Trust provided config_dir parameter (DRY principle)
+                # Only infer when explicitly None
+                if config_dir is None:
+                    config_dir = infer_config_dir(path=output_dir)
 
                 # Compute grouping tags using centralized utilities
                 # Priority: 1) Compute v2 from configs (for new runs), 2) Fallback to v1

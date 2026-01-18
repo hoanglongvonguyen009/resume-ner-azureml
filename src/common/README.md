@@ -147,8 +147,9 @@ if is_drive_path(checkpoint_path):
 
 # Advanced: Provide config_dir to load project name from config/paths.yaml
 # This enables single source of truth for project name
-from infrastructure.paths.utils import resolve_project_paths
-_, config_dir = resolve_project_paths()
+# Use resolve_project_paths_with_fallback() (SSOT) for path resolution
+from infrastructure.paths.utils import resolve_project_paths_with_fallback
+_, config_dir = resolve_project_paths_with_fallback()
 checkpoint_path = resolve_platform_checkpoint_path(
     base_path=Path("outputs/hpo"),
     relative_path="distilbert/study.db",

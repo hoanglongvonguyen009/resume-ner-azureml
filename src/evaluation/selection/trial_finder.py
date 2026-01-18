@@ -1219,12 +1219,12 @@ def select_champion_per_backbone(
     
     # Trust provided config_dir parameter, only infer when None (DRY principle)
     if config_dir is None:
-        # Infer config_dir only when not provided - use SSOT function
-        _, resolved_config_dir = resolve_project_paths_with_fallback(
+        # Infer config_dir only when not provided - use SSOT function with fallback
+        from infrastructure.paths.utils import resolve_project_paths_with_fallback
+        _, config_dir = resolve_project_paths_with_fallback(
             output_dir=None,
             config_dir=None,
         )
-        config_dir = resolved_config_dir if resolved_config_dir else Path.cwd() / "config"
     
     tags_registry = load_tags_registry(config_dir)
     backbone_tag = tags_registry.key("process", "backbone")

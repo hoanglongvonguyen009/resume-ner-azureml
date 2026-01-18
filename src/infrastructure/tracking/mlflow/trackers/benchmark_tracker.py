@@ -119,7 +119,7 @@ class MLflowBenchmarkTracker(BaseTracker):
             config_dir = infer_config_dir(path=output_dir)
 
             # Check if tracking is enabled for benchmark stage
-            from orchestration.jobs.tracking.config.loader import get_tracking_config
+            from infrastructure.naming.mlflow.config import get_tracking_config
             tracking_config = get_tracking_config(config_dir=config_dir, stage="benchmark")
             if not tracking_config.get("enabled", True):
                 logger.info("[Benchmark Tracker] MLflow tracking disabled for benchmark stage (tracking.benchmark.enabled=false)")
@@ -255,7 +255,7 @@ class MLflowBenchmarkTracker(BaseTracker):
                             build_mlflow_run_key_hash,
                             build_counter_key,
                         )
-                        from orchestration.jobs.tracking.config.loader import (
+                        from infrastructure.naming.mlflow.config import (
                             get_naming_config,
                             get_auto_increment_config,
                         )

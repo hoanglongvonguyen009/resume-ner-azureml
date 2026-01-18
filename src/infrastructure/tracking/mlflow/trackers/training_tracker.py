@@ -99,7 +99,7 @@ class MLflowTrainingTracker(BaseTracker):
         config_dir = infer_config_dir(path=output_dir)
 
         # Check if tracking is enabled for training stage BEFORE creating run
-        from orchestration.jobs.tracking.config.loader import get_tracking_config
+        from infrastructure.naming.mlflow.config import get_tracking_config
         tracking_config = get_tracking_config(config_dir=config_dir, stage="training")
         if not tracking_config.get("enabled", True):
             logger.info("[Training Tracker] MLflow tracking disabled for training stage (tracking.training.enabled=false)")

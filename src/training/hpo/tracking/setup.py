@@ -181,14 +181,19 @@ def setup_hpo_mlflow_run(
             logger.error(traceback.format_exc())
             raise
 
-        # Use resolve_project_paths_with_fallback() to consolidate path resolution
-        # This trusts provided config_dir and only infers when necessary
-        from infrastructure.paths.utils import resolve_project_paths_with_fallback
-        
-        root_dir, config_dir = resolve_project_paths_with_fallback(
-            output_dir=output_dir,
-            config_dir=config_dir,  # Trust provided config_dir if not None
-        )
+        # Trust provided config_dir parameter (DRY principle)
+        # Only infer when explicitly None
+        if config_dir is not None:
+            # Derive root_dir from config_dir directly (trust provided value)
+            from infrastructure.paths.repo import detect_repo_root
+            root_dir = detect_repo_root(config_dir=config_dir)
+        else:
+            # Only infer when explicitly None
+            from infrastructure.paths.utils import resolve_project_paths_with_fallback
+            root_dir, config_dir = resolve_project_paths_with_fallback(
+                output_dir=output_dir,
+                config_dir=None,
+            )
 
         mlflow_run_name = build_mlflow_run_name(
             hpo_parent_context,
@@ -214,13 +219,19 @@ def setup_hpo_mlflow_run(
             from infrastructure.naming import create_naming_context
             from common.shared.platform_detection import detect_platform
 
-            # In fallback path, use resolve_project_paths_with_fallback() for consistency
             # Trust provided config_dir parameter (DRY principle)
-            from infrastructure.paths.utils import resolve_project_paths_with_fallback
-            _, config_dir = resolve_project_paths_with_fallback(
-                output_dir=output_dir,
-                config_dir=config_dir,  # Trust provided config_dir if not None
-            )
+            # Only infer when explicitly None
+            if config_dir is not None:
+                # Derive root_dir from config_dir directly (trust provided value)
+                from infrastructure.paths.repo import detect_repo_root
+                root_dir = detect_repo_root(config_dir=config_dir)
+            else:
+                # Only infer when explicitly None
+                from infrastructure.paths.utils import resolve_project_paths_with_fallback
+                root_dir, config_dir = resolve_project_paths_with_fallback(
+                    output_dir=output_dir,
+                    config_dir=None,
+                )
 
             if config_dir and config_dir.exists():
                 policy = load_naming_policy(config_dir)
@@ -287,7 +298,7 @@ def commit_run_name_version(
             build_mlflow_run_key_hash,
             build_counter_key,
         )
-        from orchestration.jobs.tracking.config.loader import (
+        from infrastructure.naming.mlflow.config import (
             get_naming_config,
             get_auto_increment_config,
         )
@@ -295,14 +306,19 @@ def commit_run_name_version(
             commit_run_name_version as commit_version_internal,
         )
 
-        # Use resolve_project_paths_with_fallback() to consolidate path resolution
-        # Trust provided config_dir parameter if available
-        from infrastructure.paths.utils import resolve_project_paths_with_fallback
-        
-        root_dir, config_dir = resolve_project_paths_with_fallback(
-            output_dir=output_dir,
-            config_dir=config_dir,  # Trust provided config_dir if not None
-        )
+        # Trust provided config_dir parameter (DRY principle)
+        # Only infer when explicitly None
+        if config_dir is not None:
+            # Derive root_dir from config_dir directly (trust provided value)
+            from infrastructure.paths.repo import detect_repo_root
+            root_dir = detect_repo_root(config_dir=config_dir)
+        else:
+            # Only infer when explicitly None
+            from infrastructure.paths.utils import resolve_project_paths_with_fallback
+            root_dir, config_dir = resolve_project_paths_with_fallback(
+                output_dir=output_dir,
+                config_dir=None,
+            )
 
         # Check if auto-increment was used (suffix _1, _2, ...)
         version_match = re.search(r"_(\d+)$", mlflow_run_name)

@@ -142,6 +142,10 @@ def resolve_project_paths(
     **Key principle**: Trusts provided `config_dir` parameter to avoid re-inference
     when the caller already has the correct value (DRY principle).
     
+    **When to use**:
+    - Use `resolve_project_paths_with_fallback()` for most call sites (provides standardized fallback logic)
+    - Use `resolve_project_paths()` only when fallback logic is explicitly not desired
+    
     Args:
         output_dir: Optional output directory path (e.g., `outputs/hpo/local/distilbert`).
                     Used to infer project root by finding "outputs" directory.
@@ -198,6 +202,8 @@ def resolve_project_paths_with_fallback(
     """
     Resolve project paths with standardized fallback logic.
     
+    **Primary function for most call sites** - use this unless you explicitly don't want fallback logic.
+    
     This function consolidates the common "standardized fallback" pattern used
     across HPO and training execution scripts. It:
     1. Calls `resolve_project_paths()` to resolve paths
@@ -207,6 +213,11 @@ def resolve_project_paths_with_fallback(
     
     **Key principle**: Trusts provided `config_dir` if not None, following DRY principles.
     Only infers when explicitly None.
+    
+    **When to use**:
+    - **Primary function**: Use this for most call sites (provides standardized fallback)
+    - Use `resolve_project_paths()` only when fallback logic is explicitly not desired
+    - Use `infer_config_dir()` only for direct inference without needing root_dir
     
     Args:
         output_dir: Optional output directory path (e.g., `outputs/hpo/local/distilbert`).

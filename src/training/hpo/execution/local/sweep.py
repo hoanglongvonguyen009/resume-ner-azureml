@@ -946,6 +946,7 @@ def run_local_hpo_sweep(
             data_config=data_config,
             benchmark_config=benchmark_config,
             train_config=train_config,
+            config_dir=project_config_dir,  # Trust provided config_dir (DRY principle)
         ) as parent_run:
             # Store parent run ID for signal handler
             if parent_run:

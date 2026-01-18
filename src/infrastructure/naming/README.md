@@ -87,15 +87,27 @@ run_name = format_run_name(context=context, policy=policy)
 from src.infrastructure.naming.mlflow.run_names import build_mlflow_run_name
 from src.infrastructure.naming.mlflow.config import get_naming_config
 
-# Get naming config
+# Get naming config (SSOT - use infrastructure.naming.mlflow.config)
 naming_config = get_naming_config(config_dir=Path("config/"))
 
 # Build MLflow run name
 mlflow_name = build_mlflow_run_name(
     context=context,
-    config=naming_config
+    config_dir=Path("config/"),  # Can pass config_dir directly
+    root_dir=Path("."),  # Optional
+    output_dir=Path("outputs/hpo/local/distilbert")  # Optional
 )
 ```
+
+**Note**: All config loading functions are SSOT in `infrastructure.naming.mlflow.config`:
+- `get_naming_config()` - Naming configuration
+- `get_tracking_config()` - Tracking configuration  
+- `get_index_config()` - Index configuration
+- `get_auto_increment_config()` - Auto-increment configuration
+- `get_run_finder_config()` - Run finder configuration
+- `load_mlflow_config()` - Full MLflow configuration
+
+**Deprecated**: `orchestration.jobs.tracking.config.loader.*` - Use `infrastructure.naming.mlflow.config.*` instead.
 
 ### Basic Example: Load Tags Registry
 
@@ -166,12 +178,27 @@ trial_key = build_hpo_trial_key(
 
 ### MLflow Naming
 
-- `build_mlflow_run_name(...)`: Build MLflow run name
+- `build_mlflow_run_name(...)`: Build MLflow run name (SSOT)
 - `build_mlflow_run_key(...)`: Build MLflow run key
 - `build_mlflow_run_key_hash(...)`: Build MLflow run key hash
 - `build_mlflow_tags(...)`: Build MLflow tags
 - `build_hpo_study_key(...)`: Build HPO study key
 - `build_hpo_trial_key(...)`: Build HPO trial key
+
+### MLflow Configuration (SSOT)
+
+All config loading functions are SSOT in `infrastructure.naming.mlflow.config`:
+
+- `load_mlflow_config(config_dir: Optional[Path] = None) -> Dict[str, Any]`: Load full MLflow configuration
+- `get_naming_config(config_dir: Optional[Path] = None, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]`: Get naming configuration
+- `get_tracking_config(config_dir: Optional[Path] = None, stage: Optional[str] = None, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]`: Get tracking configuration for a stage
+- `get_index_config(config_dir: Optional[Path] = None, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]`: Get index configuration
+- `get_auto_increment_config(config_dir: Optional[Path] = None, process_type: Optional[str] = None, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]`: Get auto-increment configuration
+- `get_run_finder_config(config_dir: Optional[Path] = None, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]`: Get run finder configuration
+
+**All functions trust provided `config_dir` parameter** - only infer when explicitly `None` (DRY principle).
+
+**Deprecated**: `orchestration.jobs.tracking.config.loader.*` - Use `infrastructure.naming.mlflow.config.*` instead.
 
 ### Tags Registry
 

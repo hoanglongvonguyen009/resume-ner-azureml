@@ -53,7 +53,7 @@ if _artifacts_file_path.exists():
         raise ImportError("Could not load artifacts.py module")
 else:
     raise ImportError(f"artifacts.py not found at {_artifacts_file_path}")
-from orchestration.jobs.tracking.config.loader import get_tracking_config
+from infrastructure.naming.mlflow.config import get_tracking_config
 from infrastructure.tracking.mlflow.utils import get_mlflow_run_id
 from infrastructure.tracking.mlflow.artifacts.manager import create_checkpoint_archive
 

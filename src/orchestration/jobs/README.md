@@ -40,6 +40,9 @@ The `jobs` module provides job orchestration for:
   - `azureml/`: AzureML HPO sweep job creation
 - `tracking/`: Tracking job orchestration
   - MLflow indexing, run finding, artifact management
+  - **Note**: Config loading functions in `tracking/config/loader.py` are **deprecated**
+    - Use `infrastructure.naming.mlflow.config.*` instead (SSOT)
+    - See deprecation warnings in module docstrings for migration instructions
 - `benchmarking/`: Benchmarking job orchestration
 - `conversion/`: Conversion job orchestration
 - `training.py`: Training job orchestration

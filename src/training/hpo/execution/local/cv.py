@@ -164,14 +164,19 @@ def run_training_trial_with_cv(
             from infrastructure.paths import build_output_path, resolve_output_path
             from common.shared.platform_detection import detect_platform
             
-            # Use resolve_project_paths_with_fallback() to consolidate path resolution
-            # output_dir is the study folder: outputs/hpo/{env}/{model}/{study_name} or outputs/hpo/{env}/{model}/study-{study8}
-            from infrastructure.paths.utils import resolve_project_paths_with_fallback
-            
-            root_dir, config_dir = resolve_project_paths_with_fallback(
-                output_dir=output_dir,
-                config_dir=config_dir,  # Use provided config_dir if available
-            )
+            # Trust provided config_dir parameter (DRY principle)
+            # Only infer when explicitly None
+            if config_dir is not None:
+                # Derive root_dir from config_dir directly (trust provided value)
+                from infrastructure.paths.repo import detect_repo_root
+                root_dir = detect_repo_root(config_dir=config_dir)
+            else:
+                # Only infer when explicitly None
+                from infrastructure.paths.utils import resolve_project_paths_with_fallback
+                root_dir, config_dir = resolve_project_paths_with_fallback(
+                    output_dir=output_dir,
+                    config_dir=None,
+                )
             
             # Create NamingContext for trial
             # build_output_path() will automatically append trial-{trial8} when trial_key_hash is provided
@@ -452,7 +457,7 @@ def _create_trial_run(
                 computed_study_family_hash = get_study_family_hash_from_run(
                     hpo_parent_run_id, client, config_dir
                 )
-            
+                    
             if not computed_study_family_hash:
                 try:
                     from infrastructure.naming.mlflow.hpo_keys import (

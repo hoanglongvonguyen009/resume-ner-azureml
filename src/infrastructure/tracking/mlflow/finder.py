@@ -38,7 +38,7 @@ from infrastructure.naming.context import NamingContext
 from infrastructure.tracking.mlflow.types import RunLookupReport
 from infrastructure.naming.mlflow.run_keys import build_mlflow_run_key, build_mlflow_run_key_hash
 from orchestration.jobs.tracking.index.run_index import find_in_mlflow_index
-from orchestration.jobs.tracking.config.loader import get_run_finder_config
+from infrastructure.naming.mlflow.config import get_run_finder_config
 from common.shared.logging_utils import get_logger
 
 logger = get_logger(__name__)

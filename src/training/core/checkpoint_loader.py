@@ -115,12 +115,9 @@ def resolve_training_checkpoint_path(
                     if config.get("_config_dir"):
                         config_dir = Path(config.get("_config_dir"))
                     else:
-                        from infrastructure.paths.utils import resolve_project_paths
-                        _, config_dir = resolve_project_paths(config_dir=None)
-                        # Fallback if inference failed
-                        if config_dir is None:
-                            from infrastructure.paths.utils import infer_config_dir
-                            config_dir = infer_config_dir()
+                        # Use resolve_project_paths_with_fallback() for standardized fallback logic
+                        from infrastructure.paths.utils import resolve_project_paths_with_fallback
+                        _, config_dir = resolve_project_paths_with_fallback(config_dir=None)
                     checkpoint_path = config_dir.parent / source_path
             
             checkpoint_path = checkpoint_path.resolve()

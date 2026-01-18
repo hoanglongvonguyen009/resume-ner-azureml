@@ -9,7 +9,7 @@ from typing import Dict, Optional
 
 from common.shared.json_cache import load_json, save_json
 from common.shared.logging_utils import get_logger
-from orchestration.jobs.tracking.config.loader import get_index_config
+from infrastructure.naming.mlflow.config import get_index_config
 from orchestration.jobs.tracking.index.file_locking import acquire_lock, release_lock
 
 logger = get_logger(__name__)
