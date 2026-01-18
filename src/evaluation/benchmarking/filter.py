@@ -18,12 +18,8 @@ def _get_mlflow_client() -> Optional[Any]:
     Returns:
         MLflowClient instance or None if creation fails
     """
-    try:
-        from mlflow.tracking import MlflowClient
-        return MlflowClient()
-    except Exception as e:
-        logger.warning(f"Could not create MLflow client: {e}")
-        return None
+    from infrastructure.tracking.mlflow.client import get_mlflow_client
+    return get_mlflow_client()
 
 
 def filter_missing_benchmarks(

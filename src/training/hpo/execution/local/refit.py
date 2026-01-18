@@ -250,9 +250,9 @@ def _copy_phase2_tags_from_parent(
         return
 
     try:
-        from mlflow.tracking import MlflowClient
+        from infrastructure.tracking.mlflow.client import create_mlflow_client
         from infrastructure.naming.mlflow.tags_registry import load_tags_registry
-        client = MlflowClient()
+        client = create_mlflow_client()
         parent_run = client.get_run(hpo_parent_run_id)
         parent_tags = parent_run.data.tags
 
@@ -562,7 +562,8 @@ def _log_refit_metrics_to_mlflow(
 ) -> None:
     """Log metrics and parameters to MLflow refit run."""
     try:
-        client = mlflow.tracking.MlflowClient()
+        from infrastructure.tracking.mlflow.client import create_mlflow_client
+        client = create_mlflow_client()
 
         # Split metrics into numeric (for log_metric) and string notes (for tags)
         numeric_metrics = {}
@@ -645,10 +646,10 @@ def _link_refit_to_trial_run(
     
     if trial_key_hash and hpo_parent_run_id:
         try:
-            from mlflow.tracking import MlflowClient
+            from infrastructure.tracking.mlflow.client import create_mlflow_client
             from infrastructure.naming.mlflow.tags_registry import load_tags_registry
             
-            mlflow_client = MlflowClient()
+            mlflow_client = create_mlflow_client()
             tags_registry = load_tags_registry(config_dir)
             trial_key_tag = tags_registry.key("grouping", "trial_key_hash")
             stage_tag = tags_registry.key("process", "stage")

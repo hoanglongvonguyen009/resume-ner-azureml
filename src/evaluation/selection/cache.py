@@ -34,7 +34,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-from mlflow.tracking import MlflowClient
+# MlflowClient import removed - use create_mlflow_client() from infrastructure.tracking.mlflow.client instead
 
 from infrastructure.paths import get_cache_file_path, save_cache_with_dual_strategy
 from common.shared.json_cache import load_json
@@ -145,7 +145,8 @@ def load_cached_best_model(
         print(f"  ✓ Validating MLflow run: {run_id[:12]}...")
         
         try:
-            client = MlflowClient()
+            from infrastructure.tracking.mlflow.client import create_mlflow_client
+            client = create_mlflow_client()
             run = client.get_run(run_id)
             
             # Check run status

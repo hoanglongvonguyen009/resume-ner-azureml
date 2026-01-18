@@ -536,7 +536,8 @@ class MLflowSweepTracker(BaseTracker):
         Find and log the best trial's MLflow run ID.
         """
         try:
-            client = mlflow.tracking.MlflowClient()
+            from infrastructure.tracking.mlflow.client import create_mlflow_client
+            client = create_mlflow_client()
             active_run = mlflow.active_run()
             if active_run is None:
                 raise ValueError("No active MLflow run")
@@ -755,7 +756,8 @@ class MLflowSweepTracker(BaseTracker):
 
                 # Try to get the best trial's child run ID from MLflow tags on the parent run
                 try:
-                    client = mlflow.tracking.MlflowClient()
+                    from infrastructure.tracking.mlflow.client import create_mlflow_client
+            client = create_mlflow_client()
                     parent_run_data = client.get_run(
                         parent_run_id_for_artifacts)
                     if parent_run_data and parent_run_data.data and parent_run_data.data.tags:
@@ -767,7 +769,8 @@ class MLflowSweepTracker(BaseTracker):
                 # Fallback: If best_trial_run_id not found in tags, search child runs by trial number
                 if not best_trial_run_id:
                     try:
-                        client = mlflow.tracking.MlflowClient()
+                        from infrastructure.tracking.mlflow.client import create_mlflow_client
+            client = create_mlflow_client()
                         experiment_id = active_run.info.experiment_id
                         # Search for child runs of the parent run with matching trial number
                         child_runs = client.search_runs(
@@ -904,7 +907,8 @@ class MLflowSweepTracker(BaseTracker):
                     "Cannot log checkpoint artifacts."
                 )
 
-        client = mlflow.tracking.MlflowClient()
+        from infrastructure.tracking.mlflow.client import create_mlflow_client
+        client = create_mlflow_client()
 
         # Set refit tags
         if refit_ok is not None:

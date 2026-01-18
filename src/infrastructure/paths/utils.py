@@ -23,7 +23,21 @@ lifecycle:
   status: active
 """
 
-"""Path utility functions."""
+"""Path utility functions.
+
+This module provides utilities for resolving project paths and configuration directories.
+All functions follow the DRY principle: "trust provided parameters, only infer when None".
+
+Key Functions:
+- `resolve_project_paths_with_fallback()`: Primary function for most call sites (with fallback logic)
+- `resolve_project_paths()`: Direct resolution without fallback logic
+- `infer_config_dir()`: Direct inference of config directory
+
+DRY Principle:
+When a function receives `config_dir` (or similar parameter), it should **trust** the provided
+value if not `None`. Only infer when explicitly `None`. This prevents unnecessary re-inference
+and potential inconsistencies.
+"""
 
 from pathlib import Path
 from typing import Optional

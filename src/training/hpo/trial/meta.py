@@ -90,7 +90,8 @@ def generate_missing_trial_meta(
     if not study_key_hash:
         try:
             import mlflow
-            client = mlflow.tracking.MlflowClient()
+            from infrastructure.tracking.mlflow.client import create_mlflow_client
+            client = create_mlflow_client()
             experiments = client.search_experiments()
             for exp in experiments:
                 runs = client.search_runs(
@@ -177,7 +178,8 @@ def generate_missing_trial_meta(
                     build_hpo_trial_key,
                     build_hpo_trial_key_hash,
                 )
-                client = mlflow.tracking.MlflowClient()
+                from infrastructure.tracking.mlflow.client import create_mlflow_client
+                client = create_mlflow_client()
                 experiments = client.search_experiments()
                 for exp in experiments:
                     runs = client.search_runs(

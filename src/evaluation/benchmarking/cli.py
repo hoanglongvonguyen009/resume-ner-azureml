@@ -30,15 +30,20 @@ import sys
 import time
 from pathlib import Path
 
-# Ensure src directory is in Python path for absolute imports
-# This allows the script to be run directly: python src/evaluation/benchmarking/cli.py
-_script_dir = Path(__file__).parent.parent.parent  # Go up to src/
-if str(_script_dir) not in sys.path:
-    sys.path.insert(0, str(_script_dir))
 from typing import Any, Dict, List, Optional
+
+from common.shared.argument_parsing import validate_path_exists
+from common.shared.logging_utils import get_script_logger
+from common.shared.script_setup import setup_script_paths
+
+# Setup script paths for absolute imports
+# This allows the script to be run directly: python src/evaluation/benchmarking/cli.py
+setup_script_paths(Path(__file__))
 
 # Import only when CLI is actually used (not at module level)
 # This allows the module to be imported without torch being available
+
+logger = get_script_logger("benchmarking")
 
 
 def benchmark_model(
@@ -190,16 +195,10 @@ def main() -> None:
     
     args = parse_args()
     
-    # Load test data
-    checkpoint_dir = Path(args.checkpoint)
-    test_data_path = Path(args.test_data)
+    # Validate paths
+    checkpoint_dir = validate_path_exists(args.checkpoint, "Checkpoint directory")
+    test_data_path = validate_path_exists(args.test_data, "Test data file")
     output_path = Path(args.output)
-    
-    if not checkpoint_dir.exists():
-        raise ValueError(f"Checkpoint directory not found: {checkpoint_dir}")
-    
-    if not test_data_path.exists():
-        raise ValueError(f"Test data file not found: {test_data_path}")
     
     # Load test texts
     test_texts = load_test_texts(test_data_path)
@@ -207,7 +206,7 @@ def main() -> None:
     if not test_texts:
         raise ValueError("No test texts found in test data file")
     
-    print(f"Loaded {len(test_texts)} test texts", flush=True)
+    logger.info(f"Loaded {len(test_texts)} test texts")
     
     # Run benchmark
     results = benchmark_model(
@@ -221,12 +220,12 @@ def main() -> None:
     )
     
     # Save results
-    print(f"\nSaving results to {output_path}...", flush=True)
+    logger.info(f"Saving results to {output_path}...")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
     
-    print(f"Benchmark results saved to {output_path}", flush=True)
+    logger.info(f"Benchmark results saved to {output_path}")
 
 
 if __name__ == "__main__":

@@ -245,10 +245,10 @@ def _try_hpo_trial_systematic_naming(
     # Use centralized hash utilities (SSOT) when possible
     if parent_run_id and (not study_key_hash or not model):
         try:
-            from mlflow.tracking import MlflowClient
+            from infrastructure.tracking.mlflow.client import create_mlflow_client
             from infrastructure.tracking.mlflow.hash_utils import get_study_key_hash_from_run
 
-            client = MlflowClient()
+            client = create_mlflow_client()
             parent_run = client.get_run(parent_run_id)
             
             # Use centralized utility for study_key_hash (SSOT)

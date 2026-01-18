@@ -34,6 +34,8 @@ from typing import Dict, Optional
 from transformers import AutoTokenizer, AutoConfig
 import onnxruntime as ort
 
+from common.shared.argument_parsing import validate_path_exists
+
 
 def check_predictions(
     onnx_path: Path,
@@ -218,7 +220,11 @@ def main():
     
     args = parser.parse_args()
     
-    check_predictions(Path(args.onnx), Path(args.checkpoint), args.text)
+    # Validate paths
+    onnx_path = validate_path_exists(args.onnx, "ONNX model file")
+    checkpoint_dir = validate_path_exists(args.checkpoint, "Checkpoint directory")
+    
+    check_predictions(onnx_path, checkpoint_dir, args.text)
 
 
 if __name__ == "__main__":

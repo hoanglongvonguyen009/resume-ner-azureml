@@ -32,6 +32,7 @@ from typing import Any, Optional
 
 import mlflow
 from common.shared.logging_utils import get_logger
+from infrastructure.tracking.mlflow.client import create_mlflow_client
 from training.hpo.core.optuna_integration import import_optuna as _import_optuna
 
 logger = get_logger(__name__)
@@ -85,7 +86,7 @@ def create_trial_callback(
             run_id_short = ""
             try:
                 if parent_run_id:
-                    client = mlflow.tracking.MlflowClient()
+                    client = create_mlflow_client()
                     active_run = mlflow.active_run()
                     if active_run:
                         experiment_id = active_run.info.experiment_id

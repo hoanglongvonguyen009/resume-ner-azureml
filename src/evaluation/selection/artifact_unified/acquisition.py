@@ -43,7 +43,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 import mlflow
-from mlflow.tracking import MlflowClient
+# MlflowClient import removed - use create_mlflow_client() from infrastructure.tracking.mlflow.client instead
 
 from common.shared.logging_utils import get_logger
 from common.shared.platform_detection import detect_platform
@@ -113,7 +113,8 @@ def acquire_artifact(
     logger.debug(f"Acquisition config: {acquisition_config}")
     
     if mlflow_client is None:
-        mlflow_client = MlflowClient()
+        from infrastructure.tracking.mlflow.client import create_mlflow_client
+        mlflow_client = create_mlflow_client()
     
     # Step 1: Select artifact run (trial→refit mapping, SSOT)
     if experiment_id is None:

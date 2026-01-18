@@ -113,7 +113,8 @@ class AzureMLLoggingAdapter(LoggingAdapter):
             if val is not None:
                 if use_run_id and not active_run:
                     # Use client API when logging to existing run without active context
-                    client = mlflow.tracking.MlflowClient()
+                    from infrastructure.tracking.mlflow.client import create_mlflow_client
+                    client = create_mlflow_client()
                     client.log_metric(use_run_id, k, val)
                 else:
                     # Use active run context (normal case)
@@ -141,7 +142,8 @@ class AzureMLLoggingAdapter(LoggingAdapter):
 
         if use_run_id and not active_run:
             # Use client API when logging to existing run without active context
-            client = mlflow.tracking.MlflowClient()
+            from infrastructure.tracking.mlflow.client import create_mlflow_client
+            client = create_mlflow_client()
             for k, v in params.items():
                 client.log_param(use_run_id, k, str(v))
         else:
@@ -203,7 +205,8 @@ class LocalLoggingAdapter(LoggingAdapter):
             if val is not None:
                 if use_run_id and not active_run:
                     # Use client API when logging to existing run without active context
-                    client = mlflow.tracking.MlflowClient()
+                    from infrastructure.tracking.mlflow.client import create_mlflow_client
+                    client = create_mlflow_client()
                     client.log_metric(use_run_id, k, val)
                 else:
                     # Use active run context (normal case)
@@ -221,7 +224,8 @@ class LocalLoggingAdapter(LoggingAdapter):
 
         if use_run_id and not active_run:
             # Use client API when logging to existing run without active context
-            client = mlflow.tracking.MlflowClient()
+            from infrastructure.tracking.mlflow.client import create_mlflow_client
+            client = create_mlflow_client()
             for k, v in params.items():
                 client.log_param(use_run_id, k, str(v))
         else:

@@ -12,10 +12,10 @@ import sys
 import argparse
 from pathlib import Path
 
-# Add project root to path
-ROOT_DIR = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(ROOT_DIR / "src"))
-sys.path.insert(0, str(ROOT_DIR))
+from common.shared.script_setup import setup_script_paths
+
+# Setup script paths
+ROOT_DIR, _ = setup_script_paths(Path(__file__))
 
 from tests.shared.validate_hpo_studies import check_notebook_indentation
 

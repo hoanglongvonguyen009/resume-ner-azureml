@@ -150,7 +150,22 @@ run_names:
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         (config_dir / "paths.yaml").write_text("base:\n  outputs: outputs")
-        (config_dir / "naming.yaml").write_text("schema_version: 1")
+        (config_dir / "naming.yaml").write_text("""
+schema_version: 1
+run_names:
+  hpo_sweep:
+    pattern: "{env}_{model}_hpo_study-{study_hash}{semantic_suffix}{version}"
+    components:
+      study_hash:
+        length: 8
+        source: "study_key_hash"
+        default: "unknown"
+      semantic_suffix:
+        enabled: true
+        max_length: 30
+        source: "study_name"
+        default: ""
+""")
         
         backbone = "distilbert"
         study_name = "hpo_distilbert_smoke_test_path_testing_23"
@@ -159,8 +174,10 @@ run_names:
         
         data_config = {"name": "test", "version": "1.0"}
         hpo_config = {"search_space": {}, "objective": {"metric": "macro-f1"}}
+        train_config = {"epochs": 10, "batch_size": 16}  # Required for v2 hash computation
         
         # Don't provide study_key_hash - should be computed
+        # After refactoring, config_dir and train_config are required for study_key_hash computation
         context, run_name = setup_hpo_mlflow_run(
             backbone=backbone,
             study_name=study_name,
@@ -170,8 +187,10 @@ run_names:
             checkpoint_enabled=True,
             data_config=data_config,
             hpo_config=hpo_config,
+            train_config=train_config,  # Required for v2 hash computation
             benchmark_config=None,
             study_key_hash=None,  # Should be computed
+            config_dir=config_dir,  # Required for study_key_hash computation
         )
         
         # Verify study_key_hash was computed
@@ -263,7 +282,11 @@ run_names:
         assert context.study_key_hash == study_key_hash
 
     def test_checkpoint_file_created(self, tmp_path):
-        """Test that checkpoint file is created at {study_name}/study.db."""
+        """Test that checkpoint file is created at study-{hash}/study.db (v2 format).
+        
+        After refactoring, resolve_storage_path requires study_key_hash and uses v2 hash-based
+        folder structure. Legacy study_name format is no longer supported.
+        """
         from training.hpo.checkpoint.storage import (
             resolve_storage_path,
         )
@@ -273,23 +296,23 @@ run_names:
         
         checkpoint_config = {
             "enabled": True,
-            "study_name": "hpo_distilbert_smoke_test_path_testing_23",
-            "storage_path": "{study_name}/study.db",
         }
         
-        study_name = "hpo_distilbert_smoke_test_path_testing_23"
         backbone = "distilbert"
+        study_key_hash = "c3659feaead8e1ec1234567890abcdef1234567890abcdef1234567890abcdef12"
         
         storage_path = resolve_storage_path(
             output_dir=output_dir,
             checkpoint_config=checkpoint_config,
             backbone=backbone,
-            study_name=study_name,
+            study_key_hash=study_key_hash,  # Required for v2 format
         )
         
-        # Verify path resolves correctly
+        # Verify v2 path resolves correctly
         assert storage_path is not None
-        assert "hpo_distilbert_smoke_test_path_testing_23" in str(storage_path)
+        # Should use v2 format: {backbone}/study-{study8}/study.db
+        assert "distilbert" in str(storage_path)
+        assert "study-c3659fea" in str(storage_path)  # First 8 chars of hash
         assert "study.db" in str(storage_path)
         
         # Create the checkpoint file
@@ -338,10 +361,10 @@ run_names:
         
         assert storage_path.exists()
 
-        assert "hpo_distilbert_test" in str(storage_path)
+        # Verify v2 format is used (hash-based, not study_name-based)
         assert "study.db" in str(storage_path)
-        # Should NOT use v2 format
-        assert "study-" not in str(storage_path.parent.name)
+        assert "study-c3659fea" in str(storage_path)  # v2 format uses hash
+        assert "study-" in str(storage_path.parent.name)  # v2 format confirmed
 
     def test_study_key_hash_and_family_hash_computed(self, tmp_path):
         """Test that study_key_hash and study_family_hash are computed and can be tagged."""
@@ -388,7 +411,22 @@ run_names:
         project1_src = project1 / "src"
         project1_src.mkdir()
         (project1_config / "paths.yaml").write_text("base:\n  outputs: outputs")
-        (project1_config / "naming.yaml").write_text("schema_version: 1")
+        (project1_config / "naming.yaml").write_text("""
+schema_version: 1
+run_names:
+  hpo_sweep:
+    pattern: "{env}_{model}_hpo_study-{study_hash}{semantic_suffix}{version}"
+    components:
+      study_hash:
+        length: 8
+        source: "study_key_hash"
+        default: "unknown"
+      semantic_suffix:
+        enabled: true
+        max_length: 30
+        source: "study_name"
+        default: ""
+""")
         (project1_config / "mlflow.yaml").write_text("naming:\n  project_name: project1")
         
         project2 = tmp_path / "project2"
@@ -399,7 +437,22 @@ run_names:
         project2_outputs = project2 / "outputs" / "hpo"
         project2_outputs.mkdir(parents=True)
         (project2_config / "paths.yaml").write_text("base:\n  outputs: outputs")
-        (project2_config / "naming.yaml").write_text("schema_version: 1")
+        (project2_config / "naming.yaml").write_text("""
+schema_version: 1
+run_names:
+  hpo_sweep:
+    pattern: "{env}_{model}_hpo_study-{study_hash}{semantic_suffix}{version}"
+    components:
+      study_hash:
+        length: 8
+        source: "study_key_hash"
+        default: "unknown"
+      semantic_suffix:
+        enabled: true
+        max_length: 30
+        source: "study_name"
+        default: ""
+""")
         (project2_config / "mlflow.yaml").write_text("naming:\n  project_name: project2")
         
         # Change to project2 directory so inference would find project2
@@ -459,7 +512,22 @@ run_names:
         project_outputs.mkdir(parents=True)
         
         (project_config / "paths.yaml").write_text("base:\n  outputs: outputs")
-        (project_config / "naming.yaml").write_text("schema_version: 1")
+        (project_config / "naming.yaml").write_text("""
+schema_version: 1
+run_names:
+  hpo_sweep:
+    pattern: "{env}_{model}_hpo_study-{study_hash}{semantic_suffix}{version}"
+    components:
+      study_hash:
+        length: 8
+        source: "study_key_hash"
+        default: "unknown"
+      semantic_suffix:
+        enabled: true
+        max_length: 30
+        source: "study_name"
+        default: ""
+""")
         (project_config / "mlflow.yaml").write_text("naming:\n  project_name: test_project")
         (project_config / "tags.yaml").write_text("schema_version: 1")
         

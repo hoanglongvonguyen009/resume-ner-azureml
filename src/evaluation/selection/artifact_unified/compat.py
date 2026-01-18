@@ -34,7 +34,7 @@ to maintain backward compatibility with existing code.
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
-from mlflow.tracking import MlflowClient
+# MlflowClient import removed - use create_mlflow_client() from infrastructure.tracking.mlflow.client instead
 
 from common.shared.logging_utils import get_logger
 from evaluation.selection.artifact_unified.acquisition import acquire_artifact
@@ -124,7 +124,8 @@ def acquire_best_model_checkpoint(
     )
     
     # Get MLflow client and experiment ID
-    mlflow_client = MlflowClient()
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+    mlflow_client = create_mlflow_client()
     experiment_id = None
     
     if experiment_name:

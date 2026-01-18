@@ -12,11 +12,12 @@ Usage:
     python tests/tracking/scripts/test_artifact_upload_manual.py
 """
 
-import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
+from common.shared.script_setup import setup_script_paths
+
+# Setup script paths
+setup_script_paths(Path(__file__))
 
 import mlflow
 from mlflow.tracking import MlflowClient

@@ -41,7 +41,7 @@ Priority order:
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from mlflow.tracking import MlflowClient
+# MlflowClient import removed - use create_mlflow_client() from infrastructure.tracking.mlflow.client instead
 
 from common.shared.logging_utils import get_logger
 
@@ -416,7 +416,8 @@ def get_or_compute_study_key_hash(
     # Priority 2: Retrieve from MLflow run tags (SSOT)
     if hpo_parent_run_id:
         try:
-            client = MlflowClient()
+            from infrastructure.tracking.mlflow.client import create_mlflow_client
+            client = create_mlflow_client()
             retrieved_hash = get_study_key_hash_from_run(
                 hpo_parent_run_id, client, config_dir
             )
@@ -486,7 +487,8 @@ def get_or_compute_trial_key_hash(
     # Priority 2: Retrieve from trial run tags (SSOT)
     if trial_run_id:
         try:
-            client = MlflowClient()
+            from infrastructure.tracking.mlflow.client import create_mlflow_client
+            client = create_mlflow_client()
             retrieved_hash = get_trial_key_hash_from_run(
                 trial_run_id, client, config_dir
             )

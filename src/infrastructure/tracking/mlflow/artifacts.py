@@ -73,7 +73,8 @@ def log_artifact_safe(
         def upload_func():
             if run_id:
                 # Use explicit run_id (client.log_artifact)
-                client = mlflow.tracking.MlflowClient()
+                from infrastructure.tracking.mlflow.client import create_mlflow_client
+                client = create_mlflow_client()
                 client.log_artifact(
                     run_id=run_id,
                     local_path=str(local_path),
@@ -143,7 +144,8 @@ def log_artifacts_safe(
         def upload_func():
             if run_id:
                 # Use explicit run_id (client.log_artifacts)
-                client = mlflow.tracking.MlflowClient()
+                from infrastructure.tracking.mlflow.client import create_mlflow_client
+                client = create_mlflow_client()
                 client.log_artifacts(
                     run_id=run_id,
                     local_dir=str(local_dir),
@@ -294,7 +296,8 @@ def upload_checkpoint_archive(
                 # Explicitly specify full path to avoid Azure ML creating directories
                 def upload_manifest():
                     if run_id:
-                        client = mlflow.tracking.MlflowClient()
+                        from infrastructure.tracking.mlflow.client import create_mlflow_client
+                client = create_mlflow_client()
                         # Upload with explicit full path to avoid directory creation issues
                         client.log_artifact(
                             run_id=run_id,

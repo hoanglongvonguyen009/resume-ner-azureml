@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Optional
 
 import mlflow
-from mlflow.tracking import MlflowClient
+# MlflowClient import removed - use create_mlflow_client() from infrastructure.tracking.mlflow.client instead
 
 from infrastructure.naming.context import NamingContext
 from infrastructure.tracking.mlflow.types import RunLookupReport
@@ -90,7 +90,8 @@ def find_mlflow_run(
         else:
             strict = False
     
-    client = MlflowClient()
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+    client = create_mlflow_client()
     
     # Get experiment
     try:
@@ -334,7 +335,8 @@ def find_run_by_trial_id(
     report.strategies_attempted.append("trial_id_tag_search")
     
     try:
-        client = MlflowClient()
+        from infrastructure.tracking.mlflow.client import create_mlflow_client
+    client = create_mlflow_client()
         
         # Build filter string
         filter_string = f"tags.code.trial_id = '{trial_id}' AND (tags.code.interrupted != 'true' OR tags.code.interrupted IS NULL)"

@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Callable, Tuple
 
 import mlflow
-from mlflow.tracking import MlflowClient
+# MlflowClient import removed - use create_mlflow_client() from infrastructure.tracking.mlflow.client instead
 
 from evaluation.selection.mlflow_selection import find_best_model_from_mlflow
 from evaluation.selection.cache import load_cached_best_model, save_best_model_cache
@@ -146,7 +146,8 @@ def run_selection_workflow(
         
         if best_model is None:
             # Provide diagnostic information
-            client = MlflowClient()
+            from infrastructure.tracking.mlflow.client import create_mlflow_client
+            client = create_mlflow_client()
             from infrastructure.naming.mlflow.tags_registry import load_tags_registry
             tags_registry = load_tags_registry(config_dir)
             study_key_tag = tags_registry.key("grouping", "study_key_hash")

@@ -185,3 +185,23 @@ def validate_config_dir(config_dir: str) -> Path:
         raise FileNotFoundError(f"Config directory not found: {config_path}")
     return config_path
 
+
+def validate_path_exists(path: str | Path, description: str = "Path") -> Path:
+    """
+    Validate that a path exists and return Path object.
+    
+    Args:
+        path: Path string or Path object to validate.
+        description: Description of the path for error messages (e.g., "Checkpoint directory", "Test data file").
+    
+    Returns:
+        Path object for the validated path.
+    
+    Raises:
+        ValueError: If path does not exist.
+    """
+    path_obj = Path(path)
+    if not path_obj.exists():
+        raise ValueError(f"{description} not found: {path_obj}")
+    return path_obj
+

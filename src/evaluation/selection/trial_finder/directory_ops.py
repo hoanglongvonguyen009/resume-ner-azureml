@@ -94,9 +94,9 @@ def extract_hashes_from_trial_dir(trial_dir: Path) -> Tuple[Optional[str], Optio
                 get_study_key_hash_from_run,
                 get_trial_key_hash_from_run,
             )
-            from mlflow.tracking import MlflowClient
+            from infrastructure.tracking.mlflow.client import create_mlflow_client
             
-            client = MlflowClient()
+            client = create_mlflow_client()
             # Try to get config_dir from trial_dir for tag registry
             config_dir = None
             try:

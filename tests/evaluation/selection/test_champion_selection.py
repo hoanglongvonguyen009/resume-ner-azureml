@@ -242,11 +242,14 @@ class TestSelectChampionPerBackbone:
 
     @patch("infrastructure.tracking.mlflow.queries.query_runs_by_tags")
     def test_no_artifact_requirement(self, mock_query, mock_mlflow_client, mock_hpo_experiment, base_selection_config):
-        """Test that artifact requirement can be disabled."""
+        """Test that artifact requirement can be disabled.
+        
+        After refactoring, v1 schema is no longer supported. Tests must use v2 schema.
+        """
         runs = [
-            create_mock_run("run1", 0.85, "hash1", artifact_available=False),
-            create_mock_run("run2", 0.87, "hash1", artifact_available=False),
-            create_mock_run("run3", 0.86, "hash1", artifact_available=False),
+            create_mock_run("run1", 0.85, "hash1", schema_version="2.0", artifact_available=False),
+            create_mock_run("run2", 0.87, "hash1", schema_version="2.0", artifact_available=False),
+            create_mock_run("run3", 0.86, "hash1", schema_version="2.0", artifact_available=False),
         ]
         mock_query.return_value = runs
         
@@ -295,11 +298,14 @@ class TestSelectChampionPerBackbone:
 
     @patch("infrastructure.tracking.mlflow.queries.query_runs_by_tags")
     def test_minimize_objective(self, mock_query, mock_mlflow_client, mock_hpo_experiment, base_selection_config):
-        """Test champion selection with minimize objective."""
+        """Test champion selection with minimize objective.
+        
+        After refactoring, v1 schema is no longer supported. Tests must use v2 schema.
+        """
         runs = [
-            create_mock_run("run1", 0.85, "hash1"),
-            create_mock_run("run2", 0.87, "hash1"),  # Highest (worst for minimize)
-            create_mock_run("run3", 0.80, "hash1"),  # Lowest (best for minimize)
+            create_mock_run("run1", 0.85, "hash1", schema_version="2.0"),
+            create_mock_run("run2", 0.87, "hash1", schema_version="2.0"),  # Highest (worst for minimize)
+            create_mock_run("run3", 0.80, "hash1", schema_version="2.0"),  # Lowest (best for minimize)
         ]
         mock_query.return_value = runs
         
@@ -321,18 +327,21 @@ class TestSelectChampionPerBackbone:
 
     @patch("infrastructure.tracking.mlflow.queries.query_runs_by_tags")
     def test_multiple_groups_selects_best(self, mock_query, mock_mlflow_client, mock_hpo_experiment, base_selection_config):
-        """Test that best group is selected when multiple groups exist."""
+        """Test that best group is selected when multiple groups exist.
+        
+        After refactoring, v1 schema is no longer supported. Tests must use v2 schema.
+        """
         # Group 1: lower average score
         runs = [
-            create_mock_run("run1", 0.80, "hash1"),
-            create_mock_run("run2", 0.81, "hash1"),
-            create_mock_run("run3", 0.82, "hash1"),
+            create_mock_run("run1", 0.80, "hash1", schema_version="2.0"),
+            create_mock_run("run2", 0.81, "hash1", schema_version="2.0"),
+            create_mock_run("run3", 0.82, "hash1", schema_version="2.0"),
         ]
         # Group 2: higher average score
         runs.extend([
-            create_mock_run("run4", 0.90, "hash2"),
-            create_mock_run("run5", 0.91, "hash2"),
-            create_mock_run("run6", 0.92, "hash2"),
+            create_mock_run("run4", 0.90, "hash2", schema_version="2.0"),
+            create_mock_run("run5", 0.91, "hash2", schema_version="2.0"),
+            create_mock_run("run6", 0.92, "hash2", schema_version="2.0"),
         ])
         mock_query.return_value = runs
         
@@ -353,14 +362,17 @@ class TestSelectChampionPerBackbone:
 
     @patch("infrastructure.tracking.mlflow.queries.query_runs_by_tags")
     def test_stable_score_computation(self, mock_query, mock_mlflow_client, mock_hpo_experiment, base_selection_config):
-        """Test that stable score is computed correctly (median of top_k)."""
+        """Test that stable score is computed correctly (median of top_k).
+        
+        After refactoring, v1 schema is no longer supported. Tests must use v2 schema.
+        """
         # Create runs with known metrics for stable score calculation
         runs = [
-            create_mock_run("run1", 0.80, "hash1"),
-            create_mock_run("run2", 0.85, "hash1"),
-            create_mock_run("run3", 0.90, "hash1"),  # Top score
-            create_mock_run("run4", 0.82, "hash1"),
-            create_mock_run("run5", 0.88, "hash1"),  # Second best
+            create_mock_run("run1", 0.80, "hash1", schema_version="2.0"),
+            create_mock_run("run2", 0.85, "hash1", schema_version="2.0"),
+            create_mock_run("run3", 0.90, "hash1", schema_version="2.0"),  # Top score
+            create_mock_run("run4", 0.82, "hash1", schema_version="2.0"),
+            create_mock_run("run5", 0.88, "hash1", schema_version="2.0"),  # Second best
         ]
         mock_query.return_value = runs
         base_selection_config["champion_selection"]["require_artifact_available"] = False

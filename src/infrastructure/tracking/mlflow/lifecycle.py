@@ -61,7 +61,8 @@ def terminate_run_safe(
         True if termination succeeded, False otherwise.
     """
     try:
-        client = mlflow.tracking.MlflowClient()
+        from infrastructure.tracking.mlflow.client import create_mlflow_client
+        client = create_mlflow_client()
 
         # Check current status if requested
         if check_status:
@@ -126,7 +127,8 @@ def ensure_run_terminated(
         True if run is terminated (or was already terminated), False otherwise.
     """
     try:
-        client = mlflow.tracking.MlflowClient()
+        from infrastructure.tracking.mlflow.client import create_mlflow_client
+        client = create_mlflow_client()
         run = client.get_run(run_id)
         current_status = run.info.status
 

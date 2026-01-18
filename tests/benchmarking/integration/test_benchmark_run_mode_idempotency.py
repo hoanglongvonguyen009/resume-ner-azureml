@@ -112,27 +112,35 @@ class TestRunModeIntegration:
         assert "distilbert" in result
         assert "deberta" in result
 
-    @patch("evaluation.benchmarking.orchestrator._benchmark_exists_in_mlflow")
+    @patch("evaluation.benchmarking.filter.benchmark_already_exists")
     def test_reuse_if_exists_filters_existing_benchmarks(
         self,
-        mock_exists_mlflow,
+        mock_exists,
         sample_champions,
         benchmark_experiment,
         benchmark_config_reuse,
         tmp_path
     ):
-        """Test that reuse_if_exists filters out existing benchmarks."""
+        """Test that reuse_if_exists filters out existing benchmarks.
+        
+        After refactoring, filter_missing_benchmarks uses benchmark_already_exists
+        from existence_checker module. Patch it where it's imported in filter.py.
+        """
         root_dir = tmp_path
         environment = "local"
         
         # Mock: benchmark exists for distilbert, not for deberta
-        def side_effect(benchmark_key, *args, **kwargs):
+        # benchmark_already_exists signature: (benchmark_key, benchmark_experiment, root_dir, environment, mlflow_client, ...)
+        call_count = {"distilbert": 0, "deberta": 0}
+        def side_effect(benchmark_key, benchmark_experiment, root_dir, environment, mlflow_client=None, **kwargs):
             # Return True for first champion (distilbert), False for second (deberta)
             if "champion_run_123" in benchmark_key:
+                call_count["distilbert"] += 1
                 return True  # Exists
+            call_count["deberta"] += 1
             return False  # Doesn't exist
         
-        mock_exists_mlflow.side_effect = side_effect
+        mock_exists.side_effect = side_effect
         
         mock_client = Mock()
         
@@ -147,6 +155,9 @@ class TestRunModeIntegration:
             mlflow_client=mock_client,
             run_mode="reuse_if_exists"
         )
+        
+        # Verify mock was called
+        assert mock_exists.called, "benchmark_already_exists should have been called"
         
         # Should filter out distilbert (exists), keep deberta (doesn't exist)
         assert len(result) == 1
@@ -426,22 +437,26 @@ class TestCompleteWorkflowScenarios:
             "id": "benchmark_experiment_id_123"
         }
 
-    @patch("evaluation.benchmarking.orchestrator._benchmark_exists_in_mlflow")
+    @patch("evaluation.benchmarking.filter.benchmark_already_exists")
     def test_scenario_reuse_if_exists_with_existing_benchmark(
         self,
-        mock_exists_mlflow,
+        mock_exists,
         sample_champions,
         benchmark_experiment,
         tmp_path
     ):
-        """Test scenario: reuse_if_exists mode with existing benchmark (should skip)."""
+        """Test scenario: reuse_if_exists mode with existing benchmark (should skip).
+        
+        After refactoring, filter_missing_benchmarks uses benchmark_already_exists
+        from existence_checker module. Patch it where it's imported in filter.py.
+        """
         benchmark_config = {
             "run": {"mode": "reuse_if_exists"},
             "benchmarking": {"batch_sizes": [1]}
         }
         
         # Mock: benchmark exists
-        mock_exists_mlflow.return_value = True
+        mock_exists.return_value = True
         
         mock_client = Mock()
         
@@ -460,22 +475,26 @@ class TestCompleteWorkflowScenarios:
         # Should filter out existing benchmark
         assert len(result) == 0
 
-    @patch("evaluation.benchmarking.orchestrator._benchmark_exists_in_mlflow")
+    @patch("evaluation.benchmarking.filter.benchmark_already_exists")
     def test_scenario_reuse_if_exists_without_existing_benchmark(
         self,
-        mock_exists_mlflow,
+        mock_exists,
         sample_champions,
         benchmark_experiment,
         tmp_path
     ):
-        """Test scenario: reuse_if_exists mode without existing benchmark (should create)."""
+        """Test scenario: reuse_if_exists mode without existing benchmark (should create).
+        
+        After refactoring, filter_missing_benchmarks uses benchmark_already_exists
+        from existence_checker module. Patch it where it's imported in filter.py.
+        """
         benchmark_config = {
             "run": {"mode": "reuse_if_exists"},
             "benchmarking": {"batch_sizes": [1]}
         }
         
         # Mock: benchmark does not exist
-        mock_exists_mlflow.return_value = False
+        mock_exists.return_value = False
         
         mock_client = Mock()
         
@@ -526,15 +545,19 @@ class TestCompleteWorkflowScenarios:
         assert len(result) == 1
         assert "distilbert" in result
 
-    @patch("evaluation.benchmarking.orchestrator._benchmark_exists_in_mlflow")
+    @patch("evaluation.benchmarking.filter.benchmark_already_exists")
     def test_scenario_config_change_creates_new_benchmark(
         self,
-        mock_exists_mlflow,
+        mock_exists,
         sample_champions,
         benchmark_experiment,
         tmp_path
     ):
-        """Test scenario: config change creates new benchmark_key, triggering new benchmark."""
+        """Test scenario: config change creates new benchmark_key, triggering new benchmark.
+        
+        After refactoring, filter_missing_benchmarks uses benchmark_already_exists
+        from existence_checker module. Patch it where it's imported in filter.py.
+        """
         # First config: batch_size=1
         config1 = {
             "run": {"mode": "reuse_if_exists"},
@@ -567,12 +590,13 @@ class TestCompleteWorkflowScenarios:
         assert key1 != key2
         
         # Mock: benchmark exists for key1, not for key2
-        def side_effect(benchmark_key, *args, **kwargs):
+        # benchmark_already_exists signature: (benchmark_key, benchmark_experiment, root_dir, environment, mlflow_client, ...)
+        def side_effect(benchmark_key, benchmark_experiment, root_dir, environment, mlflow_client=None, **kwargs):
             if benchmark_key == key1:
                 return True  # Old benchmark exists
             return False  # New benchmark doesn't exist
         
-        mock_exists_mlflow.side_effect = side_effect
+        mock_exists.side_effect = side_effect
         
         mock_client = Mock()
         

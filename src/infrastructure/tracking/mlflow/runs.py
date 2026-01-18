@@ -39,7 +39,7 @@ from contextlib import contextmanager
 from typing import Any, Optional, Tuple
 
 import mlflow
-from mlflow.tracking import MlflowClient
+# MlflowClient import removed - use create_mlflow_client() from infrastructure.tracking.mlflow.client instead
 from common.shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -261,7 +261,8 @@ def create_child_run(
         tracking_uri = mlflow.get_tracking_uri()
         is_azure_ml = tracking_uri and "azureml" in tracking_uri.lower()
         if is_azure_ml:
-            client = mlflow.tracking.MlflowClient()
+            from infrastructure.tracking.mlflow.client import create_mlflow_client
+        client = create_mlflow_client()
             current_run = mlflow.active_run()
             if current_run:
                 run_info = client.get_run(run_id)
@@ -305,7 +306,8 @@ def create_run_safe(
         Run ID if successful, None otherwise.
     """
     try:
-        client = mlflow.tracking.MlflowClient()
+        from infrastructure.tracking.mlflow.client import create_mlflow_client
+        client = create_mlflow_client()
 
         # Build tags
         run_tags = tags.copy() if tags else {}
@@ -375,7 +377,8 @@ def resolve_experiment_id(
     Returns:
         Experiment ID if resolved, None otherwise.
     """
-    client = mlflow.tracking.MlflowClient()
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+    client = create_mlflow_client()
 
     # Strategy 1: Get from parent run
     if parent_run_id:

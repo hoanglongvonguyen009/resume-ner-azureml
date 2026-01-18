@@ -41,7 +41,6 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import yaml
 from azure.ai.ml import MLClient
 from azure.ai.ml.entities import AmlCompute, Workspace
 from azure.core.exceptions import ResourceNotFoundError
@@ -113,8 +112,9 @@ def load_infrastructure_config(
     if env_path and env_path.exists():
         load_dotenv(env_path, override=True)
 
-    with open(config_path, "r") as f:
-        config: Dict[str, Any] = yaml.safe_load(f)
+    from common.shared.yaml_utils import load_yaml
+    
+    config: Dict[str, Any] = load_yaml(config_path)
 
     # Resolve subscription_id - prioritize environment variable
     subscription_id = os.getenv("AZURE_SUBSCRIPTION_ID")

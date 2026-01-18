@@ -80,7 +80,8 @@ def find_best_trial_run_id(
             get_hpo_best_trial_run_id,
         )
         
-        client = mlflow.tracking.MlflowClient()
+        from infrastructure.tracking.mlflow.client import create_mlflow_client
+        client = create_mlflow_client()
         parent_run = client.get_run(parent_run_id)
         study_key_hash = parent_run.data.tags.get("code.study_key_hash")
         

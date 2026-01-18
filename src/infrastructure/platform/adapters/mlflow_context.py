@@ -182,7 +182,8 @@ class LocalMLflowContextManager(MLflowContextManager):
                 print(f"  [MLflow] Creating run with name: {run_name}", flush=True)
                 # Use MLflow client to create run with explicit name
                 # This ensures the run name is set correctly
-                client = mlflow.tracking.MlflowClient()
+                from infrastructure.tracking.mlflow.client import create_mlflow_client
+                client = create_mlflow_client()
                 experiment_id = None
                 if experiment_name:
                     experiment = mlflow.get_experiment_by_name(experiment_name)

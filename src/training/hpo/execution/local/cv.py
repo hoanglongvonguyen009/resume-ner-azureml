@@ -509,7 +509,8 @@ def _create_trial_run(
         return None
 
     try:
-        client = mlflow.tracking.MlflowClient()
+        from infrastructure.tracking.mlflow.client import create_mlflow_client
+        client = create_mlflow_client()
         active_run = mlflow.active_run()
         if not active_run:
             return None
@@ -696,7 +697,8 @@ def _log_cv_metrics_to_trial_run(
 ) -> None:
     """Log aggregated CV metrics to trial run."""
     try:
-        client = mlflow.tracking.MlflowClient()
+        from infrastructure.tracking.mlflow.client import create_mlflow_client
+        client = create_mlflow_client()
 
         # Log aggregated metrics
         client.log_metric(trial_run_id, objective_metric, average_metric)

@@ -30,24 +30,6 @@ import argparse
 from common.shared.yaml_utils import load_yaml
 
 
-def load_config_file(config_dir: Path, filename: str) -> Dict[str, Any]:
-    """
-    Load configuration file from directory.
-
-    Args:
-        config_dir: Directory containing configuration files.
-        filename: Name of the configuration file.
-
-    Returns:
-        Dictionary containing configuration data.
-
-    Raises:
-        FileNotFoundError: If the configuration file does not exist.
-    """
-    config_path = config_dir / filename
-    return load_yaml(config_path)
-
-
 def build_training_config(args: argparse.Namespace, config_dir: Path) -> Dict[str, Any]:
     """
     Build training configuration from files and command-line arguments.
@@ -60,12 +42,12 @@ def build_training_config(args: argparse.Namespace, config_dir: Path) -> Dict[st
         Dictionary containing merged configuration.
     """
     # Load base training config
-    train_config = load_config_file(config_dir, "train.yaml")
+    train_config = load_yaml(config_dir / "train.yaml")
     train_config_dict = train_config.get("training", {}).copy()
     base_train_config = train_config
     
-    model_config = load_config_file(config_dir, f"model/{args.backbone}.yaml")
-    data_config = load_config_file(config_dir, "data/resume_v1.yaml")
+    model_config = load_yaml(config_dir / f"model/{args.backbone}.yaml")
+    data_config = load_yaml(config_dir / "data/resume_v1.yaml")
     
     config = {
         "data": data_config,

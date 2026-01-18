@@ -278,24 +278,27 @@ class TestBenchmarkConfigEdgeCases:
         # Should use defaults
         assert filename == "benchmark.json"
 
-    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
-    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
-    @patch("evaluation.benchmarking.orchestrator.build_output_path")
-    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.utils.run_benchmarking")
+    @patch("evaluation.benchmarking.path_resolver.build_output_path")
+    @patch("evaluation.benchmarking.path_resolver.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.path_resolver.validate_path_before_mkdir")
     def test_benchmark_best_trials_handles_missing_test_data(
         self,
         mock_validate_path,
         mock_resolve_colab,
         mock_build_path,
-        mock_create_context,
         mock_run_benchmarking,
         tmp_path,
         mock_best_trials,
         mock_data_config,
         mock_hpo_config,
     ):
-        """Test that benchmark_best_trials handles missing test_data gracefully."""
+        """Test that benchmark_best_trials handles missing test_data gracefully.
+        
+        After refactoring, benchmark_best_trials delegates to orchestrator_original,
+        which uses path_resolver functions. This test verifies that missing test_data
+        is handled gracefully without calling run_benchmarking.
+        """
         root_dir = tmp_path / "outputs"
         root_dir.mkdir()
         
@@ -306,7 +309,6 @@ class TestBenchmarkConfigEdgeCases:
         mock_validate_path.side_effect = lambda p, **kwargs: p
         mock_resolve_colab.side_effect = lambda p: p
         mock_build_path.return_value = root_dir / "benchmarking" / "test"
-        mock_create_context.return_value = Mock()
         
         # Call benchmark_best_trials with nonexistent test_data
         result = benchmark_best_trials(

@@ -8,11 +8,12 @@ Usage:
     python tests/tracking/scripts/verify_artifact_upload_fix.py
 """
 
-import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
+from common.shared.script_setup import setup_script_paths
+
+# Setup script paths
+setup_script_paths(Path(__file__))
 
 
 def check_monkey_patch():

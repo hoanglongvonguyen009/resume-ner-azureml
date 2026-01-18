@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional
 
 import mlflow
 from common.shared.logging_utils import get_logger
+from infrastructure.tracking.mlflow.client import create_mlflow_client
 
 # Lazy import to avoid pytest collection issues
 try:
@@ -47,7 +48,7 @@ def create_trial_run_no_cv(
         return None
 
     try:
-        client = mlflow.tracking.MlflowClient()
+        client = create_mlflow_client()
         active_run = mlflow.active_run()
         if not active_run:
             return None

@@ -34,14 +34,15 @@ from pathlib import Path
 import uvicorn
 
 from ..config import APIConfig
+from common.shared.argument_parsing import validate_path_exists
+from common.shared.logging_utils import get_script_logger
 
 
 def setup_logging(log_level: str) -> None:
     """Setup logging configuration."""
-    logging.basicConfig(
-        level=getattr(logging, log_level.upper()),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
+    level = getattr(logging, log_level.upper(), logging.INFO)
+    logger = get_script_logger("api_server", level=level)
+    logger.info(f"Logging level set to {log_level.upper()}")
 
 
 def main():
@@ -102,16 +103,12 @@ def main():
     
     args = parser.parse_args()
     
-    # Set model paths
-    onnx_path = Path(args.onnx_model)
-    checkpoint_dir = Path(args.checkpoint)
-    
-    if not onnx_path.exists():
-        print(f"Error: ONNX model not found: {onnx_path}", file=sys.stderr)
-        sys.exit(1)
-    
-    if not checkpoint_dir.exists():
-        print(f"Error: Checkpoint directory not found: {checkpoint_dir}", file=sys.stderr)
+    # Validate model paths
+    try:
+        onnx_path = validate_path_exists(args.onnx_model, "ONNX model")
+        checkpoint_dir = validate_path_exists(args.checkpoint, "Checkpoint directory")
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     
     APIConfig.set_model_paths(onnx_path, checkpoint_dir)

@@ -186,6 +186,19 @@ class TestPathStructureValidation:
         root_dir = tmp_path
         config_dir = tmp_path / "config"
         config_dir.mkdir()
+        (config_dir / "paths.yaml").write_text("""
+schema_version: 2
+base:
+  outputs: outputs
+outputs:
+  hpo: hpo
+patterns:
+  final_training_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}"
+  conversion_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}/conv-{conv8}"
+  best_config_v2: "{model}/spec-{spec8}"
+  hpo_v2: "{storage_env}/{model}/study-{study8}/trial-{trial8}"
+  benchmarking_v2: "{storage_env}/{model}/study-{study8}/trial-{trial8}/bench-{bench8}"
+""")
         
         hpo_base = resolve_output_path(root_dir, config_dir, "hpo")
         study_folder = hpo_base / "local" / "distilbert" / f"study-{study8}"
@@ -214,6 +227,19 @@ class TestPathStructureValidation:
         root_dir = tmp_path
         config_dir = tmp_path / "config"
         config_dir.mkdir()
+        (config_dir / "paths.yaml").write_text("""
+schema_version: 2
+base:
+  outputs: outputs
+outputs:
+  hpo: hpo
+patterns:
+  final_training_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}"
+  conversion_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}/conv-{conv8}"
+  best_config_v2: "{model}/spec-{spec8}"
+  hpo_v2: "{storage_env}/{model}/study-{study8}/trial-{trial8}"
+  benchmarking_v2: "{storage_env}/{model}/study-{study8}/trial-{trial8}/bench-{bench8}"
+""")
         
         hpo_base = resolve_output_path(root_dir, config_dir, "hpo")
         study_folder = hpo_base / "local" / "distilbert" / f"study-{study8}"
@@ -239,40 +265,55 @@ class TestPathStructureWithBuildOutputPath:
     """Test path structure using build_output_path function."""
 
     def test_build_output_path_hpo_sweep(self, tmp_path):
-        """Test that build_output_path creates correct HPO sweep base path."""
+        """Test that resolve_output_path returns correct HPO base path for sweep.
+        
+        After refactoring, build_output_path requires trial_key_hash for HPO v2 patterns.
+        For hpo_sweep (parent run), use resolve_output_path to get the base directory,
+        then create study folder separately.
+        """
         config_dir = tmp_path / "config"
         config_dir.mkdir()
+        (config_dir / "paths.yaml").write_text("""
+schema_version: 2
+base:
+  outputs: outputs
+outputs:
+  hpo: hpo
+patterns:
+  final_training_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}"
+  conversion_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}/conv-{conv8}"
+  best_config_v2: "{model}/spec-{spec8}"
+  hpo_v2: "{storage_env}/{model}/study-{study8}/trial-{trial8}"
+  benchmarking_v2: "{storage_env}/{model}/study-{study8}/trial-{trial8}/bench-{bench8}"
+""")
         
-        study_key_hash = "a" * 64
-        study8 = study_key_hash[:8]
+        # For hpo_sweep, use resolve_output_path to get base directory
+        # (build_output_path requires trial_key_hash which isn't available for parent run)
+        hpo_base = resolve_output_path(tmp_path, config_dir, "hpo")
         
-        context = create_naming_context(
-            process_type="hpo",
-            model="distilbert",
-            environment="local",
-            storage_env="local",
-            stage="hpo_sweep",
-            study_key_hash=study_key_hash,
-        )
-        
-        output_path = build_output_path(
-            root_dir=tmp_path,
-            context=context,
-            config_dir=config_dir,
-        )
-        
-        # Verify path structure (hpo_sweep returns base directory, study folder created separately)
-        assert "outputs" in str(output_path)
-        assert "hpo" in str(output_path)
-        assert "local" in str(output_path)
-        assert "distilbert" in str(output_path)
-        # Note: build_output_path for hpo_sweep returns base dir, study folder is created separately
-        # The study folder would be: output_path / f"study-{study8}"
+        # Verify base path structure
+        assert "outputs" in str(hpo_base)
+        assert "hpo" in str(hpo_base)
+        # Note: resolve_output_path returns base hpo directory
+        # Study folder would be created as: hpo_base / "{storage_env}" / "{model}" / f"study-{study8}"
 
     def test_build_output_path_hpo_trial(self, tmp_path):
         """Test that build_output_path creates correct HPO trial path."""
         config_dir = tmp_path / "config"
         config_dir.mkdir()
+        (config_dir / "paths.yaml").write_text("""
+schema_version: 2
+base:
+  outputs: outputs
+outputs:
+  hpo: hpo
+patterns:
+  final_training_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}"
+  conversion_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}/conv-{conv8}"
+  best_config_v2: "{model}/spec-{spec8}"
+  hpo_v2: "{storage_env}/{model}/study-{study8}/trial-{trial8}"
+  benchmarking_v2: "{storage_env}/{model}/study-{study8}/trial-{trial8}/bench-{bench8}"
+""")
         
         study_key_hash = "a" * 64
         trial_key_hash = "b" * 64
@@ -304,6 +345,19 @@ class TestPathStructureWithBuildOutputPath:
         """Test that build_output_path creates correct HPO refit path."""
         config_dir = tmp_path / "config"
         config_dir.mkdir()
+        (config_dir / "paths.yaml").write_text("""
+schema_version: 2
+base:
+  outputs: outputs
+outputs:
+  hpo: hpo
+patterns:
+  final_training_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}"
+  conversion_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}/conv-{conv8}"
+  best_config_v2: "{model}/spec-{spec8}"
+  hpo_v2: "{storage_env}/{model}/study-{study8}/trial-{trial8}"
+  benchmarking_v2: "{storage_env}/{model}/study-{study8}/trial-{trial8}/bench-{bench8}"
+""")
         
         study_key_hash = "a" * 64
         trial_key_hash = "b" * 64
@@ -455,6 +509,19 @@ class TestPathStructureSmokeYaml:
         root_dir = tmp_path
         config_dir = tmp_path / "config"
         config_dir.mkdir()
+        (config_dir / "paths.yaml").write_text("""
+schema_version: 2
+base:
+  outputs: outputs
+outputs:
+  hpo: hpo
+patterns:
+  final_training_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}"
+  conversion_v2: "{storage_env}/{model}/spec-{spec8}_exec-{exec8}/v{variant}/conv-{conv8}"
+  best_config_v2: "{model}/spec-{spec8}"
+  hpo_v2: "{storage_env}/{model}/study-{study8}/trial-{trial8}"
+  benchmarking_v2: "{storage_env}/{model}/study-{study8}/trial-{trial8}/bench-{bench8}"
+""")
         
         hpo_base = resolve_output_path(root_dir, config_dir, "hpo")
         study_folder = hpo_base / "local" / "distilbert" / f"study-{study8}"

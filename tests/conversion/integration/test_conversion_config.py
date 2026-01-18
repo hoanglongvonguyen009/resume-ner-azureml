@@ -47,7 +47,7 @@ class TestConversionConfig:
              patch("deployment.conversion.orchestration.build_mlflow_run_name") as mock_build_name, \
              patch("deployment.conversion.orchestration.build_mlflow_tags") as mock_build_tags, \
              patch("deployment.conversion.orchestration.mlflow") as mock_mlflow, \
-             patch("deployment.conversion.orchestration.MlflowClient") as mock_client_class, \
+             patch("infrastructure.tracking.mlflow.client.create_mlflow_client") as mock_create_client, \
              patch("deployment.conversion.orchestration.update_mlflow_index"), \
              patch("deployment.conversion.orchestration.build_mlflow_run_key"), \
              patch("deployment.conversion.orchestration.build_mlflow_run_key_hash"), \
@@ -60,7 +60,7 @@ class TestConversionConfig:
             mock_build_tags.return_value = {}
             mock_mlflow.get_tracking_uri.return_value = None
             mock_client = Mock()
-            mock_client_class.return_value = mock_client
+            mock_create_client.return_value = mock_client
             mock_experiment = Mock()
             mock_experiment.experiment_id = "test_exp_id"
             mock_client.get_experiment_by_name.return_value = mock_experiment
@@ -128,7 +128,7 @@ class TestConversionConfig:
              patch("deployment.conversion.orchestration.build_mlflow_run_name") as mock_build_name, \
              patch("deployment.conversion.orchestration.build_mlflow_tags") as mock_build_tags, \
              patch("deployment.conversion.orchestration.mlflow") as mock_mlflow, \
-             patch("deployment.conversion.orchestration.MlflowClient") as mock_client_class, \
+             patch("infrastructure.tracking.mlflow.client.create_mlflow_client") as mock_create_client, \
              patch("deployment.conversion.orchestration.update_mlflow_index"), \
              patch("deployment.conversion.orchestration.build_mlflow_run_key"), \
              patch("deployment.conversion.orchestration.build_mlflow_run_key_hash"), \
@@ -140,7 +140,7 @@ class TestConversionConfig:
             mock_build_tags.return_value = {}
             mock_mlflow.get_tracking_uri.return_value = None
             mock_client = Mock()
-            mock_client_class.return_value = mock_client
+            mock_create_client.return_value = mock_client
             mock_experiment = Mock()
             mock_experiment.experiment_id = "test_exp_id"
             mock_client.get_experiment_by_name.return_value = mock_experiment
@@ -206,7 +206,7 @@ class TestConversionConfig:
              patch("deployment.conversion.orchestration.build_mlflow_run_name") as mock_build_name, \
              patch("deployment.conversion.orchestration.build_mlflow_tags") as mock_build_tags, \
              patch("deployment.conversion.orchestration.mlflow") as mock_mlflow, \
-             patch("deployment.conversion.orchestration.MlflowClient") as mock_client_class, \
+             patch("infrastructure.tracking.mlflow.client.create_mlflow_client") as mock_create_client, \
              patch("deployment.conversion.orchestration.update_mlflow_index"), \
              patch("deployment.conversion.orchestration.build_mlflow_run_key"), \
              patch("deployment.conversion.orchestration.build_mlflow_run_key_hash"), \
@@ -218,7 +218,7 @@ class TestConversionConfig:
             mock_build_tags.return_value = {}
             mock_mlflow.get_tracking_uri.return_value = None
             mock_client = Mock()
-            mock_client_class.return_value = mock_client
+            mock_create_client.return_value = mock_client
             mock_experiment = Mock()
             mock_experiment.experiment_id = "test_exp_id"
             mock_client.get_experiment_by_name.return_value = mock_experiment
@@ -284,7 +284,7 @@ class TestConversionConfig:
              patch("deployment.conversion.orchestration.build_mlflow_run_name") as mock_build_name, \
              patch("deployment.conversion.orchestration.build_mlflow_tags") as mock_build_tags, \
              patch("deployment.conversion.orchestration.mlflow") as mock_mlflow, \
-             patch("deployment.conversion.orchestration.MlflowClient") as mock_client_class, \
+             patch("infrastructure.tracking.mlflow.client.create_mlflow_client") as mock_create_client, \
              patch("deployment.conversion.orchestration.update_mlflow_index"), \
              patch("deployment.conversion.orchestration.build_mlflow_run_key"), \
              patch("deployment.conversion.orchestration.build_mlflow_run_key_hash"), \
@@ -296,7 +296,7 @@ class TestConversionConfig:
             mock_build_tags.return_value = {}
             mock_mlflow.get_tracking_uri.return_value = None
             mock_client = Mock()
-            mock_client_class.return_value = mock_client
+            mock_create_client.return_value = mock_client
             mock_experiment = Mock()
             mock_experiment.experiment_id = "test_exp_id"
             mock_client.get_experiment_by_name.return_value = mock_experiment
@@ -362,7 +362,7 @@ class TestConversionConfig:
              patch("deployment.conversion.orchestration.build_mlflow_run_name") as mock_build_name, \
              patch("deployment.conversion.orchestration.build_mlflow_tags") as mock_build_tags, \
              patch("deployment.conversion.orchestration.mlflow") as mock_mlflow, \
-             patch("deployment.conversion.orchestration.MlflowClient") as mock_client_class, \
+             patch("infrastructure.tracking.mlflow.client.create_mlflow_client") as mock_create_client, \
              patch("deployment.conversion.orchestration.update_mlflow_index"), \
              patch("deployment.conversion.orchestration.build_mlflow_run_key"), \
              patch("deployment.conversion.orchestration.build_mlflow_run_key_hash"), \
@@ -374,7 +374,7 @@ class TestConversionConfig:
             mock_build_tags.return_value = {}
             mock_mlflow.get_tracking_uri.return_value = None
             mock_client = Mock()
-            mock_client_class.return_value = mock_client
+            mock_create_client.return_value = mock_client
             mock_experiment = Mock()
             mock_experiment.experiment_id = "test_exp_id"
             mock_client.get_experiment_by_name.return_value = mock_experiment
@@ -438,7 +438,7 @@ class TestConversionConfig:
              patch("deployment.conversion.orchestration.build_mlflow_run_name") as mock_build_name, \
              patch("deployment.conversion.orchestration.build_mlflow_tags") as mock_build_tags, \
              patch("deployment.conversion.orchestration.mlflow") as mock_mlflow, \
-             patch("deployment.conversion.orchestration.MlflowClient") as mock_client_class, \
+             patch("infrastructure.tracking.mlflow.client.create_mlflow_client") as mock_create_client, \
              patch("deployment.conversion.orchestration.update_mlflow_index"), \
              patch("deployment.conversion.orchestration.build_mlflow_run_key"), \
              patch("deployment.conversion.orchestration.build_mlflow_run_key_hash"), \
@@ -451,7 +451,7 @@ class TestConversionConfig:
             mock_build_tags.return_value = {}
             mock_mlflow.get_tracking_uri.return_value = None
             mock_client = Mock()
-            mock_client_class.return_value = mock_client
+            mock_create_client.return_value = mock_client
             mock_experiment = Mock()
             mock_experiment.experiment_id = "test_exp_id"
             mock_client.get_experiment_by_name.return_value = mock_experiment

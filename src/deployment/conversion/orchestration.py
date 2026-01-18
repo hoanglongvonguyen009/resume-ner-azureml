@@ -48,7 +48,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Callable, TypedDict
 
 import mlflow
-from mlflow.tracking import MlflowClient
+# MlflowClient import removed - use create_mlflow_client() from infrastructure.tracking.mlflow.client instead
 
 from infrastructure.config.loader import ExperimentConfig
 from infrastructure.config.conversion import load_conversion_config
@@ -204,7 +204,8 @@ def _get_or_create_experiment(
     Returns:
         Experiment ID.
     """
-    client = MlflowClient()
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+    client = create_mlflow_client()
     try:
         experiment = client.get_experiment_by_name(conversion_experiment_name)
         if experiment is None:
@@ -278,7 +279,8 @@ def _create_conversion_mlflow_run(
         Run ID if created, None otherwise.
     """
     experiment_id = _get_or_create_experiment(conversion_experiment_name)
-    client = MlflowClient()
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+    client = create_mlflow_client()
 
     try:
         created_run = client.create_run(

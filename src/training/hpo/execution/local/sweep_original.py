@@ -644,10 +644,11 @@ def _set_phase2_hpo_tags(
         from infrastructure.naming.mlflow.tags_registry import load_tags_registry
         
         client = create_mlflow_client()
-        # Use resolve_project_paths_with_fallback() to consolidate path resolution
         # Trust provided config_dir parameter (DRY principle)
-        from infrastructure.paths.utils import resolve_project_paths_with_fallback
-        _, config_dir = resolve_project_paths_with_fallback(output_dir=None, config_dir=config_dir)
+        # Only infer when explicitly None
+        if config_dir is None:
+            from infrastructure.paths.utils import resolve_project_paths_with_fallback
+            _, config_dir = resolve_project_paths_with_fallback(output_dir=None, config_dir=None)
         tags_registry = load_tags_registry(config_dir)
         
         # Compute fingerprints

@@ -29,7 +29,7 @@ from MLflow, serving as a single source of truth for experiment discovery.
 
 from typing import Any, Dict, Optional
 
-from mlflow.tracking import MlflowClient
+# MlflowClient import removed - use create_mlflow_client() from infrastructure.tracking.mlflow.client instead
 
 from common.shared.logging_utils import get_logger
 
@@ -57,7 +57,8 @@ def discover_hpo_experiments(
         }
     """
     if mlflow_client is None:
-        mlflow_client = MlflowClient()
+        from infrastructure.tracking.mlflow.client import create_mlflow_client
+        mlflow_client = create_mlflow_client()
     
     hpo_experiments = {}
     all_experiments = mlflow_client.search_experiments()
@@ -93,7 +94,8 @@ def discover_benchmark_experiment(
         Dict with 'name' and 'id' keys, or None if not found and not created
     """
     if mlflow_client is None:
-        mlflow_client = MlflowClient()
+        from infrastructure.tracking.mlflow.client import create_mlflow_client
+        mlflow_client = create_mlflow_client()
     
     benchmark_experiment_name = f"{experiment_name}-benchmark"
     all_experiments = mlflow_client.search_experiments()
