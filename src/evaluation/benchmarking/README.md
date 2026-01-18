@@ -204,7 +204,7 @@ The benchmarking module is organized with Single Responsibility Principle:
 - `statistics.py`: Statistics calculation from measurements
 - `formatting.py`: Result formatting and comparison utilities
 - `orchestrator.py`: High-level orchestration for HPO trials
-  - **Backup support**: Uses standardized immediate backup pattern (`immediate_backup_if_needed()` from `orchestration.jobs.hpo.local.backup`)
+  - **Backup support**: Uses standardized immediate backup pattern (`immediate_backup_if_needed()` from `infrastructure.shared.backup`)
   - Backs up benchmark output files immediately after completion
   - Consistent backup behavior with HPO, training, and conversion workflows
 - `utils.py`: Subprocess wrapper and MLflow logging

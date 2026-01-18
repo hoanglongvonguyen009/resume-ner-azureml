@@ -20,7 +20,7 @@ from common.constants import METRICS_FILENAME
 class TestFullHPOWorkflow:
     """Test complete HPO workflow from start to finish."""
 
-    @patch("orchestration.jobs.hpo.local.trial.execution.subprocess.run")
+    @patch("training.execution.subprocess_runner.subprocess.run")
     @patch("training.hpo.execution.local.refit.execute_training_subprocess")
     @patch("training.hpo.execution.local.sweep.mlflow")
     def test_full_hpo_workflow_with_cv_and_refit(self, mock_mlflow, mock_refit_subprocess, mock_trial_subprocess, tmp_path):
@@ -344,7 +344,7 @@ patterns:
                     assert refit_metrics_file.exists()
                     break
 
-    @patch("orchestration.jobs.hpo.local.trial.execution.subprocess.run")
+    @patch("training.execution.subprocess_runner.subprocess.run")
     @patch("training.hpo.execution.local.sweep.mlflow")
     def test_full_hpo_workflow_no_cv_no_refit(self, mock_mlflow, mock_subprocess, tmp_path):
         """Test complete HPO workflow without CV and without refit."""
@@ -480,7 +480,7 @@ patterns:
             refit_folder = trial_folder / "refit"
             assert not refit_folder.exists()
 
-    @patch("orchestration.jobs.hpo.local.trial.execution.subprocess.run")
+    @patch("training.execution.subprocess_runner.subprocess.run")
     @patch("training.hpo.execution.local.sweep.mlflow")
     def test_full_hpo_workflow_creates_correct_path_structure(self, mock_mlflow, mock_subprocess, tmp_path):
         """Test that full HPO workflow creates correct v2 path structure."""

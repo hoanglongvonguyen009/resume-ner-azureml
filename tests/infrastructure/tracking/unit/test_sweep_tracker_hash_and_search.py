@@ -106,7 +106,7 @@ class TestSweepTrackerV2HashComputation:
         
         # Call start_sweep_run with all required configs
         with patch("mlflow.active_run", return_value=mock_run):
-            with patch("orchestration.jobs.tracking.index.run_index.update_mlflow_index"):
+            with patch("infrastructure.tracking.mlflow.index.update_mlflow_index"):
                 with patch.object(tracker, "_log_sweep_metadata"):
                     # Stub tag-builder to avoid depending on full NamingContext implementation
                     with patch("infrastructure.tracking.mlflow.trackers.sweep_tracker.build_mlflow_tags") as mock_build_tags:
@@ -164,7 +164,7 @@ class TestSweepTrackerV2HashComputation:
         
         # Call without train_config
         with patch("mlflow.active_run", return_value=mock_run):
-            with patch("orchestration.jobs.tracking.index.run_index.update_mlflow_index"):
+            with patch("infrastructure.tracking.mlflow.index.update_mlflow_index"):
                 with patch.object(tracker, "_log_sweep_metadata"):
                     with patch("infrastructure.tracking.mlflow.trackers.sweep_tracker.build_mlflow_tags") as mock_build_tags:
                         mock_build_tags.return_value = {
@@ -217,7 +217,7 @@ class TestSweepTrackerV2HashComputation:
         }
         
         with patch("mlflow.active_run", return_value=mock_run):
-            with patch("orchestration.jobs.tracking.index.run_index.update_mlflow_index"):
+            with patch("infrastructure.tracking.mlflow.index.update_mlflow_index"):
                 with patch.object(tracker, "_log_sweep_metadata"):
                     with patch("infrastructure.tracking.mlflow.trackers.sweep_tracker.build_mlflow_tags") as mock_build_tags:
                         mock_build_tags.return_value = {

@@ -49,10 +49,12 @@ import pytest
 ROOT_DIR = Path(__file__).parent.parent.parent
 SRC_DIR = ROOT_DIR / "src"
 CONFIG_DIR = ROOT_DIR / "config"
+# Ensure src is at the beginning of path to avoid conflicts with tests/training
+if str(SRC_DIR) in sys.path:
+    sys.path.remove(str(SRC_DIR))
+sys.path.insert(0, str(SRC_DIR))
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
 
 from common.constants import (
     STAGE_HPO,
@@ -215,7 +217,7 @@ def test_full_workflow_e2e(
         mock_result.stderr = ""
         return mock_result
     
-    with patch('orchestration.jobs.hpo.local.trial.execution.subprocess.run', side_effect=subprocess_side_effect):
+    with patch('training.execution.subprocess_runner.subprocess.run', side_effect=subprocess_side_effect):
         from training.hpo import run_local_hpo_sweep
         
         environment = detect_platform()
@@ -577,7 +579,7 @@ def test_full_workflow_e2e(
     (onnx_dir / "model.onnx").write_bytes(b"fake-onnx-model")
     
     monkeypatch.setattr(
-        "orchestration.jobs.conversion.run_conversion_workflow",
+        "deployment.conversion.orchestration.run_conversion_workflow",
         lambda **kwargs: fake_conversion_output_dir,
     )
     

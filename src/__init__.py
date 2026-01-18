@@ -15,7 +15,6 @@ This package contains:
   - Inference API (deployment.api.*)
 - Shared utilities (common/)
 - Platform adapters (infrastructure/)
-- Orchestration utilities (orchestration/)
 """
 
 # Export commonly used items for convenience

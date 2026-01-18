@@ -302,7 +302,7 @@ def commit_run_name_version(
             get_naming_config,
             get_auto_increment_config,
         )
-        from orchestration.jobs.tracking.index.version_counter import (
+        from infrastructure.tracking.mlflow.index import (
             commit_run_name_version as commit_version_internal,
         )
 

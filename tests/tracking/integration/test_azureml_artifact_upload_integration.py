@@ -59,7 +59,7 @@ class TestAzureMLArtifactUploadIntegration:
                 mock_client_class.return_value = mock_client
                 
                 # Mock retry_with_backoff to execute immediately
-                with patch('orchestration.jobs.tracking.trackers.sweep_tracker.retry_with_backoff') as mock_retry:
+                with patch('infrastructure.tracking.mlflow.trackers.sweep_tracker.retry_with_backoff') as mock_retry:
                     def execute_immediately(func):
                         return func()
                     mock_retry.side_effect = execute_immediately

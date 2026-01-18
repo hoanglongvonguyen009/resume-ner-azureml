@@ -844,7 +844,7 @@ def benchmark_best_trials(
             # No need to backup again unless it's a local path
             # Use centralized backup utility (standardized backup pattern)
             if backup_to_drive and backup_enabled and benchmark_output:
-                from orchestration.jobs.hpo.local.backup import immediate_backup_if_needed
+                from infrastructure.shared.backup import immediate_backup_if_needed
                 immediate_backup_if_needed(
                     target_path=benchmark_output,
                     backup_to_drive=backup_to_drive,

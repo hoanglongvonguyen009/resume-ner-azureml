@@ -151,7 +151,7 @@ Functions:
 
 **Path Resolution**: The system prioritizes v2 hash-based paths when `study_key_hash` is available, ensuring deterministic study folder names based on study configuration. Legacy `study_name` format is supported for backward compatibility.
 
-**Drive Backup**: The backup system (`orchestration.jobs.hpo.local.backup`) provides centralized backup utilities for all workflows:
+**Drive Backup**: The backup system (`infrastructure.shared.backup`) provides centralized backup utilities for all workflows:
 
 - **Standardized Immediate Backup**: `immediate_backup_if_needed()` provides generic immediate backup functionality:
   - Used by HPO, training, conversion, and benchmarking workflows

@@ -176,7 +176,7 @@ def create_training_mlflow_run(
                     build_mlflow_run_key,
                     build_mlflow_run_key_hash,
                 )
-                from orchestration.jobs.tracking.index.run_index import update_mlflow_index
+                from infrastructure.tracking.mlflow.index import update_mlflow_index
 
                 run_key = build_mlflow_run_key(context)
                 run_key_hash = build_mlflow_run_key_hash(run_key)

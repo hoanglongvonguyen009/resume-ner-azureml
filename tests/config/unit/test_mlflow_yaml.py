@@ -7,7 +7,7 @@ import yaml
 from pathlib import Path
 import pytest
 
-from orchestration.jobs.tracking.config.loader import (
+from infrastructure.naming.mlflow.config import (
     load_mlflow_config,
     get_naming_config,
     get_auto_increment_config,

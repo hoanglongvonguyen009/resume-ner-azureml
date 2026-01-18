@@ -147,7 +147,7 @@ apply_lineage_tags(lineage, mlflow_run)
 
 - `run_final_training_workflow(...)`: Execute final training with best config
   - **Backup support**: Accepts `backup_to_drive` and `backup_enabled` parameters
-  - Uses standardized immediate backup pattern (`immediate_backup_if_needed()` from `orchestration.jobs.hpo.local.backup`)
+  - Uses standardized immediate backup pattern (`immediate_backup_if_needed()` from `infrastructure.shared.backup`)
   - Backs up final checkpoint directory immediately after training completion
   - Consistent backup behavior with HPO, conversion, and benchmarking workflows
 

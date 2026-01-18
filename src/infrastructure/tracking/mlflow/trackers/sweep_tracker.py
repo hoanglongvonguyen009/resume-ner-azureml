@@ -57,7 +57,7 @@ from common.shared.logging_utils import get_logger
 from infrastructure.tracking.mlflow.types import RunHandle
 from infrastructure.naming.mlflow.tags import build_mlflow_tags
 from infrastructure.naming.mlflow.run_keys import build_mlflow_run_key, build_mlflow_run_key_hash
-from orchestration.jobs.tracking.index.run_index import update_mlflow_index
+from infrastructure.tracking.mlflow.index import update_mlflow_index
 from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
 from infrastructure.tracking.mlflow.trackers.base_tracker import BaseTracker
 from infrastructure.paths.utils import infer_config_dir

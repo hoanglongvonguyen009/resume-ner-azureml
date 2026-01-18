@@ -59,7 +59,7 @@ from infrastructure.naming.mlflow.run_keys import (
     build_mlflow_run_key,
     build_mlflow_run_key_hash,
 )
-from orchestration.jobs.tracking.index.run_index import update_mlflow_index
+from infrastructure.tracking.mlflow.index import update_mlflow_index
 from common.shared.platform_detection import detect_platform
 from common.shared.logging_utils import get_logger
 
@@ -374,7 +374,7 @@ def run_conversion_workflow(
     # Backup conversion output if enabled (standardized backup pattern)
     if backup_to_drive and backup_enabled and conversion_output_dir:
         try:
-            from orchestration.jobs.hpo.local.backup import immediate_backup_if_needed
+            from infrastructure.shared.backup import immediate_backup_if_needed
             immediate_backup_if_needed(
                 target_path=conversion_output_dir,
                 backup_to_drive=backup_to_drive,

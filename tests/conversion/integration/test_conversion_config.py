@@ -405,8 +405,8 @@ class TestConversionConfig:
             call_args = mock_popen.call_args[0][0]
             assert "--run-smoke-test" not in call_args
 
-    @patch("conversion.orchestration.subprocess.Popen")
-    @patch("conversion.orchestration.build_output_path")
+    @patch("deployment.conversion.orchestration.subprocess.Popen")
+    @patch("deployment.conversion.orchestration.build_output_path")
     def test_filename_pattern_used_in_find_onnx_model(
         self,
         mock_build_path,
@@ -433,15 +433,15 @@ class TestConversionConfig:
         conversion_config = resolved_conversion_config.copy()
         conversion_config["output"]["filename_pattern"] = "custom_{quantization}_model.onnx"
         
-        with patch("conversion.orchestration.detect_platform") as mock_detect, \
-             patch("conversion.orchestration.create_naming_context") as mock_create_context, \
-             patch("conversion.orchestration.build_mlflow_run_name") as mock_build_name, \
-             patch("conversion.orchestration.build_mlflow_tags") as mock_build_tags, \
-             patch("conversion.orchestration.mlflow") as mock_mlflow, \
-             patch("conversion.orchestration.MlflowClient") as mock_client_class, \
-             patch("conversion.orchestration.update_mlflow_index"), \
-             patch("conversion.orchestration.build_mlflow_run_key"), \
-             patch("conversion.orchestration.build_mlflow_run_key_hash"), \
+        with patch("deployment.conversion.orchestration.detect_platform") as mock_detect, \
+             patch("deployment.conversion.orchestration.create_naming_context") as mock_create_context, \
+             patch("deployment.conversion.orchestration.build_mlflow_run_name") as mock_build_name, \
+             patch("deployment.conversion.orchestration.build_mlflow_tags") as mock_build_tags, \
+             patch("deployment.conversion.orchestration.mlflow") as mock_mlflow, \
+             patch("deployment.conversion.orchestration.MlflowClient") as mock_client_class, \
+             patch("deployment.conversion.orchestration.update_mlflow_index"), \
+             patch("deployment.conversion.orchestration.build_mlflow_run_key"), \
+             patch("deployment.conversion.orchestration.build_mlflow_run_key_hash"), \
              patch("deployment.conversion.orchestration._find_onnx_model") as mock_find_onnx, \
              patch("deployment.conversion.orchestration.load_conversion_config") as mock_load_config:
             

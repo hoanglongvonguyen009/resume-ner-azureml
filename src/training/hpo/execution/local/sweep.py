@@ -57,7 +57,7 @@ from training.hpo.utils.helpers import (
 
 # Import from extracted modules
 from training.hpo.core.optuna_integration import import_optuna as _import_optuna, create_optuna_pruner
-from orchestration.jobs.hpo.local.backup import create_incremental_backup_callback
+from infrastructure.shared.backup import create_incremental_backup_callback
 # optuna imported lazily when needed (in run_local_hpo_sweep function)
 from .trial import run_training_trial
 from .cv import run_training_trial_with_cv
@@ -759,7 +759,7 @@ def run_local_hpo_sweep(
 
     # Immediate backup of study.db after creation/loading (using centralized utility)
     if backup_to_drive and backup_enabled and storage_path:
-        from orchestration.jobs.hpo.local.backup import immediate_backup_if_needed
+        from infrastructure.shared.backup import immediate_backup_if_needed
         immediate_backup_if_needed(
             target_path=storage_path,
             backup_to_drive=backup_to_drive,
@@ -872,7 +872,7 @@ def run_local_hpo_sweep(
 
     # Cleanup stale reservations from crashed processes
     try:
-        from orchestration.jobs.tracking.index.version_counter import cleanup_stale_reservations
+        from infrastructure.tracking.mlflow.index import cleanup_stale_reservations
         root_dir = output_dir.parent.parent if output_dir else Path.cwd()
         config_dir = output_dir.parent.parent / "config" if output_dir else None
         cleaned_count = cleanup_stale_reservations(

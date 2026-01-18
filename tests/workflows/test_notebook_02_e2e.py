@@ -29,10 +29,12 @@ from unittest.mock import patch
 # Setup Python path before imports
 ROOT_DIR = Path(__file__).parent.parent.parent
 SRC_DIR = ROOT_DIR / "src"
+# Ensure src is at the beginning of path to avoid conflicts with tests/training
+if str(SRC_DIR) in sys.path:
+    sys.path.remove(str(SRC_DIR))
+sys.path.insert(0, str(SRC_DIR))
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
 
 import mlflow
 import pytest
@@ -209,7 +211,7 @@ def test_best_config_selection_e2e(tmp_path, monkeypatch):
     # Patch conversion executor to return our fake conversion directory
     # Patch at multiple import paths to ensure it works
     monkeypatch.setattr(
-        "orchestration.jobs.conversion.run_conversion_workflow",
+        "deployment.conversion.orchestration.run_conversion_workflow",
         lambda **kwargs: fake_conversion_output_dir,
     )
     monkeypatch.setattr(

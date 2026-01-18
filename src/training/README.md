@@ -67,7 +67,9 @@ This module is organized into the following submodules:
 
 - `core/`: Core training components (trainer, model, evaluator, metrics)
 - `hpo/`: Hyperparameter optimization (Optuna integration, search spaces, trial execution)
+  - `azureml/`: AzureML HPO sweep job creation
 - `execution/`: Training execution (subprocess runner, distributed training, MLflow setup)
+- `azureml/`: AzureML training job creation
 - `cli/`: Command-line interfaces for training operations
 - `orchestrator.py`: High-level training orchestration
 - `config.py`: Training configuration building and resolution
@@ -131,6 +133,70 @@ best_config = run_local_hpo_sweep(
 )
 ```
 
+### Basic Workflow: AzureML Training Jobs
+
+```python
+from pathlib import Path
+from training.azureml import (
+    build_final_training_config,
+    create_final_training_job,
+    validate_final_training_job,
+)
+from infrastructure.azureml import submit_and_wait_for_job
+
+# Build final training config from best HPO config
+final_config = build_final_training_config(
+    best_config=best_hpo_config,
+    train_config=train_config,
+    random_seed=42
+)
+
+# Create AzureML training job
+training_job = create_final_training_job(
+    script_path=Path("src/training/cli/train.py"),
+    data_asset=data_asset,
+    environment=environment,
+    compute_cluster="gpu-cluster",
+    final_config=final_config,
+    aml_experiment_name="my_experiment",
+    tags={"backbone": "distilbert", "stage": "final_training"}
+)
+
+# Submit and wait for completion
+completed_job = submit_and_wait_for_job(ml_client, training_job)
+validate_final_training_job(completed_job)
+```
+
+### Basic Workflow: AzureML HPO Sweeps
+
+```python
+from pathlib import Path
+from training.hpo.azureml import (
+    create_hpo_sweep_job_for_backbone,
+    create_dry_run_sweep_job_for_backbone,
+    validate_sweep_job,
+)
+from infrastructure.azureml import submit_and_wait_for_job
+
+# Create AzureML HPO sweep job
+sweep_job = create_hpo_sweep_job_for_backbone(
+    script_path=Path("src/training/cli/train.py"),
+    data_asset=data_asset,
+    environment=environment,
+    compute_cluster="gpu-cluster",
+    hpo_config=hpo_config,
+    backbone="distilbert",
+    configs=configs,
+    config_metadata=config_metadata,
+    aml_experiment_name="my_experiment",
+    stage="hpo"
+)
+
+# Submit and wait for completion
+completed_sweep = submit_and_wait_for_job(ml_client, sweep_job)
+validate_sweep_job(completed_sweep, backbone="distilbert")
+```
+
 ### CLI Usage
 
 Train a model from command line:
@@ -153,6 +219,15 @@ python -m src.training.cli.train \
 - `run_local_hpo_sweep(...)`: Run local HPO sweep using Optuna
 - `run_final_training_workflow(...)`: Execute final training with best config
 - `extract_lineage_from_best_model(...)`: Extract lineage information from best model
+
+### AzureML Job Creation
+
+- `training.azureml.build_final_training_config(...)`: Build final training config from best HPO config
+- `training.azureml.create_final_training_job(...)`: Create AzureML final training job
+- `training.azureml.validate_final_training_job(...)`: Validate training job completion
+- `training.hpo.azureml.create_hpo_sweep_job_for_backbone(...)`: Create AzureML HPO sweep job
+- `training.hpo.azureml.create_dry_run_sweep_job_for_backbone(...)`: Create dry-run HPO sweep job
+- `training.hpo.azureml.validate_sweep_job(...)`: Validate sweep job completion
 
 ### Configuration
 

@@ -51,10 +51,12 @@ import pytest
 # Add project root to path
 ROOT_DIR = Path(__file__).parent.parent.parent
 SRC_DIR = ROOT_DIR / "src"
+# Ensure src is at the beginning of path to avoid conflicts with tests/training
+if str(SRC_DIR) in sys.path:
+    sys.path.remove(str(SRC_DIR))
+sys.path.insert(0, str(SRC_DIR))
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
 
 from common.constants import (
     STAGE_HPO,
@@ -385,7 +387,7 @@ class TestNotebookE2E_Core:
         import mlflow
         assert mlflow.get_tracking_uri() == tracking_uri
     
-    @patch('orchestration.jobs.hpo.local.trial.execution.subprocess.run')
+    @patch('training.execution.subprocess_runner.subprocess.run')
     @patch('training.hpo.execution.local.sweep.mlflow')
     def test_hpo_sweep_execution_mocked(
         self,

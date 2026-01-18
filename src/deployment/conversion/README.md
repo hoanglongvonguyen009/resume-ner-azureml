@@ -40,7 +40,8 @@ Conversion enables efficient production inference by converting PyTorch models t
 - `export.py`: ONNX export functionality
 - `execution.py`: Conversion execution and subprocess handling
 - `testing.py`: Smoke testing for converted models
-- `azureml.py`: AzureML conversion job creation (optional)
+- `azureml/`: AzureML conversion job creation
+  - `jobs.py`: AzureML conversion job creation utilities
 - `cli.py`: CLI for conversion execution
 
 ## Usage
@@ -80,15 +81,34 @@ python -m src.deployment.conversion.cli \
 ### Basic Example: AzureML Conversion Job
 
 ```python
-from src.deployment.conversion.azureml import create_conversion_job
+from pathlib import Path
+from deployment.conversion.azureml import (
+    create_conversion_job,
+    get_checkpoint_output_from_training_job,
+    validate_conversion_job,
+)
+from infrastructure.azureml import submit_and_wait_for_job
+
+# Extract checkpoint from completed training job
+checkpoint_uri = get_checkpoint_output_from_training_job(
+    training_job=completed_training_job,
+    ml_client=ml_client
+)
 
 # Create AzureML conversion job
 conversion_job = create_conversion_job(
     script_path=Path("src/deployment/conversion/cli.py"),
-    training_job=completed_training_job,
+    checkpoint_uri=checkpoint_uri,
     environment=environment,
-    compute_cluster="cpu-cluster"
+    compute_cluster="cpu-cluster",
+    backbone="distilbert",
+    experiment_name="conversion",
+    tags={"backbone": "distilbert", "stage": "conversion"}
 )
+
+# Submit and wait for completion
+completed_job = submit_and_wait_for_job(ml_client, conversion_job)
+validate_conversion_job(completed_job, ml_client=ml_client)
 ```
 
 ## API Reference
@@ -99,7 +119,7 @@ conversion_job = create_conversion_job(
   - Loads conversion config
   - Builds output directories
   - **Backup support**: Accepts `backup_to_drive` and `backup_enabled` parameters
-  - Uses standardized immediate backup pattern (`immediate_backup_if_needed()` from `orchestration.jobs.hpo.local.backup`)
+  - Uses standardized immediate backup pattern (`immediate_backup_if_needed()` from `infrastructure.shared.backup`)
   - Backs up conversion output directory immediately after conversion completion
   - Consistent backup behavior with HPO, training, and benchmarking workflows
   - Creates MLflow runs
@@ -111,11 +131,11 @@ conversion_job = create_conversion_job(
 - `export_to_onnx(...)`: Export PyTorch model to ONNX format
 - See `export.py` for detailed export functions
 
-### AzureML (Optional)
+### AzureML Job Creation
 
-- `create_conversion_job(...)`: Create AzureML conversion job
-- `get_checkpoint_output_from_training_job(...)`: Extract checkpoint from training job
-- `validate_conversion_job(...)`: Validate conversion job completion
+- `deployment.conversion.azureml.create_conversion_job(...)`: Create AzureML conversion job
+- `deployment.conversion.azureml.get_checkpoint_output_from_training_job(...)`: Extract checkpoint from training job
+- `deployment.conversion.azureml.validate_conversion_job(...)`: Validate conversion job completion
 
 ### Testing
 

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch, Mock
 
 import pytest
 
-from orchestration.jobs.hpo.local.backup import (
+from infrastructure.shared.backup import (
     backup_hpo_study_to_drive,
     create_incremental_backup_callback,
     create_study_db_backup_callback,
@@ -278,7 +278,7 @@ class TestIncrementalBackupCallback:
         trial.state = "COMPLETE"
         trial.number = 0
         
-        with patch("orchestration.jobs.hpo.local.backup._import_optuna") as mock_import:
+        with patch("infrastructure.shared.backup._import_optuna") as mock_import:
             mock_import.return_value = (optuna_module, None, None, None)
             
             # Execute callback
@@ -315,7 +315,7 @@ class TestIncrementalBackupCallback:
         trial.state = "COMPLETE"
         trial.number = 1
         
-        with patch("orchestration.jobs.hpo.local.backup._import_optuna") as mock_import:
+        with patch("infrastructure.shared.backup._import_optuna") as mock_import:
             mock_import.return_value = (optuna_module, None, None, None)
             
             # Execute callback
@@ -375,8 +375,8 @@ class TestIncrementalBackupCallback:
         trial.state = "COMPLETE"
         trial.number = 0
         
-        with patch("orchestration.jobs.hpo.local.backup._import_optuna") as mock_import, \
-             patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup._import_optuna") as mock_import, \
+             patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             mock_import.return_value = (optuna_module, None, None, None)
             # Mock is_drive_path to return True for this specific path
             def is_drive_side_effect(path):
@@ -410,8 +410,8 @@ class TestIncrementalBackupCallback:
         trial.state = "COMPLETE"
         trial.number = 0
         
-        with patch("orchestration.jobs.hpo.local.backup._import_optuna") as mock_import, \
-             patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup._import_optuna") as mock_import, \
+             patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             mock_import.return_value = (optuna_module, None, None, None)
             mock_is_drive.return_value = False  # Not in Drive
             
@@ -444,8 +444,8 @@ class TestIncrementalBackupCallback:
         trial.state = "FAIL"  # Not COMPLETE
         trial.number = 0
         
-        with patch("orchestration.jobs.hpo.local.backup._import_optuna") as mock_import, \
-             patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup._import_optuna") as mock_import, \
+             patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             mock_import.return_value = (optuna_module, None, None, None)
             mock_is_drive.return_value = False
             
@@ -477,8 +477,8 @@ class TestIncrementalBackupCallback:
         trial.state = "COMPLETE"
         trial.number = 0
         
-        with patch("orchestration.jobs.hpo.local.backup._import_optuna") as mock_import, \
-             patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup._import_optuna") as mock_import, \
+             patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             mock_import.return_value = (optuna_module, None, None, None)
             mock_is_drive.return_value = False
             
@@ -510,8 +510,8 @@ class TestIncrementalBackupCallback:
         trial.state = "COMPLETE"
         trial.number = 0
         
-        with patch("orchestration.jobs.hpo.local.backup._import_optuna") as mock_import, \
-             patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup._import_optuna") as mock_import, \
+             patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             mock_import.return_value = (optuna_module, None, None, None)
             mock_is_drive.return_value = False
             
@@ -535,7 +535,7 @@ class TestImmediateBackupIfNeeded:
         
         backup_to_drive_mock = MagicMock(return_value=True)
         
-        with patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             mock_is_drive.return_value = False  # Local path
             
             result = immediate_backup_if_needed(
@@ -560,7 +560,7 @@ class TestImmediateBackupIfNeeded:
         
         backup_to_drive_mock = MagicMock(return_value=True)
         
-        with patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             mock_is_drive.return_value = False  # Local path
             
             result = immediate_backup_if_needed(
@@ -603,7 +603,7 @@ class TestImmediateBackupIfNeeded:
         
         backup_to_drive_mock = MagicMock(return_value=True)
         
-        with patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             def is_drive_side_effect(path):
                 path_str = str(path)
                 return "/content/drive" in path_str or path == drive_path
@@ -626,7 +626,7 @@ class TestImmediateBackupIfNeeded:
         
         backup_to_drive_mock = MagicMock(return_value=True)
         
-        with patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             mock_is_drive.return_value = False  # Not in Drive
             
             result = immediate_backup_if_needed(
@@ -662,7 +662,7 @@ class TestImmediateBackupIfNeeded:
         
         backup_to_drive_mock = MagicMock(return_value=False)  # Backup fails
         
-        with patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             mock_is_drive.return_value = False  # Local path
             
             result = immediate_backup_if_needed(
@@ -683,7 +683,7 @@ class TestImmediateBackupIfNeeded:
         
         backup_to_drive_mock = MagicMock(side_effect=Exception("Backup error"))
         
-        with patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             mock_is_drive.return_value = False  # Local path
             
             # Should not raise exception
@@ -720,7 +720,7 @@ class TestShouldSkipBackup:
         drive_path.parent.mkdir(parents=True)
         drive_path.write_text("content")
         
-        with patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             def is_drive_side_effect(path):
                 path_str = str(path)
                 return "/content/drive" in path_str or path == drive_path
@@ -737,7 +737,7 @@ class TestShouldSkipBackup:
         """Test that skip returns True when path doesn't exist."""
         nonexistent_file = tmp_path / "nonexistent.txt"
         
-        with patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             mock_is_drive.return_value = False  # Not in Drive
             
             result = _should_skip_backup(
@@ -752,7 +752,7 @@ class TestShouldSkipBackup:
         target_file = tmp_path / "file.txt"
         target_file.write_text("content")
         
-        with patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             mock_is_drive.return_value = False  # Local path
             
             result = _should_skip_backup(
@@ -768,7 +768,7 @@ class TestShouldSkipBackup:
         target_file = tmp_path / "file.txt"
         target_file.write_text("content")
         
-        with patch("orchestration.jobs.hpo.local.backup.is_drive_path") as mock_is_drive:
+        with patch("infrastructure.shared.backup.is_drive_path") as mock_is_drive:
             mock_is_drive.return_value = False  # Local path
             
             result = _should_skip_backup(

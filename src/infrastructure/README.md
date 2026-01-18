@@ -60,8 +60,14 @@ This module is organized into the following submodules:
 - `config/`: Configuration loading, validation, and merging
 - `paths/`: Path resolution and management
 - `tracking/`: MLflow tracking integration
+  - `mlflow/`: MLflow tracking utilities
+    - `index/`: MLflow run indexing and version management
 - `naming/`: Naming conventions and policies
 - `platform/`: Platform adapters (AzureML, local)
+- `azureml/`: AzureML runtime utilities
+  - `runtime.py`: Job submission and monitoring
+- `shared/`: Shared cross-domain utilities
+  - `backup.py`: Backup utilities for HPO, training, conversion, and benchmarking
 - `storage/`: Storage abstractions
   - `drive.py`: Google Drive backup/restore for Colab environments
     - `DriveBackupStore`: Core backup/restore operations with Drive path rejection
@@ -167,6 +173,30 @@ run_name = format_run_name(context=context, policy=policy)
 - `get_platform_adapter(...)`: Get platform adapter for current platform
 - See `platform/adapters/` for platform-specific operations
 
+### AzureML Runtime
+
+- `infrastructure.azureml.submit_and_wait_for_job(...)`: Submit AzureML job and wait for completion
+  - Handles job submission, streaming logs, and status monitoring
+  - Raises `RuntimeError` if job fails
+
+### Shared Utilities
+
+- `infrastructure.shared.backup.immediate_backup_if_needed(...)`: Immediate backup utility for files/directories
+  - Used by HPO, training, conversion, and benchmarking workflows
+  - Checks: backup_enabled, path exists, path not in Drive
+- `infrastructure.shared.backup.create_incremental_backup_callback(...)`: Create Optuna callback for incremental backup
+- `infrastructure.shared.backup.create_study_db_backup_callback(...)`: Convenience wrapper for study.db backup callback
+- `infrastructure.shared.backup.backup_hpo_study_to_drive(...)`: Backup HPO study.db and study folder to Google Drive
+
+### MLflow Indexing
+
+- `infrastructure.tracking.mlflow.index.update_mlflow_index(...)`: Update index with run_key_hash → run_id mapping
+- `infrastructure.tracking.mlflow.index.find_in_mlflow_index(...)`: Find run_id in local index by run_key_hash
+- `infrastructure.tracking.mlflow.index.get_mlflow_index_path(...)`: Get path to mlflow_index.json
+- `infrastructure.tracking.mlflow.index.reserve_run_name_version(...)`: Reserve version number for run name
+- `infrastructure.tracking.mlflow.index.commit_run_name_version(...)`: Commit reserved version after MLflow run creation
+- `infrastructure.tracking.mlflow.index.cleanup_stale_reservations(...)`: Clean up stale reservations
+
 ### Storage
 
 - `DriveBackupStore`: Google Drive backup/restore store for Colab environments
@@ -190,8 +220,8 @@ For detailed signatures, see source code or submodule documentation.
 
 ### Used By
 
-- **Training modules**: Use infrastructure for configuration, paths, MLflow tracking
-- **Orchestration modules**: Use infrastructure for job orchestration
+- **Training modules**: Use infrastructure for configuration, paths, MLflow tracking, AzureML jobs
+- **Deployment modules**: Use infrastructure for AzureML conversion jobs
 - **Evaluation modules**: Use infrastructure for artifact discovery and tracking
 
 ## Examples
