@@ -218,6 +218,23 @@ class LocalMLflowContextManager(MLflowContextManager):
                     return named_run_context()
                 else:
                     # Fallback to standard start_run with name
+                    # CRITICAL: Validate run_name before calling mlflow.start_run()
+                    if not run_name or not run_name.strip():
+                        error_msg = (
+                            f"CRITICAL: Cannot create fallback run: run_name is None or empty. "
+                            f"This would cause MLflow to auto-generate a name like 'sad_toe_8qbllbws'. "
+                            f"run_name={run_name}, MLFLOW_RUN_NAME={os.environ.get('MLFLOW_RUN_NAME')}, "
+                            f"MLFLOW_PARENT_RUN_ID={os.environ.get('MLFLOW_PARENT_RUN_ID')}, "
+                            f"MLFLOW_CHILD_RUN_ID={os.environ.get('MLFLOW_CHILD_RUN_ID')}"
+                        )
+                        print(error_msg, file=sys.stderr, flush=True)
+                        import traceback
+                        print(f"Call stack:\n{''.join(traceback.format_stack()[-10:-1])}", file=sys.stderr, flush=True)
+                        raise ValueError(
+                            f"Cannot create fallback run: run_name is None or empty. "
+                            f"This would cause MLflow to auto-generate a name."
+                        )
+                    print(f"  [MLflow Context] Fallback: Creating run with name: '{run_name}'", file=sys.stderr, flush=True)
                     return mlflow.start_run(run_name=run_name)
             else:
                 # Deterministic fallback — avoid MLflow auto-generated names

@@ -282,8 +282,25 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
                 file=sys.stderr,
                 flush=True,
             )
+            # CRITICAL: Double-check run_name before calling mlflow.start_run()
+            # Even though we validated earlier, be extra defensive here
+            if not run_name or not run_name.strip():
+                error_msg = (
+                    f"CRITICAL: Cannot create fallback run: run_name became None/empty. "
+                    f"This would cause MLflow to auto-generate a name like 'sad_toe_8qbllbws'. "
+                    f"run_name={run_name}, MLFLOW_RUN_NAME={os.environ.get('MLFLOW_RUN_NAME')}"
+                )
+                print(error_msg, file=sys.stderr, flush=True)
+                import traceback
+                print(f"Call stack:\n{''.join(traceback.format_stack()[-10:-1])}", file=sys.stderr, flush=True)
+                raise RuntimeError(
+                    f"Cannot create fallback run: run_name is None or empty. "
+                    f"This would cause MLflow to auto-generate a name."
+                )
+            print(f"  [Training] Fallback: About to call mlflow.start_run(run_name='{run_name}')", file=sys.stderr, flush=True)
             mlflow.start_run(run_name=run_name)
             started_run_directly = True
+            print(f"  [Training] Fallback: ✓ Successfully created run with name '{run_name}'", file=sys.stderr, flush=True)
     else:
         # No parent run ID - check if we're in HPO context
         # In HPO, we should ALWAYS have a parent run ID set via MLFLOW_PARENT_RUN_ID
