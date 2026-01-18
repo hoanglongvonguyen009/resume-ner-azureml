@@ -53,17 +53,26 @@ def _patched_start_run(run_name: Optional[str] = None, run_id: Optional[str] = N
     
     This wrapper adds validation to prevent auto-generated run names.
     """
-    # Only validate if run_name is provided (run_id doesn't need validation)
-    if run_name is not None:
-        _validate_run_name(run_name, "mlflow.start_run()")
-        print(f"  [MLflow Patch] mlflow.start_run() called with run_name='{run_name}'", file=sys.stderr, flush=True)
+    # If run_id is provided, we're resuming an existing run - no validation needed
+    if run_id is not None:
+        print(f"  [MLflow Patch] mlflow.start_run() called with run_id='{run_id[:12]}...' (resuming existing run)", file=sys.stderr, flush=True)
+        if _original_start_run is None:
+            import mlflow
+            return mlflow.start_run(run_id=run_id, **kwargs)
+        else:
+            return _original_start_run(run_id=run_id, **kwargs)
+    
+    # If run_id is not provided, run_name MUST be provided and valid
+    # This prevents MLflow from auto-generating names like 'purple_jackal_l95cs465a'
+    _validate_run_name(run_name, "mlflow.start_run()")
+    print(f"  [MLflow Patch] mlflow.start_run() called with run_name='{run_name}'", file=sys.stderr, flush=True)
     
     # Call original function
     if _original_start_run is None:
         import mlflow
-        return mlflow.start_run(run_name=run_name, run_id=run_id, **kwargs)
+        return mlflow.start_run(run_name=run_name, **kwargs)
     else:
-        return _original_start_run(run_name=run_name, run_id=run_id, **kwargs)
+        return _original_start_run(run_name=run_name, **kwargs)
 
 
 def _patched_client_create_run(self: Any, experiment_id: str, run_name: Optional[str] = None, **kwargs: Any) -> Any:
@@ -72,10 +81,10 @@ def _patched_client_create_run(self: Any, experiment_id: str, run_name: Optional
     
     This wrapper adds validation to prevent auto-generated run names.
     """
-    # Only validate if run_name is provided
-    if run_name is not None:
-        _validate_run_name(run_name, "MlflowClient.create_run()")
-        print(f"  [MLflow Patch] MlflowClient.create_run() called with run_name='{run_name}'", file=sys.stderr, flush=True)
+    # run_name MUST be provided and valid - client.create_run() always creates a new run
+    # This prevents MLflow from auto-generating names like 'purple_jackal_l95cs465a'
+    _validate_run_name(run_name, "MlflowClient.create_run()")
+    print(f"  [MLflow Patch] MlflowClient.create_run() called with run_name='{run_name}'", file=sys.stderr, flush=True)
     
     # Call original function (should always be set after apply_patch() runs)
     if _original_client_create_run is None:
