@@ -255,7 +255,26 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
             )
             import traceback
             traceback.print_exc()
-            # Fallback to independent run
+            # Fallback to independent run only if run_name is available
+            # If run_name is None/empty, MLflow will auto-generate a name (e.g., bright_peach_xxx)
+            # This should be avoided - raise error instead
+            if not run_name:
+                error_msg = (
+                    f"  [Training] Cannot create fallback run: run_name is None/empty. "
+                    f"Parent run ID was: {parent_run_id[:12] if parent_run_id else 'None'}..."
+                )
+                print(error_msg, file=sys.stderr, flush=True)
+                raise RuntimeError(
+                    f"Failed to create child run and cannot create fallback: "
+                    f"run_name is None/empty. Original error: {e}"
+                ) from e
+            # Fallback to independent run with explicit name
+            print(
+                f"  [Training] WARNING: Creating independent run as fallback "
+                f"(parent was: {parent_run_id[:12] if parent_run_id else 'None'}...)",
+                file=sys.stderr,
+                flush=True,
+            )
             mlflow.start_run(run_name=run_name)
             started_run_directly = True
     else:
