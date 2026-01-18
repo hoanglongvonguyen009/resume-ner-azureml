@@ -118,6 +118,21 @@ class MLflowSweepTracker(BaseTracker):
         Yields:
             RunHandle with run information.
         """
+        # Validate run_name before creating run
+        # MLflow will auto-generate names (e.g., wheat_wheel_rr4dykvx) if run_name is None/empty
+        if not run_name or not run_name.strip():
+            error_msg = (
+                f"CRITICAL: run_name is None or empty when creating sweep run. "
+                f"This will cause MLflow to auto-generate a name. "
+                f"run_name={run_name}, run_name type={type(run_name)}"
+            )
+            logger.error(error_msg)
+            raise ValueError(
+                f"Cannot create sweep run: run_name is None or empty. "
+                f"This would cause MLflow to auto-generate a name like 'wheat_wheel_rr4dykvx'. "
+                f"Check that setup_hpo_mlflow_run() returned a valid run_name."
+            )
+        
         try:
             with mlflow.start_run(run_name=run_name) as parent_run:
                 run_id = parent_run.info.run_id

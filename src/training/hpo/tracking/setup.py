@@ -209,6 +209,20 @@ def setup_hpo_mlflow_run(
             output_dir=output_dir,
         )
 
+        # Validate run_name is not None or empty
+        # MLflow will auto-generate names (e.g., wheat_wheel_rr4dykvx) if run_name is None/empty
+        if not mlflow_run_name or not mlflow_run_name.strip():
+            error_msg = (
+                f"CRITICAL: build_mlflow_run_name returned None or empty string. "
+                f"hpo_parent_context={hpo_parent_context}, config_dir={config_dir}, "
+                f"root_dir={root_dir}, output_dir={output_dir}"
+            )
+            logger.error(error_msg)
+            raise ValueError(
+                f"Cannot create HPO sweep run: run_name is None or empty. "
+                f"This would cause MLflow to auto-generate a name. "
+                f"Check naming policy configuration."
+            )
 
         return hpo_parent_context, mlflow_run_name
 
