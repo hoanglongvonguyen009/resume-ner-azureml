@@ -79,8 +79,11 @@ def load_paths_config(config_dir: Path, storage_env: Optional[str] = None) -> Di
                 f"Invalid paths configuration in {paths_config_path}: {e}"
             ) from e
     else:
-        # Return defaults if config doesn't exist (backward compatibility)
-        config = _get_default_paths()
+        # Config file required - fail fast instead of using defaults
+        raise FileNotFoundError(
+            f"Paths configuration file not found: {paths_config_path}. "
+            "Please ensure config/paths.yaml exists in the repository root."
+        )
     
     # Apply env overrides if storage_env provided
     if storage_env:
@@ -302,7 +305,7 @@ def load_repository_root_config(config_dir: Path) -> Dict[str, Any]:
 
 
 def _get_default_paths() -> Dict[str, Any]:
-    """Default paths (backward compatible)."""
+    """Default paths (used internally - config file is now required)."""
     return {
         "base": {"outputs": "outputs"},
         "outputs": {

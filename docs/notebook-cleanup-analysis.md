@@ -134,7 +134,7 @@ Analysis of fallback patterns, redundant logic, and unused code in:
 
 ### Medium Priority
 1. Consolidate repository setup logic
-2. Analyze backup wrapper functions (may be needed for backward compatibility)
+2. Analyze backup wrapper functions (deprecated - use canonical functions)
 
 ### Low Priority
 1. Remove unused imports (after other cleanup)

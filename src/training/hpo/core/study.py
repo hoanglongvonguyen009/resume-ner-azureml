@@ -166,8 +166,6 @@ class StudyManager:
         # Get direction from objective config
         objective = hpo_config["objective"]
         self.direction = objective.get("direction", "maximize")
-        # Keep goal for backward compatibility (deprecated, but still used internally)
-        self.goal = self.direction
 
         # Create pruner and sampler
         self.pruner = create_optuna_pruner(hpo_config)

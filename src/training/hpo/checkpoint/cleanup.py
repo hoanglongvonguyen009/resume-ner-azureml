@@ -105,22 +105,12 @@ class CheckpointCleanupManager:
                     if checkpoint_dir.exists():
                         paths.append(checkpoint_dir)
 
-        # OLD STRUCTURE: Check trial_<n>_fold<k>/checkpoint/ directories (backward compatibility)
-        if self.fold_splits is not None:
-            for fold_idx in range(len(self.fold_splits)):
-                checkpoint_dir = (
-                    self.output_base_dir
-                    / f"trial_{trial_num}{run_suffix}_fold{fold_idx}"
-                    / "checkpoint"
-                )
-                if checkpoint_dir.exists():
-                    paths.append(checkpoint_dir)
-        else:
-            # Single training: get single checkpoint (if no refit exists)
-            if not refit_checkpoint_dir.exists():
-                checkpoint_dir = trial_base_dir / "checkpoint"
-                if checkpoint_dir.exists():
-                    paths.append(checkpoint_dir)
+        # Legacy structure removed - only v2 structure supported
+        # Single training: get single checkpoint (if no refit exists)
+        if not refit_checkpoint_dir.exists():
+            checkpoint_dir = trial_base_dir / "checkpoint"
+            if checkpoint_dir.exists():
+                paths.append(checkpoint_dir)
         return paths
 
     def delete_checkpoint_paths(self, paths: List[Path], trial_num: int) -> None:

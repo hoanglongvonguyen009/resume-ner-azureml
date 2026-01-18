@@ -61,10 +61,6 @@ def __getattr__(name: str):
     if name == "run_final_training_workflow":
         from .executor import run_final_training_workflow
         return run_final_training_workflow
-    # Backward compatibility alias
-    if name == "execute_final_training":
-        from .executor import run_final_training_workflow
-        return run_final_training_workflow
     # Distributed imports require torch
     elif name == "RunContext":
         from .distributed import RunContext

@@ -9,7 +9,6 @@ mock_optuna = MagicMock()
 sys.modules['optuna'] = mock_optuna
 
 from training.hpo import (
-    translate_search_space_to_optuna,
     SearchSpaceTranslator,
 )
 
@@ -59,7 +58,7 @@ class TestSearchSpaceTranslation:
         ])
 
         # Translate search space
-        params = translate_search_space_to_optuna(hpo_config, mock_trial)
+        params = SearchSpaceTranslator.to_optuna(hpo_config, mock_trial)
 
         # Assertions - verify all parameters are present
         assert "backbone" in params
@@ -98,7 +97,7 @@ class TestSearchSpaceTranslation:
         mock_trial = Mock()
         mock_trial.suggest_categorical = Mock(return_value="distilbert")
 
-        params = translate_search_space_to_optuna(hpo_config, mock_trial)
+        params = SearchSpaceTranslator.to_optuna(hpo_config, mock_trial)
 
         assert params["backbone"] == "distilbert"
         mock_trial.suggest_categorical.assert_called_once_with("backbone", ["distilbert"])
@@ -118,7 +117,7 @@ class TestSearchSpaceTranslation:
         mock_trial = Mock()
         mock_trial.suggest_float = Mock(return_value=3e-5)
 
-        params = translate_search_space_to_optuna(hpo_config, mock_trial)
+        params = SearchSpaceTranslator.to_optuna(hpo_config, mock_trial)
 
         assert "learning_rate" in params
         # Verify the call was made with correct parameters
@@ -143,7 +142,7 @@ class TestSearchSpaceTranslation:
         mock_trial = Mock()
         mock_trial.suggest_categorical = Mock(return_value=4)
 
-        params = translate_search_space_to_optuna(hpo_config, mock_trial)
+        params = SearchSpaceTranslator.to_optuna(hpo_config, mock_trial)
 
         assert params["batch_size"] == 4
         mock_trial.suggest_categorical.assert_called_once_with("batch_size", [4])
@@ -163,7 +162,7 @@ class TestSearchSpaceTranslation:
         mock_trial = Mock()
         mock_trial.suggest_float = Mock(return_value=0.2)
 
-        params = translate_search_space_to_optuna(hpo_config, mock_trial)
+        params = SearchSpaceTranslator.to_optuna(hpo_config, mock_trial)
 
         assert "dropout" in params
         # Verify the call was made with correct parameters (uniform, no log)
@@ -190,7 +189,7 @@ class TestSearchSpaceTranslation:
         mock_trial = Mock()
         mock_trial.suggest_float = Mock(return_value=0.01)
 
-        params = translate_search_space_to_optuna(hpo_config, mock_trial)
+        params = SearchSpaceTranslator.to_optuna(hpo_config, mock_trial)
 
         assert "weight_decay" in params
         # Verify the call was made with correct parameters
@@ -221,7 +220,7 @@ class TestSearchSpaceTranslation:
         mock_trial.suggest_float = Mock(return_value=3e-5)
 
         # Exclude backbone
-        params = translate_search_space_to_optuna(
+        params = SearchSpaceTranslator.to_optuna(
             hpo_config, mock_trial, exclude_params=["backbone"]
         )
 
@@ -244,7 +243,7 @@ class TestSearchSpaceTranslation:
         mock_trial = Mock()
 
         with pytest.raises(ValueError, match="Unsupported search space type"):
-            translate_search_space_to_optuna(hpo_config, mock_trial)
+            SearchSpaceTranslator.to_optuna(hpo_config, mock_trial)
 
     def test_search_space_translator_class(self):
         """Test SearchSpaceTranslator class method."""

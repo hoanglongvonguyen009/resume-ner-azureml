@@ -17,6 +17,43 @@ from infrastructure.paths import (
 )
 
 
+@pytest.fixture
+def paths_config_file(tmp_path):
+    """Create a minimal paths.yaml file for tests."""
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    
+    paths_yaml = config_dir / "paths.yaml"
+    paths_yaml.write_text("""
+base:
+  outputs: "outputs"
+outputs:
+  hpo: "hpo"
+  cache: "cache"
+  final_training: "final_training"
+cache:
+  best_configurations: "best_configurations"
+  final_training: "final_training"
+patterns:
+  final_training: "{backbone}_{run_id}"
+files:
+  cache:
+    best_config_latest: "latest_best_configuration.json"
+    best_config_index: "best_configurations_index.json"
+cache_strategies:
+  best_configurations:
+    strategy: "dual"
+    latest:
+      enabled: true
+      filename: "latest_best_configuration.json"
+    index:
+      enabled: true
+      filename: "best_configurations_index.json"
+""")
+    
+    return config_dir
+
+
 class TestLoadPathsConfig:
     """Test paths configuration loading."""
     
@@ -41,59 +78,36 @@ cache:
         assert config["outputs"]["hpo"] == "hpo"
     
     def test_load_paths_config_without_file(self, tmp_path):
-        """Test loading paths config with defaults when file doesn't exist."""
+        """Test loading paths config raises error when file doesn't exist."""
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         
-        config = load_paths_config(config_dir)
-        
-        # Should return defaults
-        assert "base" in config
-        assert "outputs" in config
-        assert config["base"]["outputs"] == "outputs"
+        # Backward compatibility defaults removed - should raise error
+        with pytest.raises(FileNotFoundError):
+            load_paths_config(config_dir)
 
 
 class TestResolveOutputPath:
     """Test output path resolution."""
     
-    def test_resolve_simple_path(self, tmp_path):
+    def test_resolve_simple_path(self, tmp_path, paths_config_file):
         """Test resolving simple output path."""
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        
-        path = resolve_output_path(tmp_path, config_dir, "hpo")
+        path = resolve_output_path(tmp_path, paths_config_file, "hpo")
         
         assert path == tmp_path / "outputs" / "hpo"
     
-    def test_resolve_cache_subdirectory(self, tmp_path):
+    def test_resolve_cache_subdirectory(self, tmp_path, paths_config_file):
         """Test resolving cache subdirectory."""
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        
         path = resolve_output_path(
-            tmp_path, config_dir, "cache", subcategory="best_configurations"
+            tmp_path, paths_config_file, "cache", subcategory="best_configurations"
         )
         
         assert path == tmp_path / "outputs" / "cache" / "best_configurations"
     
-    def test_resolve_path_with_pattern(self, tmp_path):
+    def test_resolve_path_with_pattern(self, tmp_path, paths_config_file):
         """Test resolving path with pattern replacement."""
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        
-        # Create minimal config with pattern
-        paths_yaml = config_dir / "paths.yaml"
-        paths_yaml.write_text("""
-base:
-  outputs: "outputs"
-outputs:
-  final_training: "final_training"
-patterns:
-  final_training: "{backbone}_{run_id}"
-""")
-        
         path = resolve_output_path(
-            tmp_path, config_dir, "final_training",
+            tmp_path, paths_config_file, "final_training",
             backbone="distilbert", run_id="20251227_220407"
         )
         
@@ -103,40 +117,31 @@ patterns:
 class TestGetCacheFilePath:
     """Test cache file path resolution."""
     
-    def test_get_latest_cache_file(self, tmp_path):
+    def test_get_latest_cache_file(self, tmp_path, paths_config_file):
         """Test getting latest cache file path."""
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        
         path = get_cache_file_path(
-            tmp_path, config_dir, "best_configurations", file_type="latest"
+            tmp_path, paths_config_file, "best_configurations", file_type="latest"
         )
         
         assert path.name == "latest_best_configuration.json"
         assert "best_configurations" in str(path)
     
-    def test_get_index_cache_file(self, tmp_path):
+    def test_get_index_cache_file(self, tmp_path, paths_config_file):
         """Test getting index cache file path."""
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        
         path = get_cache_file_path(
-            tmp_path, config_dir, "best_configurations", file_type="index"
+            tmp_path, paths_config_file, "best_configurations", file_type="index"
         )
         
-        assert path.name == "index.json"
+        assert path.name == "best_configurations_index.json"
 
 
 class TestGetTimestampedCacheFilename:
     """Test timestamped cache filename generation."""
     
-    def test_generate_best_config_filename(self, tmp_path):
+    def test_generate_best_config_filename(self, tmp_path, paths_config_file):
         """Test generating best config timestamped filename."""
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        
         filename = get_timestamped_cache_filename(
-            config_dir,
+            paths_config_file,
             "best_configurations",
             "distilbert-base-uncased",
             "trial_2",
@@ -149,13 +154,10 @@ class TestGetTimestampedCacheFilename:
         assert "20251227_220407" in filename
         assert filename.endswith(".json")
     
-    def test_generate_final_training_filename(self, tmp_path):
+    def test_generate_final_training_filename(self, tmp_path, paths_config_file):
         """Test generating final training timestamped filename."""
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        
         filename = get_timestamped_cache_filename(
-            config_dir,
+            paths_config_file,
             "final_training",
             "distilbert",
             "20251227_220407",
@@ -171,27 +173,24 @@ class TestGetTimestampedCacheFilename:
 class TestGetCacheStrategyConfig:
     """Test cache strategy config loading."""
     
-    def test_get_strategy_config(self, tmp_path):
+    def test_get_strategy_config(self, tmp_path, paths_config_file):
         """Test getting cache strategy configuration."""
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        
-        strategy = get_cache_strategy_config(config_dir, "best_configurations")
+        strategy = get_cache_strategy_config(paths_config_file, "best_configurations")
         
         assert "strategy" in strategy
-        assert "timestamped" in strategy
+        assert strategy["strategy"] == "dual"
         assert "latest" in strategy
         assert "index" in strategy
+        # timestamped is implicit when strategy is "dual" - check that latest/index are enabled
+        assert strategy["latest"]["enabled"] is True
+        assert strategy["index"]["enabled"] is True
 
 
 class TestSaveCacheWithDualStrategy:
     """Test dual file strategy saving."""
     
-    def test_save_cache_creates_all_files(self, tmp_path):
+    def test_save_cache_creates_all_files(self, tmp_path, paths_config_file):
         """Test that saving cache creates timestamped, latest, and index files."""
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        
         data = {
             "backbone": "distilbert",
             "trial_name": "trial_2",
@@ -200,7 +199,7 @@ class TestSaveCacheWithDualStrategy:
         
         timestamped_file, latest_file, index_file = save_cache_with_dual_strategy(
             root_dir=tmp_path,
-            config_dir=config_dir,
+            config_dir=paths_config_file,
             cache_type="best_configurations",
             data=data,
             backbone="distilbert",
@@ -233,30 +232,25 @@ class TestSaveCacheWithDualStrategy:
 class TestLoadCacheFile:
     """Test cache file loading."""
     
-    def test_load_latest_cache(self, tmp_path):
+    def test_load_latest_cache(self, tmp_path, paths_config_file):
         """Test loading latest cache file."""
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        
         # Create cache directory and files
         cache_dir = tmp_path / "outputs" / "cache" / "best_configurations"
         cache_dir.mkdir(parents=True)
         
+        # Use the filename from paths.yaml config (best_config_latest)
         latest_file = cache_dir / "latest_best_configuration.json"
         latest_file.write_text(json.dumps({"backbone": "distilbert", "trial": "trial_2"}))
         
         data = load_cache_file(
-            tmp_path, config_dir, "best_configurations", use_latest=True
+            tmp_path, paths_config_file, "best_configurations", use_latest=True
         )
         
-        assert data is not None
+        assert data is not None, f"Cache file should exist at {latest_file}"
         assert data["backbone"] == "distilbert"
     
-    def test_load_specific_timestamp(self, tmp_path):
+    def test_load_specific_timestamp(self, tmp_path, paths_config_file):
         """Test loading cache by specific timestamp."""
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        
         cache_dir = tmp_path / "outputs" / "cache" / "best_configurations"
         cache_dir.mkdir(parents=True)
         
@@ -265,7 +259,7 @@ class TestLoadCacheFile:
         
         data = load_cache_file(
             tmp_path,
-            config_dir,
+            paths_config_file,
             "best_configurations",
             use_latest=False,
             specific_timestamp="20251227_220407"
@@ -274,13 +268,10 @@ class TestLoadCacheFile:
         assert data is not None
         assert data["timestamp"] == "20251227_220407"
     
-    def test_load_returns_none_when_not_found(self, tmp_path):
+    def test_load_returns_none_when_not_found(self, tmp_path, paths_config_file):
         """Test loading returns None when cache not found."""
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        
         data = load_cache_file(
-            tmp_path, config_dir, "best_configurations", use_latest=True
+            tmp_path, paths_config_file, "best_configurations", use_latest=True
         )
         
         assert data is None

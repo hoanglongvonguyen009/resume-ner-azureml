@@ -310,14 +310,14 @@ benchmark:
         assert champion_config["min_trials_per_group"] > 0
         assert champion_config["top_k_for_stable_score"] > 0
         assert champion_config["artifact_check_source"] in ["tag", "disk"]
-        assert champion_config["prefer_schema_version"] in ["1.0", "2.0", "auto"]
+        assert champion_config["prefer_schema_version"] in ["2.0", "auto"]
 
     def test_load_config_champion_selection_with_objective_direction(self, tmp_path):
-        """Test that objective.direction (new) and objective.goal (legacy) both work."""
+        """Test that objective.direction works."""
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         
-        # Test with new 'direction' key
+        # Test with 'direction' key
         config_file = config_dir / "best_model_selection.yaml"
         config_file.write_text("""
 run:
@@ -336,23 +336,4 @@ benchmark:
         
         config = load_yaml(config_file)
         assert config["objective"]["direction"] == "maximize"
-        
-        # Test with legacy 'goal' key
-        config_file.write_text("""
-run:
-  mode: force_new
-objective:
-  metric: "macro-f1"
-  goal: "minimize"
-champion_selection:
-  min_trials_per_group: 3
-  top_k_for_stable_score: 3
-scoring:
-  f1_weight: 0.7
-benchmark:
-  required_metrics: []
-""")
-        
-        config = load_yaml(config_file)
-        assert config["objective"]["goal"] == "minimize"
 

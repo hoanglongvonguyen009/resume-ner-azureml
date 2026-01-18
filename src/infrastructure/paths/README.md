@@ -145,8 +145,11 @@ save_cache_with_dual_strategy(
 ### Cache Management
 
 - `get_cache_file_path(...)`: Get cache file path
-- `save_cache_with_dual_strategy(...)`: Save cache with local + drive backup
-- `load_cache_file(...)`: Load cache file
+- `get_cache_strategy_config(config_dir: Path, cache_type: str) -> Dict[str, Any]`: Get cache strategy configuration
+  - Returns strategy config from `paths.yaml` with defaults: `{"strategy": "dual", "latest": {"enabled": True}, "index": {"enabled": True}}`
+  - Strategy types: `"dual"` (timestamped + latest + index), `"timestamped"` (timestamped only), `"latest"` (latest only)
+- `save_cache_with_dual_strategy(...)`: Save cache with dual strategy (timestamped, latest, and index files)
+- `load_cache_file(...)`: Load cache file (supports latest, specific timestamp, or identifier)
 
 ### Repository Root Detection
 

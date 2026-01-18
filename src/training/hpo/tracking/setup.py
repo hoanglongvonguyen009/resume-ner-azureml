@@ -16,10 +16,9 @@ Handles MLflow run name creation, context setup, and version commit for HPO swee
     2. Then use `setup_hpo_mlflow_run()` to create naming context and run names
     3. Use `commit_run_name_version()` to commit reserved versions if auto-increment was used
 
-**Naming Hierarchy**:
-1. Systematic naming via `infrastructure.naming.mlflow.run_names.build_mlflow_run_name()` (preferred)
-2. Policy-based naming via `infrastructure.naming.display_policy.format_run_name()` (fallback)
-3. Legacy `create_mlflow_run_name()` (last resort fallback)
+**Naming**:
+- Uses systematic naming via `infrastructure.naming.mlflow.run_names.build_mlflow_run_name()`
+- Naming policy must be available - no fallback to legacy naming
 
 **Path Resolution**:
 - This module trusts the provided `config_dir` parameter (DRY principle).
@@ -27,8 +26,7 @@ Handles MLflow run name creation, context setup, and version commit for HPO swee
 - Only infers `config_dir` when explicitly None and cannot be derived from other parameters.
 
 **Hash Computation**:
-- Prefers v2 hash computation (`compute_study_key_hash_v2()`) when `train_config` is available.
-- Falls back to v1 hash computation (`build_hpo_study_key()`) for backward compatibility.
+- Uses v2 hash computation (`compute_study_key_hash_v2()`) when `train_config` is available.
 - Callers should pass pre-computed `study_key_hash` when available to avoid recomputation.
 """
 
@@ -38,7 +36,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 from common.shared.logging_utils import get_logger
-from training.hpo.utils.helpers import create_mlflow_run_name
 
 logger = get_logger(__name__)
 
@@ -206,69 +203,12 @@ def setup_hpo_mlflow_run(
         return hpo_parent_context, mlflow_run_name
 
     except Exception as e:
-        logger.warning(
-            f"Exception during context creation: {e}, trying policy fallback"
+        # No fallback to legacy naming - raise error
+        logger.error(
+            f"Failed to create HPO MLflow run name: {e}. "
+            "Naming policy must be available - no legacy fallback."
         )
-        hpo_parent_context = None
-
-        try:
-            from infrastructure.naming.mlflow.policy import (
-                load_naming_policy,
-                format_run_name,
-            )
-            from infrastructure.naming import create_naming_context
-            from common.shared.platform_detection import detect_platform
-
-            # Trust provided config_dir parameter (DRY principle)
-            # Only infer when explicitly None
-            if config_dir is not None:
-                # Derive root_dir from config_dir directly (trust provided value)
-                from infrastructure.paths.repo import detect_repo_root
-                root_dir = detect_repo_root(config_dir=config_dir)
-            else:
-                # Only infer when explicitly None
-                from infrastructure.paths.utils import resolve_project_paths_with_fallback
-                root_dir, config_dir = resolve_project_paths_with_fallback(
-                    output_dir=output_dir,
-                    config_dir=None,
-                )
-
-            if config_dir and config_dir.exists():
-                policy = load_naming_policy(config_dir)
-                if policy and "run_names" in policy:
-                    # Use same logic for fallback context
-                    model_short = backbone.split("-")[0] if "-" in backbone else backbone
-                    default_pattern = f"hpo_{model_short}"
-                    study_name_for_fallback = None
-                    if study_name and study_name != default_pattern:
-                        # Include all custom study names (including variants)
-                        study_name_for_fallback = study_name
-                    
-                    minimal_context = create_naming_context(
-                        process_type="hpo",
-                        model=model_short,
-                        environment=detect_platform(),
-                        study_name=study_name_for_fallback,
-                        study_key_hash=study_key_hash,
-                    )
-                    mlflow_run_name = format_run_name(
-                        "hpo_sweep", minimal_context, policy, config_dir
-                    )
-                    return minimal_context, mlflow_run_name
-        except Exception:
-            pass
-
-        mlflow_run_name = create_mlflow_run_name(
-            backbone,
-            run_id,
-            study_name,
-            should_resume,
-            checkpoint_enabled,
-        )
-        logger.warning(
-            f"Using legacy create_mlflow_run_name: {mlflow_run_name}"
-        )
-        return hpo_parent_context, mlflow_run_name
+        raise
 
 
 def commit_run_name_version(

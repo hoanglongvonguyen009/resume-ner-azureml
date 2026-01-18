@@ -33,7 +33,7 @@ Handles refit training on full dataset using best trial hyperparameters.
 """
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, TypedDict
 
 import mlflow
 from common.shared.logging_utils import get_logger
@@ -59,6 +59,278 @@ from training.execution import (
 from common.shared.platform_detection import detect_platform
 
 logger = get_logger(__name__)
+
+
+class RefitTrainingConfig(TypedDict):
+    """Configuration for refit training workflow."""
+    best_trial: Any
+    dataset_path: str
+    config_dir: Path
+    backbone: str
+    output_dir: Path
+    train_config: Dict[str, Any]
+    mlflow_experiment_name: str
+    objective_metric: str
+    hpo_parent_run_id: Optional[str]
+    study_key_hash: Optional[str]
+    study_family_hash: Optional[str]
+    trial_key_hash: Optional[str]
+    refit_protocol_fp: Optional[str]
+    run_id: Optional[str]
+
+
+def _extract_refit_params_and_trial_id(
+    best_trial: Any,
+    run_id: Optional[str],
+) -> tuple[Dict[str, Any], str, int]:
+    """
+    Extract hyperparameters and build trial ID from best trial.
+
+    Returns:
+        Tuple of (refit_params, trial_id, trial_number).
+    """
+    # Extract hyperparameters from best trial
+    refit_params = {
+        k: v for k, v in best_trial.params.items()
+        if k not in ("backbone", "trial_number", "run_id")
+    }
+
+    # Build trial ID (same as the trial that was refit)
+    trial_number = best_trial.number
+    run_suffix = f"_{run_id}" if run_id else ""
+    trial_id = f"trial_{trial_number}{run_suffix}"
+
+    # Ensure trial_id is never None/empty/whitespace
+    if not trial_id or not trial_id.strip():
+        trial_id = f"trial_{int(trial_number)}"
+        logger.warning(
+            f"[REFIT] trial_id was empty/None, auto-filled to: {trial_id!r}"
+        )
+
+    logger.info(
+        f"[REFIT] Computed trial_id={trial_id!r}, run_id={run_id!r}, "
+        f"trial_number={trial_number}"
+    )
+
+    return refit_params, trial_id, trial_number
+
+
+def _resolve_paths_and_compute_hashes(
+    config_dir: Optional[Path],
+    output_dir: Path,
+    study_key_hash: Optional[str],
+    trial_key_hash: Optional[str],
+    hpo_parent_run_id: Optional[str],
+    refit_params: Dict[str, Any],
+) -> tuple[Path, Path, Optional[str], Optional[str]]:
+    """
+    Resolve root_dir and config_dir, and compute study/trial key hashes.
+
+    Returns:
+        Tuple of (root_dir, config_dir, computed_study_key_hash, computed_trial_key_hash).
+    """
+    # Trust provided config_dir parameter (DRY principle)
+    if config_dir is not None:
+        from infrastructure.paths.repo import detect_repo_root
+        root_dir = detect_repo_root(config_dir=config_dir)
+        resolved_config_dir = config_dir
+    else:
+        from infrastructure.paths.utils import resolve_project_paths_with_fallback
+        root_dir, resolved_config_dir = resolve_project_paths_with_fallback(
+            output_dir=output_dir,
+            config_dir=None,
+        )
+
+    # Use consolidated utilities for hash computation
+    from infrastructure.tracking.mlflow.hash_utils import (
+        get_or_compute_study_key_hash,
+        get_or_compute_trial_key_hash,
+    )
+
+    # Compute study_key_hash
+    computed_study_key_hash = get_or_compute_study_key_hash(
+        study_key_hash=study_key_hash,
+        hpo_parent_run_id=hpo_parent_run_id,
+        data_config=None,  # Not available in refit context
+        hpo_config=None,  # Not available in refit context
+        train_config=None,  # Not available in refit context
+        backbone=None,  # Not available in refit context
+        config_dir=resolved_config_dir,
+    )
+
+    # Compute trial_key_hash
+    computed_trial_key_hash = get_or_compute_trial_key_hash(
+        trial_key_hash=trial_key_hash,
+        trial_run_id=None,  # Not available in refit context
+        study_key_hash=computed_study_key_hash,
+        hyperparameters=refit_params,
+        config_dir=resolved_config_dir,
+    )
+
+    return root_dir, resolved_config_dir, computed_study_key_hash, computed_trial_key_hash
+
+
+def _build_refit_output_dir(
+    refit_context: Any,
+    root_dir: Path,
+    config_dir: Path,
+    output_dir: Path,
+    study_key_hash: Optional[str],
+    refit_params: Dict[str, Any],
+) -> Path:
+    """
+    Build refit output directory using v2 pattern.
+
+    Returns:
+        Path to refit output directory.
+    """
+    refit_output_dir = None
+    if refit_context.study_key_hash and refit_context.trial_key_hash:
+        try:
+            from infrastructure.paths import build_output_path
+            refit_output_dir = build_output_path(root_dir, refit_context, config_dir=config_dir)
+            refit_output_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.warning(f"Could not construct v2 refit folder, falling back to legacy: {e}")
+            refit_output_dir = None
+
+    # Handle v2 study folder fallback
+    if refit_output_dir is None:
+        study_folder_name = output_dir.name if output_dir.name.startswith("study-") else None
+        is_v2_study_folder = study_folder_name and len(study_folder_name) > 7
+
+        if is_v2_study_folder:
+            if refit_context.trial_key_hash:
+                try:
+                    from infrastructure.paths import build_output_path
+                    from infrastructure.paths.utils import resolve_project_paths_with_fallback
+
+                    root_dir, config_dir_for_path = resolve_project_paths_with_fallback(
+                        output_dir=output_dir,
+                        config_dir=config_dir,
+                    )
+
+                    refit_output_dir = build_output_path(root_dir, refit_context, config_dir=config_dir_for_path)
+                    refit_output_dir.mkdir(parents=True, exist_ok=True)
+                    logger.info(
+                        f"Successfully created v2 refit folder using build_output_path(): {refit_output_dir}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"build_output_path() failed even on retry: {e}",
+                        exc_info=True
+                    )
+                    raise RuntimeError(
+                        f"Cannot create refit in v2 study folder {study_folder_name}. "
+                        f"build_output_path() failed: {e}"
+                    ) from e
+            else:
+                raise RuntimeError(
+                    f"Cannot create refit in v2 study folder {study_folder_name} without trial_key_hash. "
+                    f"study_key_hash={'present' if study_key_hash else 'missing'}, "
+                    f"trial_key_hash=missing, refit_params={'present' if refit_params else 'missing'}. "
+                    f"Hash computation from trial parameters may have failed."
+                )
+        else:
+            raise RuntimeError(
+                f"Cannot create refit in non-v2 study folder. Only v2 paths (study-{{hash}}) are supported. "
+                f"Found study folder: {study_folder_name or output_dir.name}"
+            )
+
+    return refit_output_dir
+
+
+def _copy_phase2_tags_from_parent(
+    hpo_parent_run_id: Optional[str],
+    config_dir: Path,
+    refit_tags: Dict[str, str],
+) -> None:
+    """Copy Phase 2 tags from parent run to refit run for consistency."""
+    if not hpo_parent_run_id:
+        return
+
+    try:
+        from mlflow.tracking import MlflowClient
+        from infrastructure.naming.mlflow.tags_registry import load_tags_registry
+        client = MlflowClient()
+        parent_run = client.get_run(hpo_parent_run_id)
+        parent_tags = parent_run.data.tags
+
+        # Phase 2 tags to copy from parent
+        try:
+            tags_registry = load_tags_registry(config_dir)
+            schema_version_tag = tags_registry.key("study", "key_schema_version")
+            data_fp_tag = tags_registry.key("fingerprint", "data")
+            eval_fp_tag = tags_registry.key("fingerprint", "eval")
+            direction_tag = tags_registry.key("objective", "direction")
+
+            # Copy tags if they exist on parent
+            if schema_version_tag in parent_tags:
+                refit_tags[schema_version_tag] = parent_tags[schema_version_tag]
+            if data_fp_tag in parent_tags:
+                refit_tags[data_fp_tag] = parent_tags[data_fp_tag]
+            if eval_fp_tag in parent_tags:
+                refit_tags[eval_fp_tag] = parent_tags[eval_fp_tag]
+            if direction_tag in parent_tags:
+                refit_tags[direction_tag] = parent_tags[direction_tag]
+        except Exception:
+            # Fallback: use hardcoded tag names
+            phase2_tag_keys = [
+                "code.study.key_schema_version",
+                "code.fingerprint.data",
+                "code.fingerprint.eval",
+                "code.objective.direction",
+            ]
+            for tag_key in phase2_tag_keys:
+                if tag_key in parent_tags:
+                    refit_tags[tag_key] = parent_tags[tag_key]
+    except Exception as e:
+        logger.debug(f"Could not copy Phase 2 tags from parent run to refit run: {e}")
+
+
+def _build_refit_tags(
+    refit_context: Any,
+    refit_output_dir: Path,
+    config_dir: Path,
+    hpo_parent_run_id: Optional[str],
+    computed_study_key_hash: Optional[str],
+    study_family_hash: Optional[str],
+    computed_trial_key_hash: Optional[str],
+    refit_protocol_fp: Optional[str],
+    refit_run_name: str,
+) -> Dict[str, str]:
+    """Build MLflow tags for refit run."""
+    from infrastructure.naming.mlflow.run_keys import (
+        build_mlflow_run_key,
+        build_mlflow_run_key_hash,
+    )
+
+    refit_run_key = build_mlflow_run_key(refit_context) if refit_context else None
+    refit_run_key_hash = build_mlflow_run_key_hash(refit_run_key) if refit_run_key else None
+
+    refit_tags = build_mlflow_tags(
+        context=refit_context,
+        output_dir=refit_output_dir,
+        parent_run_id=hpo_parent_run_id,
+        config_dir=config_dir,
+        study_key_hash=computed_study_key_hash,
+        study_family_hash=study_family_hash,
+        trial_key_hash=computed_trial_key_hash,
+        refit_protocol_fp=refit_protocol_fp,
+        run_key_hash=refit_run_key_hash,
+    )
+    refit_tags["mlflow.runType"] = "refit"
+    refit_tags["mlflow.runName"] = refit_run_name
+
+    # Copy Phase 2 tags from parent run
+    _copy_phase2_tags_from_parent(hpo_parent_run_id, config_dir, refit_tags)
+
+    if hpo_parent_run_id:
+        refit_tags["mlflow.parentRunId"] = hpo_parent_run_id
+        refit_tags["azureml.runType"] = "refit"
+
+    return refit_tags
+
 
 def run_refit_training(
     best_trial: Any,
@@ -108,83 +380,27 @@ def run_refit_training(
         f"with hyperparameters: {best_trial.params}"
     )
 
-    # Extract hyperparameters from best trial
-    refit_params = {
-        k: v for k, v in best_trial.params.items()
-        if k not in ("backbone", "trial_number", "run_id")
-    }
-
-    # Build trial ID (same as the trial that was refit)
-    trial_number = best_trial.number
-    run_suffix = f"_{run_id}" if run_id else ""
-    trial_id = f"trial_{trial_number}{run_suffix}"
-
-    # Layer A: Ensure trial_id is never None/empty/whitespace
-    if not trial_id or not trial_id.strip():
-        trial_id = f"trial_{int(trial_number)}"
-        logger.warning(
-            f"[REFIT] trial_id was empty/None, auto-filled to: {trial_id!r}"
-        )
-
-    logger.info(
-        f"[REFIT] Computed trial_id={trial_id!r}, run_id={run_id!r}, "
-        f"trial_number={trial_number}"
+    # Extract hyperparameters and build trial ID
+    refit_params, trial_id, trial_number = _extract_refit_params_and_trial_id(
+        best_trial, run_id
     )
 
-    # Trust provided config_dir parameter (DRY principle)
-    # Only infer when explicitly None
-    if config_dir is not None:
-        # Derive root_dir from config_dir directly (trust provided value)
-        from infrastructure.paths.repo import detect_repo_root
-        root_dir = detect_repo_root(config_dir=config_dir)
-    else:
-        # Only infer when explicitly None
-        from infrastructure.paths.utils import resolve_project_paths_with_fallback
-        root_dir, config_dir = resolve_project_paths_with_fallback(
-            output_dir=output_dir,
-            config_dir=None,
-        )
-    
-    # Use consolidated utilities for hash computation (follows SSOT pattern)
-    from infrastructure.tracking.mlflow.hash_utils import (
-        get_or_compute_study_key_hash,
-        get_or_compute_trial_key_hash,
+    # Resolve paths and compute hashes
+    root_dir, resolved_config_dir, computed_study_key_hash, computed_trial_key_hash = _resolve_paths_and_compute_hashes(
+        config_dir, output_dir, study_key_hash, trial_key_hash,
+        hpo_parent_run_id, refit_params
     )
 
-    # Note: refit.py doesn't have data_config, hpo_config, train_config available here,
-    # so we can only use provided study_key_hash or retrieve from parent run tags
-    computed_study_key_hash = get_or_compute_study_key_hash(
-        study_key_hash=study_key_hash,
-        hpo_parent_run_id=hpo_parent_run_id,
-        data_config=None,  # Not available in refit context
-        hpo_config=None,  # Not available in refit context
-        train_config=None,  # Not available in refit context
-        backbone=None,  # Not available in refit context
-        config_dir=config_dir,
-    )
-
-    # Compute trial_key_hash using consolidated utility
-    # Note: refit.py doesn't have trial_run_id available here, so we can only use
-    # provided trial_key_hash or compute from study_key_hash + hyperparameters
-    computed_trial_key_hash = get_or_compute_trial_key_hash(
-        trial_key_hash=trial_key_hash,
-        trial_run_id=None,  # Not available in refit context
-        study_key_hash=computed_study_key_hash,
-        hyperparameters=refit_params,
-        config_dir=config_dir,
-    )
-
-    # Create NamingContext and MLflow run for refit FIRST (needed for v2 path construction)
-    # Include study_key_hash and trial_key_hash for hash-driven naming consistency
+    # Create naming context
     refit_context = create_naming_context(
         process_type="hpo_refit",
         model=backbone.split("-")[0] if "-" in backbone else backbone,
         environment=detect_platform(),
         storage_env=detect_platform(),
         trial_id=trial_id,
-        trial_number=trial_number,  # Add trial_number for readability
-        study_key_hash=computed_study_key_hash,  # Use computed study_key_hash (from tags or configs)
-        trial_key_hash=computed_trial_key_hash,  # Use computed trial_key_hash
+        trial_number=trial_number,
+        study_key_hash=computed_study_key_hash,
+        trial_key_hash=computed_trial_key_hash,
     )
 
     # Assert: ensure trial_id is present before creating MLflow run
@@ -193,69 +409,13 @@ def run_refit_training(
         f"Computed trial_id={trial_id!r}, context.trial_id={refit_context.trial_id!r}"
     )
 
-    # Create refit output directory using v2 pattern if hashes available
-    # IMPORTANT: Do this BEFORE creating legacy directories to prevent legacy folder creation in v2 study folders
-    refit_output_dir = None
-    if refit_context.study_key_hash and refit_context.trial_key_hash:
-        try:
-            from infrastructure.paths import build_output_path
-            # build_output_path() handles hpo_refit by appending /refit to trial path
-            refit_output_dir = build_output_path(root_dir, refit_context, config_dir=config_dir)
-            refit_output_dir.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            logger.warning(f"Could not construct v2 refit folder, falling back to legacy: {e}")
-            refit_output_dir = None
-    
-    # Fallback to legacy pattern if v2 construction failed or hashes unavailable
-    if refit_output_dir is None:
-        # Check if we're in a v2 study folder (study-{hash})
-        # If so, we need to find the v2 trial folder first, then append /refit
-        study_folder_name = output_dir.name if output_dir.name.startswith("study-") else None
-        is_v2_study_folder = study_folder_name and len(study_folder_name) > 7  # study-{hash} has at least 8 chars
-        
-        if is_v2_study_folder:
-            if refit_context.trial_key_hash:
-                # Retry build_output_path() - it should work now with the fix
-                try:
-                    from infrastructure.paths import build_output_path
-                    from infrastructure.paths.utils import resolve_project_paths_with_fallback
-                    
-                    root_dir, config_dir_for_path = resolve_project_paths_with_fallback(
-                        output_dir=output_dir,
-                        config_dir=config_dir,
-                    )
-                    
-                    refit_output_dir = build_output_path(root_dir, refit_context, config_dir=config_dir_for_path)
-                    refit_output_dir.mkdir(parents=True, exist_ok=True)
-                    logger.info(
-                        f"Successfully created v2 refit folder using build_output_path(): {refit_output_dir}"
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"build_output_path() failed even on retry: {e}",
-                        exc_info=True
-                    )
-                    raise RuntimeError(
-                        f"Cannot create refit in v2 study folder {study_folder_name}. "
-                        f"build_output_path() failed: {e}"
-                    ) from e
-            else:
-                # We're in a v2 study folder but don't have trial_key_hash
-                # This is an error - we can't create v2 trial name without hash
-                raise RuntimeError(
-                    f"Cannot create refit in v2 study folder {study_folder_name} without trial_key_hash. "
-                    f"study_key_hash={'present' if study_key_hash else 'missing'}, "
-                    f"trial_key_hash=missing, refit_params={'present' if refit_params else 'missing'}. "
-                    f"Hash computation from trial parameters may have failed."
-                )
-        else:
-            # Should not happen - we only support v2 paths
-            raise RuntimeError(
-                f"Cannot create refit in non-v2 study folder. Only v2 paths (study-{{hash}}) are supported. "
-                f"Found study folder: {study_folder_name or output_dir.name}"
-            )
+    # Build refit output directory
+    refit_output_dir = _build_refit_output_dir(
+        refit_context, root_dir, resolved_config_dir, output_dir,
+        study_key_hash, refit_params
+    )
 
-    # Build command arguments for refit training using shared infrastructure
+    # Build training command
     training_options = TrainingOptions(
         epochs=train_config.get("training", {}).get("epochs", 10),
         early_stopping_enabled=True,  # Enable for refit
@@ -264,19 +424,16 @@ def run_refit_training(
     args = build_training_command(
         backbone=backbone,
         dataset_path=dataset_path,
-        config_dir=config_dir,
+        config_dir=resolved_config_dir,
         hyperparameters=refit_params,
         training_options=training_options,
     )
 
-    # Set environment variables using shared infrastructure
-    # Note: run_id will be set after MLflow run creation
+    # Set up environment variables
     mlflow_config = MLflowConfig(
         experiment_name=mlflow_experiment_name,
         parent_run_id=hpo_parent_run_id,
     )
-    # Skip artifact logging during refit training - checkpoint will be uploaded as archive
-    # by sweep_tracker.log_best_checkpoint() after refit completes
     trial_config = TrialConfig(skip_artifact_logging=True)
     env = setup_training_environment(
         root_dir=root_dir,
@@ -289,74 +446,24 @@ def run_refit_training(
     # Build MLflow run name and tags
     refit_run_name = build_mlflow_run_name(
         refit_context,
-        config_dir=config_dir,
+        config_dir=resolved_config_dir,
         root_dir=root_dir,
         output_dir=refit_output_dir,
     )
 
-    refit_run_key = build_mlflow_run_key(
-        refit_context) if refit_context else None
-    refit_run_key_hash = build_mlflow_run_key_hash(
-        refit_run_key) if refit_run_key else None
-    refit_tags = build_mlflow_tags(
-        context=refit_context,
-        output_dir=refit_output_dir,
-        parent_run_id=hpo_parent_run_id,
-        config_dir=config_dir,
-            study_key_hash=computed_study_key_hash,  # Use computed study_key_hash
-        study_family_hash=study_family_hash,
-            trial_key_hash=computed_trial_key_hash,  # Use computed trial_key_hash
-        refit_protocol_fp=refit_protocol_fp,
-        run_key_hash=refit_run_key_hash,
+    refit_tags = _build_refit_tags(
+        refit_context,
+        refit_output_dir,
+        resolved_config_dir,
+        hpo_parent_run_id,
+        computed_study_key_hash,
+        study_family_hash,
+        computed_trial_key_hash,
+        refit_protocol_fp,
+        refit_run_name,
     )
-    refit_tags["mlflow.runType"] = "refit"
-    refit_tags["mlflow.runName"] = refit_run_name
-    
-    # Copy Phase 2 tags from parent run to refit run (for consistency)
-    # This ensures refit runs have schema_version, fingerprints, etc. for champion selection
-    if hpo_parent_run_id:
-        try:
-            from mlflow.tracking import MlflowClient
-            from infrastructure.naming.mlflow.tags_registry import load_tags_registry
-            client = MlflowClient()
-            parent_run = client.get_run(hpo_parent_run_id)
-            parent_tags = parent_run.data.tags
-            
-            # Phase 2 tags to copy from parent
-            try:
-                tags_registry = load_tags_registry(config_dir)
-                schema_version_tag = tags_registry.key("study", "key_schema_version")
-                data_fp_tag = tags_registry.key("fingerprint", "data")
-                eval_fp_tag = tags_registry.key("fingerprint", "eval")
-                direction_tag = tags_registry.key("objective", "direction")
-                
-                # Copy tags if they exist on parent
-                if schema_version_tag in parent_tags:
-                    refit_tags[schema_version_tag] = parent_tags[schema_version_tag]
-                if data_fp_tag in parent_tags:
-                    refit_tags[data_fp_tag] = parent_tags[data_fp_tag]
-                if eval_fp_tag in parent_tags:
-                    refit_tags[eval_fp_tag] = parent_tags[eval_fp_tag]
-                if direction_tag in parent_tags:
-                    refit_tags[direction_tag] = parent_tags[direction_tag]
-            except Exception:
-                # Fallback: use hardcoded tag names
-                phase2_tag_keys = [
-                    "code.study.key_schema_version",
-                    "code.fingerprint.data",
-                    "code.fingerprint.eval",
-                    "code.objective.direction",
-                ]
-                for tag_key in phase2_tag_keys:
-                    if tag_key in parent_tags:
-                        refit_tags[tag_key] = parent_tags[tag_key]
-        except Exception as e:
-            logger.debug(f"Could not copy Phase 2 tags from parent run to refit run: {e}")
-    if hpo_parent_run_id:
-        refit_tags["mlflow.parentRunId"] = hpo_parent_run_id
-        refit_tags["azureml.runType"] = "refit"
 
-    # Create refit run as child of HPO parent using shared infrastructure
+    # Create refit run as child of HPO parent
     refit_run_id = None
     if hpo_parent_run_id:
         try:
@@ -366,16 +473,15 @@ def run_refit_training(
                 tags=refit_tags,
                 parent_run_id=hpo_parent_run_id,
             )
-            
-            # CRITICAL: Try to set linking tag immediately after run creation
-            # (in case run gets finalized before _log_refit_metrics_to_mlflow is called)
+
+            # Try to set linking tag immediately after run creation
             if refit_run_id and computed_trial_key_hash:
                 try:
                     _link_refit_to_trial_run(
                         refit_run_id=refit_run_id,
                         trial_key_hash=computed_trial_key_hash,
                         hpo_parent_run_id=hpo_parent_run_id,
-                        config_dir=config_dir,
+                        config_dir=resolved_config_dir,
                         trial_number=best_trial.number,
                     )
                 except Exception as e:
@@ -389,8 +495,6 @@ def run_refit_training(
     # Set run ID for refit training subprocess
     if refit_run_id:
         env["MLFLOW_RUN_ID"] = refit_run_id
-        # CRITICAL: Also set MLFLOW_PARENT_RUN_ID so training script knows it's refit mode
-        # This prevents training script from auto-ending the run (parent will terminate it)
         if hpo_parent_run_id:
             env["MLFLOW_PARENT_RUN_ID"] = hpo_parent_run_id
     elif hpo_parent_run_id:
@@ -401,10 +505,10 @@ def run_refit_training(
             f"This may create an unwanted child run."
         )
 
-    # Verify environment before running using shared infrastructure
+    # Verify environment before running
     verify_training_environment(root_dir, env, logger)
 
-    # Run refit training using shared infrastructure
+    # Run refit training
     result = execute_training_subprocess(
         command=args,
         cwd=root_dir,
@@ -421,9 +525,9 @@ def run_refit_training(
             refit_run_id=refit_run_id,
             metrics=metrics,
             refit_params=refit_params,
-            config_dir=config_dir,
-            trial_key_hash=computed_trial_key_hash,  # Use computed trial_key_hash for linking
-            hpo_parent_run_id=hpo_parent_run_id,  # Pass for linking
+            config_dir=resolved_config_dir,
+            trial_key_hash=computed_trial_key_hash,
+            hpo_parent_run_id=hpo_parent_run_id,
         )
 
     checkpoint_dir = refit_output_dir / "checkpoint"

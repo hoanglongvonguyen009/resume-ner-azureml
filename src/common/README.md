@@ -241,7 +241,7 @@ set_seed(DEFAULT_RANDOM_SEED)
 ### Notebook Setup
 
 - `detect_notebook_environment() -> NotebookEnvironment`: Detect notebook execution environment (Colab, Kaggle, local)
-- `find_repository_root(start_dir: Optional[Path] = None) -> Optional[Path]`: **Backward-compatible wrapper** for `detect_repo_root()` from `infrastructure.paths.repo`. Returns `None` if not found (for backward compatibility). For new code, use `detect_repo_root()` directly.
+- `find_repository_root(start_dir: Optional[Path] = None) -> Optional[Path]`: **Deprecated**. Use `detect_repo_root()` from `infrastructure.paths.repo` directly.
 - `setup_notebook_paths(root_dir: Optional[Path] = None, add_src_to_path: bool = True) -> NotebookPaths`: Setup notebook paths (root, config, src)
 - `get_platform_vars() -> dict[str, str | bool | Optional[Path]]`: Get platform variables as a dict (convenience function)
 - `ensure_mlflow_installed() -> None`: Install mlflow if needed (Colab/Kaggle only)

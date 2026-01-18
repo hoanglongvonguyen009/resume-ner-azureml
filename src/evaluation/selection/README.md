@@ -137,7 +137,7 @@ best_trials = find_best_trials_for_backbones(
 - `discover_artifact_mlflow(request, ..., config_dir: Optional[Path] = None)`: Discover artifact in MLflow
   - **Accepts `config_dir` parameter**: Pass `config_dir` explicitly when available
   - **Trusts provided `config_dir`**: Only infers when parameter is `None`
-- `acquire_best_model_checkpoint(...)`: Acquire best model checkpoint (backward compatibility wrapper)
+- `acquire_best_model_checkpoint(...)`: Acquire best model checkpoint
   - **Standard parameters**: `backup_to_drive`, `restore_from_drive`, `backup_enabled`, `in_colab`, `platform`
   - Uses unified artifact acquisition with fallback strategy (local → drive → MLflow)
 - `load_best_trial_from_disk(...)`: Load best trial from disk

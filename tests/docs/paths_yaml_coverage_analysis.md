@@ -8,9 +8,9 @@ All sections of `paths.yaml` are now covered by tests.
 
 ## Test Files
 
-1. **`tests/unit/orchestration/test_paths.py`** - Basic path resolution tests
-2. **`tests/unit/orchestration/test_paths_comprehensive.py`** - Comprehensive path resolution, caching, and v2 patterns
-3. **`tests/unit/orchestration/test_paths_yaml_coverage.py`** - Complete coverage of all config options (NEW)
+1. **`tests/config/unit/test_paths.py`** - Basic path resolution tests
+2. **`tests/config/unit/test_paths_comprehensive.py`** - Comprehensive path resolution, caching, and v2 patterns
+3. **`tests/config/unit/test_paths_yaml_coverage.py`** - Complete coverage of all config options (NEW)
 
 ## Coverage by Section
 
@@ -78,7 +78,7 @@ All sections of `paths.yaml` are now covered by tests.
 
 1. **files.cache options** are used as fallback when `cache_strategies` is not configured. The `get_cache_file_path()` function prioritizes `cache_strategies.latest.filename` over `files.cache.*`.
 
-2. **normalize_paths** configuration is used by `normalize_for_path()` function in `src/orchestration/normalize.py`. The `max_path_length` option is typically used at path construction time, not in the normalization function itself.
+2. **normalize_paths** configuration is used by `normalize_for_path()` function in `src/core/normalize.py`. The `max_path_length` option is typically used at path construction time, not in the normalization function itself.
 
 3. **patterns** are used by `build_output_path()` in `naming_centralized.py` for v2 fingerprint-based paths, and by `get_timestamped_cache_filename()` for cache file naming.
 

@@ -8,7 +8,7 @@ All experiment configuration options are now covered by tests.
 
 ## Test Files
 
-1. **`tests/unit/orchestration/test_experiment_config.py`** - Complete coverage of all experiment config options (NEW)
+1. **`tests/config/unit/test_experiment_config.py`** - Complete coverage of all experiment config options (NEW)
    - 29 tests passing
    - 2 skipped (conditional on real files existing)
 
@@ -124,7 +124,7 @@ All experiment configuration options are now covered by tests.
 
 ## Implementation Notes
 
-1. **Experiment configs are loaded via `load_experiment_config()`** in `orchestration/config_loader.py`
+1. **Experiment configs are loaded via `load_experiment_config()`** in `infrastructure.config.loader`
    - Path pattern: `config/experiment/{experiment_name}.yaml`
    - Returns `ExperimentConfig` dataclass with resolved paths
 
@@ -147,7 +147,7 @@ All experiment configuration options are now covered by tests.
 All configuration options in experiment/*.yaml files are:
 
 - ✅ Properly loaded from the config files
-- ✅ Used in the codebase where applicable (orchestration/config_loader.py)
+- ✅ Used in the codebase where applicable (infrastructure.config.loader)
 - ✅ Comprehensively tested
 - ✅ Have correct default values where appropriate
 - ✅ Path resolution works correctly for relative paths

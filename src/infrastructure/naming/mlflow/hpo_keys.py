@@ -141,7 +141,7 @@ def build_hpo_study_key(
         }
 
     payload = {
-        "schema_version": "1.0",
+        "schema_version": "2.0",
         "data": data_key,
         "hpo": hpo_key,
         "model": model.lower().strip(),
@@ -214,7 +214,7 @@ def build_hpo_study_family_key(
         }
 
     payload = {
-        "schema_version": "1.0",
+        "schema_version": "2.0",
         "data": data_key,
         "hpo": hpo_key,
         "benchmark": bench_key,
@@ -276,7 +276,7 @@ def build_hpo_trial_key(
     normalized_params = _normalize_hyperparameters(hyperparameters)
 
     payload = {
-        "schema_version": "1.0",
+        "schema_version": "2.0",
         "study_key_hash": study_key_hash,
         "hyperparameters": normalized_params,
     }

@@ -166,7 +166,7 @@ class TestRunModeBehavior:
         mock_client = Mock()
         
         # Mock that benchmark exists for distilbert
-        with patch("evaluation.benchmarking.orchestrator._benchmark_exists_in_mlflow") as mock_exists:
+        with patch("evaluation.benchmarking.existence_checker.benchmark_exists_in_mlflow") as mock_exists:
             mock_exists.return_value = True  # Benchmark exists for first champion
             
             result = filter_missing_benchmarks(
@@ -267,7 +267,7 @@ class TestBenchmarkKeyIdempotency:
         # Keys should be identical
         assert key1 == key2
 
-    @patch("evaluation.benchmarking.orchestrator._benchmark_exists_in_mlflow")
+    @patch("evaluation.benchmarking.existence_checker.benchmark_exists_in_mlflow")
     def test_benchmark_key_used_as_primary_check(self, mock_exists_mlflow, tmp_path):
         """Test that benchmark_key is used as PRIMARY check in idempotency."""
         benchmark_key = "test_benchmark_key_123"
@@ -302,7 +302,7 @@ class TestBenchmarkKeyIdempotency:
 class TestBenchmarkKeyFallback:
     """Test fallback to trial_key_hash + study_key_hash (backward compatibility)."""
 
-    @patch("evaluation.benchmarking.orchestrator._benchmark_exists_in_mlflow")
+    @patch("evaluation.benchmarking.existence_checker.benchmark_exists_in_mlflow")
     def test_fallback_to_hash_when_benchmark_key_not_found(self, mock_exists_mlflow, tmp_path):
         """Test fallback to trial_key_hash + study_key_hash when benchmark_key tag missing."""
         benchmark_key = "test_benchmark_key_123"
@@ -398,7 +398,7 @@ class TestIdempotencySuccessCases:
             }
         }
 
-    @patch("evaluation.benchmarking.orchestrator._benchmark_exists_in_mlflow")
+    @patch("evaluation.benchmarking.existence_checker.benchmark_exists_in_mlflow")
     def test_success_benchmark_exists_by_benchmark_key(
         self,
         mock_exists_mlflow,
@@ -431,7 +431,7 @@ class TestIdempotencySuccessCases:
         # Should filter out existing benchmark
         assert len(result) == 0  # All champions filtered out (benchmark exists)
 
-    @patch("evaluation.benchmarking.orchestrator._benchmark_exists_in_mlflow")
+    @patch("evaluation.benchmarking.existence_checker.benchmark_exists_in_mlflow")
     def test_success_benchmark_exists_by_hash_fallback(
         self,
         mock_exists_mlflow,
@@ -475,7 +475,7 @@ class TestIdempotencySuccessCases:
         # Mock: benchmark does not exist
         mock_client = Mock()
         
-        with patch("evaluation.benchmarking.orchestrator._benchmark_exists_in_mlflow") as mock_exists:
+        with patch("evaluation.benchmarking.existence_checker.benchmark_exists_in_mlflow") as mock_exists:
             mock_exists.return_value = False
             
             result = filter_missing_benchmarks(
@@ -560,7 +560,7 @@ class TestIdempotencyFailureCases:
         # Should fall back to disk check or keep champions
         assert isinstance(result, dict)
 
-    @patch("evaluation.benchmarking.orchestrator._benchmark_exists_in_mlflow")
+    @patch("evaluation.benchmarking.existence_checker.benchmark_exists_in_mlflow")
     def test_failure_mlflow_check_raises_exception(
         self,
         mock_exists_mlflow,

@@ -51,12 +51,10 @@ if config_dir is None:
 - `get_or_compute_trial_key_hash()`: Consolidated utility for trial hashes
 - `get_study_key_hash_from_run()`: Retrieve hash from MLflow run tags (SSOT)
 - `compute_study_key_hash_v2()`: Compute hash from configs (v2, preferred)
-- `compute_study_key_hash_v1()`: Compute hash from configs (v1, legacy fallback)
-
 **Priority Order**:
 1. Use provided hash (if available) - highest priority
 2. Retrieve from MLflow run tags (SSOT) - tags are source of truth
-3. Compute from configs (fallback) - v2 preferred, v1 for backward compatibility
+3. Compute from configs (fallback) - v2 required
 
 **Usage Pattern**:
 ```python
@@ -85,9 +83,9 @@ study_key_hash = run.data.tags.get("code.study_key_hash")  # Manual extraction
 - **v2** (preferred): Uses `train_config` for more accurate fingerprints
   - Requires: `data_config`, `hpo_config`, `train_config`, `model`
   - Function: `compute_study_key_hash_v2()`
-- **v1** (legacy fallback): For backward compatibility when `train_config` unavailable
-  - Requires: `data_config`, `hpo_config`, `model`
-  - Function: `build_hpo_study_key()` + `build_hpo_study_key_hash()`
+- **v2** (required): Uses `train_config` for accurate hash computation
+  - Requires: `train_config` (includes data_config, hpo_config, model)
+  - Function: `build_hpo_study_key_v2()` + `build_hpo_study_key_hash()`
 
 ### MLflow Setup
 
@@ -172,14 +170,7 @@ def setup_hpo_mlflow_run(..., train_config: Optional[Dict] = None, study_key_has
                 data_config, hpo_config, train_config, model, config_dir
             )
         
-        # Fallback to v1 for backward compatibility
-        if not study_key_hash:
-            from infrastructure.naming.mlflow.hpo_keys import (
-                build_hpo_study_key,
-                build_hpo_study_key_hash,
-            )
-            study_key = build_hpo_study_key(...)
-            study_key_hash = build_hpo_study_key_hash(study_key)
+        # v2 hash computation is required - no fallback to v1
 ```
 
 ### Pattern 3: Hash Retrieval from MLflow Runs
@@ -307,7 +298,7 @@ config_dir = infer_config_dir()
 
 ### 4. Prefer v2 Hash Computation
 
-**Principle**: Use v2 hash computation (`compute_study_key_hash_v2()`) when `train_config` is available. Fall back to v1 only when necessary for backward compatibility.
+**Principle**: Use v2 hash computation (`compute_study_key_hash_v2()`). `train_config` is required for accurate hash computation.
 
 **Example**:
 ```python

@@ -47,7 +47,7 @@ class TestStudyKeyHashComputation:
 
         # Should be valid JSON
         parsed = json.loads(study_key)
-        assert parsed["schema_version"] == "1.0"
+        assert parsed["schema_version"] == "2.0"
         assert parsed["model"] == "distilbert"
         assert "data" in parsed
         assert "hpo" in parsed
@@ -192,7 +192,7 @@ class TestTrialKeyHashComputation:
         trial_key = build_hpo_trial_key(study_key_hash, hyperparameters)
         parsed = json.loads(trial_key)
 
-        assert parsed["schema_version"] == "1.0"
+        assert parsed["schema_version"] == "2.0"
         assert parsed["study_key_hash"] == study_key_hash
         assert "hyperparameters" in parsed
 

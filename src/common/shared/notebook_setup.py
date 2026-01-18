@@ -89,28 +89,6 @@ def detect_notebook_environment() -> NotebookEnvironment:
     )
 
 
-def find_repository_root(start_dir: Optional[Path] = None) -> Optional[Path]:
-    """
-    Backward-compatible wrapper for detect_repo_root().
-    
-    .. deprecated::
-        Use `detect_repo_root()` from `infrastructure.paths.repo` instead.
-        This function is kept for backward compatibility with notebooks.
-    
-    Args:
-        start_dir: Directory to start searching from (mapped to start_path).
-    
-    Returns:
-        Path to repository root directory, or None if not found.
-    """
-    from infrastructure.paths.repo import detect_repo_root
-    
-    try:
-        return detect_repo_root(start_path=start_dir)
-    except ValueError:
-        return None
-
-
 @dataclass
 class NotebookPaths:
     """Notebook path configuration."""
@@ -138,8 +116,10 @@ def setup_notebook_paths(
     """
     # Find repository root if not provided
     if root_dir is None:
-        root_dir = find_repository_root()
-        if root_dir is None:
+        from infrastructure.paths.repo import detect_repo_root
+        try:
+            root_dir = detect_repo_root()
+        except ValueError:
             raise ValueError(
                 "Could not find repository root. Please ensure you're running from within the repository or a subdirectory."
             )
@@ -200,8 +180,10 @@ def ensure_src_in_path() -> Optional[Path]:
     Returns:
         Repository root Path if found and added to path, None otherwise.
     """
-    repo_root = find_repository_root()
-    if repo_root is None:
+    from infrastructure.paths.repo import detect_repo_root
+    try:
+        repo_root = detect_repo_root()
+    except ValueError:
         return None
     src_dir = repo_root / "src"
     if str(src_dir) not in sys.path:

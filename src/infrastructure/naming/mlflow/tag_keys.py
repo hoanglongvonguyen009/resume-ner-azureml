@@ -105,13 +105,7 @@ AZUREML_SWEEP: Tuple[str, str] = ("azureml", "sweep")
 MLFLOW_RUN_TYPE: Tuple[str, str] = ("mlflow", "run_type")
 MLFLOW_PARENT_RUN_ID: Tuple[str, str] = ("mlflow", "parent_run_id")
 
-# Legacy tags
-LEGACY_TRIAL_NUMBER: Tuple[str, str] = ("legacy", "trial_number")
-LEGACY_TRIAL_ID: Tuple[str, str] = ("legacy", "trial_id")
-LEGACY_PARENT_TRAINING_ID: Tuple[str, str] = ("legacy", "parent_training_id")
-LEGACY_VARIANT: Tuple[str, str] = ("legacy", "variant")
-LEGACY_BENCHMARK_CONFIG_HASH: Tuple[str, str] = ("legacy", "benchmark_config_hash")
-LEGACY_RUN_ID_PREFIX: Tuple[str, str] = ("legacy", "run_id_prefix")
+# Legacy tags removed - use modern tag keys instead
 
 # ---------------------------------------------------------------------------
 # Helper Functions - Direct access to commonly used tags
@@ -260,10 +254,6 @@ def get_process_model(config_dir: Optional[Path] = None) -> str:
     """Get process model tag key."""
     return _get_tag_key_from_mapping(PROCESS_MODEL, config_dir)
 
-# Legacy tags
-def get_legacy_trial_number(config_dir: Optional[Path] = None) -> str:
-    """Get legacy trial number tag key."""
-    return _get_tag_key_from_mapping(LEGACY_TRIAL_NUMBER, config_dir)
 
 __all__ = [
     # Mappings
@@ -321,6 +311,5 @@ __all__ = [
     "get_process_project",
     "get_process_backbone",
     "get_process_model",
-    "get_legacy_trial_number",
 ]
 

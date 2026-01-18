@@ -181,7 +181,7 @@ def load_tags_registry(config_dir: Optional[Path] = None) -> TagsRegistry:
     Load tags registry from config/tags.yaml with caching and fallback to defaults.
     
     Uses module-level caching to avoid repeated file reads. If the file is missing
-    or incomplete, falls back to hardcoded defaults to ensure backward compatibility.
+    or incomplete, falls back to hardcoded defaults (defaults are required for the registry to function).
     
     Args:
         config_dir: Path to config directory (defaults to current directory / "config").

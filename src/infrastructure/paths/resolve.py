@@ -53,7 +53,14 @@ def resolve_output_path(
     **kwargs
 ) -> Path:
     """
-    Resolve output path from config (legacy function for backward compatibility).
+    Resolve output path from config.
+
+    .. deprecated:: 
+        This function is deprecated. For new code, use `build_output_path()` with a NamingContext
+        for better type safety and consistency with v2 path patterns.
+        
+        Migration: Create a NamingContext and use `build_output_path(root_dir, context)` instead.
+        See `infrastructure.naming` for NamingContext creation utilities.
 
     Args:
         root_dir: Project root directory.
@@ -74,6 +81,9 @@ def resolve_output_path(
         resolve_output_path(ROOT_DIR, CONFIG_DIR, "final_training", 
                           backbone="distilbert", run_id="20251227_220407")
         # -> outputs/final_training/distilbert_20251227_220407
+        
+    TODO: Migrate all usages to `build_output_path()` with NamingContext.
+          This is a larger refactoring affecting ~20+ files.
     """
     paths_config = load_paths_config(config_dir)
     base_outputs = paths_config["base"]["outputs"]
@@ -159,19 +169,17 @@ def _build_output_path_fallback(
     base_path = root_dir / base_outputs
 
     if context.process_type == "hpo":
-        # For v2 HPO, prefer hashes but fallback to legacy pattern if missing
-        if context.study_key_hash and context.trial_key_hash:
-            study8 = context.study_key_hash[:8]
-            trial8 = context.trial_key_hash[:8]
-            final_path = base_path / "hpo" / context.storage_env / \
-                context.model / f"study-{study8}" / f"trial-{trial8}"
-        else:
-            # Legacy pattern: use trial_id if available, otherwise simple structure
-            if context.trial_id:
-                final_path = base_path / "hpo" / context.storage_env / \
-                    context.model / context.trial_id
-            else:
-                final_path = base_path / "hpo" / context.storage_env / context.model
+        # For v2 HPO, require hashes (legacy pattern removed)
+        if not context.study_key_hash or not context.trial_key_hash:
+            raise ValueError(
+                f"HPO v2 requires study_key_hash and trial_key_hash. "
+                f"Got study_key_hash={'present' if context.study_key_hash else 'missing'}, "
+                f"trial_key_hash={'present' if context.trial_key_hash else 'missing'}"
+            )
+        study8 = context.study_key_hash[:8]
+        trial8 = context.trial_key_hash[:8]
+        final_path = base_path / "hpo" / context.storage_env / \
+            context.model / f"study-{study8}" / f"trial-{trial8}"
 
     elif context.process_type == "hpo_refit":
         # For v2 HPO refit, require hashes

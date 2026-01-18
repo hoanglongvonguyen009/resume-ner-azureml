@@ -102,8 +102,7 @@ hpo_context, run_name = setup_hpo_mlflow_run(
 
 **Key Principles**:
 - Trusts provided `config_dir` parameter (no redundant inference)
-- Uses v2 hash computation when `train_config` is available
-- Falls back to v1 hash computation for backward compatibility
+- Uses v2 hash computation (required)
 - Uses `resolve_project_paths_with_fallback()` for path resolution (SSOT)
 
 ### `training.execution.mlflow_setup.create_training_mlflow_run()`

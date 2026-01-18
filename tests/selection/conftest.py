@@ -121,9 +121,6 @@ def mock_hpo_experiments():
 # Use shared MLflow run fixtures from fixtures.mlflow
 # mock_mlflow_run, mock_hpo_trial_run, mock_benchmark_run, mock_refit_run are imported above
 
-# Alias for backward compatibility (mock_trial_run -> mock_hpo_trial_run)
-mock_trial_run = mock_hpo_trial_run
-
 
 @pytest.fixture
 def mock_cache_data():

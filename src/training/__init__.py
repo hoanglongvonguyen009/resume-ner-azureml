@@ -11,7 +11,7 @@ For new code, prefer importing directly from submodules:
     from training.hpo import run_local_hpo_sweep
     from training.execution import run_final_training_workflow
 
-The top-level imports are maintained for backward compatibility.
+The top-level imports provide convenient access to common training functions.
 """
 
 from .config import build_training_config, resolve_distributed_config
@@ -48,10 +48,8 @@ __all__ = [
     # HPO (lazy)
     "run_local_hpo_sweep",
     "extract_best_config_from_study",
-    "create_search_space",
     # Execution (lazy)
     "run_final_training_workflow",
-    "execute_final_training",  # Backward compatibility alias
     "extract_lineage_from_best_model",
 ]
 
@@ -100,15 +98,8 @@ def __getattr__(name: str):
     elif name == "extract_best_config_from_study":
         from .hpo import extract_best_config_from_study
         return extract_best_config_from_study
-    elif name == "create_search_space":
-        from .hpo import create_search_space
-        return create_search_space
     # Execution utilities
     elif name == "run_final_training_workflow":
-        from .execution import run_final_training_workflow
-        return run_final_training_workflow
-    elif name == "execute_final_training":
-        # Backward compatibility alias
         from .execution import run_final_training_workflow
         return run_final_training_workflow
     elif name == "extract_lineage_from_best_model":

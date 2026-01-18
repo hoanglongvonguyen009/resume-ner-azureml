@@ -8,11 +8,10 @@ This module provides HPO functionality for both local (Optuna) and Azure ML exec
 # Core exports
 from .core import (
     SearchSpaceTranslator,
-    create_search_space,
     create_optuna_pruner,
     extract_best_config_from_study,
     import_optuna,
-    translate_search_space_to_optuna,
+    StudyManager,
 )
 # Exceptions
 from .exceptions import (
@@ -24,7 +23,6 @@ from .exceptions import (
     MetricsReadError,
 )
 from .utils.helpers import (
-    create_mlflow_run_name,
     create_study_name,
     generate_run_id,
     setup_checkpoint_storage,
@@ -54,17 +52,15 @@ __all__ = [
     "get_storage_uri",
     "resolve_storage_path",
     # HPO helpers
-    "create_mlflow_run_name",
     "create_study_name",
     "generate_run_id",
     "setup_checkpoint_storage",
     # Local sweeps
     "run_local_hpo_sweep",
-    "translate_search_space_to_optuna",
     # Search space
     "SearchSpaceTranslator",
-    "create_search_space",
-    # Study extraction
+    # Study management
+    "StudyManager",
     "extract_best_config_from_study",
     # Azure ML sweeps
     "create_dry_run_sweep_job_for_backbone",

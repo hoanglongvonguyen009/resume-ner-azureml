@@ -13,11 +13,11 @@ from evaluation.benchmarking.utils import run_benchmarking
 class TestBenchmarkWorkflow:
     """Test end-to-end benchmarking workflow with config loading."""
 
-    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
-    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
-    @patch("evaluation.benchmarking.orchestrator.build_output_path")
-    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator_original.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator_original.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator_original.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator_original.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator_original.validate_path_before_mkdir")
     def test_workflow_loads_config_and_uses_all_options(
         self,
         mock_validate_path,
@@ -226,11 +226,11 @@ output:
         output_idx = call_args.index("--output")
         assert Path(call_args[output_idx + 1]).name == filename
 
-    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
-    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
-    @patch("evaluation.benchmarking.orchestrator.build_output_path")
-    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator_original.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator_original.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator_original.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator_original.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator_original.validate_path_before_mkdir")
     def test_workflow_defaults_when_config_missing(
         self,
         mock_validate_path,

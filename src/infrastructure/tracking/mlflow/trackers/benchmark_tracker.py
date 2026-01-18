@@ -30,7 +30,7 @@ lifecycle:
 """MLflow tracker for benchmark stage."""
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, TypedDict, Tuple
 import time
 import tempfile
 import json
@@ -55,6 +55,255 @@ except ImportError:
 from infrastructure.tracking.mlflow.trackers.base_tracker import BaseTracker
 
 logger = get_logger(__name__)
+
+
+class BenchmarkRunConfig(TypedDict):
+    """Configuration for benchmark run."""
+    run_name: str
+    backbone: str
+    benchmark_source: str
+    context: Optional[Any]
+    output_dir: Optional[Path]
+    parent_run_id: Optional[str]
+    group_id: Optional[str]
+    study_key_hash: Optional[str]
+    trial_key_hash: Optional[str]
+    hpo_trial_run_id: Optional[str]
+    hpo_refit_run_id: Optional[str]
+    hpo_sweep_run_id: Optional[str]
+    benchmark_key: Optional[str]
+
+
+def _validate_run_ids(
+    hpo_trial_run_id: Optional[str],
+    hpo_refit_run_id: Optional[str],
+    hpo_sweep_run_id: Optional[str],
+) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str], str]:
+    """
+    Validate run IDs are UUIDs and determine lineage parent.
+
+    Returns:
+        Tuple of (valid_trial_run_id, valid_refit_run_id, valid_sweep_run_id, lineage_parent_run_id, parent_kind).
+    """
+    import re
+    uuid_pattern = re.compile(
+        r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+        re.IGNORECASE
+    )
+
+    valid_trial_run_id = hpo_trial_run_id if (
+        hpo_trial_run_id and uuid_pattern.match(hpo_trial_run_id)) else None
+    valid_refit_run_id = hpo_refit_run_id if (
+        hpo_refit_run_id and uuid_pattern.match(hpo_refit_run_id)) else None
+    valid_sweep_run_id = hpo_sweep_run_id if (
+        hpo_sweep_run_id and uuid_pattern.match(hpo_sweep_run_id)) else None
+
+    # Determine parent run ID for lineage (priority: trial > refit > sweep)
+    lineage_parent_run_id = valid_trial_run_id or valid_refit_run_id or valid_sweep_run_id
+    parent_kind = (
+        "trial" if valid_trial_run_id
+        else ("refit" if valid_refit_run_id
+              else ("sweep" if valid_sweep_run_id else ""))
+    )
+
+    return valid_trial_run_id, valid_refit_run_id, valid_sweep_run_id, lineage_parent_run_id, parent_kind
+
+
+def _build_benchmark_tags(
+    context: Optional[Any],
+    output_dir: Optional[Path],
+    parent_run_id: Optional[str],
+    group_id: Optional[str],
+    config_dir: Path,
+    study_key_hash: Optional[str],
+    trial_key_hash: Optional[str],
+    benchmark_run_key_hash: Optional[str],
+    benchmark_source: str,
+    backbone: str,
+    run_name: str,
+    benchmark_key: Optional[str],
+    valid_trial_run_id: Optional[str],
+    valid_refit_run_id: Optional[str],
+    valid_sweep_run_id: Optional[str],
+    lineage_parent_run_id: Optional[str],
+    parent_kind: str,
+) -> Dict[str, str]:
+    """Build MLflow tags for benchmark run."""
+    from infrastructure.naming.mlflow.tags import build_mlflow_tags
+    from infrastructure.naming.mlflow.tag_keys import (
+        get_lineage_hpo_refit_run_id,
+        get_lineage_hpo_sweep_run_id,
+        get_lineage_hpo_trial_run_id,
+        get_lineage_parent_training_run_id,
+    )
+
+    # Build base tags
+    tags = build_mlflow_tags(
+        context=context,
+        output_dir=output_dir,
+        parent_run_id=parent_run_id,
+        group_id=group_id,
+        config_dir=config_dir,
+        study_key_hash=study_key_hash,
+        trial_key_hash=trial_key_hash,
+        run_key_hash=benchmark_run_key_hash,
+    )
+
+    # Get tag keys from registry
+    lineage_hpo_trial_run_id_tag = get_lineage_hpo_trial_run_id(config_dir)
+    lineage_hpo_refit_run_id_tag = get_lineage_hpo_refit_run_id(config_dir)
+    lineage_hpo_sweep_run_id_tag = get_lineage_hpo_sweep_run_id(config_dir)
+    lineage_parent_training_run_id_tag = get_lineage_parent_training_run_id(config_dir)
+
+    # Set explicit lineage tags
+    if valid_trial_run_id:
+        tags[lineage_hpo_trial_run_id_tag] = valid_trial_run_id
+    if valid_refit_run_id:
+        tags[lineage_hpo_refit_run_id_tag] = valid_refit_run_id
+    if valid_sweep_run_id:
+        tags[lineage_hpo_sweep_run_id_tag] = valid_sweep_run_id
+
+    # Canonical parent tags
+    if lineage_parent_run_id:
+        tags[lineage_parent_training_run_id_tag] = lineage_parent_run_id
+        tags["code.lineage.parent_kind"] = parent_kind
+
+    # Add benchmark-specific tags
+    tags["benchmark_source"] = benchmark_source
+    tags["benchmarked_model"] = backbone
+    tags["mlflow.runType"] = "benchmark"
+    tags["mlflow.runName"] = run_name
+    if benchmark_key:
+        tags["benchmark_key"] = benchmark_key
+
+    return tags
+
+
+def _commit_run_name_version_if_needed(
+    context: Optional[Any],
+    run_name: str,
+    run_id: str,
+    output_dir: Optional[Path],
+    config_dir: Path,
+) -> None:
+    """Commit reserved version if auto-increment was used."""
+    if not (context and run_name):
+        return
+
+    try:
+        import re
+        from infrastructure.tracking.mlflow.index import commit_run_name_version
+        from infrastructure.naming.mlflow.run_keys import (
+            build_mlflow_run_key,
+            build_mlflow_run_key_hash,
+            build_counter_key,
+        )
+        from infrastructure.naming.mlflow.config import (
+            get_naming_config,
+            get_auto_increment_config,
+        )
+
+        # Check if auto-increment was used
+        version_match = re.search(r'_(\d+)$', run_name)
+        if not version_match:
+            return
+
+        version = int(version_match.group(1))
+        logger.info(
+            f"[Benchmark Commit] Found version {version} in run name '{run_name}'"
+        )
+
+        # Check if auto-increment is enabled for benchmarking
+        auto_inc_config = get_auto_increment_config(config_dir, "benchmarking")
+        if not auto_inc_config.get("enabled_for_process", False):
+            logger.info(
+                f"[Benchmark Commit] Auto-increment not enabled for benchmarking, skipping commit"
+            )
+            return
+
+        # Rebuild counter_key from context
+        run_key = build_mlflow_run_key(context)
+        run_key_hash = build_mlflow_run_key_hash(run_key)
+        naming_config = get_naming_config(config_dir)
+        counter_key = build_counter_key(
+            naming_config.get("project_name", "resume-ner"),
+            "benchmarking",
+            run_key_hash,
+            context.environment or "",
+        )
+
+        # Infer root_dir from output_dir
+        root_dir = None
+        if output_dir:
+            from infrastructure.paths.repo import detect_repo_root
+            root_dir = detect_repo_root(output_dir=output_dir)
+
+        if root_dir is None:
+            # Fallback: try to find project root by looking for config directory
+            root_dir = Path.cwd()
+            for candidate in [Path.cwd(), Path.cwd().parent]:
+                if (candidate / "config").exists():
+                    root_dir = candidate
+                    break
+
+        logger.info(
+            f"[Benchmark Commit] Committing version {version} for run {run_id[:12]}..., "
+            f"counter_key={counter_key[:50]}..."
+        )
+
+        commit_run_name_version(
+            counter_key, run_id, version, root_dir, config_dir
+        )
+        logger.info(
+            f"[Benchmark Commit] ✓ Successfully committed version {version} for benchmark run {run_id[:12]}..."
+        )
+    except Exception as e:
+        logger.warning(
+            f"[Benchmark Commit] ✗ Could not commit reserved version for benchmark run: {e}",
+            exc_info=True
+        )
+
+
+def _update_mlflow_index_for_benchmark(
+    run_key_hash: Optional[str],
+    run_id: str,
+    experiment_id: str,
+    tracking_uri: str,
+    output_dir: Optional[Path],
+    config_dir: Path,
+) -> None:
+    """Update local MLflow index for benchmark run."""
+    if not run_key_hash:
+        return
+
+    try:
+        from infrastructure.tracking.mlflow.index import update_mlflow_index
+
+        # Derive project root correctly
+        root_dir = None
+        if output_dir:
+            from infrastructure.paths.repo import detect_repo_root
+            root_dir = detect_repo_root(output_dir=output_dir)
+
+        if root_dir is None:
+            # Fallback: try to find project root by looking for config directory
+            root_dir = Path.cwd()
+            for candidate in [Path.cwd(), Path.cwd().parent]:
+                if (candidate / "config").exists():
+                    root_dir = candidate
+                    break
+
+        update_mlflow_index(
+            root_dir=root_dir,
+            run_key_hash=run_key_hash,
+            run_id=run_id,
+            experiment_id=experiment_id,
+            tracking_uri=tracking_uri,
+            config_dir=config_dir,
+        )
+    except Exception as e:
+        logger.debug(f"Could not update MLflow index: {e}")
+
 
 class MLflowBenchmarkTracker(BaseTracker):
     """Tracks MLflow runs for benchmarking stage."""
@@ -128,27 +377,19 @@ class MLflowBenchmarkTracker(BaseTracker):
                     yield None
                 return
 
-            # Validate run IDs are UUIDs (not timestamps) BEFORE creating run
-            import re
-            uuid_pattern = re.compile(
-                r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-                re.IGNORECASE
+            # Validate run IDs and determine lineage parent
+            valid_trial_run_id, valid_refit_run_id, valid_sweep_run_id, lineage_parent_run_id, parent_kind = _validate_run_ids(
+                hpo_trial_run_id, hpo_refit_run_id, hpo_sweep_run_id
             )
 
-            valid_trial_run_id = hpo_trial_run_id if (
-                hpo_trial_run_id and uuid_pattern.match(hpo_trial_run_id)) else None
-            valid_refit_run_id = hpo_refit_run_id if (
-                hpo_refit_run_id and uuid_pattern.match(hpo_refit_run_id)) else None
-            valid_sweep_run_id = hpo_sweep_run_id if (
-                hpo_sweep_run_id and uuid_pattern.match(hpo_sweep_run_id)) else None
-
-            # Determine parent run ID for lineage (priority: trial > refit > sweep)
-            lineage_parent_run_id = valid_trial_run_id or valid_refit_run_id or valid_sweep_run_id
-            parent_kind = (
-                "trial" if valid_trial_run_id
-                else ("refit" if valid_refit_run_id
-                      else ("sweep" if valid_sweep_run_id else ""))
-            )
+            if not lineage_parent_run_id:
+                logger.warning(
+                    f"[START_BENCHMARK_RUN] No valid parent run IDs found. "
+                    f"Received: trial={hpo_trial_run_id[:20] if hpo_trial_run_id else None}, "
+                    f"refit={hpo_refit_run_id[:20] if hpo_refit_run_id else None}, "
+                    f"sweep={hpo_sweep_run_id[:20] if hpo_sweep_run_id else None}. "
+                    f"These may be timestamps or None - will query MLflow if trial_key_hash available."
+                )
 
             with mlflow.start_run(run_name=run_name) as benchmark_run:
                 run_id = benchmark_run.info.run_id
@@ -163,26 +404,33 @@ class MLflowBenchmarkTracker(BaseTracker):
                     f"context.process_type={context.process_type if context else None}"
                 )
 
-                # Compute run_key_hash for benchmark run (needed for cleanup matching)
+                # Compute run_key_hash for benchmark run
                 from infrastructure.naming.mlflow.run_keys import (
                     build_mlflow_run_key,
                     build_mlflow_run_key_hash,
                 )
-                benchmark_run_key = build_mlflow_run_key(
-                    context) if context else None
-                benchmark_run_key_hash = build_mlflow_run_key_hash(
-                    benchmark_run_key) if benchmark_run_key else None
+                benchmark_run_key = build_mlflow_run_key(context) if context else None
+                benchmark_run_key_hash = build_mlflow_run_key_hash(benchmark_run_key) if benchmark_run_key else None
 
-                # Build and set tags atomically
-                tags = build_mlflow_tags(
-                    context=context,
-                    output_dir=output_dir,
-                    parent_run_id=parent_run_id,
-                    group_id=group_id,
-                    config_dir=config_dir,
-                    study_key_hash=study_key_hash,
-                    trial_key_hash=trial_key_hash,
-                    run_key_hash=benchmark_run_key_hash,  # For cleanup matching
+                # Build and set tags
+                tags = _build_benchmark_tags(
+                    context,
+                    output_dir,
+                    parent_run_id,
+                    group_id,
+                    config_dir,
+                    study_key_hash,
+                    trial_key_hash,
+                    benchmark_run_key_hash,
+                    benchmark_source,
+                    backbone,
+                    run_name,
+                    benchmark_key,
+                    valid_trial_run_id,
+                    valid_refit_run_id,
+                    valid_sweep_run_id,
+                    lineage_parent_run_id,
+                    parent_kind,
                 )
 
                 logger.info(
@@ -193,142 +441,22 @@ class MLflowBenchmarkTracker(BaseTracker):
                     f"code.stage={tags.get('code.stage')}"
                 )
 
-                # Use pre-computed lineage_parent_run_id and parent_kind from before run creation
-
-                # Get tag keys from registry (using centralized helpers)
-                from infrastructure.naming.mlflow.tag_keys import (
-                    get_lineage_hpo_refit_run_id,
-                    get_lineage_hpo_sweep_run_id,
-                    get_lineage_hpo_trial_run_id,
-                    get_lineage_parent_training_run_id,
-                )
-                # Note: config_dir was already inferred from output_dir at line 104, don't overwrite it
-                lineage_hpo_trial_run_id_tag = get_lineage_hpo_trial_run_id(config_dir)
-                lineage_hpo_refit_run_id_tag = get_lineage_hpo_refit_run_id(config_dir)
-                lineage_hpo_sweep_run_id_tag = get_lineage_hpo_sweep_run_id(config_dir)
-                lineage_parent_training_run_id_tag = get_lineage_parent_training_run_id(config_dir)
-                
-                # Set explicit lineage tags using code.lineage.* namespace (only valid UUIDs)
-                if valid_trial_run_id:
-                    tags[lineage_hpo_trial_run_id_tag] = valid_trial_run_id
-                if valid_refit_run_id:
-                    tags[lineage_hpo_refit_run_id_tag] = valid_refit_run_id
-                if valid_sweep_run_id:
-                    tags[lineage_hpo_sweep_run_id_tag] = valid_sweep_run_id
-
-                # Canonical parent tags (only if we have a valid parent)
                 if lineage_parent_run_id:
-                    tags[lineage_parent_training_run_id_tag] = lineage_parent_run_id
-                    # parent_kind is not in registry, keep as-is for now
-                    tags["code.lineage.parent_kind"] = parent_kind
                     logger.info(
                         f"[START_BENCHMARK_RUN] Set lineage tags: parent_run_id={lineage_parent_run_id[:12]}..., "
                         f"parent_kind={parent_kind}"
                     )
-                else:
-                    logger.warning(
-                        f"[START_BENCHMARK_RUN] No valid parent run IDs found. "
-                        f"Received: trial={hpo_trial_run_id[:20] if hpo_trial_run_id else None}, "
-                        f"refit={hpo_refit_run_id[:20] if hpo_refit_run_id else None}, "
-                        f"sweep={hpo_sweep_run_id[:20] if hpo_sweep_run_id else None}. "
-                        f"These may be timestamps or None - will query MLflow if trial_key_hash available."
-                    )
 
-                # Add benchmark-specific tags
-                tags["benchmark_source"] = benchmark_source
-                tags["benchmarked_model"] = backbone
-                tags["mlflow.runType"] = "benchmark"
-                # Set run name as tag (MLflow version compatibility)
-                tags["mlflow.runName"] = run_name
-                # Set benchmark_key tag for idempotency (PRIMARY check)
-                if benchmark_key:
-                    tags["benchmark_key"] = benchmark_key
                 mlflow.set_tags(tags)
 
                 # Commit reserved version if auto-increment was used
-                if context and run_name:
-                    try:
-                        import re
-                        from infrastructure.tracking.mlflow.index import commit_run_name_version
-                        from infrastructure.naming.mlflow.run_keys import (
-                            build_mlflow_run_key,
-                            build_mlflow_run_key_hash,
-                            build_counter_key,
-                        )
-                        from infrastructure.naming.mlflow.config import (
-                            get_naming_config,
-                            get_auto_increment_config,
-                        )
-
-                        # Check if auto-increment was used (run name has version suffix like _1, _2, etc.)
-                        version_match = re.search(r'_(\d+)$', run_name)
-                        if version_match:
-                            version = int(version_match.group(1))
-                            logger.info(
-                                f"[Benchmark Commit] Found version {version} in run name '{run_name}'"
-                            )
-
-                            # Check if auto-increment is enabled for benchmarking
-                            auto_inc_config = get_auto_increment_config(
-                                config_dir, "benchmarking")
-                            if auto_inc_config.get("enabled_for_process", False):
-                                # Rebuild counter_key from context
-                                run_key = build_mlflow_run_key(context)
-                                run_key_hash = build_mlflow_run_key_hash(
-                                    run_key)
-                                naming_config = get_naming_config(config_dir)
-                                counter_key = build_counter_key(
-                                    naming_config.get(
-                                        "project_name", "resume-ner"),
-                                    "benchmarking",
-                                    run_key_hash,
-                                    context.environment or "",
-                                )
-
-                                # Infer root_dir from output_dir
-                                root_dir = None
-                                if output_dir:
-                                    from infrastructure.paths.repo import detect_repo_root
-                                    root_dir = detect_repo_root(output_dir=output_dir)
-
-                                if root_dir is None:
-                                    # Fallback: try to find project root by looking for config directory
-                                    root_dir = Path.cwd()
-                                    for candidate in [Path.cwd(), Path.cwd().parent]:
-                                        if (candidate / "config").exists():
-                                            root_dir = candidate
-                                            break
-
-                                logger.info(
-                                    f"[Benchmark Commit] Committing version {version} for run {run_id[:12]}..., "
-                                    f"counter_key={counter_key[:50]}..."
-                                )
-
-                                commit_run_name_version(
-                                    counter_key, run_id, version, root_dir, config_dir
-                                )
-                                logger.info(
-                                    f"[Benchmark Commit] ✓ Successfully committed version {version} for benchmark run {run_id[:12]}..."
-                                )
-                            else:
-                                logger.info(
-                                    f"[Benchmark Commit] Auto-increment not enabled for benchmarking, skipping commit"
-                                )
-                        else:
-                            logger.info(
-                                f"[Benchmark Commit] No version pattern found in run name '{run_name}', "
-                                f"skipping commit (auto-increment may not have been used)"
-                            )
-                    except Exception as e:
-                        logger.warning(
-                            f"[Benchmark Commit] ✗ Could not commit reserved version for benchmark run: {e}",
-                            exc_info=True
-                        )
+                _commit_run_name_version_if_needed(
+                    context, run_name, run_id, output_dir, config_dir
+                )
 
                 # Build RunHandle
                 run_key = build_mlflow_run_key(context) if context else None
-                run_key_hash = build_mlflow_run_key_hash(
-                    run_key) if run_key else None
+                run_key_hash = build_mlflow_run_key_hash(run_key) if run_key else None
 
                 handle = RunHandle(
                     run_id=run_id,
@@ -341,38 +469,14 @@ class MLflowBenchmarkTracker(BaseTracker):
                 )
 
                 # Update local index
-                if run_key_hash:
-                    try:
-                        # Derive project root correctly by finding "outputs" directory
-                        root_dir = None
-                        if output_dir:
-                            from infrastructure.paths.repo import detect_repo_root
-                            root_dir = detect_repo_root(output_dir=output_dir)
-                        
-                        if root_dir is None:
-                            # Fallback: try to find project root by looking for config directory
-                            root_dir = Path.cwd()
-                            for candidate in [Path.cwd(), Path.cwd().parent]:
-                                if (candidate / "config").exists():
-                                    root_dir = candidate
-                                    break
-                        
-                        update_mlflow_index(
-                            root_dir=root_dir,
-                            run_key_hash=run_key_hash,
-                            run_id=run_id,
-                            experiment_id=experiment_id,
-                            tracking_uri=tracking_uri,
-                            config_dir=config_dir,
-                        )
-                    except Exception as e:
-                        logger.debug(f"Could not update MLflow index: {e}")
+                _update_mlflow_index_for_benchmark(
+                    run_key_hash, run_id, experiment_id, tracking_uri, output_dir, config_dir
+                )
 
                 yield handle
         except Exception as e:
             logger.warning(f"MLflow tracking failed: {e}")
-            logger.warning(
-                "Continuing benchmarking without MLflow tracking...")
+            logger.warning("Continuing benchmarking without MLflow tracking...")
             from contextlib import nullcontext
             with nullcontext():
                 yield None

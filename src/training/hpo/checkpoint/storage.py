@@ -36,52 +36,47 @@ def resolve_storage_path(
     output_dir: Path,
     checkpoint_config: Dict[str, Any],
     backbone: str,
+    study_key_hash: str,
     study_name: Optional[str] = None,
-    study_key_hash: Optional[str] = None,
     create_dirs: bool = True,
 ) -> Optional[Path]:
     """
     Resolve checkpoint storage path with platform awareness.
 
-    Supports both v2 hash-based folder structure (study-{hash}) and legacy
-    study_name format. When study_key_hash is provided, uses v2 structure.
-    Otherwise falls back to legacy study_name format for backward compatibility.
+    Uses v2 hash-based folder structure (study-{hash}). Legacy study_name format
+    is no longer supported.
 
     Args:
         output_dir: Base output directory for HPO trials
         checkpoint_config: Checkpoint configuration from HPO config
         backbone: Model backbone name (for placeholder substitution)
-        study_name: Optional resolved study name (for {study_name} placeholder in legacy mode)
-        study_key_hash: Optional study key hash for v2 folder structure (study-{hash})
+        study_key_hash: Study key hash for v2 folder structure (study-{hash}) - REQUIRED
+        study_name: Optional resolved study name (deprecated, kept for compatibility)
         create_dirs: Whether to create parent directories (default: True)
                     Set to False for read-only path resolution
 
     Returns:
         Resolved Path for checkpoint storage, or None if checkpointing disabled
+
+    Raises:
+        ValueError: If study_key_hash is not provided
     """
     # Check if checkpointing is enabled
     enabled = checkpoint_config.get("enabled", False)
     if not enabled:
         return None
 
-    # V2 mode: Use hash-based folder structure when study_key_hash is provided
-    if study_key_hash:
-        # Compute study8 token (first 8 characters of hash)
-        study8 = study_key_hash[:8] if len(study_key_hash) >= 8 else study_key_hash
-        # Build v2 path: {backbone}/study-{study8}/study.db
-        storage_path_str = f"{backbone}/study-{study8}/study.db"
-    else:
-        # Legacy mode: Use study_name format
-        # Get storage path from config or use default
-        storage_path_template = checkpoint_config.get(
-            "storage_path",
-            f"{{backbone}}/study.db"  # Default: relative to output_dir
+    # Require study_key_hash for v2 folder structure
+    if not study_key_hash:
+        raise ValueError(
+            "study_key_hash is required for v2 folder structure. "
+            "Legacy study_name format is no longer supported."
         )
 
-        # Replace placeholders in order: {backbone} first, then {study_name}
-        storage_path_str = storage_path_template.replace("{backbone}", backbone)
-        if study_name:
-            storage_path_str = storage_path_str.replace("{study_name}", study_name)
+    # Compute study8 token (first 8 characters of hash)
+    study8 = study_key_hash[:8] if len(study_key_hash) >= 8 else study_key_hash
+    # Build v2 path: {backbone}/study-{study8}/study.db
+    storage_path_str = f"{backbone}/study-{study8}/study.db"
 
     # Resolve with platform-specific optimizations
     platform = detect_platform()

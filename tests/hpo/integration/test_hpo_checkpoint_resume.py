@@ -13,43 +13,56 @@ except ImportError:
     optuna = None
     pytest.skip("optuna not available", allow_module_level=True)
 
+# Import StudyManager - ensure we import from src, not tests/training
+# The conftest.py should set up the path, but we need to ensure src/training is found first
+import sys
+from pathlib import Path
+
+# Ensure src is in path (conftest should do this, but be explicit)
+root_dir = Path(__file__).parent.parent.parent.parent
+src_dir = root_dir / "src"
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+
+# Now import - Python should find src/training first
 from training.hpo.core.study import StudyManager
 from training.hpo.checkpoint.storage import resolve_storage_path, get_storage_uri
+
+# Test helper: Use consistent study_key_hash for tests
+TEST_STUDY_KEY_HASH = "a" * 64  # 64-char hash for v2 structure
 
 
 class TestCheckpointCreation:
     """Test checkpoint file creation and storage path resolution."""
 
     def test_checkpoint_storage_path_resolution(self, tmp_path):
-        """Test that storage_path template is resolved correctly with placeholders."""
+        """Test that storage_path is resolved correctly with v2 hash-based structure."""
         checkpoint_config = {
             "enabled": True,
-            "study_name": "hpo_{backbone}_smoke_test_path_testing_23",
-            "storage_path": "{study_name}/study.db",
         }
         
         output_dir = tmp_path / "outputs" / "hpo"
-        study_name = "hpo_distilbert_smoke_test_path_testing_23"
+        study_key_hash = "a" * 64  # 64-char hash for v2 structure
         
         storage_path = resolve_storage_path(
             output_dir=output_dir,
             checkpoint_config=checkpoint_config,
             backbone="distilbert",
-            study_name=study_name,
+            study_key_hash=study_key_hash,
         )
         
         # Verify path was created (parent directory exists, file will be created by Optuna)
         assert storage_path is not None
         assert storage_path.parent.exists()
         assert storage_path.name == "study.db"
-        # Verify {study_name} placeholder was replaced
-        assert "hpo_distilbert_smoke_test_path_testing_23" in str(storage_path)
+        # Verify v2 structure: {backbone}/study-{study8}/study.db
+        assert "distilbert" in str(storage_path)
+        assert f"study-{study_key_hash[:8]}" in str(storage_path)
 
     def test_checkpoint_storage_path_with_backbone_placeholder(self, tmp_path):
-        """Test that {backbone} placeholder is replaced in storage_path."""
+        """Test that v2 structure includes backbone in path."""
         checkpoint_config = {
             "enabled": True,
-            "storage_path": "{backbone}/study.db",
         }
         
         output_dir = tmp_path / "outputs" / "hpo"
@@ -57,6 +70,7 @@ class TestCheckpointCreation:
             output_dir=output_dir,
             checkpoint_config=checkpoint_config,
             backbone="distilbert",
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         
         assert storage_path is not None
@@ -67,13 +81,13 @@ class TestCheckpointCreation:
         """Test that disabled checkpointing returns None."""
         checkpoint_config = {
             "enabled": False,
-            "storage_path": "{backbone}/study.db",
         }
         
         storage_path = resolve_storage_path(
             output_dir=tmp_path,
             checkpoint_config=checkpoint_config,
             backbone="distilbert",
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         
         assert storage_path is None
@@ -116,7 +130,7 @@ class TestCheckpointResume:
             output_dir=output_dir,
             checkpoint_config=checkpoint_config,
             backbone="distilbert",
-            study_name=study_name,
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         storage_uri = get_storage_uri(storage_path)
         
@@ -141,6 +155,7 @@ class TestCheckpointResume:
             study_manager.create_or_load_study(
                 output_dir=output_dir,
                 run_id="test_run_123",
+                study_key_hash=TEST_STUDY_KEY_HASH,
             )
         )
         
@@ -172,7 +187,7 @@ class TestCheckpointResume:
             output_dir=output_dir,
             checkpoint_config=checkpoint_config,
             backbone="distilbert",
-            study_name=study_name,
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         storage_uri = get_storage_uri(storage_path)
         
@@ -198,6 +213,7 @@ class TestCheckpointResume:
         study2, _, _, _, should_resume = study_manager.create_or_load_study(
             output_dir=output_dir,
             run_id="test_run_456",
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         
         assert should_resume is True
@@ -229,7 +245,7 @@ class TestCheckpointResume:
             output_dir=output_dir,
             checkpoint_config=checkpoint_config,
             backbone="distilbert",
-            study_name=study_name,
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         storage_uri = get_storage_uri(storage_path)
         
@@ -258,6 +274,7 @@ class TestCheckpointResume:
         study2, _, _, _, should_resume = study_manager.create_or_load_study(
             output_dir=output_dir,
             run_id="test_run_789",
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         
         assert should_resume is True
@@ -292,7 +309,7 @@ class TestCheckpointResume:
             output_dir=output_dir,
             checkpoint_config=checkpoint_config,
             backbone="distilbert",
-            study_name=study_name,
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         storage_uri = get_storage_uri(storage_path)
         
@@ -316,6 +333,7 @@ class TestCheckpointResume:
             study_manager.create_or_load_study(
                 output_dir=output_dir,
                 run_id="test_run_no_resume",
+                study_key_hash=TEST_STUDY_KEY_HASH,
             )
 
     def test_resume_continues_trial_numbering(self, tmp_path):
@@ -340,7 +358,7 @@ class TestCheckpointResume:
             output_dir=output_dir,
             checkpoint_config=checkpoint_config,
             backbone="distilbert",
-            study_name=study_name,
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         storage_uri = get_storage_uri(storage_path)
         
@@ -366,6 +384,7 @@ class TestCheckpointResume:
         study2, _, _, _, should_resume = study_manager.create_or_load_study(
             output_dir=output_dir,
             run_id="test_run_numbering",
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         
         assert should_resume is True
@@ -401,11 +420,12 @@ class TestCheckpointSmokeYaml:
             output_dir=output_dir,
             checkpoint_config=checkpoint_config,
             backbone="distilbert",
-            study_name=study_name,
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         
-        # Verify study_name template was used
-        assert "hpo_distilbert_smoke_test_path_testing_23" in str(storage_path)
+        # Verify v2 structure is used (backbone/study-{hash}/study.db)
+        assert "distilbert" in str(storage_path)
+        assert f"study-{TEST_STUDY_KEY_HASH[:8]}" in str(storage_path)
 
     def test_checkpoint_smoke_yaml_storage_path_template(self, tmp_path):
         """Test that smoke.yaml storage_path template ({study_name}/study.db) works."""
@@ -423,12 +443,12 @@ class TestCheckpointSmokeYaml:
             output_dir=output_dir,
             checkpoint_config=checkpoint_config,
             backbone="distilbert",
-            study_name=study_name,
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         
-        # Verify storage_path template was resolved
+        # Verify v2 structure was used
         assert storage_path.name == "study.db"
-        assert study_name in str(storage_path.parent.name)
+        assert f"study-{TEST_STUDY_KEY_HASH[:8]}" in str(storage_path)
 
     def test_checkpoint_smoke_yaml_auto_resume_true(self, tmp_path):
         """Test that smoke.yaml auto_resume=true allows resume."""
@@ -452,7 +472,7 @@ class TestCheckpointSmokeYaml:
             output_dir=output_dir,
             checkpoint_config=checkpoint_config,
             backbone="distilbert",
-            study_name=study_name,
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         storage_uri = get_storage_uri(storage_path)
         
@@ -475,6 +495,7 @@ class TestCheckpointSmokeYaml:
         study2, _, _, _, should_resume = study_manager.create_or_load_study(
             output_dir=output_dir,
             run_id="test_run_smoke",
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         
         assert should_resume is True
@@ -498,7 +519,7 @@ class TestCheckpointFileIO:
             output_dir=output_dir,
             checkpoint_config=checkpoint_config,
             backbone="distilbert",
-            study_name=study_name,
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         storage_uri = get_storage_uri(storage_path)
         
@@ -538,7 +559,7 @@ class TestCheckpointFileIO:
             output_dir=output_dir,
             checkpoint_config=checkpoint_config,
             backbone="distilbert",
-            study_name=study_name,
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         storage_uri = get_storage_uri(storage_path)
         
@@ -586,7 +607,7 @@ class TestCheckpointFileIO:
             output_dir=output_dir1,
             checkpoint_config=checkpoint_config,
             backbone="distilbert",
-            study_name=study_name,
+            study_key_hash=TEST_STUDY_KEY_HASH,
         )
         storage_uri1 = get_storage_uri(storage_path1)
         

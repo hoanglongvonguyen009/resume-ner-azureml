@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """MLflow artifact management utilities.
 
-This module re-exports artifact functions for backward compatibility.
+This module provides a unified interface for artifact management functions.
 """
 
 # Re-export checkpoint archive functions from manager

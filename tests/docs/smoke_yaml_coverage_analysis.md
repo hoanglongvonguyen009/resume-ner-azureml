@@ -5,7 +5,7 @@
 ### ✅ Fully Covered Sections
 
 #### 1. search_space (lines 1-25)
-- **Test File**: `tests/unit/orchestration/test_hpo_search_space.py`
+- **Test File**: `tests/hpo/unit/test_hpo_search_space.py` (or similar location)
 - **Coverage**:
   - ✅ `backbone` (type: choice, values) - `test_translate_smoke_yaml_search_space`, `test_backbone_choice_values`
   - ✅ `learning_rate` (type: loguniform, min, max) - `test_translate_smoke_yaml_search_space`
@@ -57,7 +57,7 @@
 #### 7. selection (lines 57-72)
 - **Test Files**: 
   - `tests/integration/hpo/test_best_trial_selection_component.py`
-  - `tests/unit/orchestration/test_best_trial_selection.py`
+  - `tests/evaluation/selection/unit/test_best_trial_selection.py` (or similar location)
 - **Coverage**:
   - ✅ `accuracy_threshold: 0.015` - `test_selection_with_accuracy_threshold`, multiple tests in `test_best_trial_selection.py`
   - ✅ `use_relative_threshold: true` - `test_selection_with_accuracy_threshold`, multiple tests
@@ -126,14 +126,14 @@
 
 ## Test Files Summary
 
-1. **`tests/unit/orchestration/test_hpo_search_space.py`** - Search space translation
-2. **`tests/integration/hpo/test_early_termination.py`** - Early termination/pruning
-3. **`tests/integration/hpo/test_hpo_checkpoint_resume.py`** - Checkpoint and resume
-4. **`tests/integration/hpo/test_refit_training.py`** - Refit training
-5. **`tests/integration/hpo/test_best_trial_selection_component.py`** - Selection logic
-6. **`tests/unit/orchestration/test_best_trial_selection.py`** - Selection logic (unit)
-7. **`tests/integration/hpo/test_hpo_full_workflow.py`** - Full workflow integration
-8. **`tests/integration/hpo/test_hpo_resume_workflow.py`** - Resume workflow
+1. **`tests/hpo/unit/test_hpo_search_space.py`** (or similar location) - Search space translation
+2. **`tests/hpo/integration/test_early_termination.py`** - Early termination/pruning
+3. **`tests/hpo/integration/test_hpo_checkpoint_resume.py`** - Checkpoint and resume
+4. **`tests/hpo/integration/test_refit_training.py`** (or similar location) - Refit training
+5. **`tests/evaluation/selection/integration/test_best_trial_selection_component.py`** (or similar location) - Selection logic
+6. **`tests/evaluation/selection/unit/test_best_trial_selection.py`** (or similar location) - Selection logic (unit)
+7. **`tests/hpo/integration/test_hpo_full_workflow.py`** - Full workflow integration
+8. **`tests/hpo/integration/test_hpo_resume_workflow.py`** - Resume workflow
 
 ## Conclusion
 

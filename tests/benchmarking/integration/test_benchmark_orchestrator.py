@@ -18,11 +18,11 @@ class TestBenchmarkOrchestratorConfigUsage:
         (checkpoint_dir / "config.json").write_text('{"model_type": "distilbert"}')
         (checkpoint_dir / "tokenizer_config.json").write_text('{"vocab_size": 1000}')
 
-    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
-    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
-    @patch("evaluation.benchmarking.orchestrator.build_output_path")
-    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator_original.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator_original.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator_original.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator_original.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator_original.validate_path_before_mkdir")
     def test_benchmark_best_trials_uses_config_batch_sizes(
         self,
         mock_validate_path,
@@ -76,11 +76,11 @@ class TestBenchmarkOrchestratorConfigUsage:
         call_args = mock_run_benchmarking.call_args
         assert call_args.kwargs["batch_sizes"] == batch_sizes
 
-    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
-    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
-    @patch("evaluation.benchmarking.orchestrator.build_output_path")
-    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator_original.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator_original.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator_original.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator_original.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator_original.validate_path_before_mkdir")
     def test_benchmark_best_trials_uses_config_iterations(
         self,
         mock_validate_path,
@@ -134,11 +134,11 @@ class TestBenchmarkOrchestratorConfigUsage:
         call_args = mock_run_benchmarking.call_args
         assert call_args.kwargs["iterations"] == iterations
 
-    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
-    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
-    @patch("evaluation.benchmarking.orchestrator.build_output_path")
-    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator_original.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator_original.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator_original.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator_original.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator_original.validate_path_before_mkdir")
     def test_benchmark_best_trials_uses_config_warmup(
         self,
         mock_validate_path,
@@ -192,11 +192,11 @@ class TestBenchmarkOrchestratorConfigUsage:
         call_args = mock_run_benchmarking.call_args
         assert call_args.kwargs["warmup_iterations"] == warmup
 
-    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
-    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
-    @patch("evaluation.benchmarking.orchestrator.build_output_path")
-    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator_original.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator_original.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator_original.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator_original.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator_original.validate_path_before_mkdir")
     def test_benchmark_best_trials_uses_config_max_length(
         self,
         mock_validate_path,
@@ -250,11 +250,11 @@ class TestBenchmarkOrchestratorConfigUsage:
         call_args = mock_run_benchmarking.call_args
         assert call_args.kwargs["max_length"] == max_length
 
-    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
-    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
-    @patch("evaluation.benchmarking.orchestrator.build_output_path")
-    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator_original.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator_original.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator_original.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator_original.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator_original.validate_path_before_mkdir")
     def test_benchmark_best_trials_uses_config_device(
         self,
         mock_validate_path,
@@ -308,11 +308,11 @@ class TestBenchmarkOrchestratorConfigUsage:
         call_args = mock_run_benchmarking.call_args
         assert call_args.kwargs["device"] == device
 
-    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
-    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
-    @patch("evaluation.benchmarking.orchestrator.build_output_path")
-    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator_original.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator_original.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator_original.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator_original.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator_original.validate_path_before_mkdir")
     def test_benchmark_best_trials_uses_output_filename(
         self,
         mock_validate_path,
@@ -362,11 +362,11 @@ class TestBenchmarkOrchestratorConfigUsage:
         output_path = call_args.kwargs["output_path"]
         assert output_path.name == config_filename
 
-    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
-    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
-    @patch("evaluation.benchmarking.orchestrator.build_output_path")
-    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator_original.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator_original.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator_original.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator_original.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator_original.validate_path_before_mkdir")
     def test_benchmark_best_trials_uses_custom_output_filename(
         self,
         mock_validate_path,
@@ -418,11 +418,11 @@ class TestBenchmarkOrchestratorConfigUsage:
         assert output_path.name == custom_filename
         assert output_path.name == "custom_benchmark.json"
 
-    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
-    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
-    @patch("evaluation.benchmarking.orchestrator.build_output_path")
-    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator_original.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator_original.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator_original.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator_original.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator_original.validate_path_before_mkdir")
     def test_benchmark_best_trials_all_config_options_together(
         self,
         mock_validate_path,

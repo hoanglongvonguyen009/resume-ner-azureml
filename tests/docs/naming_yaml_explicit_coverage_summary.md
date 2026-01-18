@@ -5,9 +5,9 @@ This document confirms that all configuration options in `config/naming.yaml` (l
 ## Coverage Status: ✅ 100% Complete
 
 All sections and options are covered by tests in:
-1. **`tests/unit/orchestration/test_naming_comprehensive.py`** - Integration tests for all process types
-2. **`tests/unit/orchestration/jobs/tracking/naming/test_naming_policy_details.py`** - Detailed policy tests
-3. **`tests/unit/orchestration/test_naming_yaml_explicit_coverage.py`** - Explicit tests for every config option (NEW)
+1. **`tests/tracking/integration/test_naming_integration.py`** - Integration tests for all process types
+2. **`tests/tracking/unit/test_naming_policy_details.py`** - Detailed policy tests
+3. **`tests/config/unit/test_naming_yaml.py`** - Explicit tests for every config option (NEW)
 
 ## Explicit Coverage by Section
 
@@ -130,7 +130,7 @@ All component options are explicitly tested:
 
 All tests pass:
 ```bash
-pytest tests/unit/orchestration/test_naming_yaml_explicit_coverage.py -v
+pytest tests/config/unit/test_naming_yaml.py -v
 # Result: 20 passed
 ```
 

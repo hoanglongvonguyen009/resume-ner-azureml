@@ -118,44 +118,6 @@ class TestCheckpointResolutionFromLocalDisk:
         assert checkpoint_dir is not None
         assert Path(checkpoint_dir).exists()
 
-    def test_resolve_checkpoint_from_legacy_trial_structure(self, mock_champion_data, temp_dir):
-        """Test resolving checkpoint from legacy trial directory structure."""
-        # Create legacy structure: study-{name}/trial_{number}_{run_id}/
-        study_dir = temp_dir / "outputs" / "hpo" / "local" / "distilbert" / "study-legacy"
-        study_dir.mkdir(parents=True)
-        
-        trial_dir = study_dir / "trial_1_abc123"
-        trial_dir.mkdir()
-        
-        checkpoint_dir = trial_dir / "checkpoint"
-        checkpoint_dir.mkdir()
-        (checkpoint_dir / "pytorch_model.bin").touch()
-        
-        # Search for trial directory containing trial_key_hash
-        trial_key_hash = mock_champion_data["champion"]["trial_key_hash"]
-        hpo_output_dir = study_dir.parent
-        
-        found_trial_dir = None
-        for study_dir_candidate in hpo_output_dir.iterdir():
-            if study_dir_candidate.is_dir():
-                for trial_dir_candidate in study_dir_candidate.iterdir():
-                    if trial_dir_candidate.is_dir() and trial_dir_candidate.name.startswith("trial"):
-                        # Check if hash matches (legacy format might not have hash in name)
-                        # In this case, we'd need to check trial_meta.json or other metadata
-                        if "trial" in trial_dir_candidate.name.lower():
-                            # For legacy, we might need to check all trial directories
-                            checkpoint_candidate = trial_dir_candidate / "checkpoint"
-                            if checkpoint_candidate.exists():
-                                found_trial_dir = str(trial_dir_candidate)
-                                break
-                if found_trial_dir:
-                    break
-        
-        # Legacy structure might not be findable by hash alone
-        # This test documents the limitation
-        assert found_trial_dir is not None or True  # May not always work for legacy
-
-
 class TestCheckpointResolutionFromMLflow:
     """Test checkpoint resolution from MLflow artifacts."""
 

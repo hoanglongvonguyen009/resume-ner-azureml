@@ -10,7 +10,7 @@ This design consolidates all repository root detection logic into a single, cent
 - Reuses existing `config/paths.yaml` structure (derives markers from `base.*`)
 - Separates concerns: repo root detection ≠ output routing ≠ Drive mapping
 - Uses relative paths for Drive mapping (not string replacement)
-- Provides backward compatibility through wrapper functions
+- Provides deprecated wrapper functions (use `detect_repo_root()` directly)
 
 ## 1. Unified Function Signature
 
@@ -76,7 +76,7 @@ def detect_repo_root(
 - **Configurable search**: Search order and strategies from config
 - **Platform-aware**: Supports Colab, Kaggle, AzureML, workspaces, local
 
-### 1.2 Backward Compatibility Wrapper
+### 1.2 Deprecated Wrapper
 
 **Location**: `src/common/shared/notebook_setup.py` (update existing function)
 
@@ -84,11 +84,11 @@ def detect_repo_root(
 ```python
 def find_repository_root(start_dir: Optional[Path] = None) -> Optional[Path]:
     """
-    Backward-compatible wrapper for detect_repo_root().
+    Deprecated wrapper for detect_repo_root().
     
     .. deprecated:: 
         Use `detect_repo_root()` from `infrastructure.paths` instead.
-        This function is kept for backward compatibility with notebooks.
+        This function is deprecated and will be removed in a future version.
     
     Args:
         start_dir: Directory to start searching from (mapped to start_path).
@@ -105,9 +105,9 @@ def find_repository_root(start_dir: Optional[Path] = None) -> Optional[Path]:
 ```
 
 **Key Design Decisions**:
-- **Backward compatible**: Returns `Optional[Path]` (not `Path`)
+- **Deprecated**: Returns `Optional[Path]` (not `Path`)
 - **Thin wrapper**: Delegates to unified function
-- **Deprecation notice**: Points to canonical function
+- **Use canonical function**: Use `detect_repo_root()` directly
 
 ## 2. Configuration Structure
 
@@ -557,7 +557,7 @@ from infrastructure.paths import (
 
 1. Mark `find_project_root()` and `infer_root_dir()` as deprecated
 2. Remove after all migrations complete
-3. Keep `find_repository_root()` as wrapper (for backward compatibility)
+3. Deprecate `find_repository_root()` wrapper (use `detect_repo_root()` directly)
 
 ### 7.4 Phase 4: Update Documentation
 
@@ -584,8 +584,8 @@ from infrastructure.paths import (
 ### 8.3 Migration Strategy
 
 - ✅ Migration phases defined
-- ✅ Backward compatibility strategy defined
 - ✅ Deprecation strategy defined
+- ✅ Wrapper marked as deprecated
 
 ### 8.4 Documentation
 

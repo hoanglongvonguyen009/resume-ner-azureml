@@ -240,42 +240,8 @@ class TestObjectiveDirectionMigrationIntegration:
             }
         }
 
-    def test_objective_direction_preferred_over_goal(self):
-        """Test that direction is preferred over goal when both present."""
-        selection_config = {
-            "objective": {
-                "metric": "macro-f1",
-                "direction": "minimize",  # New
-                "goal": "maximize"  # Legacy (different value)
-            }
-        }
-        
-        # Code should prefer direction
-        direction = selection_config.get("objective", {}).get("direction")
-        goal = selection_config.get("objective", {}).get("goal")
-        
-        assert direction == "minimize"
-        assert goal == "maximize"  # Still accessible but deprecated
-
-    def test_objective_goal_fallback_when_direction_missing(self):
-        """Test that goal is used when direction is missing."""
-        selection_config = {
-            "objective": {
-                "metric": "macro-f1",
-                "goal": "minimize"  # Legacy only
-            }
-        }
-        
-        # Should use goal as fallback
-        direction = selection_config.get("objective", {}).get("direction")
-        goal = selection_config.get("objective", {}).get("goal", "maximize")
-        
-        # direction is None, goal is used
-        assert direction is None
-        assert goal == "minimize"
-
-    def test_objective_direction_default_when_both_missing(self):
-        """Test that direction defaults when both direction and goal are missing."""
+    def test_objective_direction_default_when_missing(self):
+        """Test that direction defaults when missing."""
         selection_config = {
             "objective": {
                 "metric": "macro-f1"
@@ -283,10 +249,8 @@ class TestObjectiveDirectionMigrationIntegration:
         }
         
         direction = selection_config.get("objective", {}).get("direction", "maximize")
-        goal = selection_config.get("objective", {}).get("goal", "maximize")
         
         assert direction == "maximize"  # Default
-        assert goal == "maximize"  # Default
 
 
 class TestChampionSelectionConfigIntegration:

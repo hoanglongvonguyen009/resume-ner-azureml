@@ -8,7 +8,7 @@ All model configuration options are now covered by tests.
 
 ## Test Files
 
-1. **`tests/unit/orchestration/test_model_config.py`** - Complete coverage of all model config options (NEW)
+1. **`tests/config/unit/test_model_config.py`** - Complete coverage of all model config options (NEW)
    - 27 tests passing
    - 1 skipped (conditional on real files existing)
 
@@ -107,7 +107,7 @@ All model configuration options are now covered by tests.
 
 1. **Model configs are loaded via `load_config_file()`** in `training/config.py` with path pattern `model/{backbone}.yaml`
 
-2. **Model configs are also loaded via `load_all_configs()`** in `orchestration/config_loader.py` which loads from `ExperimentConfig.model_config`
+2. **Model configs are also loaded via `load_all_configs()`** in `infrastructure.config.loader` which loads from `ExperimentConfig.model_config`
 
 3. **All sections are optional** except `backbone` and `tokenizer`. Missing sections don't cause errors.
 
@@ -120,7 +120,7 @@ All model configuration options are now covered by tests.
 All configuration options in model/*.yaml files are:
 
 - ✅ Properly loaded from the config files
-- ✅ Used in the codebase where applicable (training/config.py, orchestration/config_loader.py)
+- ✅ Used in the codebase where applicable (training/config.py, infrastructure.config.loader)
 - ✅ Comprehensively tested
 - ✅ Have correct type handling (int, float, bool, string)
 

@@ -141,7 +141,7 @@ apply_lineage_tags(lineage, mlflow_run)
 - `build_training_run_name_with_fallback(..., config_dir: Optional[Path] = None)`: Build training run name with fallback logic
   - **Accepts `config_dir` parameter**: Pass `config_dir` explicitly when available (follows "trust provided parameter" pattern)
   - **Trusts provided `config_dir`**: Only infers when parameter is `None`
-  - Uses infrastructure naming as primary, falls back to policy-based or legacy naming
+  - Uses infrastructure naming as primary, falls back to policy-based naming
 
 ### High-Level Execution
 

@@ -8,8 +8,8 @@ All sections of `mlflow.yaml` are now covered by tests.
 
 ## Test Files
 
-1. **`tests/unit/orchestration/jobs/tracking/test_mlflow_config_comprehensive.py`** - Comprehensive MLflow config tests
-2. **`tests/unit/orchestration/test_mlflow_yaml_explicit_coverage.py`** - Explicit tests for every config option (NEW)
+1. **`tests/tracking/unit/test_mlflow_config_comprehensive.py`** - Comprehensive MLflow config tests
+2. **`tests/config/unit/test_mlflow_yaml.py`** - Explicit tests for every config option (NEW)
 
 ## Coverage by Section
 

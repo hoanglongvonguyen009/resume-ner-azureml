@@ -11,11 +11,11 @@ from evaluation.benchmarking.utils import run_benchmarking
 class TestBenchmarkMlflowTrackingWithTrialId:
     """Test MLflow tracking works correctly with trial_id extraction."""
 
-    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
-    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
-    @patch("evaluation.benchmarking.orchestrator.build_output_path")
-    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator_original.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator_original.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator_original.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator_original.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator_original.validate_path_before_mkdir")
     def test_benchmark_passes_trial_id_to_run_benchmarking(
         self,
         mock_validate_path,
@@ -81,11 +81,11 @@ class TestBenchmarkMlflowTrackingWithTrialId:
         # Should extract trial_id from trial_name (trial-25d03eeb)
         assert call_kwargs["trial_id"] == "trial-25d03eeb"
 
-    @patch("evaluation.benchmarking.orchestrator.run_benchmarking")
-    @patch("evaluation.benchmarking.orchestrator.create_naming_context")
-    @patch("evaluation.benchmarking.orchestrator.build_output_path")
-    @patch("evaluation.benchmarking.orchestrator.resolve_output_path_for_colab")
-    @patch("evaluation.benchmarking.orchestrator.validate_path_before_mkdir")
+    @patch("evaluation.benchmarking.orchestrator_original.run_benchmarking")
+    @patch("evaluation.benchmarking.orchestrator_original.create_naming_context")
+    @patch("evaluation.benchmarking.orchestrator_original.build_output_path")
+    @patch("evaluation.benchmarking.orchestrator_original.resolve_output_path_for_colab")
+    @patch("evaluation.benchmarking.orchestrator_original.validate_path_before_mkdir")
     def test_benchmark_passes_trial_id_old_format(
         self,
         mock_validate_path,
@@ -156,12 +156,14 @@ class TestBenchmarkMlflowTrackingWithTrialId:
         assert call_kwargs["trial_id"] == "1_20251231_161745"
 
     @patch("evaluation.benchmarking.utils.subprocess.run")
+    @patch("infrastructure.naming.mlflow.run_names.build_mlflow_run_name")
     @patch("infrastructure.naming.create_naming_context")
     @patch("common.shared.platform_detection.detect_platform")
     def test_run_benchmarking_mlflow_tracking_with_trial_id(
         self,
         mock_detect_platform,
         mock_create_context,
+        mock_build_run_name,
         mock_subprocess,
         tmp_path,
         mock_checkpoint_dir,
@@ -170,6 +172,9 @@ class TestBenchmarkMlflowTrackingWithTrialId:
         """Test that MLflow tracking works when trial_id is provided."""
         project_root = tmp_path
         output_path = tmp_path / "benchmark.json"
+        
+        # Mock build_mlflow_run_name to return a simple name (avoids naming policy complexity)
+        mock_build_run_name.return_value = "local_distilbert_benchmark_trial-25d03eeb"
         
         # Mock subprocess
         mock_result = Mock()
@@ -227,12 +232,14 @@ class TestBenchmarkMlflowTrackingWithTrialId:
         assert call_kwargs["trial_id"] == "trial-25d03eeb"
 
     @patch("evaluation.benchmarking.utils.subprocess.run")
+    @patch("infrastructure.naming.mlflow.run_names.build_mlflow_run_name")
     @patch("infrastructure.naming.create_naming_context")
     @patch("common.shared.platform_detection.detect_platform")
     def test_run_benchmarking_mlflow_tracking_fallback_to_trial_key_hash(
         self,
         mock_detect_platform,
         mock_create_context,
+        mock_build_run_name,
         mock_subprocess,
         tmp_path,
         mock_checkpoint_dir,
@@ -241,6 +248,9 @@ class TestBenchmarkMlflowTrackingWithTrialId:
         """Test that MLflow tracking works when trial_id is constructed from trial_key_hash."""
         project_root = tmp_path
         output_path = tmp_path / "benchmark.json"
+        
+        # Mock build_mlflow_run_name to return a simple name (avoids naming policy complexity)
+        mock_build_run_name.return_value = "local_distilbert_benchmark_trial-25d03eeb"
         
         # Mock subprocess
         mock_result = Mock()

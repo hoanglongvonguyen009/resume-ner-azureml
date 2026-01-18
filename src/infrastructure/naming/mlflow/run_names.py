@@ -155,9 +155,12 @@ def build_mlflow_run_name(
             )
             use_policy = False
 
-    # Fallback to legacy logic if policy not available or formatting failed
+    # No fallback to legacy logic - policy must be available
     if not use_policy:
-        return _build_legacy_run_name(context, naming_config, run_name_config, config_dir)
+        raise ValueError(
+            f"Naming policy not available or formatting failed. "
+            f"Legacy fallback removed. Process type: {process_type}"
+        )
 
     # Apply version suffix using existing collision logic
     env = context.storage_env if hasattr(context, "storage_env") else context.environment
@@ -228,23 +231,4 @@ def build_mlflow_run_name(
     
     return base_name
 
-def _build_legacy_run_name(
-    context: NamingContext,
-    naming_config: dict,
-    run_name_config: dict,
-    config_dir: Optional[Path] = None,
-) -> str:
-    """
-    Legacy run name building logic (fallback when policy not available).
-    
-    This preserves the original hardcoded logic for backward compatibility.
-    """
-    env = context.storage_env if hasattr(context, "storage_env") else context.environment
-    
-    # For final_training, include variant if available
-    if context.process_type == "final_training" and hasattr(context, "variant") and context.variant is not None:
-        return f"{env}_{context.model}_{context.process_type}_v{context.variant}"
-    
-    # Default legacy format
-    return f"{env}_{context.model}_{context.process_type}_legacy"
 

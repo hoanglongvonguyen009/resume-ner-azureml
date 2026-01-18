@@ -139,15 +139,6 @@ class TestGetChampionSelectionConfig:
         result = get_champion_selection_config(config)
         assert result["artifact_check_source"] == "disk"
 
-    def test_prefer_schema_version_1_0(self):
-        """Test prefer_schema_version set to 1.0."""
-        config = {
-            "champion_selection": {
-                "prefer_schema_version": "1.0",
-            }
-        }
-        result = get_champion_selection_config(config)
-        assert result["prefer_schema_version"] == "1.0"
 
     def test_prefer_schema_version_2_0(self):
         """Test prefer_schema_version set to 2.0."""

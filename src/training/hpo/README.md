@@ -47,6 +47,7 @@ The `hpo` module provides hyperparameter optimization capabilities:
   - `search_space.py`: Search space translation (Optuna, AzureML)
   - `optuna_integration.py`: Optuna integration utilities
   - `study.py`: Study management and best config extraction
+  - `types.py`: Shared HPO type definitions (e.g., `HPOParentContext`)
 - `execution/`: Trial execution
   - `local/`: Local execution (sweeps, trials, CV, refit)
   - `azureml/`: AzureML sweep job creation
@@ -124,32 +125,41 @@ search_space = create_search_space({
 ### Study Management
 
 - `extract_best_config_from_study(...)`: Extract best configuration from Optuna study
+- `StudyManager`: Manage Optuna study creation, loading, and resume logic
+  - **Import**: `from training.hpo import StudyManager` or `from training.hpo.core import StudyManager`
+  - **Key method**: `create_or_load_study(output_dir, run_id, study_key_hash=...)` - Requires `study_key_hash` parameter for v2 path resolution
 - `create_study_name(...)`: Create study name from configuration
+- `HPOParentContext`: TypedDict for HPO parent run context
+  - **Import**: `from training.hpo.core import HPOParentContext` or `from training.hpo.core.types import HPOParentContext`
+  - **Fields**: `hpo_parent_run_id`, `study_key_hash`, `study_family_hash` (all Optional[str])
+  - Used for tracking parent-child relationships in HPO runs
 
 ### Checkpoint Management
 
 **Layering**:
 - **Low-level**: `common.shared.platform_detection.resolve_platform_checkpoint_path()` - Platform-specific path resolution (Colab Drive, Kaggle, local)
-- **Mid-level**: `training.hpo.checkpoint.storage.resolve_storage_path()` - HPO-specific checkpoint storage path resolution (uses low-level function, handles v2/legacy formats)
+- **Mid-level**: `training.hpo.checkpoint.storage.resolve_storage_path()` - HPO-specific checkpoint storage path resolution (uses low-level function, uses v2 hash-based paths)
 - **High-level**: `training.hpo.utils.helpers.setup_checkpoint_storage()` - Complete checkpoint setup orchestration (uses mid-level function, handles Drive restore, resume logic)
 
 Functions:
 - `resolve_storage_path(...)`: Resolve checkpoint storage path with platform awareness (uses `resolve_platform_checkpoint_path()` internally)
-  - **V2 mode**: When `study_key_hash` is provided, uses v2 hash-based folder structure: `{backbone}/study-{study8}/study.db`
+  - **Signature**: `resolve_storage_path(output_dir, checkpoint_config, backbone, study_key_hash, study_name=None, create_dirs=True)`
+  - **Required parameter**: `study_key_hash` (str) - Study key hash for v2 folder structure
+  - Uses v2 hash-based folder structure: `{backbone}/study-{study8}/study.db`
     - `study8` is the first 8 characters of `study_key_hash`
     - Example: `distilbert/study-c3659fea/study.db`
-  - **Legacy mode**: When `study_key_hash` is None, falls back to legacy `study_name` format: `{backbone}/{study_name}/study.db`
-    - Maintains backward compatibility with existing configurations
+  - **Legacy support**: `study_name` parameter is deprecated and kept only for compatibility
+  - Raises `ValueError` if `study_key_hash` is not provided
 - `get_storage_uri(...)`: Get checkpoint storage URI
 - `setup_checkpoint_storage(...)`: Set up checkpoint storage with Drive restore support
-  - Accepts optional `study_key_hash` parameter for v2 path resolution
-  - **V2 folder detection**: When `study_key_hash` is provided, checks for v2 study folder first using `find_study_folder_in_backbone_dir()` before falling back to `resolve_storage_path()`
+  - **Required parameter**: `study_key_hash` (str) - Study key hash for v2 path resolution
+  - **V2 folder detection**: Checks for v2 study folder using `find_study_folder_in_backbone_dir()`
   - This ensures v2 folders are used directly (local paths) rather than being mapped to Drive paths, preventing false positives in restore logic
 - `CheckpointCleanupManager`: Manage checkpoint cleanup
 
 **Note**: When checkpoints are stored in Google Drive (Colab), the system automatically detects Drive paths and skips redundant `restore_from_drive()` calls to prevent path resolution errors.
 
-**Path Resolution**: The system prioritizes v2 hash-based paths when `study_key_hash` is available, ensuring deterministic study folder names based on study configuration. Legacy `study_name` format is supported for backward compatibility.
+**Path Resolution**: The system uses v2 hash-based paths with `study_key_hash`, ensuring deterministic study folder names based on study configuration.
 
 **Drive Backup**: The backup system (`infrastructure.shared.backup`) provides centralized backup utilities for all workflows:
 

@@ -119,52 +119,6 @@ class TestObjectiveConfig:
         
         assert direction == "minimize"
 
-    def test_objective_goal_extraction(self):
-        """Test that objective.goal (legacy) is extracted."""
-        selection_config = {
-            "objective": {
-                "goal": "maximize"
-            }
-        }
-        
-        goal = selection_config.get("objective", {}).get("goal", "maximize")
-        
-        assert goal == "maximize"
-        assert isinstance(goal, str)
-
-    def test_objective_direction_and_goal_both_present(self):
-        """Test that both direction and goal can be present (migration period)."""
-        selection_config = {
-            "objective": {
-                "direction": "maximize",
-                "goal": "maximize"  # Legacy
-            }
-        }
-        
-        direction = selection_config.get("objective", {}).get("direction", "maximize")
-        goal = selection_config.get("objective", {}).get("goal", "maximize")
-        
-        # Both should be extractable
-        assert direction == "maximize"
-        assert goal == "maximize"
-
-    def test_objective_direction_preferred_over_goal(self):
-        """Test that direction is preferred over goal when both present."""
-        selection_config = {
-            "objective": {
-                "direction": "minimize",  # New
-                "goal": "maximize"  # Legacy (different value)
-            }
-        }
-        
-        # Code should prefer direction over goal
-        direction = selection_config.get("objective", {}).get("direction")
-        goal = selection_config.get("objective", {}).get("goal")
-        
-        # Both exist, but direction should be used
-        assert direction == "minimize"
-        assert goal == "maximize"  # Still accessible but deprecated
-
 
 class TestChampionSelectionConfig:
     """Test champion_selection configuration (all options)."""
@@ -302,17 +256,6 @@ class TestChampionSelectionConfig:
         
         assert version == "2.0"
 
-    def test_prefer_schema_version_1_0(self):
-        """Test that prefer_schema_version with 1.0 value."""
-        selection_config = {
-            "champion_selection": {
-                "prefer_schema_version": "1.0"
-            }
-        }
-        
-        version = selection_config.get("champion_selection", {}).get("prefer_schema_version", "auto")
-        
-        assert version == "1.0"
 
     def test_allow_mixed_schema_groups_extraction(self):
         """Test that allow_mixed_schema_groups is extracted."""

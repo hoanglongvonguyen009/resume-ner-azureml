@@ -35,6 +35,15 @@ class TestComputeNextVariant:
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         
+        # Create paths.yaml config file (required for resolve_output_path)
+        paths_yaml = config_dir / "paths.yaml"
+        paths_yaml.write_text("""
+base:
+  outputs: "outputs"
+outputs:
+  hpo: "hpo"
+""")
+        
         # Create existing variant folders
         hpo_output = tmp_path / "outputs" / "hpo" / "local" / "distilbert"
         hpo_output.mkdir(parents=True)
@@ -54,6 +63,15 @@ class TestComputeNextVariant:
         """Test HPO variant computation with custom base name."""
         config_dir = tmp_path / "config"
         config_dir.mkdir()
+        
+        # Create paths.yaml config file (required for resolve_output_path)
+        paths_yaml = config_dir / "paths.yaml"
+        paths_yaml.write_text("""
+base:
+  outputs: "outputs"
+outputs:
+  hpo: "hpo"
+""")
         
         # Create existing variant folders
         hpo_output = tmp_path / "outputs" / "hpo" / "local" / "distilbert"
@@ -129,6 +147,15 @@ class TestFindExistingVariants:
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         
+        # Create paths.yaml config file (required for resolve_output_path)
+        paths_yaml = config_dir / "paths.yaml"
+        paths_yaml.write_text("""
+base:
+  outputs: "outputs"
+outputs:
+  hpo: "hpo"
+""")
+        
         # Create HPO output structure
         hpo_output = tmp_path / "outputs" / "hpo" / "local" / "distilbert"
         hpo_output.mkdir(parents=True)
@@ -147,6 +174,15 @@ class TestFindExistingVariants:
         """Test finding HPO variants with explicit variant suffixes."""
         config_dir = tmp_path / "config"
         config_dir.mkdir()
+        
+        # Create paths.yaml config file (required for resolve_output_path)
+        paths_yaml = config_dir / "paths.yaml"
+        paths_yaml.write_text("""
+base:
+  outputs: "outputs"
+outputs:
+  hpo: "hpo"
+""")
         
         # Create HPO output structure
         hpo_output = tmp_path / "outputs" / "hpo" / "local" / "distilbert"
@@ -168,6 +204,15 @@ class TestFindExistingVariants:
         """Test finding HPO variants with mixed folder patterns."""
         config_dir = tmp_path / "config"
         config_dir.mkdir()
+        
+        # Create paths.yaml config file (required for resolve_output_path)
+        paths_yaml = config_dir / "paths.yaml"
+        paths_yaml.write_text("""
+base:
+  outputs: "outputs"
+outputs:
+  hpo: "hpo"
+""")
         
         # Create HPO output structure with mixed patterns
         hpo_output = tmp_path / "outputs" / "hpo" / "local" / "distilbert"
@@ -226,6 +271,15 @@ class TestVariantsIntegration:
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         
+        # Create paths.yaml config file (required for resolve_output_path)
+        paths_yaml = config_dir / "paths.yaml"
+        paths_yaml.write_text("""
+base:
+  outputs: "outputs"
+outputs:
+  hpo: "hpo"
+""")
+        
         hpo_output = tmp_path / "outputs" / "hpo" / "local" / "distilbert"
         hpo_output.mkdir(parents=True)
         
@@ -269,6 +323,15 @@ class TestVariantsIntegration:
         """Test HPO variant computation with custom study_name template."""
         config_dir = tmp_path / "config"
         config_dir.mkdir()
+        
+        # Create paths.yaml config file (required for resolve_output_path)
+        paths_yaml = config_dir / "paths.yaml"
+        paths_yaml.write_text("""
+base:
+  outputs: "outputs"
+outputs:
+  hpo: "hpo"
+""")
         
         hpo_output = tmp_path / "outputs" / "hpo" / "local" / "distilbert"
         hpo_output.mkdir(parents=True)

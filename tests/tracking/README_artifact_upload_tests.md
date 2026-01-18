@@ -117,7 +117,7 @@ pytest tests/tracking/scripts/test_artifact_upload_manual.py -v
 
 ## Related Code
 
-- **Monkey-patch**: `src/orchestration/jobs/tracking/trackers/sweep_tracker.py` (lines 21-42)
-- **Artifact upload**: `src/orchestration/jobs/tracking/trackers/sweep_tracker.py` (lines 1098-1121)
-- **Refit run completion**: `src/orchestration/jobs/hpo/local_sweeps.py` (lines 997-1042)
+- **Monkey-patch**: `src/infrastructure/tracking/mlflow/trackers/sweep_tracker.py` (lines 21-42)
+- **Artifact upload**: `src/infrastructure/tracking/mlflow/trackers/sweep_tracker.py` (lines 1098-1121)
+- **Refit run completion**: `src/training/hpo/execution/local/sweep.py` (lines 997-1042)
 

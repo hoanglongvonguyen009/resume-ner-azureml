@@ -35,7 +35,7 @@ from azure.ai.ml.sweep import (
     SweepJobLimits,
 )
 
-from training.hpo.core.search_space import create_search_space
+from training.hpo.core.search_space import SearchSpaceTranslator
 
 def _build_data_input_from_asset(data_asset: Data) -> Input:
     """
@@ -98,7 +98,7 @@ def create_dry_run_sweep_job_for_backbone(
             k: v for k, v in smoke_hpo_config["search_space"].items() if k != "backbone"
         }
     }
-    search_space = create_search_space(reduced)
+    search_space = SearchSpaceTranslator.to_azure_ml(reduced)
 
     trials = max(2, smoke_hpo_config["sampling"]["max_trials"] // 2)
 
@@ -196,7 +196,7 @@ def create_hpo_sweep_job_for_backbone(
             k: v for k, v in hpo_config["search_space"].items() if k != "backbone"
         }
     }
-    search_space = create_search_space(reduced)
+    search_space = SearchSpaceTranslator.to_azure_ml(reduced)
 
     cmd_args = (
         f"--data-asset ${{{{inputs.data}}}} "

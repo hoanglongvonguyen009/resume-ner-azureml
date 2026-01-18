@@ -25,7 +25,7 @@ The `workflows/` module provides end-to-end tests that validate complete noteboo
 - **Notebook 02 E2E**: Tests the complete workflow from `02_best_config_selection.ipynb` (Selection → Final Training → Conversion)
 - **Full Workflow E2E**: Tests the complete pipeline from notebook 01 through notebook 02 (HPO → Benchmarking → Selection → Final Training → Conversion)
 
-These tests exercise the real orchestration modules, config usage, naming, paths, and tags without requiring Azure ML, GPUs, or long training/benchmark jobs. They validate:
+These tests exercise the real domain modules (training, deployment, infrastructure), config usage, naming, paths, and tags without requiring Azure ML, GPUs, or long training/benchmark jobs. They validate:
 
 - Path structure against `paths.yaml` v2 patterns
 - Run names against `naming.yaml` patterns

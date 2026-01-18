@@ -141,29 +141,6 @@ class TestSelectChampionPerBackbone:
         assert result["champion"]["metric"] == 0.87
         assert result["champion"]["schema_version"] == "2.0"
 
-    @patch("infrastructure.tracking.mlflow.queries.query_runs_by_tags")
-    def test_successful_selection_v1(self, mock_query, mock_mlflow_client, mock_hpo_experiment, base_selection_config):
-        """Test successful champion selection with v1 runs."""
-        runs = [
-            create_mock_run("run1", 0.85, "hash1", schema_version="1.0"),
-            create_mock_run("run2", 0.87, "hash1", schema_version="1.0"),
-            create_mock_run("run3", 0.86, "hash1", schema_version="1.0"),
-        ]
-        mock_query.return_value = runs
-        
-        # Prefer v1 explicitly and ignore artifact availability for this test
-        base_selection_config["champion_selection"]["prefer_schema_version"] = "1.0"
-        base_selection_config["champion_selection"]["require_artifact_available"] = False
-        
-        result = select_champion_per_backbone(
-            backbone="distilbert",
-            hpo_experiment=mock_hpo_experiment,
-            selection_config=base_selection_config,
-            mlflow_client=mock_mlflow_client,
-        )
-        
-        assert result is not None
-        assert result["champion"]["schema_version"] == "1.0"
 
     @patch("infrastructure.tracking.mlflow.queries.query_runs_by_tags")
     def test_no_runs_returns_none(self, mock_query, mock_mlflow_client, mock_hpo_experiment, base_selection_config):

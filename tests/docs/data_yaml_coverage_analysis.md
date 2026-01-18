@@ -8,7 +8,7 @@ All data configuration options are now covered by tests.
 
 ## Test Files
 
-1. **`tests/unit/orchestration/test_data_config.py`** - Complete coverage of all data config options (NEW)
+1. **`tests/config/unit/test_data_config.py`** - Complete coverage of all data config options (NEW)
    - 29 tests passing
    - 1 skipped (conditional on real files existing)
 
@@ -105,7 +105,7 @@ All data configuration options are now covered by tests.
 
 1. **Data configs are loaded via `load_config_file()`** in `training/config.py` with path pattern `data/{filename}.yaml`
 
-2. **Data configs are also loaded via `load_all_configs()`** in `orchestration/config_loader.py` which loads from `ExperimentConfig.data_config`
+2. **Data configs are also loaded via `load_all_configs()`** in `infrastructure.config.loader` which loads from `ExperimentConfig.data_config`
 
 3. **Integration with training**: Data configs are used by:
    - `build_label_list()` in `training/data.py` to extract entity types from `schema.entity_types`

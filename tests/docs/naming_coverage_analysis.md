@@ -123,7 +123,7 @@
 
 ## Test Files
 
-1. **`tests/unit/orchestration/test_naming_comprehensive.py`** (734 lines)
+1. **`tests/tracking/integration/test_naming_integration.py`** (or similar location)
    - Context validation
    - Context creation
    - Run name building for all process types
@@ -131,7 +131,7 @@
    - Auto-increment versioning
    - Parent training ID building
 
-2. **`tests/unit/orchestration/jobs/tracking/naming/test_naming_policy_details.py`** (397 lines)
+2. **`tests/tracking/unit/test_naming_policy_details.py`** (397 lines)
    - Component configuration (zero_pad, defaults, length truncation)
    - Semantic suffix handling
    - Version format parsing

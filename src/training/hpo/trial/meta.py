@@ -111,9 +111,11 @@ def generate_missing_trial_meta(
     if not study_key_hash and hpo_config and data_config:
         try:
             from infrastructure.naming.mlflow.hpo_keys import (
-                build_hpo_study_key,
+                build_hpo_study_key,  # v1 - used here because train_config not available
                 build_hpo_study_key_hash,
             )
+            # Build study key hash using v1 (train_config not available in this context)
+            # TODO: Migrate to v2 when train_config becomes available
             study_key = build_hpo_study_key(
                 data_config=data_config,
                 hpo_config=hpo_config,

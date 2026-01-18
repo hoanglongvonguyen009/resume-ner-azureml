@@ -338,35 +338,6 @@ run_names:
         
         assert storage_path.exists()
 
-    def test_checkpoint_path_fallback_to_legacy_when_no_hash(self, tmp_path):
-        """Test that resolve_storage_path falls back to legacy study_name format when study_key_hash is None."""
-        from training.hpo.checkpoint.storage import (
-            resolve_storage_path,
-        )
-        
-        output_dir = tmp_path / "outputs" / "hpo"
-        output_dir.mkdir(parents=True)
-        
-        checkpoint_config = {
-            "enabled": True,
-            "study_name": "hpo_{backbone}_test",
-            "storage_path": "{study_name}/study.db",
-        }
-        
-        backbone = "distilbert"
-        study_name = "hpo_distilbert_test"
-        
-        # Call without study_key_hash - should use legacy format
-        storage_path = resolve_storage_path(
-            output_dir=output_dir,
-            checkpoint_config=checkpoint_config,
-            backbone=backbone,
-            study_name=study_name,
-            study_key_hash=None,  # Explicitly None
-        )
-        
-        # Verify legacy path format
-        assert storage_path is not None
         assert "hpo_distilbert_test" in str(storage_path)
         assert "study.db" in str(storage_path)
         # Should NOT use v2 format

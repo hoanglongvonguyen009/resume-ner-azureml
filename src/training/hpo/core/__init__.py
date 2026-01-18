@@ -6,25 +6,26 @@ from .optuna_integration import (
 )
 from .search_space import (
     SearchSpaceTranslator,
-    create_search_space,
-    translate_search_space_to_optuna,
 )
 from .study import (
     StudyManager,
     extract_best_config_from_study,
 )
+from .types import (
+    HPOParentContext,
+)
 
 __all__ = [
     # Search space
     "SearchSpaceTranslator",
-    "create_search_space",
-    "translate_search_space_to_optuna",
     # Study
     "StudyManager",
     "extract_best_config_from_study",
     # Optuna integration
     "import_optuna",
     "create_optuna_pruner",
+    # Types
+    "HPOParentContext",
 ]
 
 

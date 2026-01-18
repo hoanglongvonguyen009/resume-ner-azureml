@@ -32,6 +32,12 @@ tracking_uri parameter gracefully. This fixes a compatibility issue between
 MLflow 3.5.0 and azureml-mlflow 1.61.0.
 
 The patch is automatically applied when this module is imported.
+
+TODO: Evaluate if this patch is still needed:
+- Test artifact uploads without this patch
+- Check MLflow and azureml-mlflow versions in use
+- Remove this module if patch is no longer needed
+- Removal criteria: Artifact uploads work without patch on current MLflow/azureml-mlflow versions
 """
 import functools
 import inspect

@@ -37,14 +37,17 @@ from typing import Any, Dict, List, Optional
 
 from mlflow.tracking import MlflowClient
 
+from common.constants.mlflow import DEFAULT_MLFLOW_MAX_RESULTS
+from common.types import MLflowRun
+
 
 def query_runs_by_tags(
     client: MlflowClient,
     experiment_ids: List[str],
     required_tags: Dict[str, str],
     filter_string: str = "",
-    max_results: int = 1000,
-) -> List[Any]:
+    max_results: int = DEFAULT_MLFLOW_MAX_RESULTS,
+) -> List[MLflowRun]:
     """
     Query MLflow runs filtered by required tags.
     
@@ -83,10 +86,10 @@ def query_runs_by_tags(
 
 
 def find_best_run_by_metric(
-    runs: List[Any],
+    runs: List[MLflowRun],
     metric_name: str,
     maximize: bool = True,
-) -> Optional[Any]:
+) -> Optional[MLflowRun]:
     """
     Select best run by metric value.
     
@@ -113,9 +116,9 @@ def find_best_run_by_metric(
 
 
 def group_runs_by_variant(
-    runs: List[Any],
+    runs: List[MLflowRun],
     variant_tag: str = "code.variant",
-) -> Dict[str, List[Any]]:
+) -> Dict[str, List[MLflowRun]]:
     """
     Group runs by variant tag.
     

@@ -119,7 +119,31 @@ elif run_mode == RunMode.REUSE_IF_EXISTS:
 ### Variants
 
 - `compute_next_variant(...)`: Compute next variant number
+  - **Signature**: `compute_next_variant(root_dir, config_dir, process_type, model, spec_fp=None, exec_fp=None, base_name=None)`
+  - **Required parameters**: `root_dir`, `config_dir`, `process_type` ("final_training" or "hpo"), `model`
+  - **For HPO**: Requires `base_name` parameter (e.g., "hpo_distilbert")
+  - **For final_training**: Requires `spec_fp` and `exec_fp` parameters
+  - **Note**: For HPO process type, `config_dir` must contain a valid `paths.yaml` file (used by `resolve_output_path()`)
 - `find_existing_variants(...)`: Find existing variants
+  - **Signature**: `find_existing_variants(root_dir, config_dir, process_type, model, spec_fp=None, exec_fp=None, base_name=None)`
+  - **Required parameters**: Same as `compute_next_variant()`
+  - **Note**: For HPO process type, `config_dir` must contain a valid `paths.yaml` file
+
+**Example**:
+```python
+from infrastructure.config.variants import compute_next_variant
+from pathlib import Path
+
+# For HPO variants (requires paths.yaml in config_dir)
+config_dir = Path("config")  # Must contain paths.yaml
+next_variant = compute_next_variant(
+    root_dir=Path("."),
+    config_dir=config_dir,
+    process_type="hpo",
+    model="distilbert",
+    base_name="hpo_distilbert"
+)
+```
 
 For detailed signatures, see source code.
 

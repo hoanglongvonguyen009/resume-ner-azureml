@@ -36,7 +36,8 @@ COLAB_CONTENT_DIR = Path("/content")
 KAGGLE_WORKING_DIR = Path("/kaggle/working")
 DRIVE_PATH_PREFIX = "/content/drive"
 
-# Legacy checkpoint directory (for backward compatibility fallback)
+# Legacy checkpoint directory (deprecated - kept for migration purposes)
+# TODO: Remove after confirming no old Colab runs use this path
 LEGACY_CHECKPOINT_DIR = "resume-ner-checkpoints"
 
 # Default project name (fallback if config not available)
@@ -182,7 +183,8 @@ def resolve_platform_checkpoint_path(
                 drive_base = COLAB_DRIVE_MOUNT / content_relative
                 return drive_base / relative_path
             else:
-                # Last resort: use old behavior for backward compatibility
+                # Legacy fallback (deprecated - kept for migration)
+                # TODO: Remove after confirming no old Colab runs use legacy checkpoint paths
                 checkpoint_base = COLAB_DRIVE_MOUNT / LEGACY_CHECKPOINT_DIR
                 return checkpoint_base / relative_path
         else:

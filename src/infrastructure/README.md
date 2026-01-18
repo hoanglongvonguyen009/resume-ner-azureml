@@ -293,8 +293,7 @@ The following functions are SSOT for common operations:
 
 - **Path Resolution**: `infrastructure.paths.resolve.resolve_output_path()` - SSOT for output path resolution
 - **Path Building**: `infrastructure.paths.resolve.build_output_path()` - SSOT for building paths from patterns
-- **Project Paths**: `infrastructure.paths.utils.resolve_project_paths_with_fallback()` - **Preferred SSOT** for resolving root_dir and config_dir with standardized fallback logic
-  - **Legacy**: `infrastructure.paths.utils.resolve_project_paths()` - Still available but prefer `resolve_project_paths_with_fallback()` for consistency
+- **Project Paths**: `infrastructure.paths.utils.resolve_project_paths_with_fallback()` - **SSOT** for resolving root_dir and config_dir with standardized fallback logic
 - **MLflow Config Loading**: `infrastructure.naming.mlflow.config.load_mlflow_config()` - SSOT for loading MLflow configuration
 - **Naming Config**: `infrastructure.naming.mlflow.config.get_naming_config()` - SSOT for naming configuration access
 - **Tracking Config**: `infrastructure.naming.mlflow.config.get_tracking_config()` - SSOT for tracking configuration access

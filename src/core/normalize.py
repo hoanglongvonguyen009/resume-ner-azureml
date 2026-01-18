@@ -72,8 +72,7 @@ def normalize_for_name(
             - "replace": Dict[str, str] - character/string replacements
             - "lowercase": bool - whether to convert to lowercase
         return_warnings: If True, returns tuple of (normalized_value, warnings).
-            If False, returns only the normalized string. Defaults to True for
-            backward compatibility.
+            If False, returns only the normalized string. Defaults to True.
 
     Returns:
         If return_warnings is True: Tuple of (normalized_value, warnings) where

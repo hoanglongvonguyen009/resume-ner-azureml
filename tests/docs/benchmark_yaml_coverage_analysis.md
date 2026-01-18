@@ -6,7 +6,7 @@
 
 #### 1. `benchmarking.batch_sizes: [1, 8, 16]` (line 5)
 - **Test Files**: 
-  - `tests/unit/orchestration/test_benchmark_config_options.py`
+  - `tests/benchmarking/unit/test_benchmark_config_options.py`
   - `tests/integration/benchmarking/test_benchmark_orchestrator.py`
   - `tests/integration/benchmarking/test_benchmark_utils.py`
 - **Coverage**: ✅ Extraction, defaults, custom values, type validation
@@ -14,7 +14,7 @@
 
 #### 2. `benchmarking.iterations: 100` (line 8)
 - **Test Files**: 
-  - `tests/unit/orchestration/test_benchmark_config_options.py`
+  - `tests/benchmarking/unit/test_benchmark_config_options.py`
   - `tests/integration/benchmarking/test_benchmark_orchestrator.py`
   - `tests/integration/benchmarking/test_benchmark_utils.py`
 - **Coverage**: ✅ Extraction, defaults, custom values, edge cases (negative, zero)
@@ -22,7 +22,7 @@
 
 #### 3. `benchmarking.warmup_iterations: 10` (line 11)
 - **Test Files**: 
-  - `tests/unit/orchestration/test_benchmark_config_options.py`
+  - `tests/benchmarking/unit/test_benchmark_config_options.py`
   - `tests/integration/benchmarking/test_benchmark_orchestrator.py`
   - `tests/integration/benchmarking/test_benchmark_utils.py`
 - **Coverage**: ✅ Extraction, defaults, custom values, edge cases
@@ -30,7 +30,7 @@
 
 #### 4. `benchmarking.max_length: 512` (line 14)
 - **Test Files**: 
-  - `tests/unit/orchestration/test_benchmark_config_options.py`
+  - `tests/benchmarking/unit/test_benchmark_config_options.py`
   - `tests/integration/benchmarking/test_benchmark_orchestrator.py`
   - `tests/integration/benchmarking/test_benchmark_utils.py`
 - **Coverage**: ✅ Extraction, defaults, custom values, edge cases (negative, zero)
@@ -38,7 +38,7 @@
 
 #### 5. `benchmarking.device: null` (line 17)
 - **Test Files**: 
-  - `tests/unit/orchestration/test_benchmark_config_options.py`
+  - `tests/benchmarking/unit/test_benchmark_config_options.py`
   - `tests/integration/benchmarking/test_benchmark_orchestrator.py`
   - `tests/integration/benchmarking/test_benchmark_utils.py`
 - **Coverage**: ✅ Extraction (null, "cuda", "cpu"), defaults, conditional subprocess flag
@@ -46,14 +46,14 @@
 
 #### 6. `benchmarking.test_data: null` (line 22)
 - **Test Files**: 
-  - `tests/unit/orchestration/test_benchmark_config_options.py`
+  - `tests/benchmarking/unit/test_benchmark_config_options.py`
   - `tests/integration/benchmarking/test_benchmark_edge_cases.py`
 - **Coverage**: ✅ Extraction (null, relative path, absolute path), fallback logic, missing path handling
 - **Status**: Complete (config extraction and fallback logic tested; actual resolution happens at call site)
 
 #### 7. `output.filename: "benchmark.json"` (line 27)
 - **Test Files**: 
-  - `tests/unit/orchestration/test_benchmark_config_options.py`
+  - `tests/benchmarking/unit/test_benchmark_config_options.py`
   - `tests/integration/benchmarking/test_benchmark_orchestrator.py`
   - `tests/integration/benchmarking/test_benchmark_utils.py`
 - **Coverage**: ✅ Extraction, defaults, custom values, path separator handling
@@ -70,12 +70,12 @@
 
 ## Test Files Created
 
-1. **`tests/unit/orchestration/test_benchmark_config.py`** (6 tests)
+1. **`tests/benchmarking/unit/test_benchmark_config.py`** (6 tests)
    - Config loading via `load_experiment_config()` and `load_all_configs()`
    - Default behavior when file missing
    - Structure validation
 
-2. **`tests/unit/orchestration/test_benchmark_config_options.py`** (27 tests)
+2. **`tests/benchmarking/unit/test_benchmark_config_options.py`** (27 tests)
    - Individual option extraction
    - Default values
    - Custom values

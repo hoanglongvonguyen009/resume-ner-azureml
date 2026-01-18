@@ -165,7 +165,7 @@ class TestMLflowSelectionConfigUsage:
         mock_benchmark_experiment,
         mock_hpo_experiments,
         mock_benchmark_run,
-        mock_trial_run,
+        mock_hpo_trial_run,
         mock_refit_run,
     ):
         """Test that composite score is calculated using config weights."""
@@ -185,7 +185,7 @@ class TestMLflowSelectionConfigUsage:
         benchmark_run.data.tags["tags.grouping.trial_key_hash"] = "trial_hash_456"
         
         # Setup trial run with F1 score
-        trial_run = mock_trial_run
+        trial_run = mock_hpo_trial_run
         trial_run.data.metrics["macro-f1"] = 0.75
         trial_run.data.tags["tags.grouping.study_key_hash"] = "study_hash_123"
         trial_run.data.tags["tags.grouping.trial_key_hash"] = "trial_hash_456"

@@ -43,8 +43,9 @@ This module orchestrates the conversion workflow from the orchestration layer:
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Dict, Optional, Callable, TypedDict
 
 import mlflow
 from mlflow.tracking import MlflowClient
@@ -64,6 +65,354 @@ from common.shared.platform_detection import detect_platform
 from common.shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
+
+
+class ConversionWorkflowConfig(TypedDict):
+    """Configuration for conversion workflow."""
+    root_dir: Path
+    config_dir: Path
+    parent_training_output_dir: Path
+    parent_spec_fp: str
+    parent_exec_fp: str
+    experiment_config: ExperimentConfig
+    conversion_experiment_name: str
+    platform: str
+    parent_training_run_id: Optional[str]
+    backup_enabled: bool
+    backup_to_drive: Optional[Callable[[Path, bool], bool]]
+    restore_from_drive: Optional[Callable[[Path, bool], bool]]
+    in_colab: bool
+
+
+def _build_conversion_context_and_output(
+    conversion_config: Dict[str, Any],
+    root_dir: Path,
+    platform: str,
+    parent_spec_fp: str,
+    parent_exec_fp: str,
+) -> tuple[Any, Path]:
+    """
+    Build conversion context and output directory.
+
+    Returns:
+        Tuple of (conversion_context, conversion_output_dir).
+    """
+    conv_fp = conversion_config.get("conv_fp")
+    parent_training_id = conversion_config.get("parent_training_id")
+    backbone = conversion_config.get("backbone")
+
+    backbone_short = extract_short_backbone_name(backbone)
+
+    conversion_context = create_naming_context(
+        process_type="conversion",
+        model=backbone_short,
+        spec_fp=parent_spec_fp,
+        exec_fp=parent_exec_fp,
+        environment=platform,
+        parent_training_id=parent_training_id,
+        conv_fp=conv_fp,
+    )
+
+    conversion_output_dir = build_output_path(root_dir, conversion_context)
+    conversion_output_dir.mkdir(parents=True, exist_ok=True)
+
+    return conversion_context, conversion_output_dir
+
+
+def _build_conversion_command(
+    conversion_config: Dict[str, Any],
+    config_dir: Path,
+    backbone: str,
+    conversion_output_dir: Path,
+) -> list[str]:
+    """
+    Build conversion command arguments.
+
+    Returns:
+        List of command arguments.
+    """
+    checkpoint_path = conversion_config["checkpoint_path"]
+    quantization = conversion_config["onnx"]["quantization"]
+    opset_version = conversion_config["onnx"]["opset_version"]
+    run_smoke_test = conversion_config["onnx"]["run_smoke_test"]
+
+    conversion_args = [
+        sys.executable,
+        "-m",
+        "deployment.conversion.execution",
+        "--checkpoint-path",
+        checkpoint_path,
+        "--config-dir",
+        str(config_dir),
+        "--backbone",
+        backbone,
+        "--output-dir",
+        str(conversion_output_dir),
+        "--opset-version",
+        str(opset_version),
+    ]
+
+    # Add quantization flag if needed
+    if quantization == "int8":
+        conversion_args.append("--quantize-int8")
+
+    # Add smoke test flag if needed
+    if run_smoke_test:
+        conversion_args.append("--run-smoke-test")
+
+    return conversion_args
+
+
+def _setup_conversion_environment(
+    root_dir: Path,
+    conversion_experiment_name: str,
+) -> tuple[Dict[str, str], str]:
+    """
+    Setup environment variables for conversion subprocess.
+
+    Returns:
+        Tuple of (conversion_env, tracking_uri).
+    """
+    conversion_env = os.environ.copy()
+
+    # Add src directory to PYTHONPATH
+    src_dir = root_dir / "src"
+    pythonpath = conversion_env.get("PYTHONPATH", "")
+    if pythonpath:
+        conversion_env["PYTHONPATH"] = f"{str(src_dir)}{os.pathsep}{pythonpath}"
+    else:
+        conversion_env["PYTHONPATH"] = str(src_dir)
+
+    # Set MLflow tracking environment
+    from infrastructure.tracking.mlflow.setup import setup_mlflow
+    tracking_uri = setup_mlflow(
+        experiment_name=conversion_experiment_name,
+        fallback_to_local=True,
+    )
+    conversion_env["MLFLOW_TRACKING_URI"] = tracking_uri
+    conversion_env["MLFLOW_EXPERIMENT_NAME"] = conversion_experiment_name
+
+    return conversion_env, tracking_uri
+
+
+def _get_or_create_experiment(
+    conversion_experiment_name: str,
+) -> str:
+    """
+    Get or create MLflow experiment.
+
+    Returns:
+        Experiment ID.
+    """
+    client = MlflowClient()
+    try:
+        experiment = client.get_experiment_by_name(conversion_experiment_name)
+        if experiment is None:
+            experiment_id = client.create_experiment(conversion_experiment_name)
+        else:
+            experiment_id = experiment.experiment_id
+        return experiment_id
+    except Exception as e:
+        # Fallback: use infrastructure setup
+        try:
+            from infrastructure.tracking.mlflow.setup import setup_mlflow
+            setup_mlflow(experiment_name=conversion_experiment_name, fallback_to_local=True)
+            experiment = mlflow.get_experiment_by_name(conversion_experiment_name)
+        except Exception:
+            # Last resort: direct mlflow API
+            mlflow.set_experiment(conversion_experiment_name)
+            experiment = mlflow.get_experiment_by_name(conversion_experiment_name)
+        if experiment is None:
+            raise RuntimeError(
+                f"Could not get or create experiment: {conversion_experiment_name}") from e
+        return experiment.experiment_id
+
+
+def _build_conversion_tags(
+    conversion_context: Any,
+    conversion_output_dir: Path,
+    config_dir: Path,
+    conversion_config: Dict[str, Any],
+    run_name: str,
+    parent_training_run_id: Optional[str],
+    parent_spec_fp: str,
+    parent_exec_fp: str,
+) -> Dict[str, str]:
+    """Build MLflow tags for conversion run."""
+    tags = build_mlflow_tags(
+        context=conversion_context,
+        output_dir=conversion_output_dir,
+        parent_run_id=None,  # Don't set for cross-experiment
+        group_id=None,
+        config_dir=config_dir,
+    )
+    tags["mlflow.runType"] = "conversion"
+    tags["conversion.format"] = conversion_config["format"]
+    tags["conversion.quantization"] = conversion_config["onnx"]["quantization"]
+    tags["conversion.opset_version"] = str(conversion_config["onnx"]["opset_version"])
+    tags["mlflow.runName"] = run_name
+
+    # Add lineage tags
+    if parent_training_run_id:
+        tags["code.lineage.parent_training_run_id"] = parent_training_run_id
+    tags["code.lineage.source"] = "final_training"
+    tags["code.lineage.parent_spec_fp"] = parent_spec_fp
+    tags["code.lineage.parent_exec_fp"] = parent_exec_fp
+
+    return tags
+
+
+def _create_conversion_mlflow_run(
+    conversion_experiment_name: str,
+    run_name: str,
+    tags: Dict[str, str],
+    conversion_context: Any,
+    root_dir: Path,
+    config_dir: Path,
+    tracking_uri: str,
+) -> Optional[str]:
+    """
+    Create MLflow run for conversion.
+
+    Returns:
+        Run ID if created, None otherwise.
+    """
+    experiment_id = _get_or_create_experiment(conversion_experiment_name)
+    client = MlflowClient()
+
+    try:
+        created_run = client.create_run(
+            experiment_id=experiment_id,
+            run_name=run_name,
+            tags=tags,
+        )
+        run_id = created_run.info.run_id
+
+        # Update local index
+        try:
+            run_key = build_mlflow_run_key(conversion_context)
+            run_key_hash = build_mlflow_run_key_hash(run_key)
+            update_mlflow_index(
+                root_dir=root_dir,
+                run_key_hash=run_key_hash,
+                run_id=run_id,
+                experiment_id=experiment_id,
+                tracking_uri=tracking_uri or mlflow.get_tracking_uri(),
+                config_dir=config_dir,
+            )
+        except Exception as e:
+            logger.debug(f"Could not update MLflow index: {e}")
+
+        logger.info(f"Created MLflow run: {run_name} ({run_id[:12]}...)")
+        return run_id
+    except Exception as e:
+        logger.warning(f"Could not create MLflow run: {e}")
+        return None
+
+
+def _execute_conversion_subprocess(
+    conversion_args: list[str],
+    root_dir: Path,
+    conversion_env: Dict[str, str],
+) -> tuple[int, list[str], list[str]]:
+    """
+    Execute conversion subprocess with streaming output.
+
+    Returns:
+        Tuple of (returncode, stdout_lines, stderr_lines).
+    """
+    logger.info(f"Running conversion: {' '.join(conversion_args)}")
+    process = subprocess.Popen(
+        conversion_args,
+        cwd=root_dir,
+        env=conversion_env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,  # Line buffered
+    )
+
+    # Stream output in real-time and capture for error reporting
+    stdout_lines = []
+    stderr_lines = []
+
+    def read_stdout():
+        """Read stdout in a separate thread."""
+        try:
+            for line in process.stdout:
+                logger.info(line.rstrip())
+                stdout_lines.append(line.rstrip())
+        except Exception as e:
+            logger.debug(f"Error reading stdout: {e}")
+
+    def read_stderr():
+        """Read stderr in a separate thread."""
+        try:
+            for line in process.stderr:
+                logger.warning(line.rstrip())
+                stderr_lines.append(line.rstrip())
+        except Exception as e:
+            logger.debug(f"Error reading stderr: {e}")
+
+    # Start threads to read stdout and stderr concurrently
+    stdout_thread = threading.Thread(target=read_stdout, daemon=True)
+    stderr_thread = threading.Thread(target=read_stderr, daemon=True)
+    stdout_thread.start()
+    stderr_thread.start()
+
+    # Wait for process to complete
+    returncode = process.wait()
+
+    # Wait for threads to finish reading
+    stdout_thread.join(timeout=1.0)
+    stderr_thread.join(timeout=1.0)
+
+    return returncode, stdout_lines, stderr_lines
+
+
+def _handle_conversion_result(
+    returncode: int,
+    stdout_lines: list[str],
+    stderr_lines: list[str],
+    run_id: Optional[str],
+) -> None:
+    """
+    Handle conversion subprocess result (success or failure).
+
+    Raises:
+        RuntimeError: If conversion failed.
+    """
+    if returncode != 0:
+        if run_id:
+            from infrastructure.tracking.mlflow import terminate_run_safe
+            terminate_run_safe(run_id, status="FAILED", check_status=True)
+
+        # Build detailed error message
+        error_msg = f"Model conversion failed with return code {returncode}"
+        if stderr_lines:
+            error_msg += f"\n\nStderr output (last 30 lines):\n" + "\n".join(stderr_lines[-30:])
+        if stdout_lines:
+            # Check if there are any error-like messages in stdout
+            error_lines = [
+                line for line in stdout_lines
+                if any(keyword in line.lower() for keyword in ['error', 'exception', 'traceback', 'failed', 'fatal'])
+            ]
+            if error_lines:
+                error_msg += f"\n\nError messages from stdout (last 20 lines):\n" + "\n".join(error_lines[-20:])
+            else:
+                # If no obvious error lines, show last few lines of stdout
+                error_msg += f"\n\nLast stdout output (last 10 lines):\n" + "\n".join(stdout_lines[-10:])
+
+        raise RuntimeError(error_msg)
+    else:
+        # Subprocess should have ended the run, but verify it's terminated
+        if run_id:
+            try:
+                from infrastructure.tracking.mlflow import ensure_run_terminated
+                ensure_run_terminated(run_id, expected_status="FINISHED")
+            except Exception as e:
+                logger.debug(f"Could not verify run status: {e}")
+
 
 def run_conversion_workflow(
     root_dir: Path,
@@ -122,256 +471,75 @@ def run_conversion_workflow(
         parent_exec_fp=parent_exec_fp,
         experiment_config=experiment_config,
     )
-    
-    # Get fingerprints and config from resolved config
-    conv_fp = conversion_config.get("conv_fp")
-    parent_training_id = conversion_config.get("parent_training_id")
-    backbone = conversion_config.get("backbone")  # Canonical backbone from metadata
-    
-    # Build conversion context (executor computes output dir - single source of truth)
-    environment = platform
-    # Use short name only for UI naming, keep canonical backbone for model loading
-    backbone_short = extract_short_backbone_name(backbone)
-    
-    conversion_context = create_naming_context(
-        process_type="conversion",
-        model=backbone_short,
-        spec_fp=parent_spec_fp,
-        exec_fp=parent_exec_fp,
-        environment=environment,
-        parent_training_id=parent_training_id,
-        conv_fp=conv_fp,
+
+    # Build conversion context and output directory
+    conversion_context, conversion_output_dir = _build_conversion_context_and_output(
+        conversion_config, root_dir, platform, parent_spec_fp, parent_exec_fp
     )
-    
-    # Build output directory (executor is source of truth)
-    conversion_output_dir = build_output_path(root_dir, conversion_context)
-    conversion_output_dir.mkdir(parents=True, exist_ok=True)
-    
     logger.info(f"Output directory: {conversion_output_dir}")
-    
+
     # Get conversion parameters
-    checkpoint_path = conversion_config["checkpoint_path"]
+    backbone = conversion_config.get("backbone")
     quantization = conversion_config["onnx"]["quantization"]
-    opset_version = conversion_config["onnx"]["opset_version"]
-    run_smoke_test = conversion_config["onnx"]["run_smoke_test"]
     filename_pattern = conversion_config.get("output", {}).get("filename_pattern", "model_{quantization}.onnx")
-    
-    # Build conversion command arguments
-    conversion_args = [
-        sys.executable,
-        "-m",
-        "deployment.conversion.execution",
-        "--checkpoint-path",
-        checkpoint_path,
-        "--config-dir",
-        str(config_dir),
-        "--backbone",
-        backbone,  # Use canonical backbone
-        "--output-dir",
-        str(conversion_output_dir),
-        "--opset-version",
-        str(opset_version),  # Pass opset_version
-    ]
-    
-    # Add quantization flag if needed
-    if quantization == "int8":
-        conversion_args.append("--quantize-int8")
-    
-    # Add smoke test flag if needed
-    if run_smoke_test:
-        conversion_args.append("--run-smoke-test")
-    
-    # Set up environment variables
-    conversion_env = os.environ.copy()
-    
-    # Add src directory to PYTHONPATH
-    src_dir = root_dir / "src"
-    pythonpath = conversion_env.get("PYTHONPATH", "")
-    if pythonpath:
-        conversion_env["PYTHONPATH"] = f"{str(src_dir)}{os.pathsep}{pythonpath}"
-    else:
-        conversion_env["PYTHONPATH"] = str(src_dir)
-    
-    # Set MLflow tracking environment (use SSOT for setup)
-    # Note: MLflow should already be configured, but we ensure it's set up for subprocess
-    from infrastructure.tracking.mlflow.setup import setup_mlflow
-    tracking_uri = setup_mlflow(
-        experiment_name=conversion_experiment_name,
-        fallback_to_local=True,
+
+    # Build conversion command
+    conversion_args = _build_conversion_command(
+        conversion_config, config_dir, backbone, conversion_output_dir
     )
-    conversion_env["MLFLOW_TRACKING_URI"] = tracking_uri
-    conversion_env["MLFLOW_EXPERIMENT_NAME"] = conversion_experiment_name
-    
-    # Create MLflow run in parent process (no active context)
-    # Build systematic run name
+
+    # Setup environment variables
+    conversion_env, tracking_uri = _setup_conversion_environment(
+        root_dir, conversion_experiment_name
+    )
+
+    # Build MLflow run name and tags
     run_name = build_mlflow_run_name(
         context=conversion_context,
         config_dir=config_dir,
         root_dir=root_dir,
         output_dir=conversion_output_dir,
     )
-    
-    # Get or create experiment
-    client = MlflowClient()
-    try:
-        experiment = client.get_experiment_by_name(conversion_experiment_name)
-        if experiment is None:
-            experiment_id = client.create_experiment(conversion_experiment_name)
-        else:
-            experiment_id = experiment.experiment_id
-    except Exception as e:
-        # Fallback: use infrastructure setup (preferred) or mlflow API as last resort
-        try:
-            from infrastructure.tracking.mlflow.setup import setup_mlflow
-            setup_mlflow(experiment_name=conversion_experiment_name, fallback_to_local=True)
-            experiment = mlflow.get_experiment_by_name(conversion_experiment_name)
-        except Exception:
-            # Last resort: direct mlflow API
-            mlflow.set_experiment(conversion_experiment_name)
-            experiment = mlflow.get_experiment_by_name(conversion_experiment_name)
-        if experiment is None:
-            raise RuntimeError(
-                f"Could not get or create experiment: {conversion_experiment_name}") from e
-        experiment_id = experiment.experiment_id
-    
-    # Build tags using build_mlflow_tags
-    # NOTE: Do NOT set parent_run_id for cross-experiment lineage (use code.lineage.* only)
-    tags = build_mlflow_tags(
-        context=conversion_context,
-        output_dir=conversion_output_dir,
-        parent_run_id=None,  # Fixed: Don't set for cross-experiment
-        group_id=None,
-        config_dir=config_dir,
+
+    tags = _build_conversion_tags(
+        conversion_context,
+        conversion_output_dir,
+        config_dir,
+        conversion_config,
+        run_name,
+        parent_training_run_id,
+        parent_spec_fp,
+        parent_exec_fp,
     )
-    tags["mlflow.runType"] = "conversion"
-    tags["conversion.format"] = conversion_config["format"]
-    tags["conversion.quantization"] = quantization
-    tags["conversion.opset_version"] = str(opset_version)
-    tags["mlflow.runName"] = run_name  # Ensure run name is set
-    
-    # Add lineage tags (link to parent training via code.lineage.* only)
-    if parent_training_run_id:
-        tags["code.lineage.parent_training_run_id"] = parent_training_run_id
-    tags["code.lineage.source"] = "final_training"
-    tags["code.lineage.parent_spec_fp"] = parent_spec_fp
-    tags["code.lineage.parent_exec_fp"] = parent_exec_fp
-    
-    # Create run WITHOUT starting it (no active context)
-    try:
-        created_run = client.create_run(
-            experiment_id=experiment_id,
-            run_name=run_name,
-            tags=tags,
-        )
-        run_id = created_run.info.run_id
-        
-        # Update local index
-        try:
-            run_key = build_mlflow_run_key(conversion_context)
-            run_key_hash = build_mlflow_run_key_hash(run_key)
-            update_mlflow_index(
-                root_dir=root_dir,
-                run_key_hash=run_key_hash,
-                run_id=run_id,
-                experiment_id=experiment_id,
-                tracking_uri=tracking_uri or mlflow.get_tracking_uri(),
-                config_dir=config_dir,
-            )
-        except Exception as e:
-            logger.debug(f"Could not update MLflow index: {e}")
-        
-        logger.info(f"Created MLflow run: {run_name} ({run_id[:12]}...)")
-        
-        # Pass run_id to subprocess (CRITICAL: subprocess must use this)
+
+    # Create MLflow run
+    run_id = _create_conversion_mlflow_run(
+        conversion_experiment_name,
+        run_name,
+        tags,
+        conversion_context,
+        root_dir,
+        config_dir,
+        tracking_uri,
+    )
+
+    # Pass run_id to subprocess
+    if run_id:
         conversion_env["MLFLOW_RUN_ID"] = run_id
-    except Exception as e:
-        logger.warning(f"Could not create MLflow run: {e}")
-        # Continue without MLflow run (conversion will still work, just no tracking)
-        run_id = None
-    
-    # Execute conversion (stream output instead of capture_output=True)
-    logger.info(f"Running conversion: {' '.join(conversion_args)}")
-    process = subprocess.Popen(
-        conversion_args,
-        cwd=root_dir,
-        env=conversion_env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,  # Capture stderr separately for better error reporting
-        text=True,
-        bufsize=1,  # Line buffered
+
+    # Execute conversion subprocess
+    returncode, stdout_lines, stderr_lines = _execute_conversion_subprocess(
+        conversion_args, root_dir, conversion_env
     )
-    
-    # Stream output in real-time and capture for error reporting
-    stdout_lines = []
-    stderr_lines = []
-    import threading
-    
-    def read_stdout():
-        """Read stdout in a separate thread."""
-        try:
-            for line in process.stdout:
-                logger.info(line.rstrip())
-                stdout_lines.append(line.rstrip())
-        except Exception as e:
-            logger.debug(f"Error reading stdout: {e}")
-    
-    def read_stderr():
-        """Read stderr in a separate thread."""
-        try:
-            for line in process.stderr:
-                logger.warning(line.rstrip())
-                stderr_lines.append(line.rstrip())
-        except Exception as e:
-            logger.debug(f"Error reading stderr: {e}")
-    
-    # Start threads to read stdout and stderr concurrently
-    stdout_thread = threading.Thread(target=read_stdout, daemon=True)
-    stderr_thread = threading.Thread(target=read_stderr, daemon=True)
-    stdout_thread.start()
-    stderr_thread.start()
-    
-    # Wait for process to complete
-    returncode = process.wait()
-    
-    # Wait for threads to finish reading
-    stdout_thread.join(timeout=1.0)
-    stderr_thread.join(timeout=1.0)
-    
-    # Handle subprocess failure - ensure run is marked as FAILED
-    if returncode != 0:
-        if run_id:
-            from infrastructure.tracking.mlflow import terminate_run_safe
-            terminate_run_safe(run_id, status="FAILED", check_status=True)
-        
-        # Build detailed error message
-        error_msg = f"Model conversion failed with return code {returncode}"
-        if stderr_lines:
-            error_msg += f"\n\nStderr output (last 30 lines):\n" + "\n".join(stderr_lines[-30:])
-        if stdout_lines:
-            # Check if there are any error-like messages in stdout
-            error_lines = [line for line in stdout_lines if any(keyword in line.lower() for keyword in ['error', 'exception', 'traceback', 'failed', 'fatal'])]
-            if error_lines:
-                error_msg += f"\n\nError messages from stdout (last 20 lines):\n" + "\n".join(error_lines[-20:])
-            else:
-                # If no obvious error lines, show last few lines of stdout
-                error_msg += f"\n\nLast stdout output (last 10 lines):\n" + "\n".join(stdout_lines[-10:])
-        
-        raise RuntimeError(error_msg)
-    else:
-        # Subprocess should have ended the run, but verify it's terminated
-        if run_id:
-            try:
-                from infrastructure.tracking.mlflow import ensure_run_terminated
-                ensure_run_terminated(run_id, expected_status="FINISHED")
-            except Exception as e:
-                logger.debug(f"Could not verify run status: {e}")
-    
-    # Find ONNX model file (respect filename_pattern)
+
+    # Handle conversion result
+    _handle_conversion_result(returncode, stdout_lines, stderr_lines, run_id)
+
+    # Find ONNX model file
     onnx_model_path = _find_onnx_model(conversion_output_dir, quantization, filename_pattern)
-    
     logger.info(f"Conversion completed. ONNX model: {onnx_model_path}")
-    
-    # Backup conversion output if enabled (standardized backup pattern)
+
+    # Backup conversion output if enabled
     if backup_to_drive and backup_enabled and conversion_output_dir:
         try:
             from infrastructure.shared.backup import immediate_backup_if_needed
@@ -382,9 +550,8 @@ def run_conversion_workflow(
                 is_directory=True,
             )
         except Exception as e:
-            # Log error but don't crash - backup is optional
             logger.warning(f"Could not backup conversion output to Drive: {e}")
-    
+
     return conversion_output_dir
 
 def _find_onnx_model(output_dir: Path, quantization: str, filename_pattern: str) -> Path:

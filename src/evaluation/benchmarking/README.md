@@ -259,18 +259,14 @@ benchmark_results = benchmark_champions(
 3. **No Redundant Hash Computation**: Champions already have `study_key_hash` and `trial_key_hash`
 4. **Idempotent**: Uses stable benchmark keys and respects `run_mode` configuration
 
-### Legacy Support
+### Champion Format
 
-The `benchmark_best_trials()` function still supports the legacy `best_trials` format for backward compatibility. However, it now detects champion mode via the `_is_champion` flag and skips redundant operations when using champions.
-
-### Legacy Format Support
-
-The benchmarking module now requires champion format from Phase 2. Legacy `best_trials` format is no longer supported. Champions must include:
+The benchmarking module requires champion format from Phase 2. Champions must include:
 - `checkpoint_dir`: Path to checkpoint directory
 - `study_key_hash`: Study key hash
 - `trial_key_hash`: Trial key hash
 
-**Migration**: Use `benchmark_champions()` with champions from Phase 2 selection instead.
+Use `benchmark_champions()` with champions from Phase 2 selection.
 
 ## Troubleshooting
 

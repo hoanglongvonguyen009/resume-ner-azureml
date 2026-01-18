@@ -52,7 +52,7 @@ def compute_refit_protocol_fp(
         64-character hex hash of refit protocol fingerprint.
     """
     payload = {
-        "schema_version": "1.0",
+        "schema_version": "2.0",
         "dataset": {
             "name": data_config.get("name", ""),
             "version": data_config.get("version", ""),

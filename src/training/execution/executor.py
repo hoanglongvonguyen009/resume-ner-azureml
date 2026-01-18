@@ -33,7 +33,7 @@ lifecycle:
 """Final training execution module."""
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Dict, Optional, Callable, TypedDict
 
 import mlflow
 from .subprocess_runner import (
@@ -83,6 +83,383 @@ from common.shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
 
+
+class FinalTrainingConfig(TypedDict):
+    """Configuration for final training workflow."""
+    root_dir: Path
+    config_dir: Path
+    best_model: Dict[str, Any]
+    experiment_config: ExperimentConfig
+    lineage: Dict[str, Any]
+    training_experiment_name: str
+    platform: str
+    backup_enabled: bool
+    backup_to_drive: Optional[Callable[[Path, bool], bool]]
+    restore_from_drive: Optional[Callable[[Path, bool], bool]]
+    in_colab: bool
+
+
+def _is_checkpoint_complete(checkpoint_dir: Path, metadata_file: Path) -> bool:
+    """Check if checkpoint is complete (has metadata with completion flag, or valid checkpoint files)."""
+    # First check: metadata.json with completion flag
+    if metadata_file.exists():
+        try:
+            from common.shared.json_cache import load_json
+            metadata = load_json(metadata_file, default={})
+            if metadata.get("status", {}).get("training", {}).get("completed", False):
+                return True
+        except Exception:
+            pass
+
+    # Fallback: check if checkpoint exists and has model files (indicates training completed)
+    if checkpoint_dir.exists():
+        # Check for key model files that indicate successful training
+        required_files = ["config.json", "model.safetensors"]
+        # Also accept .bin or .pt files as alternatives
+        model_files = list(checkpoint_dir.glob("model.*"))
+        config_file = checkpoint_dir / "config.json"
+
+        if config_file.exists() and (model_files or any(
+            (checkpoint_dir / f).exists() for f in required_files
+        )):
+            return True
+
+    return False
+
+
+def _check_existing_run(
+    final_output_dir: Path,
+    final_checkpoint_dir: Path,
+    final_training_yaml: Dict[str, Any],
+    root_dir: Path,
+    config_dir: Path,
+    environment: str,
+    backbone_name: str,
+    spec_fp: str,
+    exec_fp: str,
+) -> Optional[Path]:
+    """
+    Check for existing completed run and return checkpoint path if found.
+
+    Returns:
+        Checkpoint path if existing run found, None otherwise.
+    """
+    from infrastructure.config.run_decision import should_reuse_existing
+    from infrastructure.config.run_mode import is_force_new
+
+    # First check: exact match (resolved variant)
+    metadata_file = final_output_dir / "metadata.json"
+    checkpoint_exists = final_checkpoint_dir.exists()
+    is_complete = _is_checkpoint_complete(final_checkpoint_dir, metadata_file) if checkpoint_exists else False
+
+    should_reuse = should_reuse_existing(
+        config=final_training_yaml,
+        exists=checkpoint_exists,
+        is_complete=is_complete,
+        process_type="final_training"
+    )
+
+    if should_reuse:
+        logger.info("Found existing completed final training run")
+        logger.info(f"  Output directory: {final_output_dir}")
+        logger.info(f"  Checkpoint: {final_checkpoint_dir}")
+        logger.info(f"  Reusing existing checkpoint (run.mode: {final_training_yaml.get('run', {}).get('mode', 'reuse_if_exists')})")
+        return final_checkpoint_dir
+
+    # Second check: search for any complete variant with same spec_fp + exec_fp
+    if not is_force_new(final_training_yaml):
+        try:
+            from infrastructure.paths import resolve_output_path
+            base_output_dir = resolve_output_path(
+                root_dir, config_dir, "final_training")
+            final_training_base = base_output_dir / environment / backbone_name
+
+            if final_training_base.exists():
+                # Look for directories matching spec_{spec_fp}_exec_{exec_fp}
+                spec_exec_pattern = f"spec_{spec_fp}_exec_{exec_fp}"
+                for spec_exec_dir in final_training_base.iterdir():
+                    if spec_exec_dir.is_dir() and spec_exec_dir.name == spec_exec_pattern:
+                        # Check all variants in this directory (highest first)
+                        variant_dirs = sorted(
+                            [d for d in spec_exec_dir.iterdir() if d.is_dir()
+                             and d.name.startswith("v")],
+                            key=lambda d: int(
+                                d.name[1:]) if d.name[1:].isdigit() else 0,
+                            reverse=True  # Check highest variant first
+                        )
+                        for variant_dir in variant_dirs:
+                            variant_checkpoint = variant_dir / "checkpoint"
+                            variant_metadata = variant_dir / "metadata.json"
+
+                            variant_exists = variant_checkpoint.exists()
+                            variant_complete = _is_checkpoint_complete(variant_checkpoint, variant_metadata) if variant_exists else False
+
+                            should_reuse_variant = should_reuse_existing(
+                                config=final_training_yaml,
+                                exists=variant_exists,
+                                is_complete=variant_complete,
+                                process_type="final_training"
+                            )
+
+                            if should_reuse_variant:
+                                logger.info("Found existing completed final training run")
+                                logger.info(f"  Output directory: {variant_dir}")
+                                logger.info(f"  Checkpoint: {variant_checkpoint}")
+                                logger.info(f"  Reusing existing checkpoint (run.mode: {final_training_yaml.get('run', {}).get('mode', 'reuse_if_exists')})")
+                                return variant_checkpoint
+                        break  # Only check the matching spec_exec directory
+        except Exception as e:
+            logger.warning(f"Could not search for existing runs: {e}")
+            # Continue with training if search fails
+
+    return None
+
+
+def _resolve_dataset_path(
+    final_training_yaml: Dict[str, Any],
+    root_dir: Path,
+    config_dir: Path,
+    all_configs: Dict[str, Any],
+    experiment_config: ExperimentConfig,
+) -> Path:
+    """
+    Resolve dataset path from final_training.yaml config.
+
+    Returns:
+        Resolved dataset path.
+    """
+    dataset_config_yaml = final_training_yaml.get("dataset", {})
+    local_path_override = dataset_config_yaml.get("local_path_override")
+
+    if local_path_override:
+        # Use the override path directly
+        dataset_local_path = Path(local_path_override) if Path(
+            local_path_override).is_absolute() else root_dir / local_path_override
+    else:
+        # Get dataset path from data config
+        data_config = all_configs.get("data", {})
+        if not data_config:
+            # Fallback: resolve data config using same logic as load_final_training_config
+            data_config_path = dataset_config_yaml.get("data_config")
+            if data_config_path:
+                if not Path(data_config_path).is_absolute():
+                    data_config_path = config_dir / data_config_path
+                else:
+                    data_config_path = Path(data_config_path)
+                data_config = load_yaml(data_config_path)
+            else:
+                # Use experiment_config.data_config
+                if experiment_config.data_config:
+                    data_config = load_yaml(experiment_config.data_config)
+                else:
+                    data_config = {}
+
+        # Get dataset path from data config using resolve_dataset_path
+        dataset_path_from_config = resolve_dataset_path(data_config)
+
+        # Resolve to absolute path relative to config directory
+        if dataset_path_from_config.is_absolute():
+            dataset_local_path = dataset_path_from_config
+        else:
+            # Resolve relative to config directory
+            dataset_local_path = (
+                config_dir / dataset_path_from_config).resolve()
+
+    # Validate dataset path exists
+    if not dataset_local_path.exists():
+        raise FileNotFoundError(
+            f"Dataset path not found: {dataset_local_path}\n"
+            f"Please check:\n"
+            f"  1. final_training.yaml dataset.local_path_override (if set)\n"
+            f"  2. Data config file dataset_path setting\n"
+            f"  3. That the dataset directory exists at the specified path"
+        )
+
+    return dataset_local_path
+
+
+def _setup_training_context_and_output(
+    final_training_config: Dict[str, Any],
+    all_configs: Dict[str, Any],
+    best_model: Dict[str, Any],
+    root_dir: Path,
+    platform: str,
+) -> tuple[Any, Path, str, str, int]:
+    """
+    Setup training context and output directory.
+
+    Returns:
+        Tuple of (training_context, final_output_dir, spec_fp, exec_fp, variant).
+    """
+    # Get fingerprints from config (already computed by load_final_training_config)
+    spec_fp = final_training_config.get("spec_fp")
+    exec_fp = final_training_config.get("exec_fp")
+    variant = final_training_config.get("variant", 1)
+
+    # If not in config, compute them
+    if not spec_fp or not exec_fp:
+        spec_fp = compute_spec_fp(
+            model_config=all_configs.get("model", {}),
+            data_config=all_configs.get("data", {}),
+            train_config=all_configs.get("train", {}),
+            seed=int(best_model.get("params", {}).get("random_seed", 42)),
+        )
+
+        try:
+            git_sha = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"],
+                cwd=root_dir,
+                stderr=subprocess.DEVNULL,
+            ).decode().strip()
+        except Exception:
+            git_sha = None
+
+        exec_fp = compute_exec_fp(
+            git_sha=git_sha,
+            env_config=all_configs.get("env", {}),
+        )
+
+    # Create training context
+    backbone_name = extract_short_backbone_name(
+        final_training_config.get("backbone", "distilbert")
+    )
+
+    training_context = create_naming_context(
+        process_type="final_training",
+        model=backbone_name,
+        spec_fp=spec_fp,
+        exec_fp=exec_fp,
+        environment=platform,
+        variant=variant,
+    )
+
+    final_output_dir = build_output_path(root_dir, training_context)
+
+    return training_context, final_output_dir, spec_fp, exec_fp, variant
+
+
+def _setup_mlflow_run(
+    training_context: Any,
+    final_output_dir: Path,
+    config_dir: Path,
+    root_dir: Path,
+    training_experiment_name: str,
+    lineage: Dict[str, Any],
+) -> tuple[Optional[str], Optional[str], str]:
+    """
+    Setup MLflow run for training.
+
+    Returns:
+        Tuple of (run_id, experiment_id, tracking_uri).
+    """
+    from infrastructure.tracking.mlflow.setup import setup_mlflow
+    from training.execution.tag_helpers import add_training_tags_with_lineage
+
+    # Set up MLflow tracking (SSOT)
+    mlflow_tracking_uri = setup_mlflow(
+        experiment_name=training_experiment_name,
+        fallback_to_local=True,
+    )
+
+    # Build systematic run name
+    run_name = build_mlflow_run_name(
+        context=training_context,
+        config_dir=config_dir,
+        root_dir=root_dir,
+        output_dir=final_output_dir,
+    )
+
+    # Build tags using build_mlflow_tags + add training-specific and lineage tags
+    base_tags = build_mlflow_tags(
+        context=training_context,
+        output_dir=final_output_dir,
+        parent_run_id=None,
+        group_id=None,
+        config_dir=config_dir,
+    )
+
+    tags = add_training_tags_with_lineage(
+        tags=base_tags,
+        lineage=lineage,
+        run_name=run_name,
+        config_dir=config_dir,
+    )
+
+    # Create run WITHOUT starting it (no active context) using shared infrastructure
+    run_id = None
+    experiment_id = None
+    try:
+        run_id, created_run = create_training_mlflow_run(
+            experiment_name=training_experiment_name,
+            run_name=run_name,
+            tags=tags,
+            root_dir=root_dir,
+            config_dir=config_dir,
+            context=training_context,
+            tracking_uri=mlflow_tracking_uri,
+        )
+        experiment_id = created_run.info.experiment_id
+        logger.info(f"Created MLflow run: {run_name} ({run_id[:12]}...)")
+    except Exception as e:
+        logger.warning(f"Could not create MLflow run: {e}")
+        import traceback
+        traceback.print_exc()
+        # Continue without MLflow run (training will still work, just no tracking)
+        run_id = None
+
+    return run_id, experiment_id, mlflow_tracking_uri
+
+
+def _save_training_metadata(
+    root_dir: Path,
+    config_dir: Path,
+    training_context: Any,
+    final_checkpoint_dir: Path,
+    run_id: Optional[str],
+    experiment_id: Optional[str],
+    tracking_uri: str,
+    backbone_name: str,
+) -> None:
+    """Save metadata.json with completion status."""
+    try:
+        from infrastructure.metadata.training import save_metadata_with_fingerprints
+
+        # Prepare MLflow info
+        mlflow_info_dict = None
+        if run_id:
+            mlflow_info_dict = {
+                "run_id": run_id,
+                "experiment_id": experiment_id,
+                "tracking_uri": tracking_uri,
+            }
+
+        # Prepare status updates
+        status_updates = {
+            "training": {
+                "completed": True,
+                "checkpoint_path": str(final_checkpoint_dir),
+            }
+        }
+
+        # Save metadata
+        metadata_path = save_metadata_with_fingerprints(
+            root_dir=root_dir,
+            config_dir=config_dir,
+            context=training_context,
+            metadata_content={
+                "backbone": backbone_name,
+            },
+            status_updates=status_updates,
+            mlflow_info=mlflow_info_dict,
+        )
+        logger.info(f"Saved metadata to: {metadata_path}")
+    except Exception as e:
+        logger.warning(f"Could not save metadata.json: {e}")
+        import traceback
+        traceback.print_exc()
+        # Continue even if metadata save fails
+
+
 def run_final_training_workflow(
     root_dir: Path,
     config_dir: Path,
@@ -129,7 +506,6 @@ def run_final_training_workflow(
         ValueError: If required configuration is missing.
     """
     # Prepare best_config dict for load_final_training_config
-    # The function expects best_config with backbone and hyperparameters
     best_config = {
         "backbone": best_model.get("backbone"),
         "hyperparameters": best_model.get("params", {}),
@@ -145,209 +521,39 @@ def run_final_training_workflow(
 
     # Build training context and output directory
     all_configs = load_all_configs(experiment_config)
-    environment = platform
-
-    # Get fingerprints from config (already computed by load_final_training_config)
-    spec_fp = final_training_config.get("spec_fp")
-    exec_fp = final_training_config.get("exec_fp")
-    variant = final_training_config.get("variant", 1)
-
-    # If not in config, compute them
-    if not spec_fp or not exec_fp:
-        spec_fp = compute_spec_fp(
-            model_config=all_configs.get("model", {}),
-            data_config=all_configs.get("data", {}),
-            train_config=all_configs.get("train", {}),
-            seed=int(best_model.get("params", {}).get("random_seed", 42)),
-        )
-
-        try:
-            git_sha = subprocess.check_output(
-                ["git", "rev-parse", "HEAD"],
-                cwd=root_dir,
-                stderr=subprocess.DEVNULL,
-            ).decode().strip()
-        except Exception:
-            git_sha = None
-
-        exec_fp = compute_exec_fp(
-            git_sha=git_sha,
-            env_config=all_configs.get("env", {}),
-        )
-
-    # Create training context
-    backbone_name = extract_short_backbone_name(
-        final_training_config.get("backbone", "distilbert")
+    training_context, final_output_dir, spec_fp, exec_fp, variant = _setup_training_context_and_output(
+        final_training_config, all_configs, best_model, root_dir, platform
     )
-
-    training_context = create_naming_context(
-        process_type="final_training",
-        model=backbone_name,
-        spec_fp=spec_fp,
-        exec_fp=exec_fp,
-        environment=environment,
-        variant=variant,
-    )
-
-    final_output_dir = build_output_path(root_dir, training_context)
 
     logger.info("Final training config loaded from final_training.yaml")
     logger.info(f"Output directory: {final_output_dir}")
 
-    # Resolve dataset path from final_training.yaml config
-    # Check for local_path_override first (from final_training.yaml)
+    # Load final_training.yaml for reuse checks and dataset config
     final_training_yaml = load_yaml(config_dir / "final_training.yaml")
-
-    # Check if run should be skipped based on run.mode
-    from infrastructure.config.run_decision import should_reuse_existing
-    from infrastructure.config.run_mode import is_force_new
-    
     final_checkpoint_dir = final_output_dir / "checkpoint"
 
-    # Helper function to check if a checkpoint is complete
-    def is_checkpoint_complete(checkpoint_dir: Path, metadata_file: Path) -> bool:
-        """Check if checkpoint is complete (has metadata with completion flag, or valid checkpoint files)."""
-        # First check: metadata.json with completion flag
-        if metadata_file.exists():
-            try:
-                from common.shared.json_cache import load_json
-                metadata = load_json(metadata_file, default={})
-                if metadata.get("status", {}).get("training", {}).get("completed", False):
-                    return True
-            except Exception:
-                pass
-
-        # Fallback: check if checkpoint exists and has model files (indicates training completed)
-        if checkpoint_dir.exists():
-            # Check for key model files that indicate successful training
-            required_files = ["config.json", "model.safetensors"]
-            # Also accept .bin or .pt files as alternatives
-            model_files = list(checkpoint_dir.glob("model.*"))
-            config_file = checkpoint_dir / "config.json"
-
-            if config_file.exists() and (model_files or any(
-                (checkpoint_dir / f).exists() for f in required_files
-            )):
-                return True
-
-        return False
-
-    # First check: exact match (resolved variant)
-    metadata_file = final_output_dir / "metadata.json"
-    checkpoint_exists = final_checkpoint_dir.exists()
-    is_complete = is_checkpoint_complete(final_checkpoint_dir, metadata_file) if checkpoint_exists else False
-    
-    should_reuse = should_reuse_existing(
-        config=final_training_yaml,
-        exists=checkpoint_exists,
-        is_complete=is_complete,
-        process_type="final_training"
+    # Check for existing completed run
+    backbone_name = extract_short_backbone_name(
+        final_training_config.get("backbone", "distilbert")
     )
-    
-    if should_reuse:
-        logger.info("Found existing completed final training run")
-        logger.info(f"  Output directory: {final_output_dir}")
-        logger.info(f"  Checkpoint: {final_checkpoint_dir}")
-        logger.info(f"  Reusing existing checkpoint (run.mode: {final_training_yaml.get('run', {}).get('mode', 'reuse_if_exists')})")
-        return final_checkpoint_dir
+    existing_checkpoint = _check_existing_run(
+        final_output_dir,
+        final_checkpoint_dir,
+        final_training_yaml,
+        root_dir,
+        config_dir,
+        platform,
+        backbone_name,
+        spec_fp,
+        exec_fp,
+    )
+    if existing_checkpoint:
+        return existing_checkpoint
 
-    # Second check: search for any complete variant with same spec_fp + exec_fp
-    # This handles cases where _resolve_variant didn't find the complete variant
-    # Skip variant search if force_new (we want to create new, not reuse any variant)
-    if not is_force_new(final_training_yaml):
-        try:
-            from infrastructure.paths import resolve_output_path
-            base_output_dir = resolve_output_path(
-                root_dir, config_dir, "final_training")
-            final_training_base = base_output_dir / environment / backbone_name
-
-            if final_training_base.exists():
-                # Look for directories matching spec_{spec_fp}_exec_{exec_fp}
-                spec_exec_pattern = f"spec_{spec_fp}_exec_{exec_fp}"
-                for spec_exec_dir in final_training_base.iterdir():
-                    if spec_exec_dir.is_dir() and spec_exec_dir.name == spec_exec_pattern:
-                        # Check all variants in this directory (highest first)
-                        variant_dirs = sorted(
-                            [d for d in spec_exec_dir.iterdir() if d.is_dir()
-                             and d.name.startswith("v")],
-                            key=lambda d: int(
-                                d.name[1:]) if d.name[1:].isdigit() else 0,
-                            reverse=True  # Check highest variant first
-                        )
-                        for variant_dir in variant_dirs:
-                            variant_checkpoint = variant_dir / "checkpoint"
-                            variant_metadata = variant_dir / "metadata.json"
-
-                            variant_exists = variant_checkpoint.exists()
-                            variant_complete = is_checkpoint_complete(variant_checkpoint, variant_metadata) if variant_exists else False
-                            
-                            should_reuse_variant = should_reuse_existing(
-                                config=final_training_yaml,
-                                exists=variant_exists,
-                                is_complete=variant_complete,
-                                process_type="final_training"
-                            )
-                            
-                            if should_reuse_variant:
-                                logger.info("Found existing completed final training run")
-                                logger.info(f"  Output directory: {variant_dir}")
-                                logger.info(f"  Checkpoint: {variant_checkpoint}")
-                                logger.info(f"  Reusing existing checkpoint (run.mode: {final_training_yaml.get('run', {}).get('mode', 'reuse_if_exists')})")
-                                return variant_checkpoint
-                        break  # Only check the matching spec_exec directory
-        except Exception as e:
-            logger.warning(f"Could not search for existing runs: {e}")
-            # Continue with training if search fails
-    dataset_config_yaml = final_training_yaml.get("dataset", {})
-    local_path_override = dataset_config_yaml.get("local_path_override")
-
-    if local_path_override:
-        # Use the override path directly
-        dataset_local_path = Path(local_path_override) if Path(
-            local_path_override).is_absolute() else root_dir / local_path_override
-    else:
-        # Get dataset path from data config
-        # Try to get from all_configs first (which may have been resolved by load_final_training_config)
-        data_config = all_configs.get("data", {})
-        if not data_config:
-            # Fallback: resolve data config using same logic as load_final_training_config
-            # Check for explicit data_config in final_training.yaml
-            data_config_path = dataset_config_yaml.get("data_config")
-            if data_config_path:
-                if not Path(data_config_path).is_absolute():
-                    data_config_path = config_dir / data_config_path
-                else:
-                    data_config_path = Path(data_config_path)
-                data_config = load_yaml(data_config_path)
-            else:
-                # Use experiment_config.data_config
-                if experiment_config.data_config:
-                    data_config = load_yaml(experiment_config.data_config)
-                else:
-                    data_config = {}
-
-        # Get dataset path from data config using resolve_dataset_path
-        # This handles seed-based dataset structures (e.g., dataset_tiny/seed0/)
-        # resolve_dataset_path returns a Path relative to the config directory
-        dataset_path_from_config = resolve_dataset_path(data_config)
-
-        # Resolve to absolute path relative to config directory
-        if dataset_path_from_config.is_absolute():
-            dataset_local_path = dataset_path_from_config
-        else:
-            # Resolve relative to config directory (e.g., "../dataset_tiny" -> root_dir/dataset_tiny)
-            dataset_local_path = (
-                config_dir / dataset_path_from_config).resolve()
-
-    # Validate dataset path exists
-    if not dataset_local_path.exists():
-        raise FileNotFoundError(
-            f"Dataset path not found: {dataset_local_path}\n"
-            f"Please check:\n"
-            f"  1. final_training.yaml dataset.local_path_override (if set)\n"
-            f"  2. Data config file dataset_path setting\n"
-            f"  3. That the dataset directory exists at the specified path"
-        )
+    # Resolve dataset path
+    dataset_local_path = _resolve_dataset_path(
+        final_training_yaml, root_dir, config_dir, all_configs, experiment_config
+    )
 
     # Build training command arguments using shared infrastructure
     training_options = TrainingOptions(
@@ -370,18 +576,21 @@ def run_final_training_workflow(
         training_options=training_options,
     )
 
-    # Set up MLflow tracking (SSOT)
-    from infrastructure.tracking.mlflow.setup import setup_mlflow
-    mlflow_tracking_uri = setup_mlflow(
-        experiment_name=training_experiment_name,
-        fallback_to_local=True,
+    # Setup MLflow run
+    run_id, experiment_id, mlflow_tracking_uri = _setup_mlflow_run(
+        training_context,
+        final_output_dir,
+        config_dir,
+        root_dir,
+        training_experiment_name,
+        lineage,
     )
 
     # Set up environment variables using shared infrastructure
     mlflow_config = MLflowConfig(
         experiment_name=training_experiment_name,
         tracking_uri=mlflow_tracking_uri,
-        run_id=None,  # Will be set after run creation
+        run_id=run_id,  # Will be set after run creation
     )
     training_env = setup_training_environment(
         root_dir=root_dir,
@@ -390,58 +599,9 @@ def run_final_training_workflow(
         mlflow_config=mlflow_config,
     )
 
-    # Create MLflow run in parent process (no active context) using shared infrastructure
-    # Build systematic run name
-    run_name = build_mlflow_run_name(
-        context=training_context,
-        config_dir=config_dir,
-        root_dir=root_dir,
-        output_dir=final_output_dir,
-    )
-
-    # Build tags using build_mlflow_tags + add training-specific and lineage tags
-    base_tags = build_mlflow_tags(
-        context=training_context,
-        output_dir=final_output_dir,
-        parent_run_id=None,
-        group_id=None,
-        config_dir=config_dir,
-    )
-
-    # Use consolidated tag building helper
-    from training.execution.tag_helpers import add_training_tags_with_lineage
-
-    tags = add_training_tags_with_lineage(
-        tags=base_tags,
-        lineage=lineage,
-        run_name=run_name,
-        config_dir=config_dir,
-    )
-
-    # Create run WITHOUT starting it (no active context) using shared infrastructure
-    run_id = None
-    experiment_id = None
-    try:
-        run_id, created_run = create_training_mlflow_run(
-            experiment_name=training_experiment_name,
-            run_name=run_name,
-            tags=tags,
-            root_dir=root_dir,
-            config_dir=config_dir,
-            context=training_context,
-            tracking_uri=mlflow_tracking_uri,
-        )
-        experiment_id = created_run.info.experiment_id
-        logger.info(f"Created MLflow run: {run_name} ({run_id[:12]}...)")
-
-        # Pass run_id to subprocess
+    # Pass run_id to subprocess
+    if run_id:
         training_env["MLFLOW_RUN_ID"] = run_id
-    except Exception as e:
-        logger.warning(f"Could not create MLflow run: {e}")
-        import traceback
-        traceback.print_exc()
-        # Continue without MLflow run (training will still work, just no tracking)
-        run_id = None
 
     # Execute training using shared infrastructure
     logger.info("Running final training...")
@@ -471,43 +631,16 @@ def run_final_training_workflow(
             final_checkpoint_dir = actual_checkpoint
 
     # Save metadata.json with completion status
-    try:
-        from infrastructure.metadata.training import save_metadata_with_fingerprints
-
-        # Prepare MLflow info (use variables from outer scope)
-        mlflow_info_dict = None
-        if run_id:
-            mlflow_info_dict = {
-                "run_id": run_id,
-                "experiment_id": experiment_id,
-                "tracking_uri": mlflow_tracking_uri,
-            }
-
-        # Prepare status updates
-        status_updates = {
-            "training": {
-                "completed": True,
-                "checkpoint_path": str(final_checkpoint_dir),
-            }
-        }
-
-        # Save metadata (mlflow_info is passed as keyword argument)
-        metadata_path = save_metadata_with_fingerprints(
-            root_dir=root_dir,
-            config_dir=config_dir,
-            context=training_context,
-            metadata_content={
-                "backbone": backbone_name,
-            },
-            status_updates=status_updates,
-            mlflow_info=mlflow_info_dict,  # Pass as keyword argument
-        )
-        logger.info(f"Saved metadata to: {metadata_path}")
-    except Exception as e:
-        logger.warning(f"Could not save metadata.json: {e}")
-        import traceback
-        traceback.print_exc()
-        # Continue even if metadata save fails
+    _save_training_metadata(
+        root_dir,
+        config_dir,
+        training_context,
+        final_checkpoint_dir,
+        run_id,
+        experiment_id,
+        mlflow_tracking_uri,
+        backbone_name,
+    )
 
     logger.info(f"Final training completed. Checkpoint: {final_checkpoint_dir}")
     if run_id:
@@ -527,5 +660,4 @@ def run_final_training_workflow(
             # Log error but don't crash - backup is optional
             logger.warning(f"Could not backup checkpoint to Drive: {e}")
 
-    # Tags are already set during run creation, no need to apply lineage tags post-hoc
     return final_checkpoint_dir

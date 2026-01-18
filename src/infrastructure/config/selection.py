@@ -84,7 +84,7 @@ def get_champion_selection_config(selection_config: Dict[str, Any]) -> Dict[str,
         - top_k_for_stable_score: int (clamped to <= min_trials_per_group)
         - require_artifact_available: bool
         - artifact_check_source: str ("tag" or "disk")
-        - prefer_schema_version: str ("2.0", "1.0", or "auto")
+        - prefer_schema_version: str ("2.0" or "auto")
         - allow_mixed_schema_groups: bool
     """
     champion_config = selection_config.get("champion_selection", {})
