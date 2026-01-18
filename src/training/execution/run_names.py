@@ -168,14 +168,10 @@ def _try_systematic_naming(
         from infrastructure.naming.mlflow.run_names import build_mlflow_run_name
         from common.shared.platform_detection import detect_platform
 
-        # Use resolve_project_paths() to consolidate path resolution
+        # Use resolve_project_paths_with_fallback() (SSOT) to consolidate path resolution
         if config_dir is None:
-            from infrastructure.paths.utils import resolve_project_paths
-            _, config_dir = resolve_project_paths(output_dir=output_dir, config_dir=None)
-            # Fallback if inference failed
-            if config_dir is None:
-                from infrastructure.paths.utils import infer_config_dir
-                config_dir = infer_config_dir(path=output_dir)
+            from infrastructure.paths.utils import resolve_project_paths_with_fallback
+            _, config_dir = resolve_project_paths_with_fallback(output_dir=output_dir, config_dir=None)
 
         # Build naming context based on process type
         if process_type == "final_training":
@@ -246,14 +242,20 @@ def _try_hpo_trial_systematic_naming(
     from common.shared.platform_detection import detect_platform
 
     # Try to get study_key_hash and model from parent run if not provided
+    # Use centralized hash utilities (SSOT) when possible
     if parent_run_id and (not study_key_hash or not model):
         try:
             from mlflow.tracking import MlflowClient
+            from infrastructure.tracking.mlflow.hash_utils import get_study_key_hash_from_run
 
             client = MlflowClient()
             parent_run = client.get_run(parent_run_id)
+            
+            # Use centralized utility for study_key_hash (SSOT)
             if not study_key_hash:
-                study_key_hash = parent_run.data.tags.get("code.study_key_hash")
+                study_key_hash = get_study_key_hash_from_run(parent_run_id, client, config_dir)
+            
+            # Model tag is not a hash, so keep direct tag access
             if not model:
                 model = parent_run.data.tags.get("code.model")
         except Exception:

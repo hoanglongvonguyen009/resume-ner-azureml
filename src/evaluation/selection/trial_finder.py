@@ -117,6 +117,8 @@ def _read_trial_meta(trial_dir: Path) -> Optional[Dict[str, Any]]:
 def _extract_hashes_from_trial_dir(trial_dir: Path) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """Extract hashes and run_id from trial directory.
     
+    Uses centralized hash utilities (SSOT) when run_id is available, falls back to file metadata.
+    
     Args:
         trial_dir: Path to trial directory
         
@@ -127,13 +129,41 @@ def _extract_hashes_from_trial_dir(trial_dir: Path) -> Tuple[Optional[str], Opti
     if not meta:
         return None, None, None
     
-    study_key_hash = meta.get("study_key_hash")
-    trial_key_hash = meta.get("trial_key_hash")
     trial_run_id = None
-    
     run_id_from_meta = meta.get("run_id")
     if run_id_from_meta and _UUID_PATTERN.match(run_id_from_meta):
         trial_run_id = run_id_from_meta
+    
+    # Priority 1: Use centralized utilities to get hashes from MLflow tags (SSOT)
+    if trial_run_id:
+        try:
+            from infrastructure.tracking.mlflow.hash_utils import (
+                get_study_key_hash_from_run,
+                get_trial_key_hash_from_run,
+            )
+            from mlflow.tracking import MlflowClient
+            
+            client = MlflowClient()
+            # Try to get config_dir from trial_dir for tag registry
+            config_dir = None
+            try:
+                from infrastructure.paths.utils import resolve_project_paths_with_fallback
+                _, config_dir = resolve_project_paths_with_fallback(output_dir=trial_dir, config_dir=None)
+            except Exception:
+                pass
+            
+            study_key_hash = get_study_key_hash_from_run(trial_run_id, client, config_dir)
+            trial_key_hash = get_trial_key_hash_from_run(trial_run_id, client, config_dir)
+            
+            # If we got hashes from MLflow tags, use them (SSOT)
+            if study_key_hash or trial_key_hash:
+                return study_key_hash, trial_key_hash, trial_run_id
+        except Exception as e:
+            logger.debug(f"Could not retrieve hashes from MLflow tags for run {trial_run_id[:12] if trial_run_id else 'unknown'}...: {e}")
+    
+    # Priority 2: Fall back to file metadata
+    study_key_hash = meta.get("study_key_hash")
+    trial_key_hash = meta.get("trial_key_hash")
     
     return study_key_hash, trial_key_hash, trial_run_id
 
@@ -369,9 +399,9 @@ def _find_trial_dir_by_hash(
     if study_key_hash:
         try:
             from infrastructure.paths.parse import find_trial_by_hash
-            from infrastructure.paths.utils import resolve_project_paths
+            from infrastructure.paths.utils import resolve_project_paths_with_fallback
             
-            project_root, resolved_config_dir = resolve_project_paths(
+            project_root, resolved_config_dir = resolve_project_paths_with_fallback(
                 output_dir=hpo_backbone_dir,
                 config_dir=None,
             )
@@ -1185,12 +1215,12 @@ def select_champion_per_backbone(
     
     from infrastructure.naming.mlflow.tags_registry import load_tags_registry
     from pathlib import Path
-    from infrastructure.paths.utils import resolve_project_paths
+    from infrastructure.paths.utils import resolve_project_paths_with_fallback
     
     # Trust provided config_dir parameter, only infer when None (DRY principle)
     if config_dir is None:
-        # Infer config_dir only when not provided
-        _, resolved_config_dir = resolve_project_paths(
+        # Infer config_dir only when not provided - use SSOT function
+        _, resolved_config_dir = resolve_project_paths_with_fallback(
             output_dir=None,
             config_dir=None,
         )

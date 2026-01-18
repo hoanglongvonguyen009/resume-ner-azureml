@@ -90,42 +90,38 @@ def setup_hpo_mlflow_run(
 
 
         # Compute study_key_hash if missing
-        # Use v2 hash computation when train_config is available, fallback to v1 for backward compatibility.
+        # Use centralized hash utilities with proper fallback hierarchy.
         # The caller should pass pre-computed study_key_hash when available.
         if study_key_hash is None and data_config and hpo_config:
             try:
-                # Note: config_dir will be resolved later via resolve_project_paths_with_fallback()
-                # at line 162-165. Trust provided config_dir parameter (DRY principle).
+                # Use centralized hash utilities (SSOT) - trusts provided config_dir
+                from infrastructure.tracking.mlflow.hash_utils import (
+                    get_or_compute_study_key_hash,
+                )
                 
-                # Try v2 computation first if train_config is available
-                if train_config:
-                    from infrastructure.tracking.mlflow.hash_utils import compute_study_key_hash_v2
-                    study_key_hash = compute_study_key_hash_v2(
-                        data_config=data_config,
-                        hpo_config=hpo_config,
-                        train_config=train_config,
-                        model=backbone,
-                        config_dir=config_dir,
+                # Resolve config_dir early if needed for hash computation
+                # Trust provided config_dir parameter (DRY principle)
+                resolved_config_dir = config_dir
+                if resolved_config_dir is None:
+                    # Only infer when truly None - use minimal resolution for hash computation
+                    from infrastructure.paths.utils import resolve_project_paths_with_fallback
+                    _, resolved_config_dir = resolve_project_paths_with_fallback(
+                        output_dir=output_dir,
+                        config_dir=None,
                     )
-                    if study_key_hash:
-                        logger.debug("Computed study_key_hash using v2 (with train_config)")
                 
-                # Fallback to v1 if v2 failed or train_config not available
-                if not study_key_hash:
-                    from infrastructure.naming.mlflow.hpo_keys import (
-                        build_hpo_study_key,
-                        build_hpo_study_key_hash,
-                    )
-                    # Legacy approach: build_hpo_study_key (v1) for backward compatibility
-                    study_key = build_hpo_study_key(
-                        data_config=data_config,
-                        hpo_config=hpo_config,
-                        model=backbone,
-                        benchmark_config=benchmark_config,
-                    )
-                    study_key_hash = build_hpo_study_key_hash(study_key)
-                    if study_key_hash:
-                        logger.debug("Computed study_key_hash using v1 (legacy fallback)")
+                # Use centralized utility with proper fallback hierarchy
+                study_key_hash = get_or_compute_study_key_hash(
+                    study_key_hash=None,  # Not provided yet
+                    hpo_parent_run_id=None,  # Not available at this point
+                    data_config=data_config,
+                    hpo_config=hpo_config,
+                    train_config=train_config,
+                    backbone=backbone,
+                    config_dir=resolved_config_dir,
+                )
+                if study_key_hash:
+                    logger.debug("Computed study_key_hash using centralized utilities")
             except Exception as e:
                 logger.warning(
                     f"Could not compute study_key_hash for naming: {e}"
@@ -220,9 +216,11 @@ def setup_hpo_mlflow_run(
 
             # In fallback path, use resolve_project_paths_with_fallback() for consistency
             # Trust provided config_dir parameter (DRY principle)
-            if config_dir is None:
-                from infrastructure.paths.utils import resolve_project_paths_with_fallback
-                _, config_dir = resolve_project_paths_with_fallback(output_dir=output_dir, config_dir=None)
+            from infrastructure.paths.utils import resolve_project_paths_with_fallback
+            _, config_dir = resolve_project_paths_with_fallback(
+                output_dir=output_dir,
+                config_dir=config_dir,  # Trust provided config_dir if not None
+            )
 
             if config_dir and config_dir.exists():
                 policy = load_naming_policy(config_dir)

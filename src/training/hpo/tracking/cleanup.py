@@ -153,11 +153,10 @@ def cleanup_interrupted_runs(
 
         # Load naming config for project name comparison
         from infrastructure.naming.mlflow.config import get_naming_config
-        from infrastructure.paths.utils import resolve_project_paths
-
-        # Use resolve_project_paths() with provided config_dir if available
-        # Trust provided config_dir parameter, only infer if None
         from infrastructure.paths.utils import resolve_project_paths_with_fallback
+
+        # Use resolve_project_paths_with_fallback() with provided config_dir if available
+        # Trust provided config_dir parameter, only infer if None
         _, config_dir = resolve_project_paths_with_fallback(
             output_dir=output_dir, 
             config_dir=config_dir  # Use provided config_dir if available

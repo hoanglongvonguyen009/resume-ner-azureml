@@ -449,22 +449,22 @@ def _create_trial_run(
             # Get study_family_hash (no consolidated utility yet, keep existing pattern)
             computed_study_family_hash = study_family_hash
             if not computed_study_family_hash and hpo_parent_run_id:
-                    computed_study_family_hash = get_study_family_hash_from_run(
-                        hpo_parent_run_id, client, config_dir
-                            )
-                    
-                if not computed_study_family_hash:
-                    try:
-                        from infrastructure.naming.mlflow.hpo_keys import (
-                            build_hpo_study_family_key,
-                            build_hpo_study_family_hash,
-                        )
-                        study_family_key = build_hpo_study_family_key(
-                            data_config, hpo_config, benchmark_config
-                        )
-                        computed_study_family_hash = build_hpo_study_family_hash(study_family_key)
-                    except Exception as e:
-                        logger.debug(f"Could not compute study_family_hash: {e}")
+                computed_study_family_hash = get_study_family_hash_from_run(
+                    hpo_parent_run_id, client, config_dir
+                )
+            
+            if not computed_study_family_hash:
+                try:
+                    from infrastructure.naming.mlflow.hpo_keys import (
+                        build_hpo_study_family_key,
+                        build_hpo_study_family_hash,
+                    )
+                    study_family_key = build_hpo_study_family_key(
+                        data_config, hpo_config, benchmark_config
+                    )
+                    computed_study_family_hash = build_hpo_study_family_hash(study_family_key)
+                except Exception as e:
+                    logger.debug(f"Could not compute study_family_hash: {e}")
 
             # Create NamingContext for HPO trial WITH study_key_hash and trial_number
             # This must be done AFTER retrieving study_key_hash so run name includes it
@@ -493,24 +493,24 @@ def _create_trial_run(
                 study_key_hash=computed_study_key_hash,
                 hyperparameters=hyperparameters,
                 config_dir=config_dir,
+            )
+            if trial_key_hash:
+                # Update context with computed trial_key_hash
+                trial_context = create_naming_context(
+                    process_type="hpo",
+                    model=backbone_short,
+                    environment=detect_platform(),
+                    storage_env=detect_platform(),
+                    stage="hpo_trial",
+                    trial_id=trial_id,
+                    trial_number=trial_number_int,  # Keep explicit trial_number
+                    study_key_hash=computed_study_key_hash,
+                    trial_key_hash=trial_key_hash,
                 )
-                if trial_key_hash:
-                    # Update context with computed trial_key_hash
-                    trial_context = create_naming_context(
-                        process_type="hpo",
-                        model=backbone_short,
-                        environment=detect_platform(),
-                        storage_env=detect_platform(),
-                        stage="hpo_trial",
-                        trial_id=trial_id,
-                        trial_number=trial_number_int,  # Keep explicit trial_number
-                        study_key_hash=computed_study_key_hash,
-                        trial_key_hash=trial_key_hash,
-                    )
-                else:
-                    logger.warning(
-                        f"Could not compute trial_key_hash from configs"
-                    )
+            else:
+                logger.warning(
+                    f"Could not compute trial_key_hash from configs"
+                )
 
             # Build tags including project identity tags and grouping tags
             from infrastructure.naming.mlflow.tags import build_mlflow_tags

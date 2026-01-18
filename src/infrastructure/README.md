@@ -230,6 +230,9 @@ setup_mlflow(config={
 1. **Use configuration files**: Always load configs from YAML files, don't hardcode
 2. **Repository root detection**: Use `detect_repo_root()` from `infrastructure.paths.repo` (canonical function)
 3. **Resolve paths through infrastructure**: Use `resolve_output_path` instead of hardcoding paths
+4. **Use consolidated path resolution**: Prefer `resolve_project_paths_with_fallback()` for project path resolution (standardized fallback logic)
+5. **Use centralized hash utilities**: Always use `get_or_compute_study_key_hash()` and `get_or_compute_trial_key_hash()` instead of manually retrieving hashes from MLflow runs
+6. **Trust provided parameters**: When calling functions that accept `config_dir`, trust the provided value - inference only occurs when explicitly `None` (DRY principle)
 
 ## Consolidation Patterns
 
@@ -260,7 +263,10 @@ The following functions are SSOT for common operations:
 
 - **Path Resolution**: `infrastructure.paths.resolve.resolve_output_path()` - SSOT for output path resolution
 - **Path Building**: `infrastructure.paths.resolve.build_output_path()` - SSOT for building paths from patterns
-- **Project Paths**: `infrastructure.paths.utils.resolve_project_paths()` - SSOT for resolving root_dir and config_dir
+- **Project Paths**: `infrastructure.paths.utils.resolve_project_paths_with_fallback()` - **Preferred SSOT** for resolving root_dir and config_dir with standardized fallback logic
+  - **Legacy**: `infrastructure.paths.utils.resolve_project_paths()` - Still available but prefer `resolve_project_paths_with_fallback()` for consistency
+- **Hash Computation**: `infrastructure.tracking.mlflow.hash_utils.get_or_compute_study_key_hash()` - SSOT for study key hash retrieval/computation
+- **Hash Computation**: `infrastructure.tracking.mlflow.hash_utils.get_or_compute_trial_key_hash()` - SSOT for trial key hash retrieval/computation
 - **Tags Registry**: `infrastructure.naming.mlflow.tags_registry.load_tags_registry()` - SSOT for loading tags registry
 - **YAML Loading**: `common.shared.yaml_utils.load_yaml()` - SSOT for YAML file loading
 - **MLflow Setup**: `infrastructure.tracking.mlflow.setup.setup_mlflow()` - SSOT for MLflow configuration
@@ -278,6 +284,11 @@ The following functions are SSOT for common operations:
 - Naming policies are cached for performance
 - Platform adapters abstract away platform differences
 - **MLflow setup**: `infrastructure.tracking.mlflow.setup.setup_mlflow()` is the SSOT (wraps `common.shared.mlflow_setup.setup_mlflow_cross_platform()` internally)
+- **Consolidation**: All modules follow the "trust provided config_dir" pattern and use SSOT functions to eliminate DRY violations
+
+**See Also**: 
+- [`docs/architecture/mlflow-utilities.md`](../../docs/architecture/mlflow-utilities.md) - Consolidated patterns, SSOT functions, and usage examples
+- [`docs/design/mlflow-layering.md`](../../docs/design/mlflow-layering.md) - Detailed MLflow setup layering documentation
 
 ## Testing
 

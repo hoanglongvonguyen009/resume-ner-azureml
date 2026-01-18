@@ -691,11 +691,11 @@ def run_local_hpo_sweep(
                     f"[HPO Setup] k_fold.enabled=True but n_splits not specified, CV will be disabled"
                 )
 
-    # Use resolve_project_paths() to consolidate path resolution
+    # Use resolve_project_paths_with_fallback() to consolidate path resolution
     # (needed for variant computation in create_study_name)
-    from infrastructure.paths.utils import resolve_project_paths
+    from infrastructure.paths.utils import resolve_project_paths_with_fallback
     
-    root_dir_for_variants, _ = resolve_project_paths(
+    root_dir_for_variants, _ = resolve_project_paths_with_fallback(
         output_dir=output_dir,
         config_dir=project_config_dir,  # Use provided project_config_dir
     )
@@ -1132,12 +1132,12 @@ def run_local_hpo_sweep(
                         compute_trial_key_hash_from_configs,
                         compute_study_key_hash_v2,
                     )
-                    from infrastructure.paths.utils import resolve_project_paths
+                    from infrastructure.paths.utils import resolve_project_paths_with_fallback
                     
                     client = mlflow.tracking.MlflowClient()
                     # Use project_config_dir (already available) instead of re-inferring
-                    # Use resolve_project_paths() for consistency, but trust provided project_config_dir
-                    _, config_dir_for_refit = resolve_project_paths(
+                    # Use resolve_project_paths_with_fallback() for consistency, but trust provided project_config_dir
+                    _, config_dir_for_refit = resolve_project_paths_with_fallback(
                         output_dir=output_dir, 
                         config_dir=project_config_dir  # Use provided project_config_dir
                     )

@@ -46,7 +46,6 @@ from infrastructure.naming.mlflow.run_keys import (
     build_mlflow_run_key_hash,
 )
 # Tag key imports moved to local scope where needed
-from infrastructure.paths.utils import resolve_project_paths
 from training.execution import (
     MLflowConfig,
     TrainingOptions,

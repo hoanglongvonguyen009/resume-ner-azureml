@@ -192,12 +192,9 @@ def load_tags_registry(config_dir: Optional[Path] = None) -> TagsRegistry:
     global _registry_cache, _registry_cache_path
 
     if config_dir is None:
-        from infrastructure.paths.utils import resolve_project_paths
-        _, config_dir = resolve_project_paths(config_dir=None)
-        # If inference failed, fall back to infer_config_dir for backward compatibility
-        if config_dir is None:
-            from infrastructure.paths.utils import infer_config_dir
-            config_dir = infer_config_dir()
+        # Use resolve_project_paths_with_fallback() (SSOT) for path resolution
+        from infrastructure.paths.utils import resolve_project_paths_with_fallback
+        _, config_dir = resolve_project_paths_with_fallback(config_dir=None)
 
     config_path = config_dir / "tags.yaml"
 

@@ -63,7 +63,9 @@ def extract_cv_statistics(best_trial: Any) -> Optional[Tuple[float, float]]:
 
 
 def get_trial_hash_info(trial_dir: Path) -> Tuple[Optional[str], Optional[str], Optional[int]]:
-    """Extract study_key_hash, trial_key_hash, and trial_number from trial_meta.json if available.
+    """Extract study_key_hash, trial_key_hash, and trial_number from trial directory.
+    
+    Uses centralized hash utilities (SSOT) when run_id is available, falls back to file metadata.
 
     Args:
         trial_dir: Path to trial directory containing trial_meta.json.
@@ -74,16 +76,51 @@ def get_trial_hash_info(trial_dir: Path) -> Tuple[Optional[str], Optional[str], 
     trial_meta_path = trial_dir / "trial_meta.json"
     if not trial_meta_path.exists():
         return None, None, None
+    
     try:
         with open(trial_meta_path, "r") as f:
             meta = json.load(f)
-        return (
-            meta.get("study_key_hash"),
-            meta.get("trial_key_hash"),
-            meta.get("trial_number"),
-        )
     except Exception:
         return None, None, None
+    
+    # Priority 1: Use centralized utilities to get hashes from MLflow tags (SSOT)
+    run_id = meta.get("run_id")
+    if run_id:
+        try:
+            from infrastructure.tracking.mlflow.hash_utils import (
+                get_study_key_hash_from_run,
+                get_trial_key_hash_from_run,
+            )
+            from mlflow.tracking import MlflowClient
+            
+            client = MlflowClient()
+            # Try to get config_dir from trial_dir for tag registry
+            config_dir = None
+            try:
+                from infrastructure.paths.utils import resolve_project_paths_with_fallback
+                _, config_dir = resolve_project_paths_with_fallback(output_dir=trial_dir, config_dir=None)
+            except Exception:
+                pass
+            
+            study_key_hash = get_study_key_hash_from_run(run_id, client, config_dir)
+            trial_key_hash = get_trial_key_hash_from_run(run_id, client, config_dir)
+            
+            # If we got hashes from MLflow tags, use them (SSOT)
+            if study_key_hash or trial_key_hash:
+                return (
+                    study_key_hash,
+                    trial_key_hash,
+                    meta.get("trial_number"),
+                )
+        except Exception:
+            pass  # Fall back to file metadata
+    
+    # Priority 2: Fall back to file metadata
+    return (
+        meta.get("study_key_hash"),
+        meta.get("trial_key_hash"),
+        meta.get("trial_number"),
+    )
 
 
 def load_study_from_disk(

@@ -124,6 +124,9 @@ best_trials = find_best_trials_for_backbones(
   - Returns the first v2 study folder found, or None if not found
   - Supports v2 hash-based folder structure only
 - `get_trial_hash_info(...)`: Get trial hash information
+  - **Uses centralized hash utilities**: Prioritizes MLflow tags (SSOT) when `run_id` is available
+  - Falls back to file metadata (`trial_meta.json`) when MLflow tags are unavailable
+  - Follows the consolidated hash extraction pattern from `infrastructure.tracking.mlflow.hash_utils`
 
 ### Artifact Acquisition
 
@@ -214,9 +217,20 @@ uvx pytest tests/evaluation/selection/
 - [`../../training/README.md`](../../training/README.md) - Training and HPO
 - [`../../infrastructure/README.md`](../../infrastructure/README.md) - Infrastructure layer
 
+## Best Practices
+
+1. **Use centralized hash utilities**: Always use `get_or_compute_study_key_hash()` and `get_or_compute_trial_key_hash()` from `infrastructure.tracking.mlflow.hash_utils` instead of manually extracting hashes from MLflow runs or file metadata
+2. **Trust provided parameters**: When calling functions that accept `config_dir`, trust the provided value - inference only occurs when explicitly `None` (DRY principle)
+3. **Use SSOT for path resolution**: Use `resolve_project_paths_with_fallback()` from `infrastructure.paths.utils` for path resolution
+
+**See Also**: 
+- [`docs/architecture/mlflow-utilities.md`](../../../docs/architecture/mlflow-utilities.md) - Consolidated patterns, SSOT functions, and usage examples
+- [`docs/design/mlflow-layering.md`](../../../docs/design/mlflow-layering.md) - Detailed MLflow setup layering documentation
+
 ## Notes
 
 - Selection supports both local (Optuna) and AzureML HPO results
 - Speed scores are automatically normalized relative to fastest model
 - Selection cache improves performance for repeated selections
+- Hash extraction uses centralized utilities with MLflow tags as SSOT, falling back to file metadata
 
