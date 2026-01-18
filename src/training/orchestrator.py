@@ -28,6 +28,14 @@ lifecycle:
 
 """Training orchestration logic."""
 
+# CRITICAL: Import MLflow patch BEFORE importing mlflow to catch all run creation
+import sys
+try:
+    from infrastructure.tracking.mlflow.patches import apply_patch
+    apply_patch()
+except Exception as e:
+    print(f"  [Training Orchestrator] WARNING: Could not apply MLflow patch: {e}", file=sys.stderr, flush=True)
+
 import os
 import argparse
 from pathlib import Path
