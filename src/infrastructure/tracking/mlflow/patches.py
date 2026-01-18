@@ -77,13 +77,14 @@ def _patched_client_create_run(self: Any, experiment_id: str, run_name: Optional
         _validate_run_name(run_name, "MlflowClient.create_run()")
         print(f"  [MLflow Patch] MlflowClient.create_run() called with run_name='{run_name}'", file=sys.stderr, flush=True)
     
-    # Call original function
+    # Call original function (should always be set after apply_patch() runs)
     if _original_client_create_run is None:
-        from mlflow.tracking import MlflowClient
-        # Fallback to original if patch not ready
-        return MlflowClient.create_run(self, experiment_id=experiment_id, run_name=run_name, **kwargs)
-    else:
-        return _original_client_create_run(self, experiment_id=experiment_id, run_name=run_name, **kwargs)
+        # This should never happen if patch was applied correctly
+        error_msg = "CRITICAL: MlflowClient.create_run() patch not properly initialized"
+        print(error_msg, file=sys.stderr, flush=True)
+        raise RuntimeError(error_msg)
+    
+    return _original_client_create_run(self, experiment_id=experiment_id, run_name=run_name, **kwargs)
 
 
 def apply_patch() -> None:
