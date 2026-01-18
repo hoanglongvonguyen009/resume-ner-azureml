@@ -201,7 +201,22 @@ class LocalMLflowContextManager(MLflowContextManager):
                         experiment_id = experiment.experiment_id
                 
                 if experiment_id:
+                    # CRITICAL: Validate run_name before creating run via client
+                    if not run_name or not run_name.strip():
+                        error_msg = (
+                            f"CRITICAL: Cannot create run via client: run_name is None or empty. "
+                            f"This would cause MLflow to auto-generate a name like 'sad_toe_8qbllbws'. "
+                            f"run_name={run_name}, experiment_id={experiment_id}"
+                        )
+                        print(error_msg, file=sys.stderr, flush=True)
+                        import traceback
+                        print(f"Call stack:\n{''.join(traceback.format_stack()[-10:-1])}", file=sys.stderr, flush=True)
+                        raise ValueError(
+                            f"Cannot create run via client: run_name is None or empty. "
+                            f"This would cause MLflow to auto-generate a name."
+                        )
                     # Create run with explicit name using client
+                    print(f"  [MLflow Context] Creating run via client with name: '{run_name}' (experiment_id: {experiment_id})", file=sys.stderr, flush=True)
                     run = client.create_run(
                         experiment_id=experiment_id,
                         run_name=run_name
