@@ -157,7 +157,34 @@ save_cache_with_dual_strategy(
 ### Project Path Utilities
 
 - `infer_config_dir(config_dir: Optional[Path] = None, path: Optional[Path] = None, root_dir: Optional[Path] = None) -> Path`: Infer config directory. Uses `detect_repo_root()` internally if needed.
-- `resolve_project_paths(output_dir: Optional[Path] = None, config_dir: Optional[Path] = None, start_path: Optional[Path] = None) -> tuple[Path, Path]`: Resolve both root_dir and config_dir. Uses `detect_repo_root()` internally.
+- `resolve_project_paths(output_dir: Optional[Path] = None, config_dir: Optional[Path] = None, start_path: Optional[Path] = None) -> tuple[Path, Path]`: **SSOT for resolving both root_dir and config_dir**. Uses `detect_repo_root()` internally. **Trusts provided `config_dir` parameter** - only infers when `None`.
+- `resolve_project_paths_with_fallback(output_dir: Optional[Path] = None, config_dir: Optional[Path] = None) -> tuple[Path, Path]`: **Consolidated utility for path resolution with standardized fallback logic**. This function consolidates the common "standardized fallback" pattern used across HPO and training execution scripts. It:
+  1. Calls `resolve_project_paths()` to resolve paths
+  2. Applies standardized fallback logic:
+     - If `root_dir` is None, uses `Path.cwd()`
+     - If `config_dir` is None after resolution, infers it using `infer_config_dir()`
+  
+  **Key principle**: Trusts provided `config_dir` if not None, following DRY principles. Only infers when explicitly None.
+
+**Pattern**: All path utilities follow the "trust provided config_dir" pattern:
+- If `config_dir` is provided (not `None`), it's used directly without inference
+- Inference only occurs when `config_dir` is explicitly `None`
+- This avoids redundant inference and follows DRY principles
+
+**Usage Example**:
+```python
+from infrastructure.paths.utils import resolve_project_paths_with_fallback
+
+# Resolve paths with standardized fallback
+# Trust provided config_dir (DRY principle)
+root_dir, config_dir = resolve_project_paths_with_fallback(
+    output_dir=Path("outputs/hpo/local/distilbert"),
+    config_dir=config_dir,  # Use provided value, don't re-infer
+)
+```
+
+**See Also**: 
+- [`docs/architecture/mlflow-utilities.md`](../../../docs/architecture/mlflow-utilities.md) - Consolidated patterns including path resolution patterns
 
 For detailed signatures, see source code.
 
@@ -209,6 +236,11 @@ config_dir = infer_config_dir(path=checkpoint_dir)  # checkpoint_dir = /content/
 root_dir = detect_repo_root()  # Uses platform-specific locations from config
 config_dir = root_dir / "config"
 ```
+
+**Trust Provided Parameters Pattern**: All path resolution functions follow the "trust provided parameter" pattern:
+- Functions that accept `config_dir: Optional[Path] = None` will **trust the provided value** and use it directly
+- Inference only occurs when the parameter is explicitly `None`
+- This follows DRY principles and avoids redundant inference
 
 Functions that accept explicit `config_dir` or `root_dir` parameters will use them directly, avoiding inference issues.
 

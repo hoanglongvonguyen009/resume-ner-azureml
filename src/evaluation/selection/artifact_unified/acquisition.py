@@ -214,6 +214,7 @@ def acquire_artifact(
                 mlflow_client=mlflow_client,
                 experiment_id=experiment_id,
                 run_selector_result=run_selector_result,
+                config_dir=config_dir,  # Pass config_dir explicitly (DRY principle)
                 validate=False,  # Don't validate during discovery (expensive)
             )
             if location:

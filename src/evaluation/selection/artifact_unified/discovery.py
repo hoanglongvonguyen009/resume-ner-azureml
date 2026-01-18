@@ -474,6 +474,7 @@ def discover_artifact_mlflow(
     mlflow_client: MlflowClient,
     experiment_id: str,
     run_selector_result: RunSelectorResult,
+    config_dir: Optional[Path] = None,
     validate: bool = False,  # MLflow discovery doesn't validate (just checks tag)
 ) -> Optional[ArtifactLocation]:
     """
@@ -484,6 +485,7 @@ def discover_artifact_mlflow(
         mlflow_client: MLflow client instance
         experiment_id: MLflow experiment ID
         run_selector_result: Result from run selector (contains artifact_run_id)
+        config_dir: Optional config directory (for tag key retrieval). If None, uses request.metadata.get("config_dir") or infers.
         validate: If True, check artifact actually exists (requires download - expensive)
         
     Returns:
@@ -498,8 +500,11 @@ def discover_artifact_mlflow(
         run = mlflow_client.get_run(artifact_run_id)
         
         # Check artifact availability tag (declared availability)
+        # Trust provided config_dir parameter, fallback to request.metadata, then infer
         from infrastructure.naming.mlflow.tags_registry import load_tags_registry
-        tags_registry = load_tags_registry(request.metadata.get("config_dir"))
+        if config_dir is None:
+            config_dir = request.metadata.get("config_dir")
+        tags_registry = load_tags_registry(config_dir)
         artifact_tag = tags_registry.key("artifact", "available")
         
         artifact_available = run.data.tags.get(artifact_tag, "false").lower()

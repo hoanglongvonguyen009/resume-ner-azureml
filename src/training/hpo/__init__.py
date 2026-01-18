@@ -14,6 +14,15 @@ from .core import (
     import_optuna,
     translate_search_space_to_optuna,
 )
+# Exceptions
+from .exceptions import (
+    HPOError,
+    TrialExecutionError,
+    SelectionError,
+    MLflowTrackingError,
+    StudyLoadError,
+    MetricsReadError,
+)
 from .utils.helpers import (
     create_mlflow_run_name,
     create_study_name,
@@ -63,6 +72,13 @@ __all__ = [
     "validate_sweep_job",
     # Trial execution
     "TrialExecutor",
+    # Exceptions
+    "HPOError",
+    "TrialExecutionError",
+    "SelectionError",
+    "MLflowTrackingError",
+    "StudyLoadError",
+    "MetricsReadError",
 ]
 
 

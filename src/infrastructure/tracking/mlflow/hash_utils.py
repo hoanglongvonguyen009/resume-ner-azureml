@@ -377,3 +377,148 @@ def compute_trial_key_hash_from_configs(
         return None
 
 
+def get_or_compute_study_key_hash(
+    study_key_hash: Optional[str] = None,
+    hpo_parent_run_id: Optional[str] = None,
+    data_config: Optional[Dict[str, Any]] = None,
+    hpo_config: Optional[Dict[str, Any]] = None,
+    train_config: Optional[Dict[str, Any]] = None,
+    backbone: Optional[str] = None,
+    config_dir: Optional[Path] = None,
+) -> Optional[str]:
+    """
+    Get or compute study_key_hash using fallback hierarchy.
+    
+    Priority order:
+    1. Use provided study_key_hash (if available)
+    2. Retrieve from MLflow run tags (SSOT) - if hpo_parent_run_id provided
+    3. Compute from configs (fallback) - if data_config, hpo_config, train_config, backbone available
+    
+    This function consolidates the common pattern used across HPO and training execution scripts.
+    
+    Args:
+        study_key_hash: Optional pre-computed study key hash (highest priority).
+        hpo_parent_run_id: Optional HPO parent run ID to retrieve hash from tags (SSOT).
+        data_config: Optional data configuration dictionary (for computation fallback).
+        hpo_config: Optional HPO configuration dictionary (for computation fallback).
+        train_config: Optional training configuration dictionary (for computation fallback).
+        backbone: Optional model backbone name (for computation fallback).
+        config_dir: Optional config directory for tag registry and hash computation.
+        
+    Returns:
+        study_key_hash if found/computed, None otherwise.
+    """
+    # Priority 1: Use provided study_key_hash
+    if study_key_hash:
+        logger.debug(f"Using provided study_key_hash: {study_key_hash[:16]}...")
+        return study_key_hash
+    
+    # Priority 2: Retrieve from MLflow run tags (SSOT)
+    if hpo_parent_run_id:
+        try:
+            client = MlflowClient()
+            retrieved_hash = get_study_key_hash_from_run(
+                hpo_parent_run_id, client, config_dir
+            )
+            if retrieved_hash:
+                logger.debug(
+                    f"Retrieved study_key_hash from parent run tags (SSOT): {retrieved_hash[:16]}..."
+                )
+                return retrieved_hash
+        except Exception as e:
+            logger.debug(f"Could not retrieve study_key_hash from parent run: {e}")
+    
+    # Priority 3: Compute from configs (fallback)
+    if data_config and hpo_config and train_config and backbone:
+        try:
+            computed_hash = compute_study_key_hash_v2(
+                data_config, hpo_config, train_config, backbone, config_dir
+            )
+            if computed_hash:
+                logger.debug(
+                    f"Computed study_key_hash from configs (fallback): {computed_hash[:16]}..."
+                )
+                return computed_hash
+        except Exception as e:
+            logger.debug(f"Could not compute study_key_hash from configs: {e}")
+    
+    logger.warning(
+        f"Could not get or compute study_key_hash. "
+        f"study_key_hash={'provided' if study_key_hash else 'missing'}, "
+        f"hpo_parent_run_id={'provided' if hpo_parent_run_id else 'missing'}, "
+        f"configs={'available' if (data_config and hpo_config and train_config and backbone) else 'missing'}"
+    )
+    return None
+
+
+def get_or_compute_trial_key_hash(
+    trial_key_hash: Optional[str] = None,
+    trial_run_id: Optional[str] = None,
+    study_key_hash: Optional[str] = None,
+    hyperparameters: Optional[Dict[str, Any]] = None,
+    config_dir: Optional[Path] = None,
+) -> Optional[str]:
+    """
+    Get or compute trial_key_hash using fallback hierarchy.
+    
+    Priority order:
+    1. Use provided trial_key_hash (if available)
+    2. Retrieve from trial run tags (SSOT) - if trial_run_id provided
+    3. Compute from study_key_hash + hyperparameters (fallback) - if both available
+    
+    This function consolidates the common pattern used across HPO and training execution scripts.
+    
+    Args:
+        trial_key_hash: Optional pre-computed trial key hash (highest priority).
+        trial_run_id: Optional trial run ID to retrieve hash from tags (SSOT).
+        study_key_hash: Optional study key hash (for computation fallback).
+        hyperparameters: Optional hyperparameters dictionary (for computation fallback).
+        config_dir: Optional config directory for tag registry and hash computation.
+        
+    Returns:
+        trial_key_hash if found/computed, None otherwise.
+    """
+    # Priority 1: Use provided trial_key_hash
+    if trial_key_hash:
+        logger.debug(f"Using provided trial_key_hash: {trial_key_hash[:16]}...")
+        return trial_key_hash
+    
+    # Priority 2: Retrieve from trial run tags (SSOT)
+    if trial_run_id:
+        try:
+            client = MlflowClient()
+            retrieved_hash = get_trial_key_hash_from_run(
+                trial_run_id, client, config_dir
+            )
+            if retrieved_hash:
+                logger.debug(
+                    f"Retrieved trial_key_hash from trial run tags (SSOT): {retrieved_hash[:16]}..."
+                )
+                return retrieved_hash
+        except Exception as e:
+            logger.debug(f"Could not retrieve trial_key_hash from trial run: {e}")
+    
+    # Priority 3: Compute from study_key_hash + hyperparameters (fallback)
+    if study_key_hash and hyperparameters:
+        try:
+            computed_hash = compute_trial_key_hash_from_configs(
+                study_key_hash, hyperparameters, config_dir
+            )
+            if computed_hash:
+                logger.debug(
+                    f"Computed trial_key_hash from configs (fallback): {computed_hash[:16]}..."
+                )
+                return computed_hash
+        except Exception as e:
+            logger.debug(f"Could not compute trial_key_hash from configs: {e}")
+    
+    logger.warning(
+        f"Could not get or compute trial_key_hash. "
+        f"trial_key_hash={'provided' if trial_key_hash else 'missing'}, "
+        f"trial_run_id={'provided' if trial_run_id else 'missing'}, "
+        f"study_key_hash={'available' if study_key_hash else 'missing'}, "
+        f"hyperparameters={'available' if hyperparameters else 'missing'}"
+    )
+    return None
+
+

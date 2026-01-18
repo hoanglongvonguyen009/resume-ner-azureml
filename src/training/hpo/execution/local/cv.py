@@ -111,31 +111,21 @@ def run_training_trial_with_cv(
     computed_trial_key_hash = None
     computed_study_key_hash = study_key_hash
 
-    # Fallback hierarchy for study_key_hash (v2-first) using centralized utilities:
-    # 1. Use value passed from parent (study_key_hash argument)
-    # 2. Read from parent run tag (already v2 for new runs) - SSOT
-    # 3. Compute v2 from configs using fingerprints (always succeeds for dict inputs)
+    # Use consolidated utility for study_key_hash computation (fallback hierarchy)
     from infrastructure.tracking.mlflow.hash_utils import (
-        get_study_key_hash_from_run,
-        compute_study_key_hash_v2,
-        compute_trial_key_hash_from_configs,
+        get_or_compute_study_key_hash,
+        get_or_compute_trial_key_hash,
     )
     
-    if not computed_study_key_hash and hpo_parent_run_id:
-        try:
-            client = mlflow.tracking.MlflowClient()
-            computed_study_key_hash = get_study_key_hash_from_run(
-                hpo_parent_run_id, client, config_dir
-            )
-        except Exception as e:
-            logger.debug(f"Could not retrieve study_key_hash from parent run: {e}")
-
-    if not computed_study_key_hash and data_config and hpo_config and train_config:
-        computed_study_key_hash = compute_study_key_hash_v2(
-            data_config, hpo_config, train_config, backbone, config_dir
-            )
-        if not computed_study_key_hash:
-            logger.debug(f"Could not compute v2 study_key_hash in CV orchestrator")
+    computed_study_key_hash = get_or_compute_study_key_hash(
+        study_key_hash=computed_study_key_hash,
+        hpo_parent_run_id=hpo_parent_run_id,
+        data_config=data_config,
+        hpo_config=hpo_config,
+        train_config=train_config,
+        backbone=backbone,
+        config_dir=config_dir,
+    )
 
     # Compute trial_key_hash if we have study_key_hash
     if computed_study_key_hash:
@@ -144,8 +134,12 @@ def run_training_trial_with_cv(
             k: v for k, v in trial_params.items()
             if k not in ("backbone", "trial_number", "run_id")
         }
-        computed_trial_key_hash = compute_trial_key_hash_from_configs(
-            computed_study_key_hash, hyperparameters, config_dir
+        computed_trial_key_hash = get_or_compute_trial_key_hash(
+            trial_key_hash=None,  # Not available from trial run in CV context
+            trial_run_id=None,  # Not available in CV context
+            study_key_hash=computed_study_key_hash,
+            hyperparameters=hyperparameters,
+            config_dir=config_dir,
         )
         if not computed_trial_key_hash:
             logger.warning(f"Could not compute trial_key_hash")
@@ -170,23 +164,14 @@ def run_training_trial_with_cv(
             from infrastructure.paths import build_output_path, resolve_output_path
             from common.shared.platform_detection import detect_platform
             
-            # Use resolve_project_paths() to consolidate path resolution
+            # Use resolve_project_paths_with_fallback() to consolidate path resolution
             # output_dir is the study folder: outputs/hpo/{env}/{model}/{study_name} or outputs/hpo/{env}/{model}/study-{study8}
-            from infrastructure.paths.utils import resolve_project_paths
+            from infrastructure.paths.utils import resolve_project_paths_with_fallback
             
-            root_dir, resolved_config_dir = resolve_project_paths(
+            root_dir, config_dir = resolve_project_paths_with_fallback(
                 output_dir=output_dir,
                 config_dir=config_dir,  # Use provided config_dir if available
             )
-            
-            # Standardized fallback: use resolved value, or provided parameter, or infer
-            if root_dir is None:
-                root_dir = Path.cwd()
-            # Use resolved config_dir, or provided config_dir, or infer as last resort
-            config_dir = resolved_config_dir or config_dir
-            if config_dir is None:
-                from infrastructure.paths.utils import infer_config_dir
-                config_dir = infer_config_dir(path=root_dir) if root_dir else infer_config_dir()
             
             # Create NamingContext for trial
             # build_output_path() will automatically append trial-{trial8} when trial_key_hash is provided
@@ -230,13 +215,17 @@ def run_training_trial_with_cv(
                     f"Attempting to recompute from trial_params..."
                 )
                 try:
-                    from infrastructure.tracking.mlflow.hash_utils import compute_trial_key_hash_from_configs
+                    from infrastructure.tracking.mlflow.hash_utils import get_or_compute_trial_key_hash
                     hyperparameters = {
                         k: v for k, v in trial_params.items()
                         if k not in ("backbone", "trial_number", "run_id")
                     }
-                    computed_trial_key_hash = compute_trial_key_hash_from_configs(
-                        computed_study_key_hash, hyperparameters, config_dir
+                    computed_trial_key_hash = get_or_compute_trial_key_hash(
+                        trial_key_hash=None,  # Not available from trial run
+                        trial_run_id=None,  # Not available in this context
+                        study_key_hash=computed_study_key_hash,
+                        hyperparameters=hyperparameters,
+                        config_dir=config_dir,
                     )
                 except Exception as e:
                     logger.error(
@@ -250,15 +239,12 @@ def run_training_trial_with_cv(
                     from infrastructure.naming import create_naming_context
                     from infrastructure.paths import build_output_path
                     from common.shared.platform_detection import detect_platform
-                    from infrastructure.paths.utils import resolve_project_paths
+                    from infrastructure.paths.utils import resolve_project_paths_with_fallback
                     
-                    root_dir, resolved_config_dir = resolve_project_paths(
+                    root_dir, config_dir = resolve_project_paths_with_fallback(
                         output_dir=output_dir,
                         config_dir=config_dir,
                     )
-                    if root_dir is None:
-                        root_dir = Path.cwd()
-                    config_dir = resolved_config_dir or config_dir
                     
                     trial_context = create_naming_context(
                         process_type="hpo",
@@ -443,39 +429,28 @@ def _create_trial_run(
                 if k not in ("backbone", "trial_number", "run_id")
             }
 
-            # Compute trial_key_hash from study_key_hash and hyperparameters using centralized utilities
-            # Priority: 1) Retrieve from tags (SSOT), 2) Compute from configs (fallback)
+            # Use consolidated utility for study_key_hash computation
             from infrastructure.tracking.mlflow.hash_utils import (
-                get_study_key_hash_from_run,
+                get_or_compute_study_key_hash,
                 get_study_family_hash_from_run,
-                compute_study_key_hash_v2,
-                compute_trial_key_hash_from_configs,
+                get_or_compute_trial_key_hash,
             )
             
-            computed_study_key_hash = study_key_hash
+            computed_study_key_hash = get_or_compute_study_key_hash(
+                study_key_hash=study_key_hash,
+                hpo_parent_run_id=hpo_parent_run_id,
+                data_config=data_config,
+                hpo_config=hpo_config,
+                train_config=train_config,
+                backbone=backbone,
+                config_dir=config_dir,
+            )
+            
+            # Get study_family_hash (no consolidated utility yet, keep existing pattern)
             computed_study_family_hash = study_family_hash
-
-            # Priority 1: Get from parent run tags (source of truth - already v2 for new runs)
-            if (not computed_study_key_hash or not computed_study_family_hash) and hpo_parent_run_id:
-                if not computed_study_key_hash:
-                    computed_study_key_hash = get_study_key_hash_from_run(
-                        hpo_parent_run_id, client, config_dir
-                    )
-                if not computed_study_family_hash:
+            if not computed_study_family_hash and hpo_parent_run_id:
                     computed_study_family_hash = get_study_family_hash_from_run(
                         hpo_parent_run_id, client, config_dir
-                    )
-
-            # Priority 2: Compute v2 from configs if parent tags missing (for backward compatibility)
-            if (not computed_study_key_hash or not computed_study_family_hash) and data_config and hpo_config and train_config:
-                if not computed_study_key_hash:
-                    computed_study_key_hash = compute_study_key_hash_v2(
-                        data_config, hpo_config, train_config, backbone, config_dir
-                            )
-                    if computed_study_key_hash:
-                            logger.debug(
-                                f"[TRIAL_RUN] Computed v2 study_key_hash from configs: "
-                                f"{computed_study_key_hash[:16]}... (fallback)"
                             )
                     
                 if not computed_study_family_hash:
@@ -510,11 +485,14 @@ def _create_trial_run(
             # Build systematic run name (now with study_key_hash in context)
             run_name = build_mlflow_run_name(trial_context, config_dir)
 
-            # Compute trial_key_hash if we have study_key_hash and hyperparameters
-            trial_key_hash = None
-            if computed_study_key_hash and hyperparameters:
-                trial_key_hash = compute_trial_key_hash_from_configs(
-                    computed_study_key_hash, hyperparameters, config_dir
+            # Compute trial_key_hash using consolidated utility
+            from infrastructure.tracking.mlflow.hash_utils import get_or_compute_trial_key_hash
+            trial_key_hash = get_or_compute_trial_key_hash(
+                trial_key_hash=None,  # Not available from trial run in this context
+                trial_run_id=None,  # Not available in this context
+                study_key_hash=computed_study_key_hash,
+                hyperparameters=hyperparameters,
+                config_dir=config_dir,
                 )
                 if trial_key_hash:
                     # Update context with computed trial_key_hash

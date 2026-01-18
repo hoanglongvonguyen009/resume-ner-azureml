@@ -157,16 +157,11 @@ def cleanup_interrupted_runs(
 
         # Use resolve_project_paths() with provided config_dir if available
         # Trust provided config_dir parameter, only infer if None
-        _, resolved_config_dir = resolve_project_paths(
+        from infrastructure.paths.utils import resolve_project_paths_with_fallback
+        _, config_dir = resolve_project_paths_with_fallback(
             output_dir=output_dir, 
             config_dir=config_dir  # Use provided config_dir if available
         )
-        # Standardized fallback: use resolved value, or provided parameter, or infer
-        # Use resolved config_dir, or provided config_dir, or infer as last resort
-        config_dir = resolved_config_dir or config_dir
-        if config_dir is None:
-            from infrastructure.paths.utils import infer_config_dir
-            config_dir = infer_config_dir()
         naming_config = get_naming_config(config_dir)
 
         # Get current run start_time for legacy run validation

@@ -134,10 +134,12 @@ class TestCVTrialRunHashComputation:
         mock_active_run.info.experiment_id = "exp-123"
         mock_parent_run = MagicMock()
         mock_parent_run.info.run_id = "parent-run-123"
-        mock_parent_run.data.tags.get.side_effect = lambda key: {
+        # Create proper tags dict-like object for the test
+        mock_tags = {
             "code.study_key_hash": parent_study_key_hash,
             "code.study_family_hash": parent_study_family_hash,
-        }.get(key)
+        }
+        mock_parent_run.data.tags = mock_tags
         mock_trial_run = MagicMock()
         mock_trial_run.info.run_id = "trial-run-456"
         mock_client.get_run.return_value = mock_parent_run
@@ -188,7 +190,7 @@ class TestCVTrialRunHashComputation:
         mock_active_run.info.experiment_id = "exp-123"
         mock_parent_run = MagicMock()
         mock_parent_run.info.run_id = "parent-run-123"
-        mock_parent_run.data.tags.get.return_value = None  # No tags
+        mock_parent_run.data.tags = {}  # No tags - use actual dict
         mock_trial_run = MagicMock()
         mock_trial_run.info.run_id = "trial-run-456"
         mock_client.get_run.return_value = mock_parent_run
@@ -263,9 +265,9 @@ class TestCVTrialRunHashComputation:
         mock_active_run.info.experiment_id = "exp-123"
         mock_parent_run = MagicMock()
         mock_parent_run.info.run_id = "parent-run-123"
-        mock_parent_run.data.tags.get.side_effect = lambda key: {
+        mock_parent_run.data.tags = {
             "code.study_key_hash": expected_study_key_hash,
-        }.get(key)
+        }  # Use actual dict
         mock_trial_run = MagicMock()
         mock_trial_run.info.run_id = "trial-run-456"
         mock_client.get_run.return_value = mock_parent_run

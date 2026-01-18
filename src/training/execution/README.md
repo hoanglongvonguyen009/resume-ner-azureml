@@ -114,11 +114,17 @@ apply_lineage_tags(lineage, mlflow_run)
 
 ### MLflow Setup
 
-**Note**: Always call `infrastructure.tracking.mlflow.setup.setup_mlflow()` (SSOT) before using these functions.
+**Layering**: This module handles training-specific run creation and lifecycle management. It does NOT handle MLflow setup/configuration.
+
+**Prerequisites**: Always call `infrastructure.tracking.mlflow.setup.setup_mlflow()` (SSOT) **first** before using these functions.
 
 - `create_training_mlflow_run(...)`: Create MLflow run for training
 - `create_training_child_run(...)`: Create child MLflow run
 - `setup_mlflow_tracking_env(...)`: Setup MLflow tracking environment
+
+**See Also**: 
+- [`docs/design/mlflow-layering.md`](../../../docs/design/mlflow-layering.md) - Detailed MLflow setup layering documentation
+- [`docs/architecture/mlflow-utilities.md`](../../../docs/architecture/mlflow-utilities.md) - Consolidated patterns and best practices
 
 ### Distributed Training
 
@@ -132,7 +138,10 @@ apply_lineage_tags(lineage, mlflow_run)
 - `extract_lineage_from_best_model(...)`: Extract lineage from best model
 - `apply_lineage_tags(...)`: Apply lineage tags to MLflow run
 - `add_training_tags(...)`: Add training tags to MLflow run
-- `build_training_run_name_with_fallback(...)`: Build training run name
+- `build_training_run_name_with_fallback(..., config_dir: Optional[Path] = None)`: Build training run name with fallback logic
+  - **Accepts `config_dir` parameter**: Pass `config_dir` explicitly when available (follows "trust provided parameter" pattern)
+  - **Trusts provided `config_dir`**: Only infers when parameter is `None`
+  - Uses infrastructure naming as primary, falls back to policy-based or legacy naming
 
 ### High-Level Execution
 
@@ -164,6 +173,16 @@ For detailed signatures, see source code.
 ```bash
 uvx pytest tests/training/execution/
 ```
+
+## Best Practices
+
+1. **MLflow setup layering**: Always call `infrastructure.tracking.mlflow.setup.setup_mlflow()` first, then use functions from this module for run creation
+2. **Trust provided parameters**: When calling functions that accept `config_dir`, trust the provided value - inference only occurs when explicitly `None` (DRY principle)
+3. **Use consolidated utilities**: Use centralized hash utilities (`get_or_compute_study_key_hash()`, `get_or_compute_trial_key_hash()`) instead of manually retrieving hashes from MLflow runs
+
+**See Also**: 
+- [`docs/architecture/mlflow-utilities.md`](../../../docs/architecture/mlflow-utilities.md) - Consolidated patterns, SSOT functions, and usage examples
+- [`docs/design/mlflow-layering.md`](../../../docs/design/mlflow-layering.md) - Detailed MLflow setup layering documentation
 
 ## Related Modules
 

@@ -51,7 +51,7 @@ Training, deployment, and other modules should call `infrastructure.tracking.mlf
   - `finder.py`: Run finding and querying
   - `artifacts/`: Artifact upload and download
   - `trackers/`: Specialized trackers (sweep, training, benchmark, conversion)
-  - `hash_utils.py`: Hash computation for tracking
+  - `hash_utils.py`: Hash computation for tracking (includes consolidated hash computation utilities)
   - `urls.py`: URL generation for MLflow runs
   - `lifecycle.py`: Run lifecycle management
   - `queries.py`: Query utilities
@@ -138,7 +138,57 @@ for run in runs:
 - `MLflowBenchmarkTracker`: Tracker for benchmarking runs
 - `MLflowConversionTracker`: Tracker for conversion runs
 
+### Hash Computation Utilities
+
+Consolidated utilities for hash computation with fallback hierarchy:
+
+- `get_or_compute_study_key_hash(...)`: **Consolidated utility for study key hash computation**. Implements fallback hierarchy:
+  1. Use provided `study_key_hash` (if available)
+  2. Retrieve from MLflow run tags (SSOT) - if `hpo_parent_run_id` provided
+  3. Compute from configs (fallback) - if `data_config`, `hpo_config`, `train_config`, `backbone` available
+  
+  This function consolidates the common pattern used across HPO and training execution scripts.
+
+- `get_or_compute_trial_key_hash(...)`: **Consolidated utility for trial key hash computation**. Implements fallback hierarchy:
+  1. Use provided `trial_key_hash` (if available)
+  2. Retrieve from MLflow run tags (SSOT) - if `trial_run_id` provided
+  3. Compute from configs (fallback) - if `study_key_hash` and `hyperparameters` available
+
+**Usage Example**:
+```python
+from infrastructure.tracking.mlflow.hash_utils import (
+    get_or_compute_study_key_hash,
+    get_or_compute_trial_key_hash,
+)
+
+# Get or compute study key hash
+study_key_hash = get_or_compute_study_key_hash(
+    study_key_hash=None,  # Not provided
+    hpo_parent_run_id="parent-run-123",  # Try to retrieve from parent
+    data_config=data_config,
+    hpo_config=hpo_config,
+    train_config=train_config,
+    backbone="distilbert-base-uncased",
+    config_dir=config_dir,
+)
+
+# Get or compute trial key hash
+trial_key_hash = get_or_compute_trial_key_hash(
+    trial_key_hash=None,  # Not provided
+    trial_run_id=None,  # Not available
+    study_key_hash=study_key_hash,
+    hyperparameters={"learning_rate": 3e-5, "batch_size": 16},
+    config_dir=config_dir,
+)
+```
+
+**Best Practice**: Use these consolidated utilities instead of implementing inline hash computation patterns. They follow the SSOT pattern and provide consistent fallback behavior across all execution scripts.
+
 For detailed signatures, see source code.
+
+**See Also**: 
+- [`docs/architecture/mlflow-utilities.md`](../../../docs/architecture/mlflow-utilities.md) - Consolidated patterns and best practices
+- [`docs/design/mlflow-layering.md`](../../../docs/design/mlflow-layering.md) - MLflow setup layering documentation
 
 ## Integration Points
 
@@ -162,8 +212,14 @@ For detailed signatures, see source code.
 4. **Consistent naming**: Use naming utilities for consistent run names
 5. **Tag management**: Use tag utilities for consistent tagging
 6. **Explicit path parameters**: When calling tracker methods that upload artifacts (e.g., `log_best_checkpoint()`), pass explicit `config_dir` parameter to avoid path inference issues in Colab where checkpoints may be in Drive while project code is elsewhere
+7. **Trust provided parameters**: When calling utilities that accept `config_dir`, trust the provided value - inference only occurs when explicitly `None` (DRY principle)
+8. **Use centralized hash utilities**: Always use `get_or_compute_study_key_hash()` and `get_or_compute_trial_key_hash()` instead of manually retrieving hashes from MLflow runs
 
 **Note**: Training modules (e.g., `training.execution.mlflow_setup`) extend this module's setup with training-specific run lifecycle management. They assume MLflow has already been configured via `setup_mlflow()`.
+
+**See Also**: 
+- [`docs/architecture/mlflow-utilities.md`](../../../docs/architecture/mlflow-utilities.md) - Consolidated patterns, SSOT functions, and usage examples
+- [`docs/design/mlflow-layering.md`](../../../docs/design/mlflow-layering.md) - Detailed MLflow setup layering documentation
 
 ### Colab-Specific Considerations
 

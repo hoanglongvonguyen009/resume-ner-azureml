@@ -191,6 +191,63 @@ def resolve_project_paths(
     return root_dir, config_dir
 
 
+def resolve_project_paths_with_fallback(
+    output_dir: Optional[Path] = None,
+    config_dir: Optional[Path] = None,
+) -> tuple[Path, Path]:
+    """
+    Resolve project paths with standardized fallback logic.
+    
+    This function consolidates the common "standardized fallback" pattern used
+    across HPO and training execution scripts. It:
+    1. Calls `resolve_project_paths()` to resolve paths
+    2. Applies standardized fallback logic:
+       - If root_dir is None, uses Path.cwd()
+       - If config_dir is None after resolution, infers it using `infer_config_dir()`
+    
+    **Key principle**: Trusts provided `config_dir` if not None, following DRY principles.
+    Only infers when explicitly None.
+    
+    Args:
+        output_dir: Optional output directory path (e.g., `outputs/hpo/local/distilbert`).
+        config_dir: Optional config directory path (e.g., `config/`).
+                   If provided, trusted and used directly without inference.
+    
+    Returns:
+        Tuple of `(root_dir, config_dir)`. Both are Path (never None).
+    
+    Examples:
+        >>> # Trust provided config_dir (no inference)
+        >>> root_dir, config_dir = resolve_project_paths_with_fallback(
+        ...     output_dir=Path("/workspace/outputs/hpo/local/distilbert"),
+        ...     config_dir=Path("/workspace/config")
+        ... )
+        >>> assert config_dir == Path("/workspace/config")
+        >>> assert root_dir == Path("/workspace")
+        
+        >>> # Infer from output_dir when config_dir not provided
+        >>> root_dir, config_dir = resolve_project_paths_with_fallback(
+        ...     output_dir=Path("/workspace/outputs/hpo/local/distilbert")
+        ... )
+        >>> assert root_dir == Path("/workspace")
+        >>> assert config_dir == Path("/workspace/config")
+    """
+    root_dir, resolved_config_dir = resolve_project_paths(
+        output_dir=output_dir,
+        config_dir=config_dir,
+    )
+    
+    # Standardized fallback: use resolved value, or provided parameter, or infer
+    if root_dir is None:
+        root_dir = Path.cwd()
+    
+    # Use resolved config_dir, or provided config_dir, or infer as last resort
+    config_dir = resolved_config_dir or config_dir
+    if config_dir is None:
+        config_dir = infer_config_dir(path=root_dir) if root_dir else infer_config_dir()
+    
+    return root_dir, config_dir
+
 
 
 

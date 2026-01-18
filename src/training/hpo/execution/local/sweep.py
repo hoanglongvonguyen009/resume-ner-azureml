@@ -216,14 +216,21 @@ def create_local_hpo_objective(
         try:
             from infrastructure.tracking.mlflow.utils import get_mlflow_run_id
             hpo_parent_run_id = get_mlflow_run_id()
-            # Get grouping tags from parent run
+            # Get grouping tags from parent run using centralized utilities
             try:
-                client = mlflow.tracking.MlflowClient()
-                parent_run = client.get_run(hpo_parent_run_id)
-                study_key_hash = parent_run.data.tags.get(
-                    "code.study_key_hash")
-                study_family_hash = parent_run.data.tags.get(
-                    "code.study_family_hash")
+                from mlflow.tracking import MlflowClient
+                from infrastructure.tracking.mlflow.hash_utils import (
+                    get_study_key_hash_from_run,
+                    get_study_family_hash_from_run,
+                )
+                client = MlflowClient()
+                # Use centralized utilities for hash retrieval (SSOT)
+                study_key_hash = get_study_key_hash_from_run(
+                    hpo_parent_run_id, client, config_dir
+                )
+                study_family_hash = get_study_family_hash_from_run(
+                    hpo_parent_run_id, client, config_dir
+                )
             except Exception as e:
                 logger.debug(
                     f"Could not get grouping tags from parent run: {e}")
@@ -295,16 +302,13 @@ def create_local_hpo_objective(
                         try:
                             from infrastructure.naming import create_naming_context
                             from infrastructure.paths import build_output_path
-                            from infrastructure.paths.utils import resolve_project_paths
+                            from infrastructure.paths.utils import resolve_project_paths_with_fallback
                             
-                            # Resolve project paths for build_output_path()
-                            root_dir, resolved_config_dir = resolve_project_paths(
+                            # Resolve project paths for build_output_path() using consolidated utility
+                            root_dir, config_dir_for_path = resolve_project_paths_with_fallback(
                                 output_dir=output_base_dir,
                                 config_dir=config_dir,
                             )
-                            if root_dir is None:
-                                root_dir = Path.cwd()
-                            config_dir_for_path = resolved_config_dir or config_dir
                             
                             # Create NamingContext for trial
                             trial_context = create_naming_context(
@@ -481,11 +485,10 @@ def _set_phase2_hpo_tags(
         from infrastructure.naming.mlflow.tags_registry import load_tags_registry
         
         client = mlflow.tracking.MlflowClient()
-        # Use provided config_dir parameter (trust caller, don't re-infer)
-        # Only infer if explicitly None and cannot be derived
-        if config_dir is None:
-            from infrastructure.paths.utils import infer_config_dir
-            config_dir = infer_config_dir()
+        # Use resolve_project_paths_with_fallback() to consolidate path resolution
+        # Trust provided config_dir parameter (DRY principle)
+        from infrastructure.paths.utils import resolve_project_paths_with_fallback
+        _, config_dir = resolve_project_paths_with_fallback(output_dir=None, config_dir=config_dir)
         tags_registry = load_tags_registry(config_dir)
         
         # Compute fingerprints
@@ -714,22 +717,13 @@ def run_local_hpo_sweep(
             from infrastructure.paths import load_paths_config, apply_env_overrides, resolve_output_path
             from common.shared.platform_detection import detect_platform
 
-            # Use resolve_project_paths() to consolidate path resolution
-            from infrastructure.paths.utils import resolve_project_paths
+            # Use resolve_project_paths_with_fallback() to consolidate path resolution
+            from infrastructure.paths.utils import resolve_project_paths_with_fallback
             
-            root_dir, resolved_config_dir = resolve_project_paths(
+            root_dir, config_dir = resolve_project_paths_with_fallback(
                 output_dir=output_dir,
                 config_dir=project_config_dir,  # Use provided project_config_dir
             )
-            
-            # Standardized fallback: use resolved value, or provided parameter, or infer
-            if root_dir is None:
-                root_dir = Path.cwd()
-            # Use resolved config_dir, or provided project_config_dir, or infer as last resort
-            config_dir = resolved_config_dir or project_config_dir
-            if config_dir is None:
-                from infrastructure.paths.utils import infer_config_dir
-                config_dir = infer_config_dir(path=root_dir) if root_dir else infer_config_dir()
             hpo_base = resolve_output_path(root_dir, config_dir, "hpo")
             paths_config = load_paths_config(config_dir)
             storage_env = detect_platform()
@@ -1151,22 +1145,17 @@ def run_local_hpo_sweep(
                     if config_dir_for_refit is None:
                         config_dir_for_refit = project_config_dir
                     
-                    # Priority 1: Retrieve study_key_hash from parent run tags (SSOT)
-                    refit_study_key_hash = None
-                    if parent_run_id:
-                        refit_study_key_hash = get_study_key_hash_from_run(
-                            parent_run_id, client, config_dir_for_refit
-                            )
-
-                    # Priority 2: Compute v2 from configs if tags unavailable
-                    if not refit_study_key_hash and data_config and hpo_config and train_config:
-                        refit_study_key_hash = compute_study_key_hash_v2(
-                            data_config, hpo_config, train_config, backbone, config_dir_for_refit
-                        )
-                        if refit_study_key_hash:
-                                logger.debug(
-                                    f"[REFIT] Computed v2 study_key_hash from configs: "
-                                    f"{refit_study_key_hash[:16]}... (fallback)"
+                    # Use consolidated utility for study_key_hash computation
+                    from infrastructure.tracking.mlflow.hash_utils import get_or_compute_study_key_hash
+                    
+                    refit_study_key_hash = get_or_compute_study_key_hash(
+                        study_key_hash=None,  # Not pre-computed in refit context
+                        hpo_parent_run_id=parent_run_id,
+                        data_config=data_config,
+                        hpo_config=hpo_config,
+                        train_config=train_config,
+                        backbone=backbone,
+                        config_dir=config_dir_for_refit,
                                 )
 
                     # Priority 1: Retrieve study_family_hash from parent run tags (SSOT)

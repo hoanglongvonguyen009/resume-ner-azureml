@@ -97,6 +97,23 @@ mlflow_name = build_mlflow_run_name(
 )
 ```
 
+### Basic Example: Load Tags Registry
+
+```python
+from pathlib import Path
+from src.infrastructure.naming.mlflow.tags_registry import load_tags_registry
+
+# Load tags registry (SSOT for tags registry loading)
+tags_registry = load_tags_registry(config_dir=Path("config/"))
+
+# Use tags registry for tag building
+tags = build_tags_from_registry(context=context, registry=tags_registry)
+```
+
+**Note**: `load_tags_registry()` follows the "trust provided config_dir" pattern:
+- If `config_dir` is provided, it's used directly
+- Only infers when `config_dir` is `None`
+
 ### Basic Example: Build MLflow Tags
 
 ```python
@@ -155,6 +172,13 @@ trial_key = build_hpo_trial_key(
 - `build_mlflow_tags(...)`: Build MLflow tags
 - `build_hpo_study_key(...)`: Build HPO study key
 - `build_hpo_trial_key(...)`: Build HPO trial key
+
+### Tags Registry
+
+- `load_tags_registry(config_dir: Optional[Path] = None) -> TagsRegistry`: **SSOT for loading tags registry** from `config/tags.yaml`
+  - **Trusts provided `config_dir`**: Only infers when parameter is `None`
+  - Returns cached registry if already loaded for the same config_dir
+  - Falls back to defaults if config file not found
 
 ### Experiments
 

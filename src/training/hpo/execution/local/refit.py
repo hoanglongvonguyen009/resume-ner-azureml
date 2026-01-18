@@ -132,60 +132,42 @@ def run_refit_training(
         f"trial_number={trial_number}"
     )
 
-    # Use resolve_project_paths() to consolidate path resolution
+    # Use resolve_project_paths_with_fallback() to consolidate path resolution
     # (needed for v2 path construction)
-    from infrastructure.paths.utils import resolve_project_paths
+    from infrastructure.paths.utils import resolve_project_paths_with_fallback
     
-    root_dir, resolved_config_dir = resolve_project_paths(
+    root_dir, config_dir = resolve_project_paths_with_fallback(
         config_dir=config_dir,  # Use provided config_dir
     )
     
-    # Standardized fallback: use resolved value, or provided parameter, or infer
-    if root_dir is None:
-        root_dir = Path.cwd()
-    # Use resolved config_dir, or provided config_dir, or infer as last resort
-    config_dir = resolved_config_dir or config_dir
-    if config_dir is None:
-        from infrastructure.paths.utils import infer_config_dir
-        config_dir = infer_config_dir(path=root_dir) if root_dir else infer_config_dir()
+    # Use consolidated utilities for hash computation (follows SSOT pattern)
+    from infrastructure.tracking.mlflow.hash_utils import (
+        get_or_compute_study_key_hash,
+        get_or_compute_trial_key_hash,
+    )
 
-    # Follow SSOT pattern: Retrieve from tags first, then compute as fallback
-    # Priority 1: Use provided study_key_hash (should have been retrieved by caller)
-    # Priority 2: Retrieve study_key_hash from parent run tags (SSOT)
-    computed_study_key_hash = study_key_hash
-    if not computed_study_key_hash and hpo_parent_run_id:
-        try:
-            from infrastructure.tracking.mlflow.hash_utils import get_study_key_hash_from_run
-            import mlflow
-            client = mlflow.tracking.MlflowClient()
-            computed_study_key_hash = get_study_key_hash_from_run(
-                hpo_parent_run_id, client, config_dir
-            )
-            if computed_study_key_hash:
-                logger.debug(
-                    f"[REFIT] Retrieved study_key_hash={computed_study_key_hash[:16]}... "
-                    f"from parent run tags (SSOT)"
-                )
-        except Exception as e:
-            logger.debug(f"Could not retrieve study_key_hash from parent run: {e}")
+    # Note: refit.py doesn't have data_config, hpo_config, train_config available here,
+    # so we can only use provided study_key_hash or retrieve from parent run tags
+    computed_study_key_hash = get_or_compute_study_key_hash(
+        study_key_hash=study_key_hash,
+        hpo_parent_run_id=hpo_parent_run_id,
+        data_config=None,  # Not available in refit context
+        hpo_config=None,  # Not available in refit context
+        train_config=None,  # Not available in refit context
+        backbone=None,  # Not available in refit context
+        config_dir=config_dir,
+    )
 
-    # Priority 1: Use provided trial_key_hash (should have been retrieved from trial run by caller - SSOT)
-    # Priority 2: Compute trial_key_hash from trial parameters (fallback when trial run tags unavailable)
-    computed_trial_key_hash = trial_key_hash
-    if not computed_trial_key_hash and computed_study_key_hash and refit_params:
-        try:
-            from infrastructure.tracking.mlflow.hash_utils import compute_trial_key_hash_from_configs
-            computed_trial_key_hash = compute_trial_key_hash_from_configs(
-                computed_study_key_hash, refit_params, config_dir
-            )
-            if computed_trial_key_hash:
-                logger.warning(
-                    f"[REFIT] Computed trial_key_hash={computed_trial_key_hash[:16]}... "
-                    f"from trial parameters (fallback - may not match trial run hash). "
-                    f"Trial run tags should be used as SSOT."
-                )
-        except Exception as e:
-            logger.debug(f"Could not compute trial_key_hash from trial parameters: {e}")
+    # Compute trial_key_hash using consolidated utility
+    # Note: refit.py doesn't have trial_run_id available here, so we can only use
+    # provided trial_key_hash or compute from study_key_hash + hyperparameters
+    computed_trial_key_hash = get_or_compute_trial_key_hash(
+        trial_key_hash=trial_key_hash,
+        trial_run_id=None,  # Not available in refit context
+        study_key_hash=computed_study_key_hash,
+        hyperparameters=refit_params,
+        config_dir=config_dir,
+    )
 
     # Create NamingContext and MLflow run for refit FIRST (needed for v2 path construction)
     # Include study_key_hash and trial_key_hash for hash-driven naming consistency
@@ -231,15 +213,12 @@ def run_refit_training(
                 # Retry build_output_path() - it should work now with the fix
                 try:
                     from infrastructure.paths import build_output_path
-                    from infrastructure.paths.utils import resolve_project_paths
+                    from infrastructure.paths.utils import resolve_project_paths_with_fallback
                     
-                    root_dir, resolved_config_dir = resolve_project_paths(
+                    root_dir, config_dir_for_path = resolve_project_paths_with_fallback(
                         output_dir=output_dir,
                         config_dir=config_dir,
                     )
-                    if root_dir is None:
-                        root_dir = Path.cwd()
-                    config_dir_for_path = resolved_config_dir or config_dir
                     
                     refit_output_dir = build_output_path(root_dir, refit_context, config_dir=config_dir_for_path)
                     refit_output_dir.mkdir(parents=True, exist_ok=True)

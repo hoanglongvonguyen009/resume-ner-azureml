@@ -333,6 +333,9 @@ def train_model(
     # Use consolidated run name building with fallback
     from training.execution.run_names import build_training_run_name_with_fallback
 
+    # Extract config_dir from config if available (stored by build_training_config)
+    config_dir = config.get("_config_dir")
+
     run_id = config.get("training", {}).get("run_id", "unknown")
     run_name = build_training_run_name_with_fallback(
         process_type="final_training",
@@ -340,6 +343,7 @@ def train_model(
         output_dir=output_dir,
         backbone=backbone,
         run_id=run_id,
+        config_dir=config_dir,  # Pass config_dir explicitly (DRY principle)
     )
 
     # We'll use the tracker context manager later, after training completes

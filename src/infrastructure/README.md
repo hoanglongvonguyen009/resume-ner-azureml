@@ -230,6 +230,42 @@ setup_mlflow(config={
 1. **Use configuration files**: Always load configs from YAML files, don't hardcode
 2. **Repository root detection**: Use `detect_repo_root()` from `infrastructure.paths.repo` (canonical function)
 3. **Resolve paths through infrastructure**: Use `resolve_output_path` instead of hardcoding paths
+
+## Consolidation Patterns
+
+The infrastructure module follows consolidation patterns to eliminate DRY violations:
+
+### Trust Provided Parameters Pattern
+
+All functions that accept `config_dir: Optional[Path] = None` follow the "trust provided parameter" pattern:
+
+- **If `config_dir` is provided** (not `None`), it's used directly without inference
+- **Inference only occurs** when `config_dir` is explicitly `None`
+- This avoids redundant inference and follows DRY principles
+
+**Example:**
+```python
+# ✅ Good: Pass config_dir explicitly when available
+root_dir = detect_repo_root()
+config_dir = root_dir / "config"
+tags_registry = load_tags_registry(config_dir=config_dir)  # Uses provided config_dir directly
+
+# ✅ Also valid: Let function infer when config_dir is None
+tags_registry = load_tags_registry(config_dir=None)  # Function will infer
+```
+
+### Single Source of Truth (SSOT) Functions
+
+The following functions are SSOT for common operations:
+
+- **Path Resolution**: `infrastructure.paths.resolve.resolve_output_path()` - SSOT for output path resolution
+- **Path Building**: `infrastructure.paths.resolve.build_output_path()` - SSOT for building paths from patterns
+- **Project Paths**: `infrastructure.paths.utils.resolve_project_paths()` - SSOT for resolving root_dir and config_dir
+- **Tags Registry**: `infrastructure.naming.mlflow.tags_registry.load_tags_registry()` - SSOT for loading tags registry
+- **YAML Loading**: `common.shared.yaml_utils.load_yaml()` - SSOT for YAML file loading
+- **MLflow Setup**: `infrastructure.tracking.mlflow.setup.setup_mlflow()` - SSOT for MLflow configuration
+
+**Best Practice**: Always use SSOT functions instead of duplicating logic. If you need similar functionality, check if an SSOT function exists first.
 4. **Use naming policies**: Generate names using naming policies for consistency
 5. **Platform abstraction**: Use platform adapters instead of platform-specific code
 6. **MLflow setup**: Always use `infrastructure.tracking.mlflow.setup.setup_mlflow()` (SSOT) for MLflow configuration

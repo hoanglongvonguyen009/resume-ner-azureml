@@ -1636,7 +1636,6 @@ def _get_checkpoint_path_from_run(
         try:
             from evaluation.selection.local_selection_v2 import find_trial_checkpoint_by_hash
             from common.shared.platform_detection import detect_platform
-            from infrastructure.paths import build_output_path
             from infrastructure.naming.mlflow.tags_registry import load_tags_registry
             
             # Get backbone from run
@@ -1645,9 +1644,11 @@ def _get_checkpoint_path_from_run(
             backbone = run.data.tags.get(backbone_tag) or run.data.tags.get("code.model", "unknown")
             backbone_name = backbone.split("-")[0] if "-" in backbone else backbone
             
-            # Build HPO output directory path manually (outputs/hpo/{environment}/{backbone_name})
+            # Use SSOT for HPO output directory path resolution
+            from infrastructure.paths.resolve import resolve_output_path
             environment = detect_platform()
-            hpo_output_dir = root_dir / "outputs" / "hpo" / environment / backbone_name
+            hpo_base_dir = resolve_output_path(root_dir, config_dir, "hpo")
+            hpo_output_dir = hpo_base_dir / environment / backbone_name
             
             # Use single source of truth for local disk lookup
             checkpoint_path = find_trial_checkpoint_by_hash(

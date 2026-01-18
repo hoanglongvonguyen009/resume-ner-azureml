@@ -195,6 +195,20 @@ Supported search space parameter types:
 - `choice`: Categorical choice (values list)
 - `int_uniform`: Integer uniform distribution (min, max)
 
+## Best Practices
+
+1. **Use consolidated utilities**: Use consolidated utilities from infrastructure modules instead of implementing inline patterns:
+   - **Path resolution**: Use `resolve_project_paths_with_fallback()` from `infrastructure.paths.utils` for path resolution with standardized fallback logic
+   - **Hash computation**: Use `get_or_compute_study_key_hash()` and `get_or_compute_trial_key_hash()` from `infrastructure.tracking.mlflow.hash_utils` instead of implementing inline hash computation patterns
+2. **Trust provided parameters**: When calling utilities that accept `config_dir`, trust the provided value - inference only occurs when explicitly `None` (DRY principle)
+3. **Use SSOT for MLflow**: Always use `infrastructure.tracking.mlflow.setup.setup_mlflow()` for MLflow configuration. Call this **first** before using `setup_hpo_mlflow_run()`
+4. **Explicit path parameters**: Pass explicit `config_dir` parameter to avoid path inference issues in Colab where checkpoints may be in Drive while project code is elsewhere
+5. **Prefer v2 hash computation**: When `train_config` is available, pass it to `setup_hpo_mlflow_run()` to enable v2 hash computation (more accurate than v1)
+
+**See Also**: 
+- [`docs/architecture/mlflow-utilities.md`](../../../docs/architecture/mlflow-utilities.md) - Consolidated patterns, SSOT functions, and usage examples
+- [`docs/design/mlflow-layering.md`](../../../docs/design/mlflow-layering.md) - Detailed MLflow setup layering documentation
+
 ## Testing
 
 ```bash
