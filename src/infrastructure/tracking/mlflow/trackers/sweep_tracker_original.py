@@ -757,7 +757,7 @@ class MLflowSweepTracker(BaseTracker):
                 # Try to get the best trial's child run ID from MLflow tags on the parent run
                 try:
                     from infrastructure.tracking.mlflow.client import create_mlflow_client
-            client = create_mlflow_client()
+                    client = create_mlflow_client()
                     parent_run_data = client.get_run(
                         parent_run_id_for_artifacts)
                     if parent_run_data and parent_run_data.data and parent_run_data.data.tags:
@@ -770,7 +770,7 @@ class MLflowSweepTracker(BaseTracker):
                 if not best_trial_run_id:
                     try:
                         from infrastructure.tracking.mlflow.client import create_mlflow_client
-            client = create_mlflow_client()
+                        client = create_mlflow_client()
                         experiment_id = active_run.info.experiment_id
                         # Search for child runs of the parent run with matching trial number
                         child_runs = client.search_runs(

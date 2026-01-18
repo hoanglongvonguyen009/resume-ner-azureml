@@ -20,7 +20,26 @@ lifecycle:
   status: active
 """
 
-"""Configuration loading and building utilities."""
+"""Configuration loading and building utilities.
+
+**Layering**:
+- **YAML loading**: Uses `common.shared.yaml_utils.load_yaml()` (SSOT) directly
+- **This module**: Training-specific config builder (merges YAML configs with CLI args)
+
+**Related Modules**:
+- `common.shared.yaml_utils` - SSOT for YAML loading (used directly)
+- `infrastructure.config.loader` - Domain-specific config loaders (different purpose)
+
+**Boundaries**:
+- **common.shared.yaml_utils**: SSOT for YAML file loading (raw YAML parsing)
+- **training.config**: Training-specific config builder (merges configs with CLI args)
+- **infrastructure.config.loader**: Domain-specific config loaders (experiment configs, hashing)
+
+**When This Module Is Appropriate**:
+- Building training configuration from YAML files + CLI arguments
+- Training-specific config merging and override logic
+- Resolving distributed training configuration
+"""
 
 from pathlib import Path
 from typing import Dict, Any, Optional

@@ -13,6 +13,7 @@ from unittest.mock import Mock, patch, MagicMock
 from typing import Dict, Any
 
 from infrastructure.tracking.mlflow.trackers.sweep_tracker import MLflowSweepTracker
+from infrastructure.tracking.mlflow.trackers.sweep_tracker.trial_finder import extract_trial_number
 
 
 @pytest.fixture
@@ -109,7 +110,7 @@ class TestSweepTrackerV2HashComputation:
             with patch("infrastructure.tracking.mlflow.index.update_mlflow_index"):
                 with patch.object(tracker, "_log_sweep_metadata"):
                     # Stub tag-builder to avoid depending on full NamingContext implementation
-                    with patch("infrastructure.tracking.mlflow.trackers.sweep_tracker.build_mlflow_tags") as mock_build_tags:
+                    with patch("infrastructure.tracking.mlflow.trackers.sweep_tracker.tagging.build_mlflow_tags") as mock_build_tags:
                         mock_build_tags.return_value = {
                             "code.study_key_hash": "a" * 64,
                             "code.fingerprint.data": "data-fp",
@@ -166,7 +167,7 @@ class TestSweepTrackerV2HashComputation:
         with patch("mlflow.active_run", return_value=mock_run):
             with patch("infrastructure.tracking.mlflow.index.update_mlflow_index"):
                 with patch.object(tracker, "_log_sweep_metadata"):
-                    with patch("infrastructure.tracking.mlflow.trackers.sweep_tracker.build_mlflow_tags") as mock_build_tags:
+                    with patch("infrastructure.tracking.mlflow.trackers.sweep_tracker.tagging.build_mlflow_tags") as mock_build_tags:
                         mock_build_tags.return_value = {
                             "code.study_key_hash": "a" * 64,
                             "code.fingerprint.data": "data-fp",
@@ -219,7 +220,7 @@ class TestSweepTrackerV2HashComputation:
         with patch("mlflow.active_run", return_value=mock_run):
             with patch("infrastructure.tracking.mlflow.index.update_mlflow_index"):
                 with patch.object(tracker, "_log_sweep_metadata"):
-                    with patch("infrastructure.tracking.mlflow.trackers.sweep_tracker.build_mlflow_tags") as mock_build_tags:
+                    with patch("infrastructure.tracking.mlflow.trackers.sweep_tracker.tagging.build_mlflow_tags") as mock_build_tags:
                         mock_build_tags.return_value = {
                             "code.study_key_hash": "a" * 64,
                             "code.fingerprint.data": "data-fp",

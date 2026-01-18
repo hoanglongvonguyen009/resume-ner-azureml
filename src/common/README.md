@@ -211,65 +211,20 @@ set_seed(DEFAULT_RANDOM_SEED)
 
 ## API Reference
 
-### Logging Utilities
-
 - `get_logger(name: str, level: Optional[int] = None) -> logging.Logger`: Get configured logger
-- `get_script_logger(script_name: str) -> logging.Logger`: Get logger for CLI scripts
-
-### Hash Utilities
-
-- `compute_hash_64(data: str) -> str`: Compute full SHA256 hash (64 chars)
 - `compute_hash_16(data: str) -> str`: Compute truncated SHA256 hash (16 chars)
 - `compute_json_hash(data: Dict[str, Any], length: int = 64) -> str`: Hash JSON-serialized dict
-- `compute_selection_cache_key(...) -> str`: Compute cache key for selection logic
-
-### Dictionary Utilities
-
 - `deep_merge(defaults: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]`: Deep merge dictionaries
-
-### File Utilities
-
-- `verify_output_file(file_path: Path) -> None`: Verify output file exists and is readable
-- `get_file_mtime(file_path: Path) -> float`: Get file modification time
-
-### Platform Detection
-
 - `detect_platform() -> str`: Detect platform ("colab", "kaggle", "azure", or "local")
-- `resolve_platform_checkpoint_path(base_path: Path, relative_path: str, config_dir: Optional[Path] = None) -> Path`: **Low-level** platform-specific checkpoint path resolution. Maps paths to Google Drive in Colab, `/kaggle/working` in Kaggle, or uses provided path locally. This is the foundation for checkpoint path resolution - higher-level functions (e.g., `training.hpo.checkpoint.storage.resolve_storage_path()`) use this internally.
-- `is_drive_path(path: Path | str) -> bool`: Check if a path is already in Google Drive (starts with `/content/drive`)
-
-### Notebook Setup
-
+- `resolve_platform_checkpoint_path(base_path: Path, relative_path: str, config_dir: Optional[Path] = None) -> Path`: **Low-level** platform-specific checkpoint path resolution (foundation for checkpoint path resolution)
 - `detect_notebook_environment() -> NotebookEnvironment`: Detect notebook execution environment (Colab, Kaggle, local)
-- `find_repository_root(start_dir: Optional[Path] = None) -> Optional[Path]`: **Deprecated**. Use `detect_repo_root()` from `infrastructure.paths.repo` directly.
 - `setup_notebook_paths(root_dir: Optional[Path] = None, add_src_to_path: bool = True) -> NotebookPaths`: Setup notebook paths (root, config, src)
-- `get_platform_vars() -> dict[str, str | bool | Optional[Path]]`: Get platform variables as a dict (convenience function)
-- `ensure_mlflow_installed() -> None`: Install mlflow if needed (Colab/Kaggle only)
-- `ensure_src_in_path() -> Optional[Path]`: Ensure src/ is in Python path
-
-**Note**: `find_repository_root()` in `notebook_setup.py` is a backward-compatible wrapper around `detect_repo_root()` that returns `None` instead of raising. For new code, use `detect_repo_root()` directly:
-
-```python
-# ✅ Recommended for new code
-from infrastructure.paths.repo import detect_repo_root
-root_dir = detect_repo_root()  # Raises ValueError if not found
-```
-
-### MLflow Setup
-
-**Note**: These functions are internal implementation details. For MLflow setup, use `infrastructure.tracking.mlflow.setup.setup_mlflow()` (SSOT) instead.
-
-- `setup_mlflow_cross_platform(config: Dict) -> None`: **Internal** - Low-level MLflow setup (used by infrastructure layer)
-- `setup_mlflow_from_config(config_path: Path) -> None`: Setup MLflow from config file
-- `create_ml_client_from_config(config: Dict) -> Optional[MLClient]`: Create AzureML client
-
-### Tokenization Utilities
-
 - `prepare_onnx_inputs(texts: List[str], tokenizer) -> Dict`: Prepare inputs for ONNX model
-- `get_offset_mapping(text: str, tokenizer) -> List[Tuple[int, int]]`: Get token offset mappings
-- `prepare_onnx_inputs_with_offsets(...) -> Tuple[Dict, List]`: Prepare inputs with offsets
+- `STAGE_HPO`, `METRICS_FILENAME`, `DEFAULT_RANDOM_SEED`: Orchestration constants (stage names, file names, defaults)
 
-### Constants
+**Note**: `find_repository_root()` is deprecated - use `detect_repo_root()` from `infrastructure.paths.repo` instead. MLflow setup functions are internal - use `infrastructure.tracking.mlflow.setup.setup_mlflow()` (SSOT) instead.
+
+For detailed signatures and additional utilities (file operations, hash utilities, tokenization), see source code.
 
 - `STAGE_SMOKE`, `STAGE_HPO`, `STAGE_TRAINING`: Stage name constants
 - `EXPERIMENT_NAME`, `MODEL_NAME`, `PROD_STAGE`: Naming constants

@@ -111,76 +111,25 @@ search_space = create_search_space({
 
 ## API Reference
 
-### HPO Execution
-
 - `run_local_hpo_sweep(...)`: Run local HPO sweep using Optuna
-- `TrialExecutor`: Execute individual HPO trials
-
-### Search Space
-
-- `create_search_space(...)`: Create search space from configuration
-- `translate_search_space_to_optuna(...)`: Translate search space to Optuna format
-- `SearchSpaceTranslator`: Search space translation utilities
-
-### Study Management
-
 - `extract_best_config_from_study(...)`: Extract best configuration from Optuna study
-- `StudyManager`: Manage Optuna study creation, loading, and resume logic
-  - **Import**: `from training.hpo import StudyManager` or `from training.hpo.core import StudyManager`
-  - **Key method**: `create_or_load_study(output_dir, run_id, study_key_hash=...)` - Requires `study_key_hash` parameter for v2 path resolution
-- `create_study_name(...)`: Create study name from configuration
-- `HPOParentContext`: TypedDict for HPO parent run context
-  - **Import**: `from training.hpo.core import HPOParentContext` or `from training.hpo.core.types import HPOParentContext`
-  - **Fields**: `hpo_parent_run_id`, `study_key_hash`, `study_family_hash` (all Optional[str])
-  - Used for tracking parent-child relationships in HPO runs
-
-### Checkpoint Management
-
-**Layering**:
-- **Low-level**: `common.shared.platform_detection.resolve_platform_checkpoint_path()` - Platform-specific path resolution (Colab Drive, Kaggle, local)
-- **Mid-level**: `training.hpo.checkpoint.storage.resolve_storage_path()` - HPO-specific checkpoint storage path resolution (uses low-level function, uses v2 hash-based paths)
-- **High-level**: `training.hpo.utils.helpers.setup_checkpoint_storage()` - Complete checkpoint setup orchestration (uses mid-level function, handles Drive restore, resume logic)
-
-Functions:
-- `resolve_storage_path(...)`: Resolve checkpoint storage path with platform awareness (uses `resolve_platform_checkpoint_path()` internally)
-  - **Signature**: `resolve_storage_path(output_dir, checkpoint_config, backbone, study_key_hash, study_name=None, create_dirs=True)`
-  - **Required parameter**: `study_key_hash` (str) - Study key hash for v2 folder structure
-  - Uses v2 hash-based folder structure: `{backbone}/study-{study8}/study.db`
-    - `study8` is the first 8 characters of `study_key_hash`
-    - Example: `distilbert/study-c3659fea/study.db`
-  - **Legacy support**: `study_name` parameter is deprecated and kept only for compatibility
-  - Raises `ValueError` if `study_key_hash` is not provided
-- `get_storage_uri(...)`: Get checkpoint storage URI
-- `setup_checkpoint_storage(...)`: Set up checkpoint storage with Drive restore support
-  - **Required parameter**: `study_key_hash` (str) - Study key hash for v2 path resolution
-  - **V2 folder detection**: Checks for v2 study folder using `find_study_folder_in_backbone_dir()`
-  - This ensures v2 folders are used directly (local paths) rather than being mapped to Drive paths, preventing false positives in restore logic
+- `create_search_space(...)`: Create search space from configuration
+- `StudyManager`: Manage Optuna study creation, loading, and resume logic (requires `study_key_hash` for v2 path resolution)
+- `HPOParentContext`: TypedDict for HPO parent run context (`hpo_parent_run_id`, `study_key_hash`, `study_family_hash`)
+- `resolve_storage_path(...)`: Resolve checkpoint storage path with platform awareness (requires `study_key_hash`, uses v2 hash-based paths)
+- `setup_checkpoint_storage(...)`: Set up checkpoint storage with Drive restore support (requires `study_key_hash`)
+- `TrialExecutor`: Execute individual HPO trials
+- `SearchSpaceTranslator`: Search space translation utilities
 - `CheckpointCleanupManager`: Manage checkpoint cleanup
 
-**Note**: When checkpoints are stored in Google Drive (Colab), the system automatically detects Drive paths and skips redundant `restore_from_drive()` calls to prevent path resolution errors.
+**Checkpoint Management Layering**:
+- **Low-level**: `common.shared.platform_detection.resolve_platform_checkpoint_path()` - Platform-specific path resolution
+- **Mid-level**: `training.hpo.checkpoint.storage.resolve_storage_path()` - HPO-specific checkpoint storage (uses v2 hash-based paths)
+- **High-level**: `training.hpo.utils.helpers.setup_checkpoint_storage()` - Complete checkpoint setup orchestration
 
-**Path Resolution**: The system uses v2 hash-based paths with `study_key_hash`, ensuring deterministic study folder names based on study configuration.
+**Backup System**: Uses `infrastructure.shared.backup` for centralized backup utilities. `study.db` is backed up immediately after creation/loading and incrementally after each trial.
 
-**Drive Backup**: The backup system (`infrastructure.shared.backup`) provides centralized backup utilities for all workflows:
-
-- **Standardized Immediate Backup**: `immediate_backup_if_needed()` provides generic immediate backup functionality:
-  - Used by HPO, training, conversion, and benchmarking workflows
-  - Checks: backup_enabled, path exists, path not already in Drive (via `is_drive_path()`)
-  - Prevents crashes by rejecting Drive paths early
-  - Consistent behavior across all workflows (standardized pattern)
-- **HPO-Specific Incremental Backup**: 
-  - **Immediate Backup**: `study.db` is backed up immediately after study creation/loading in `run_local_hpo_sweep()` using `immediate_backup_if_needed()`
-  - **Incremental Backup**: An Optuna callback (`create_incremental_backup_callback()`) backs up `study.db` after each completed trial
-  - **Simplified Logic**: The backup system (`backup_hpo_study_to_drive()`) uses v2 study folders directly:
-    - Checks for v2 study folders first using `find_study_folder_in_backbone_dir()` before any fallback
-    - Uses v2 folder paths directly (not `resolve_storage_path()` which maps to Drive)
-    - Verifies actual file existence before backup
-    - Skips backup for paths already in Drive (detected via `is_drive_path()`)
-  - **Centralized Callbacks**: Reusable backup callbacks (`create_incremental_backup_callback()`, `create_study_db_backup_callback()`) can be used for any Optuna study
-- **Drive Path Rejection**: The backup API (`infrastructure.storage.drive.DriveBackupStore`) rejects Drive paths early to prevent crashes
-- This ensures all workflow outputs (study.db, checkpoints, ONNX models) are properly backed up to Drive in Colab environments with minimal data loss risk
-
-For detailed signatures, see source code.
+For detailed signatures and additional utilities, see source code.
 
 ## Integration Points
 

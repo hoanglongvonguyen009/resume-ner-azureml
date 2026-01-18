@@ -29,6 +29,30 @@ ci:
 lifecycle:
   status: active
 """
+
+"""Domain-specific configuration loaders.
+
+**Layering**:
+- **YAML loading**: Uses `common.shared.yaml_utils.load_yaml()` (SSOT) internally
+- **This module**: Provides domain-specific abstractions (ExperimentConfig, config hashing)
+- **training.config**: Training-specific config builder (uses `load_yaml()` directly)
+
+**Boundaries**:
+- **common.shared.yaml_utils**: SSOT for YAML file loading (raw YAML parsing)
+- **infrastructure.config.loader**: Domain-specific config loaders (experiment configs, hashing)
+- **training.config**: Training-specific config builder (merges configs with CLI args)
+
+**When Domain-Specific Loaders Are Appropriate**:
+- When you need structured config objects (e.g., `ExperimentConfig` dataclass)
+- When you need config hashing or metadata computation
+- When you need to load multiple related configs together
+- When you need domain-specific validation or transformation
+
+**When to Use SSOT Directly**:
+- Simple YAML file loading without domain-specific logic
+- Test fixtures and test utilities
+- One-off config loading in scripts
+"""
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict

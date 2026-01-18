@@ -26,7 +26,25 @@ lifecycle:
   status: active
 """
 
-"""Platform-aware MLflow setup utility for cross-platform tracking."""
+"""Platform-aware MLflow setup utility for cross-platform tracking.
+
+**Layering**:
+- This module provides low-level cross-platform MLflow setup utilities.
+- It is wrapped by `infrastructure.tracking.mlflow.setup.setup_mlflow()` (SSOT).
+- Higher-level code should use `infrastructure.tracking.mlflow.setup.setup_mlflow()` instead
+  of calling functions in this module directly.
+
+**Related Modules**:
+- `infrastructure.tracking.mlflow.setup` - SSOT for MLflow configuration (wraps this module)
+- `training.execution.mlflow_setup` - Training run lifecycle (assumes MLflow configured)
+- `training.hpo.tracking.setup` - HPO naming context (assumes MLflow configured)
+
+**Boundaries**:
+- **This module**: Low-level platform detection, Azure ML URI handling, cross-platform setup
+- **infrastructure.tracking.mlflow.setup**: High-level unified interface (SSOT) - use this instead
+- **training.execution.mlflow_setup**: Run lifecycle management (different responsibility)
+- **training.hpo.tracking.setup**: HPO naming context (different responsibility)
+"""
 
 import os
 import sys

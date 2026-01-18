@@ -336,7 +336,7 @@ def find_run_by_trial_id(
     
     try:
         from infrastructure.tracking.mlflow.client import create_mlflow_client
-    client = create_mlflow_client()
+        client = create_mlflow_client()
         
         # Build filter string
         filter_string = f"tags.code.trial_id = '{trial_id}' AND (tags.code.interrupted != 'true' OR tags.code.interrupted IS NULL)"

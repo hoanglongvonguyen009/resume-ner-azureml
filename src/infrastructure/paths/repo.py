@@ -24,7 +24,16 @@ lifecycle:
   status: active
 """
 
-"""Unified repository root detection with configurable search strategies."""
+"""Unified repository root detection with configurable search strategies.
+
+**Single Source of Truth (SSOT)**:
+This module is the SSOT for repository root detection. All call sites should use
+`detect_repo_root()` from this module rather than manually searching for repository markers.
+
+**Related Modules**:
+- `infrastructure.paths.utils` - Path resolution utilities (uses this module internally)
+- `infrastructure.paths.config` - Repository root configuration loading
+"""
 
 from pathlib import Path
 from typing import Any, Optional

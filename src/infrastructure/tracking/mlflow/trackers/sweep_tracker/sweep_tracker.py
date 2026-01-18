@@ -73,6 +73,14 @@ from infrastructure.tracking.mlflow.trackers.sweep_tracker.trial_finder import (
 )
 
 # Import original methods that haven't been fully extracted yet
+# TODO: Complete migration - extract remaining methods and remove sweep_tracker_original.py
+# Migration Status: IN PROGRESS
+# See: MASTER-20260118-1608-consolidate-remaining-dry-violations-src-unified.plan.md
+# 
+# Remaining methods to extract:
+# - log_final_metrics() - delegates to _original
+# - log_best_checkpoint() - delegates to _original  
+# - log_tracking_info() - delegates to _original
 from infrastructure.tracking.mlflow.trackers.sweep_tracker_original import (
     MLflowSweepTracker as _MLflowSweepTrackerOriginal,
 )
@@ -92,6 +100,7 @@ class MLflowSweepTracker(BaseTracker):
         """
         super().__init__(experiment_name)
         # Use original implementation for methods not yet extracted
+        # TODO: Complete migration - extract log_final_metrics, log_best_checkpoint, log_tracking_info
         self._original = _MLflowSweepTrackerOriginal(experiment_name)
 
     @contextmanager
@@ -254,4 +263,54 @@ class MLflowSweepTracker(BaseTracker):
     def log_tracking_info(self) -> None:
         """Log MLflow tracking URI information for user visibility."""
         return self._original.log_tracking_info()
+
+    def _log_best_trial_id(
+        self,
+        study: Any,
+        parent_run_id: str,
+        run_name: Optional[str] = None,
+        should_resume: bool = False,
+        cached_child_runs: Optional[List] = None,
+        output_dir: Optional[Path] = None,
+    ) -> None:
+        """
+        Find and log the best trial's MLflow run ID.
+        
+        This method delegates to the original implementation during migration.
+        TODO: Extract to sweep_tracker module when migration completes.
+        """
+        return self._original._log_best_trial_id(
+            study=study,
+            parent_run_id=parent_run_id,
+            run_name=run_name,
+            should_resume=should_resume,
+            cached_child_runs=cached_child_runs,
+            output_dir=output_dir,
+        )
+
+    def _log_sweep_metadata(
+        self,
+        hpo_config: Dict[str, Any],
+        backbone: str,
+        study_name: str,
+        checkpoint_config: Optional[Dict[str, Any]],
+        storage_path: Optional[Any],
+        should_resume: bool,
+        output_dir: Optional[Path] = None,
+    ) -> None:
+        """
+        Log sweep metadata to MLflow run.
+        
+        This method delegates to the original implementation during migration.
+        TODO: Remove when migration completes - use log_sweep_metadata from metrics module instead.
+        """
+        return self._original._log_sweep_metadata(
+            hpo_config=hpo_config,
+            backbone=backbone,
+            study_name=study_name,
+            checkpoint_config=checkpoint_config,
+            storage_path=storage_path,
+            should_resume=should_resume,
+            output_dir=output_dir,
+        )
 

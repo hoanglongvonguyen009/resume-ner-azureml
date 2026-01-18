@@ -27,8 +27,10 @@ lifecycle:
 from pathlib import Path
 from typing import Any, Dict
 
-from azure.ai.ml import Input, Output, command
+from azure.ai.ml import Output, command
 from azure.ai.ml.entities import Environment, Job, Data
+
+from infrastructure.azureml import build_data_input_from_asset
 
 DEFAULT_RANDOM_SEED = 42
 
@@ -82,22 +84,6 @@ def validate_final_training_job(job: Job) -> None:
     if job.status != "Completed":
         raise ValueError(f"Final training job failed with status: {job.status}")
 
-def _build_data_input_from_asset(data_asset: Data) -> Input:
-    """
-    Build a standard Azure ML ``Input`` for a ``uri_folder`` data asset.
-
-    Args:
-        data_asset: Registered Azure ML data asset.
-
-    Returns:
-        Input pointing at the asset, mounted as a folder.
-    """
-    return Input(
-        type="uri_folder",
-        path=f"azureml:{data_asset.name}:{data_asset.version}",
-        mode="mount",
-    )
-
 def create_final_training_job(
     script_path: Path,
     data_asset: Data,
@@ -146,7 +132,7 @@ def create_final_training_job(
         f"--use-combined-data {str(final_config['use_combined_data']).lower()}"
     )
 
-    data_input = _build_data_input_from_asset(data_asset)
+    data_input = build_data_input_from_asset(data_asset)
 
     # Use the project root as code snapshot so both `src/` and `config/` are included.
     # Azure ML automatically sets AZURE_ML_OUTPUT_checkpoint for the named "checkpoint"

@@ -222,12 +222,16 @@ python -m src.training.cli.train \
 
 ### AzureML Job Creation
 
-- `training.azureml.build_final_training_config(...)`: Build final training config from best HPO config
-- `training.azureml.create_final_training_job(...)`: Create AzureML final training job
-- `training.azureml.validate_final_training_job(...)`: Validate training job completion
-- `training.hpo.azureml.create_hpo_sweep_job_for_backbone(...)`: Create AzureML HPO sweep job
-- `training.hpo.azureml.create_dry_run_sweep_job_for_backbone(...)`: Create dry-run HPO sweep job
-- `training.hpo.azureml.validate_sweep_job(...)`: Validate sweep job completion
+- `training.execution.jobs.build_final_training_config(...)`: Build final training config from best HPO config
+- `training.execution.jobs.create_final_training_job(...)`: Create AzureML final training job
+- `training.execution.jobs.validate_final_training_job(...)`: Validate training job completion
+
+**Note**: The `training.azureml` import path is deprecated but still works for backward compatibility. Use `training.execution.jobs` for new code.
+- `training.hpo.execution.azureml.create_hpo_sweep_job_for_backbone(...)`: Create AzureML HPO sweep job
+- `training.hpo.execution.azureml.create_dry_run_sweep_job_for_backbone(...)`: Create dry-run HPO sweep job
+- `training.hpo.execution.azureml.validate_sweep_job(...)`: Validate sweep job completion
+
+**Note**: The `training.hpo.azureml` import path is deprecated but still works for backward compatibility. Use `training.hpo.execution.azureml` for new code.
 
 ### Configuration
 

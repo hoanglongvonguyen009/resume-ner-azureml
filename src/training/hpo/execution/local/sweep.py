@@ -47,7 +47,9 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
 
 # Re-export from original file for backward compatibility
-# TODO: Extract functions into focused modules incrementally
+# TODO: Complete migration - extract functions into focused modules and remove sweep_original.py
+# See: MASTER-20260118-1608-consolidate-remaining-dry-violations-src-unified.plan.md
+# Migration Status: IN PROGRESS
 from training.hpo.execution.local.sweep_original import (
     create_local_hpo_objective,
     run_local_hpo_sweep,

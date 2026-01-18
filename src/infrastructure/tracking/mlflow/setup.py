@@ -41,6 +41,19 @@ directly calling mlflow.set_tracking_uri() or mlflow.set_experiment().
 - Run lifecycle management (creating runs, tags, parent/child relationships) is
   handled by `infrastructure.tracking.mlflow.runs` and trackers, which assume
   MLflow has already been configured by this module.
+
+**Related Modules**:
+- `common.shared.mlflow_setup` - Low-level cross-platform setup (wrapped by this module)
+- `training.execution.mlflow_setup` - Training run lifecycle management (creates runs, manages parent/child)
+- `training.hpo.tracking.setup` - HPO-specific naming context and run name generation
+- `testing.setup.environment_setup` - Testing-specific MLflow initialization
+
+**Boundaries**:
+- **This module**: MLflow configuration (tracking URI, experiment setup) - SSOT
+- **training.execution.mlflow_setup**: Run creation and lifecycle (assumes MLflow configured)
+- **training.hpo.tracking.setup**: HPO naming context (assumes MLflow configured)
+- **common.shared.mlflow_setup**: Low-level platform detection and Azure ML URI handling
+- **testing.setup.environment_setup**: Test environment initialization (may call this module)
 """
 
 import os

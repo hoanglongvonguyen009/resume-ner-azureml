@@ -28,15 +28,37 @@ lifecycle:
 This module provides utilities for resolving project paths and configuration directories.
 All functions follow the DRY principle: "trust provided parameters, only infer when None".
 
-Key Functions:
-- `resolve_project_paths_with_fallback()`: Primary function for most call sites (with fallback logic)
-- `resolve_project_paths()`: Direct resolution without fallback logic
-- `infer_config_dir()`: Direct inference of config directory
+**Single Source of Truth (SSOT)**:
+This module is the SSOT for path resolution across the codebase. All call sites should use
+functions from this module rather than manually inferring paths.
 
-DRY Principle:
+**Key Functions**:
+- `resolve_project_paths_with_fallback()`: **Primary function for most call sites** (with fallback logic)
+- `resolve_project_paths()`: Direct resolution without fallback logic (use only when fallback not desired)
+- `infer_config_dir()`: Direct inference of config directory (use only when root_dir not needed)
+- `detect_repo_root()`: Repository root detection (from `infrastructure.paths.repo`)
+
+**Decision Tree: When to Use Which Function**:
+1. **Need both root_dir and config_dir with fallback?**
+   → Use `resolve_project_paths_with_fallback()` (most common case)
+   
+2. **Need both root_dir and config_dir without fallback?**
+   → Use `resolve_project_paths()`
+   
+3. **Only need config_dir, don't need root_dir?**
+   → Use `infer_config_dir()`
+   
+4. **Only need root_dir?**
+   → Use `detect_repo_root()` from `infrastructure.paths.repo`
+
+**DRY Principle**:
 When a function receives `config_dir` (or similar parameter), it should **trust** the provided
 value if not `None`. Only infer when explicitly `None`. This prevents unnecessary re-inference
 and potential inconsistencies.
+
+**Related Modules**:
+- `infrastructure.paths.repo` - Repository root detection (used internally)
+- `infrastructure.paths.output` - Output path resolution (uses functions from this module)
 """
 
 from pathlib import Path

@@ -124,55 +124,20 @@ save_cache_with_dual_strategy(
 
 ## API Reference
 
-### Path Resolution
-
 - `resolve_output_path(root_dir: Path, config_dir: Path, category: str, **kwargs) -> Path`: Resolve output path from config
 - `build_output_path(pattern: str, **kwargs) -> Path`: Build path from pattern
-- `PROCESS_PATTERN_KEYS`: Mapping from process_type to pattern keys
-
-### Path Validation
-
-- `validate_output_path(path: Path) -> None`: Validate output path
-- `validate_path_before_mkdir(path: Path) -> None`: Validate path before creating directory
-
-### Path Parsing
-
+- `detect_repo_root(...) -> Path`: **Unified repository root detection** (canonical function, uses configurable search strategies from `config/paths.yaml`)
+- `resolve_project_paths_with_fallback(...) -> tuple[Path, Path]`: **Preferred SSOT** for path resolution with standardized fallback logic (use for most call sites)
+- `resolve_project_paths(...) -> tuple[Path, Path]`: SSOT for resolving both root_dir and config_dir (use when fallback logic not desired)
 - `parse_hpo_path_v2(path: Path) -> Dict[str, str]`: Parse HPO path v2 format
-- `is_v2_path(path: Path) -> bool`: Check if path is v2 format
 - `find_study_by_hash(base_dir: Path, study_hash: str) -> Optional[Path]`: Find study by hash
-- `find_trial_by_hash(base_dir: Path, trial_hash: str) -> Optional[Path]`: Find trial by hash
-
-### Cache Management
-
-- `get_cache_file_path(...)`: Get cache file path
-- `get_cache_strategy_config(config_dir: Path, cache_type: str) -> Dict[str, Any]`: Get cache strategy configuration
-  - Returns strategy config from `paths.yaml` with defaults: `{"strategy": "dual", "latest": {"enabled": True}, "index": {"enabled": True}}`
-  - Strategy types: `"dual"` (timestamped + latest + index), `"timestamped"` (timestamped only), `"latest"` (latest only)
+- `get_cache_file_path(...) -> Path`: Get cache file path
 - `save_cache_with_dual_strategy(...)`: Save cache with dual strategy (timestamped, latest, and index files)
-- `load_cache_file(...)`: Load cache file (supports latest, specific timestamp, or identifier)
+- `validate_output_path(path: Path) -> None`: Validate output path
 
-### Repository Root Detection
+**Pattern**: All path utilities follow the "trust provided config_dir" pattern - if `config_dir` is provided (not `None`), it's used directly without inference.
 
-- `detect_repo_root(start_path: Optional[Path] = None, config_dir: Optional[Path] = None, output_dir: Optional[Path] = None, use_cache: Optional[bool] = None) -> Path`: **Unified repository root detection function** (canonical function). Uses configurable search strategies from `config/paths.yaml`. Returns `Path` (raises `ValueError` if not found).
-- `validate_repo_root(candidate: Path, config: Optional[dict] = None) -> bool`: Validate candidate directory is repository root. Checks required markers (config/, src/) and optional markers (.git, pyproject.toml).
-
-
-### Project Path Utilities
-
-- `infer_config_dir(config_dir: Optional[Path] = None, path: Optional[Path] = None, root_dir: Optional[Path] = None) -> Path`: Infer config directory. Uses `detect_repo_root()` internally if needed. **Use only for direct inference without needing root_dir**.
-- `resolve_project_paths(output_dir: Optional[Path] = None, config_dir: Optional[Path] = None, start_path: Optional[Path] = None) -> tuple[Path, Path]`: **SSOT for resolving both root_dir and config_dir**. Uses `detect_repo_root()` internally. **Trusts provided `config_dir` parameter** - only infers when `None`. **Use only when fallback logic is explicitly not desired**.
-- `resolve_project_paths_with_fallback(output_dir: Optional[Path] = None, config_dir: Optional[Path] = None) -> tuple[Path, Path]`: **Preferred SSOT** for path resolution with standardized fallback logic. This function consolidates the common "standardized fallback" pattern used across HPO and training execution scripts. **Use this for most call sites**. It:
-  1. Calls `resolve_project_paths()` to resolve paths
-  2. Applies standardized fallback logic:
-     - If `root_dir` is None, uses `Path.cwd()`
-     - If `config_dir` is None after resolution, infers it using `infer_config_dir()`
-  
-  **Key principle**: Trusts provided `config_dir` if not None, following DRY principles. Only infers when explicitly None.
-
-**Pattern**: All path utilities follow the "trust provided config_dir" pattern:
-- If `config_dir` is provided (not `None`), it's used directly without inference
-- Inference only occurs when `config_dir` is explicitly `None`
-- This avoids redundant inference and follows DRY principles
+For detailed signatures and additional utilities (path parsing, cache management, validation), see source code.
 
 **Usage Example**:
 ```python

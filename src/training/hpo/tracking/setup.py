@@ -11,10 +11,20 @@ Handles MLflow run name creation, context setup, and version commit for HPO swee
   It does NOT handle MLflow setup/configuration (tracking URI, experiment setup).
 - All functions in this module assume MLflow has already been configured via infrastructure setup.
 
+**Related Modules**:
+- `infrastructure.tracking.mlflow.setup` - SSOT for MLflow configuration (call this first)
+- `training.execution.mlflow_setup` - Training run lifecycle (different domain)
+- `infrastructure.naming.mlflow.run_names` - Run name generation utilities (used internally)
+
 **Usage Pattern**:
     1. Call `infrastructure.tracking.mlflow.setup.setup_mlflow()` first (in HPO orchestrator)
     2. Then use `setup_hpo_mlflow_run()` to create naming context and run names
     3. Use `commit_run_name_version()` to commit reserved versions if auto-increment was used
+
+**Boundaries**:
+- **This module**: HPO naming context and run name generation (assumes MLflow configured)
+- **infrastructure.tracking.mlflow.setup**: MLflow configuration (tracking URI, experiment) - SSOT
+- **training.execution.mlflow_setup**: Training run lifecycle (different domain)
 
 **Naming**:
 - Uses systematic naming via `infrastructure.naming.mlflow.run_names.build_mlflow_run_name()`

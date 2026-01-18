@@ -36,12 +36,9 @@ The `config` module provides configuration management:
 - `loader.py`: Experiment configuration loading and domain config loading
 - `merging.py`: Configuration merging and argument overrides
 - `validation.py`: Configuration validation
-- `run_mode.py`: Run mode utilities
-- `run_decision.py`: Run decision logic (reuse, resume, etc.)
+- `run_mode.py`, `run_decision.py`: Run mode utilities and decision logic (reuse, resume, etc.)
 - `variants.py`: Configuration variant management
-- `training.py`: Training-specific configuration loading
-- `selection.py`: Selection-specific configuration loading
-- `conversion.py`: Conversion-specific configuration loading
+- `training.py`, `selection.py`, `conversion.py`: Domain-specific configuration loading
 - `environment.py`: Environment configuration
 
 ## Usage

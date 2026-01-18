@@ -1,0 +1,1528 @@
+
+============================================================
+[INFO] Pytest log file: /workspaces/resume-ner-azureml/outputs/pytest_logs/pytest_20260118_162059.log
+============================================================
+
+============================= test session starts ==============================
+platform linux -- Python 3.10.19, pytest-9.0.2, pluggy-1.6.0 -- /opt/conda/envs/resume-ner-training/bin/python
+cachedir: .pytest_cache
+rootdir: /workspaces/resume-ner-azureml
+configfile: pytest.ini
+plugins: xdist-3.8.0, cov-7.0.0, asyncio-1.3.0, mock-3.15.1, anyio-4.12.1
+asyncio: mode=auto, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... 
+----------------------------- live log collection ------------------------------
+2026-01-18 16:21:03 INFO     infrastructure.tracking.mlflow.compatibility: Applied Azure ML artifact compatibility patch
+collected 1081 items / 40 errors
+
+==================================== ERRORS ====================================
+_ ERROR collecting tests/benchmarking/integration/test_benchmark_edge_cases.py _
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/benchmarking/integration/test_benchmark_edge_cases.py:9: in <module>
+    from evaluation.benchmarking.orchestrator import benchmark_best_trials
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+___ ERROR collecting tests/conversion/integration/test_conversion_config.py ____
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/conversion/integration/test_conversion_config.py:7: in <module>
+    from deployment.conversion.orchestration import run_conversion_workflow
+src/deployment/__init__.py:8: in <module>
+    from .conversion import run_conversion_workflow, execute_conversion
+src/deployment/conversion/__init__.py:14: in <module>
+    from .orchestration import run_conversion_workflow
+src/deployment/conversion/orchestration.py:63: in <module>
+    from infrastructure.tracking.mlflow.index import update_mlflow_index
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_ ERROR collecting tests/evaluation/selection/scripts/test_checkpoint_resolution_manual.py _
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/evaluation/selection/scripts/test_checkpoint_resolution_manual.py:22: in <module>
+    from evaluation.selection.artifact_acquisition import acquire_best_model_checkpoint
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+____ ERROR collecting tests/evaluation/selection/test_champion_selection.py ____
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/evaluation/selection/test_champion_selection.py:13: in <module>
+    from evaluation.selection.trial_finder import select_champion_per_backbone
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_ ERROR collecting tests/final_training/integration/test_final_training_component.py _
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/final_training/integration/test_final_training_component.py:10: in <module>
+    import training.execution.executor as executor
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_ ERROR collecting tests/final_training/integration/test_final_training_logging_intervals.py _
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/final_training/integration/test_final_training_logging_intervals.py:13: in <module>
+    import training.execution.executor as executor
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_____________ ERROR collecting tests/hpo/e2e/test_hpo_workflow.py ______________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/hpo/e2e/test_hpo_workflow.py:28: in <module>
+    from testing.orchestrators.test_orchestrator import (
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+src/testing/orchestrators/test_orchestrator.py:37: in <module>
+    from testing.services.hpo_executor import run_hpo_sweep_for_dataset
+src/testing/services/hpo_executor.py:42: in <module>
+    from training.hpo import run_local_hpo_sweep
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/hpo/__init__.py:84: in __getattr__
+    from .execution.local.sweep import run_local_hpo_sweep
+src/training/hpo/execution/local/__init__.py:3: in <module>
+    from .cv import run_training_trial_with_cv
+src/training/hpo/execution/local/cv.py:40: in <module>
+    from .trial import run_training_trial
+src/training/hpo/execution/local/trial.py:42: in <module>
+    from training.execution import (
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+________ ERROR collecting tests/hpo/integration/test_error_handling.py _________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/hpo/integration/test_error_handling.py:8: in <module>
+    from training.hpo import (
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/hpo/__init__.py:87: in __getattr__
+    from .execution.local.trial import TrialExecutor
+src/training/hpo/execution/local/__init__.py:3: in <module>
+    from .cv import run_training_trial_with_cv
+src/training/hpo/execution/local/cv.py:40: in <module>
+    from .trial import run_training_trial
+src/training/hpo/execution/local/trial.py:42: in <module>
+    from training.execution import (
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_______ ERROR collecting tests/hpo/integration/test_hpo_full_workflow.py _______
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/hpo/integration/test_hpo_full_workflow.py:15: in <module>
+    from training.hpo import run_local_hpo_sweep, extract_best_config_from_study
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/hpo/__init__.py:84: in __getattr__
+    from .execution.local.sweep import run_local_hpo_sweep
+src/training/hpo/execution/local/__init__.py:3: in <module>
+    from .cv import run_training_trial_with_cv
+src/training/hpo/execution/local/cv.py:40: in <module>
+    from .trial import run_training_trial
+src/training/hpo/execution/local/trial.py:42: in <module>
+    from training.execution import (
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+______ ERROR collecting tests/hpo/integration/test_hpo_resume_workflow.py ______
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/hpo/integration/test_hpo_resume_workflow.py:15: in <module>
+    from training.hpo import run_local_hpo_sweep
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/hpo/__init__.py:84: in __getattr__
+    from .execution.local.sweep import run_local_hpo_sweep
+src/training/hpo/execution/local/__init__.py:3: in <module>
+    from .cv import run_training_trial_with_cv
+src/training/hpo/execution/local/cv.py:40: in <module>
+    from .trial import run_training_trial
+src/training/hpo/execution/local/trial.py:42: in <module>
+    from training.execution import (
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+________ ERROR collecting tests/hpo/integration/test_hpo_sweep_setup.py ________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/hpo/integration/test_hpo_sweep_setup.py:9: in <module>
+    from training.hpo.tracking.setup import setup_hpo_mlflow_run
+src/training/hpo/tracking/__init__.py:3: in <module>
+    from .cleanup import cleanup_interrupted_runs, should_skip_cleanup
+src/training/hpo/tracking/cleanup.py:24: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+________ ERROR collecting tests/hpo/integration/test_refit_training.py _________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/hpo/integration/test_refit_training.py:15: in <module>
+    from training.hpo.execution.local.refit import run_refit_training
+src/training/hpo/execution/local/__init__.py:3: in <module>
+    from .cv import run_training_trial_with_cv
+src/training/hpo/execution/local/cv.py:40: in <module>
+    from .trial import run_training_trial
+src/training/hpo/execution/local/trial.py:42: in <module>
+    from training.execution import (
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+______ ERROR collecting tests/hpo/integration/test_smoke_yaml_options.py _______
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/hpo/integration/test_smoke_yaml_options.py:17: in <module>
+    from training.hpo.tracking.cleanup import should_skip_cleanup
+src/training/hpo/tracking/__init__.py:3: in <module>
+    from .cleanup import cleanup_interrupted_runs, should_skip_cleanup
+src/training/hpo/tracking/cleanup.py:24: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+________ ERROR collecting tests/hpo/integration/test_trial_execution.py ________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/hpo/integration/test_trial_execution.py:8: in <module>
+    from training.hpo import TrialExecutor
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/hpo/__init__.py:87: in __getattr__
+    from .execution.local.trial import TrialExecutor
+src/training/hpo/execution/local/__init__.py:3: in <module>
+    from .cv import run_training_trial_with_cv
+src/training/hpo/execution/local/cv.py:40: in <module>
+    from .trial import run_training_trial
+src/training/hpo/execution/local/trial.py:42: in <module>
+    from training.execution import (
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+__ ERROR collecting tests/infrastructure/tracking/unit/test_mlflow_queries.py __
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/infrastructure/tracking/unit/test_mlflow_queries.py:11: in <module>
+    from infrastructure.tracking.mlflow.queries import (
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_ ERROR collecting tests/infrastructure/tracking/unit/test_sweep_tracker_hash_and_search.py _
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/infrastructure/tracking/unit/test_sweep_tracker_hash_and_search.py:15: in <module>
+    from infrastructure.tracking.mlflow.trackers.sweep_tracker import MLflowSweepTracker
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+______________ ERROR collecting tests/integration/api/test_api.py ______________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/integration/api/test_api.py:10: in <module>
+    from src.deployment.api.app import app
+src/__init__.py:24: in <module>
+    from .training import train_model, build_training_config
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/__init__.py:61: in __getattr__
+    from .core import train_model
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/core/__init__.py:38: in __getattr__
+    from .trainer import train_model
+src/training/core/trainer.py:48: in <module>
+    from training.execution.distributed import RunContext, create_run_context
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_______ ERROR collecting tests/integration/api/test_inference_direct.py ________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/integration/api/test_inference_direct.py:7: in <module>
+    from src.deployment.api.inference import ONNXInferenceEngine
+src/__init__.py:24: in <module>
+    from .training import train_model, build_training_config
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/__init__.py:61: in __getattr__
+    from .core import train_model
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/core/__init__.py:38: in __getattr__
+    from .trainer import train_model
+src/training/core/trainer.py:48: in <module>
+    from training.execution.distributed import RunContext, create_run_context
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_____ ERROR collecting tests/integration/api/test_inference_performance.py _____
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/integration/api/test_inference_performance.py:13: in <module>
+    from src.deployment.api.inference import ONNXInferenceEngine
+src/__init__.py:24: in <module>
+    from .training import train_model, build_training_config
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/__init__.py:61: in __getattr__
+    from .core import train_model
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/core/__init__.py:38: in __getattr__
+    from .trainer import train_model
+src/training/core/trainer.py:48: in <module>
+    from training.execution.distributed import RunContext, create_run_context
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_ ERROR collecting tests/selection/integration/test_artifact_acquisition_edge_cases.py _
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/selection/integration/test_artifact_acquisition_edge_cases.py:7: in <module>
+    from evaluation.selection.artifact_acquisition import acquire_best_model_checkpoint
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_ ERROR collecting tests/selection/integration/test_artifact_acquisition_logic.py _
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/selection/integration/test_artifact_acquisition_logic.py:7: in <module>
+    from evaluation.selection.artifact_acquisition import acquire_best_model_checkpoint
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_ ERROR collecting tests/selection/integration/test_artifact_acquisition_unified_config.py _
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/selection/integration/test_artifact_acquisition_unified_config.py:11: in <module>
+    from evaluation.selection.artifact_unified.acquisition import acquire_artifact
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_ ERROR collecting tests/selection/integration/test_artifact_acquisition_workflow.py _
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/selection/integration/test_artifact_acquisition_workflow.py:7: in <module>
+    from evaluation.selection.artifact_acquisition import acquire_best_model_checkpoint
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+____ ERROR collecting tests/selection/integration/test_best_model_cache.py _____
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/selection/integration/test_best_model_cache.py:9: in <module>
+    from evaluation.selection.cache import (
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_ ERROR collecting tests/selection/integration/test_best_model_selection_config_integration.py _
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/selection/integration/test_best_model_selection_config_integration.py:17: in <module>
+    from evaluation.selection.mlflow_selection import find_best_model_from_mlflow
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_ ERROR collecting tests/selection/integration/test_mlflow_selection_config.py _
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/selection/integration/test_mlflow_selection_config.py:7: in <module>
+    from evaluation.selection.mlflow_selection import find_best_model_from_mlflow
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_ ERROR collecting tests/selection/integration/test_selection_cache_config.py __
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/selection/integration/test_selection_cache_config.py:8: in <module>
+    from evaluation.selection.cache import (
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+__ ERROR collecting tests/selection/integration/test_selection_edge_cases.py ___
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/selection/integration/test_selection_edge_cases.py:7: in <module>
+    from evaluation.selection.cache import compute_selection_cache_key
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+___ ERROR collecting tests/selection/integration/test_selection_workflow.py ____
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/selection/integration/test_selection_workflow.py:8: in <module>
+    from evaluation.selection.mlflow_selection import find_best_model_from_mlflow
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_ ERROR collecting tests/selection/unit/test_artifact_acquisition_config_comprehensive.py _
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/selection/unit/test_artifact_acquisition_config_comprehensive.py:19: in <module>
+    from evaluation.selection.artifact_unified.acquisition import acquire_artifact
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_________ ERROR collecting tests/selection/unit/test_study_summary.py __________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/selection/unit/test_study_summary.py:11: in <module>
+    from evaluation.selection.study_summary import (
+src/evaluation/__init__.py:15: in <module>
+    from .selection import (
+src/evaluation/selection/__init__.py:14: in <module>
+    from .mlflow_selection import find_best_model_from_mlflow
+src/evaluation/selection/mlflow_selection.py:61: in <module>
+    from infrastructure.tracking.mlflow.client import create_mlflow_client
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_ ERROR collecting tests/tracking/integration/test_tracking_config_enabled.py __
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/tracking/integration/test_tracking_config_enabled.py:14: in <module>
+    from infrastructure.tracking.mlflow.trackers.benchmark_tracker import MLflowBenchmarkTracker
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+_ ERROR collecting tests/tracking/unit/test_sweep_tracker_config_inference.py __
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/tracking/unit/test_sweep_tracker_config_inference.py:14: in <module>
+    from infrastructure.tracking.mlflow.trackers.sweep_tracker import MLflowSweepTracker
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+______________ ERROR collecting tests/unit/api/test_extractors.py ______________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/unit/api/test_extractors.py:7: in <module>
+    from src.deployment.api.extractors import (
+src/__init__.py:24: in <module>
+    from .training import train_model, build_training_config
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/__init__.py:61: in __getattr__
+    from .core import train_model
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/core/__init__.py:38: in __getattr__
+    from .trainer import train_model
+src/training/core/trainer.py:48: in <module>
+    from training.execution.distributed import RunContext, create_run_context
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+______________ ERROR collecting tests/unit/api/test_inference.py _______________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/unit/api/test_inference.py:8: in <module>
+    from src.deployment.api.inference import ONNXInferenceEngine
+src/__init__.py:24: in <module>
+    from .training import train_model, build_training_config
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/__init__.py:61: in __getattr__
+    from .core import train_model
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/core/__init__.py:38: in __getattr__
+    from .trainer import train_model
+src/training/core/trainer.py:48: in <module>
+    from training.execution.distributed import RunContext, create_run_context
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+___________ ERROR collecting tests/unit/api/test_inference_fixes.py ____________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/unit/api/test_inference_fixes.py:15: in <module>
+    from src.deployment.api.inference import ONNXInferenceEngine
+src/__init__.py:24: in <module>
+    from .training import train_model, build_training_config
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/__init__.py:61: in __getattr__
+    from .core import train_model
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/core/__init__.py:38: in __getattr__
+    from .trainer import train_model
+src/training/core/trainer.py:48: in <module>
+    from training.execution.distributed import RunContext, create_run_context
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+________ ERROR collecting tests/unit/api/test_inference_performance.py _________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/unit/api/test_inference_performance.py:24: in <module>
+    from src.deployment.api.inference import ONNXInferenceEngine
+src/__init__.py:24: in <module>
+    from .training import train_model, build_training_config
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/__init__.py:61: in __getattr__
+    from .core import train_model
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/core/__init__.py:38: in __getattr__
+    from .trainer import train_model
+src/training/core/trainer.py:48: in <module>
+    from training.execution.distributed import RunContext, create_run_context
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+__________ ERROR collecting tests/workflows/test_full_workflow_e2e.py __________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/workflows/test_full_workflow_e2e.py:68: in <module>
+    from training.execution import extract_lineage_from_best_model
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+___________ ERROR collecting tests/workflows/test_notebook_01_e2e.py ___________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/workflows/test_notebook_01_e2e.py:74: in <module>
+    from training.hpo import run_local_hpo_sweep
+<frozen importlib._bootstrap>:1075: in _handle_fromlist
+    ???
+src/training/hpo/__init__.py:84: in __getattr__
+    from .execution.local.sweep import run_local_hpo_sweep
+src/training/hpo/execution/local/__init__.py:3: in <module>
+    from .cv import run_training_trial_with_cv
+src/training/hpo/execution/local/cv.py:40: in <module>
+    from .trial import run_training_trial
+src/training/hpo/execution/local/trial.py:42: in <module>
+    from training.execution import (
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+___________ ERROR collecting tests/workflows/test_notebook_02_e2e.py ___________
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/opt/conda/envs/resume-ner-training/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1050: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/opt/conda/envs/resume-ner-training/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/workflows/test_notebook_02_e2e.py:44: in <module>
+    from training.execution import extract_lineage_from_best_model
+src/training/execution/__init__.py:28: in <module>
+    from .tags import apply_lineage_tags
+src/training/execution/tags.py:37: in <module>
+    from infrastructure.tracking.mlflow.finder import find_mlflow_run
+src/infrastructure/tracking/mlflow/__init__.py:17: in <module>
+    from .artifacts import (
+src/infrastructure/tracking/mlflow/artifacts/__init__.py:15: in <module>
+    from infrastructure.tracking.mlflow.artifacts.uploader import ArtifactUploader
+src/infrastructure/tracking/mlflow/artifacts/uploader.py:48: in <module>
+    _spec.loader.exec_module(_artifacts_module)
+E     File "/workspaces/resume-ner-azureml/src/infrastructure/tracking/mlflow/artifacts.py", line 302
+E       client.log_artifact(
+E   IndentationError: unexpected indent
+=========================== short test summary info ============================
+ERROR tests/benchmarking/integration/test_benchmark_edge_cases.py
+ERROR tests/conversion/integration/test_conversion_config.py
+ERROR tests/evaluation/selection/scripts/test_checkpoint_resolution_manual.py
+ERROR tests/evaluation/selection/test_champion_selection.py
+ERROR tests/final_training/integration/test_final_training_component.py
+ERROR tests/final_training/integration/test_final_training_logging_intervals.py
+ERROR tests/hpo/e2e/test_hpo_workflow.py
+ERROR tests/hpo/integration/test_error_handling.py
+ERROR tests/hpo/integration/test_hpo_full_workflow.py
+ERROR tests/hpo/integration/test_hpo_resume_workflow.py
+ERROR tests/hpo/integration/test_hpo_sweep_setup.py
+ERROR tests/hpo/integration/test_refit_training.py
+ERROR tests/hpo/integration/test_smoke_yaml_options.py
+ERROR tests/hpo/integration/test_trial_execution.py
+ERROR tests/infrastructure/tracking/unit/test_mlflow_queries.py
+ERROR tests/infrastructure/tracking/unit/test_sweep_tracker_hash_and_search.py
+ERROR tests/integration/api/test_api.py
+ERROR tests/integration/api/test_inference_direct.py
+ERROR tests/integration/api/test_inference_performance.py
+ERROR tests/selection/integration/test_artifact_acquisition_edge_cases.py
+ERROR tests/selection/integration/test_artifact_acquisition_logic.py
+ERROR tests/selection/integration/test_artifact_acquisition_unified_config.py
+ERROR tests/selection/integration/test_artifact_acquisition_workflow.py
+ERROR tests/selection/integration/test_best_model_cache.py
+ERROR tests/selection/integration/test_best_model_selection_config_integration.py
+ERROR tests/selection/integration/test_mlflow_selection_config.py
+ERROR tests/selection/integration/test_selection_cache_config.py
+ERROR tests/selection/integration/test_selection_edge_cases.py
+ERROR tests/selection/integration/test_selection_workflow.py
+ERROR tests/selection/unit/test_artifact_acquisition_config_comprehensive.py
+ERROR tests/selection/unit/test_study_summary.py
+ERROR tests/tracking/integration/test_tracking_config_enabled.py
+ERROR tests/tracking/unit/test_sweep_tracker_config_inference.py
+ERROR tests/unit/api/test_extractors.py
+ERROR tests/unit/api/test_inference.py
+ERROR tests/unit/api/test_inference_fixes.py
+ERROR tests/unit/api/test_inference_performance.py
+ERROR tests/workflows/test_full_workflow_e2e.py
+ERROR tests/workflows/test_notebook_01_e2e.py
+ERROR tests/workflows/test_notebook_02_e2e.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 40 errors during collection !!!!!!!!!!!!!!!!!!!
+============================= 40 errors in 15.58s ==============================
+
+============================================================
+[INFO] Pytest log file: /workspaces/resume-ner-azureml/outputs/pytest_logs/pytest_20260118_162059.log
+============================================================
+
+2026-01-18 16:21:03,902 - infrastructure.tracking.mlflow.compatibility - INFO - Applied Azure ML artifact compatibility patch
+
+ERROR conda.cli.main_run:execute(127): `conda run pytest tests/ -v --tb=short` failed. (See above for error)
+

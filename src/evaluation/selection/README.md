@@ -41,10 +41,7 @@ Selection supports both local (Optuna) and AzureML HPO results, with automatic s
 - `study_summary.py`: Study analysis and statistics
 - `artifact_acquisition.py`: Artifact discovery and acquisition
 - `artifact_unified/`: Unified artifact discovery and validation
-- `disk_loader.py`: Disk-based loading of trials and benchmarks
-- `cache.py`: Selection result caching
-- `experiment_discovery.py`: Experiment discovery utilities
-- `workflows/`: Selection workflows
+- `workflows/`: Selection workflows (`run_selection_workflow`, `run_benchmarking_workflow`)
 
 ## Usage
 
@@ -109,70 +106,20 @@ best_trials = find_best_trials_for_backbones(
 
 ## API Reference
 
-### Selection Functions
+### Main Selection Functions
 
-- `select_best_configuration_across_studies(...)`: Select best configuration across multiple backbone studies
+- `select_best_configuration_across_studies(...)`: Select best configuration across multiple backbone studies (local HPO)
 - `select_best_configuration(...)`: Select best configuration from AzureML sweep job
-- `extract_best_config_from_study(...)`: **Import from `training.hpo.core.study`** - Extract best config from Optuna study (canonical location)
 - `select_production_configuration(...)`: Alias for `select_best_configuration`
-
-### Trial Finding
-
 - `find_best_trials_for_backbones(...)`: Find best trials for each backbone
-- `find_study_folder_in_backbone_dir(...)`: Find v2 study folder in backbone directory
-  - Searches for v2 format folders: `study-{study8}` (e.g., `study-c3659fea`)
-  - Returns the first v2 study folder found, or None if not found
-  - Supports v2 hash-based folder structure only
-- `get_trial_hash_info(...)`: Get trial hash information
-  - **Uses centralized hash utilities**: Prioritizes MLflow tags (SSOT) when `run_id` is available
-  - Falls back to file metadata (`trial_meta.json`) when MLflow tags are unavailable
-  - Follows the consolidated hash extraction pattern from `infrastructure.tracking.mlflow.hash_utils`
-
-### Artifact Acquisition
-
-- `acquire_artifact(request, root_dir, config_dir, ...)`: **SSOT for artifact acquisition**
-  - **Accepts `config_dir` parameter**: Pass `config_dir` explicitly (follows "trust provided parameter" pattern)
-  - Uses unified artifact acquisition with fallback strategy (local → drive → MLflow)
-  - All path resolution uses SSOT functions (`resolve_output_path()`, `build_output_path()`)
-- `discover_artifact_mlflow(request, ..., config_dir: Optional[Path] = None)`: Discover artifact in MLflow
-  - **Accepts `config_dir` parameter**: Pass `config_dir` explicitly when available
-  - **Trusts provided `config_dir`**: Only infers when parameter is `None`
-- `acquire_best_model_checkpoint(...)`: Acquire best model checkpoint
-  - **Standard parameters**: `backup_to_drive`, `restore_from_drive`, `backup_enabled`, `in_colab`, `platform`
-  - Uses unified artifact acquisition with fallback strategy (local → drive → MLflow)
-- `load_best_trial_from_disk(...)`: Load best trial from disk
-- `load_cached_best_model(...)`: Load cached best model
-
-### Workflows
-
+- `acquire_artifact(...)`: **SSOT for artifact acquisition** - Unified artifact discovery with fallback (local → drive → MLflow)
+- `acquire_best_model_checkpoint(...)`: Acquire best model checkpoint with standard backup parameters
+- `run_selection_workflow(...)`: Run complete best model selection workflow (queries MLflow, selects best model, acquires checkpoint)
 - `run_benchmarking_workflow(...)`: Run complete benchmarking workflow on champions
-  - **Standard parameters**: `backup_enabled`, `backup_to_drive`, `restore_from_drive`, `in_colab`, `platform`
-  - Selects champions, runs benchmarks, tracks results in MLflow
-- `run_selection_workflow(...)`: Run complete best model selection workflow
-  - **Standard parameters**: `backup_enabled`, `backup_to_drive`, `restore_from_drive`, `in_colab`, `platform`
-  - Queries MLflow, selects best model, acquires checkpoint
+- `SelectionLogic`: Selection logic class with `normalize_speed_scores()` and `apply_threshold()` methods
+- `extract_best_config_from_study(...)`: **Import from `training.hpo.core.study`** - Extract best config from Optuna study (canonical location)
 
-### Study Analysis
-
-- `extract_cv_statistics(...)`: Extract cross-validation statistics
-- `load_study_from_disk(...)`: Load Optuna study from disk
-- `print_study_summaries(...)`: Print study summaries
-- `format_study_summary_line(...)`: Format study summary line
-
-### Selection Logic
-
-- `SelectionLogic`: Selection logic class
-  - `normalize_speed_scores(...)`: Normalize speed scores relative to fastest
-  - `apply_threshold(...)`: Apply accuracy-speed tradeoff threshold
-- `MODEL_SPEED_SCORES`: Dictionary of model speed scores (parameter proxies)
-
-### Caching
-
-- `compute_selection_cache_key(...)`: Compute cache key for selection
-- `load_cached_best_model(...)`: Load cached best model
-- `save_best_model_cache(...)`: Save best model to cache
-
-For detailed signatures, see source code.
+For detailed signatures and additional utilities (trial finding, study analysis, caching), see source code.
 
 ## Integration Points
 

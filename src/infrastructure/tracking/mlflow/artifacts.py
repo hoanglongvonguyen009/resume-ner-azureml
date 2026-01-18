@@ -297,7 +297,7 @@ def upload_checkpoint_archive(
                 def upload_manifest():
                     if run_id:
                         from infrastructure.tracking.mlflow.client import create_mlflow_client
-                client = create_mlflow_client()
+                        client = create_mlflow_client()
                         # Upload with explicit full path to avoid directory creation issues
                         client.log_artifact(
                             run_id=run_id,

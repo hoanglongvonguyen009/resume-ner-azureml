@@ -113,76 +113,19 @@ for run in runs:
 
 ## API Reference
 
-### MLflow Setup
-
 - `setup_mlflow(...)`: Setup MLflow tracking (SSOT for configuration)
-
-### Run Management
-
 - `create_mlflow_run(...)`: Create MLflow run
-- See `mlflow/runs.py` for detailed run management functions
-
-### Run Finding
-
 - `find_mlflow_runs(...)`: Find MLflow runs by query
-- See `mlflow/finder.py` for detailed finding functions
-
-### Artifacts
-
-- See `mlflow/artifacts/` for artifact upload and download utilities
-
-### Trackers
-
 - `MLflowSweepTracker`: Tracker for HPO sweeps
 - `MLflowTrainingTracker`: Tracker for training runs
 - `MLflowBenchmarkTracker`: Tracker for benchmarking runs
 - `MLflowConversionTracker`: Tracker for conversion runs
+- `get_or_compute_study_key_hash(...)`: Consolidated utility for study key hash computation (fallback: provided → MLflow tags → compute from configs)
+- `get_or_compute_trial_key_hash(...)`: Consolidated utility for trial key hash computation (fallback: provided → MLflow tags → compute from configs)
 
-### Hash Computation Utilities
+**Additional APIs**: See `mlflow/runs.py` for run management, `mlflow/finder.py` for finding functions, `mlflow/artifacts/` for artifact utilities.
 
-Consolidated utilities for hash computation with fallback hierarchy:
-
-- `get_or_compute_study_key_hash(...)`: **Consolidated utility for study key hash computation**. Implements fallback hierarchy:
-  1. Use provided `study_key_hash` (if available)
-  2. Retrieve from MLflow run tags (SSOT) - if `hpo_parent_run_id` provided
-  3. Compute from configs (fallback) - if `data_config`, `hpo_config`, `train_config`, `backbone` available
-  
-  This function consolidates the common pattern used across HPO and training execution scripts.
-
-- `get_or_compute_trial_key_hash(...)`: **Consolidated utility for trial key hash computation**. Implements fallback hierarchy:
-  1. Use provided `trial_key_hash` (if available)
-  2. Retrieve from MLflow run tags (SSOT) - if `trial_run_id` provided
-  3. Compute from configs (fallback) - if `study_key_hash` and `hyperparameters` available
-
-**Usage Example**:
-```python
-from infrastructure.tracking.mlflow.hash_utils import (
-    get_or_compute_study_key_hash,
-    get_or_compute_trial_key_hash,
-)
-
-# Get or compute study key hash
-study_key_hash = get_or_compute_study_key_hash(
-    study_key_hash=None,  # Not provided
-    hpo_parent_run_id="parent-run-123",  # Try to retrieve from parent
-    data_config=data_config,
-    hpo_config=hpo_config,
-    train_config=train_config,
-    backbone="distilbert-base-uncased",
-    config_dir=config_dir,
-)
-
-# Get or compute trial key hash
-trial_key_hash = get_or_compute_trial_key_hash(
-    trial_key_hash=None,  # Not provided
-    trial_run_id=None,  # Not available
-    study_key_hash=study_key_hash,
-    hyperparameters={"learning_rate": 3e-5, "batch_size": 16},
-    config_dir=config_dir,
-)
-```
-
-**Best Practice**: Use these consolidated utilities instead of implementing inline hash computation patterns. They follow the SSOT pattern and provide consistent fallback behavior across all execution scripts.
+**Best Practice**: Use `get_or_compute_study_key_hash()` and `get_or_compute_trial_key_hash()` instead of implementing inline hash computation patterns. They follow the SSOT pattern and provide consistent fallback behavior.
 
 For detailed signatures, see source code.
 

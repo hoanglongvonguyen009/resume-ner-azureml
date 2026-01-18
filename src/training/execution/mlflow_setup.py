@@ -38,9 +38,19 @@ for training workflows. It does NOT handle MLflow setup/configuration.
 - This module focuses on run lifecycle management (creating runs, tags, parent/child relationships).
 - All functions in this module assume MLflow has already been configured via infrastructure setup.
 
+**Related Modules**:
+- `infrastructure.tracking.mlflow.setup` - SSOT for MLflow configuration (call this first)
+- `infrastructure.tracking.mlflow.runs` - Core run creation utilities (used internally)
+- `training.hpo.tracking.setup` - HPO-specific naming context (different domain)
+
 **Usage Pattern**:
     1. Call `infrastructure.tracking.mlflow.setup.setup_mlflow()` first (in orchestrator/subprocess runner)
     2. Then use functions from this module to create and manage runs
+
+**Boundaries**:
+- **This module**: Training run creation and lifecycle (assumes MLflow configured)
+- **infrastructure.tracking.mlflow.setup**: MLflow configuration (tracking URI, experiment) - SSOT
+- **training.hpo.tracking.setup**: HPO naming context (different domain, also assumes MLflow configured)
 """
 
 from pathlib import Path

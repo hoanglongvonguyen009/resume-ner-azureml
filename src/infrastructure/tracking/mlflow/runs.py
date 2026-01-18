@@ -262,7 +262,7 @@ def create_child_run(
         is_azure_ml = tracking_uri and "azureml" in tracking_uri.lower()
         if is_azure_ml:
             from infrastructure.tracking.mlflow.client import create_mlflow_client
-        client = create_mlflow_client()
+            client = create_mlflow_client()
             current_run = mlflow.active_run()
             if current_run:
                 run_info = client.get_run(run_id)

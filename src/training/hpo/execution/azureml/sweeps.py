@@ -27,7 +27,7 @@ lifecycle:
 from pathlib import Path
 from typing import Any, Dict
 
-from azure.ai.ml import Input, command, MLClient
+from azure.ai.ml import command, MLClient
 from azure.ai.ml.entities import Environment, Data, Job
 from azure.ai.ml.sweep import (
     SweepJob,
@@ -35,23 +35,8 @@ from azure.ai.ml.sweep import (
     SweepJobLimits,
 )
 
+from infrastructure.azureml import build_data_input_from_asset
 from training.hpo.core.search_space import SearchSpaceTranslator
-
-def _build_data_input_from_asset(data_asset: Data) -> Input:
-    """
-    Build a standard Azure ML ``Input`` for a ``uri_folder`` data asset.
-
-    Args:
-        data_asset: Registered Azure ML data asset.
-
-    Returns:
-        Input pointing at the asset, mounted as a folder.
-    """
-    return Input(
-        type="uri_folder",
-        path=f"azureml:{data_asset.name}:{data_asset.version}",
-        mode="mount",
-    )
 
 def create_dry_run_sweep_job_for_backbone(
     script_path: Path,
@@ -112,7 +97,7 @@ def create_dry_run_sweep_job_for_backbone(
         f"--weight-decay ${{{{search_space.weight_decay}}}}"
     )
 
-    data_input = _build_data_input_from_asset(data_asset)
+    data_input = build_data_input_from_asset(data_asset)
 
     trial_job = command(
         code="..",
@@ -208,7 +193,7 @@ def create_hpo_sweep_job_for_backbone(
         f"--weight-decay ${{{{search_space.weight_decay}}}}"
     )
 
-    data_input = _build_data_input_from_asset(data_asset)
+    data_input = build_data_input_from_asset(data_asset)
     trial_job = command(
         code="..",
         command=f"python src/{script_path.name} {cmd_args}",

@@ -1,4 +1,23 @@
-"""Main sweep module - refactored to use extracted modules."""
+"""Main sweep module - refactored to use extracted modules.
+
+**Migration Status**: IN PROGRESS
+
+This module wraps `sweep_original.py` to maintain backward compatibility while
+incremental refactoring extracts functionality into focused submodules.
+
+**Migration Plan**:
+- Extract objective function creation logic
+- Extract sweep execution orchestration
+- Extract tagging logic
+- Once extraction is complete, remove `sweep_original.py` and update this module
+
+**Current State**:
+- Functions are re-exported from `sweep_original.py` via wrapper pattern
+- Top-level `sweep.py` also maintains backward compatibility
+- Both wrapper files will be consolidated once migration is complete
+
+**See**: `MASTER-20260118-1608-consolidate-remaining-dry-violations-src-unified.plan.md`
+"""
 
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
@@ -9,6 +28,7 @@ logger = get_logger(__name__)
 
 # Import original functions for now (will be refactored incrementally)
 # This maintains backward compatibility while we extract modules
+# TODO: Complete migration - extract functions into focused modules and remove sweep_original.py
 from training.hpo.execution.local.sweep_original import (
     create_local_hpo_objective as _create_local_hpo_objective_original,
     run_local_hpo_sweep as _run_local_hpo_sweep_original,

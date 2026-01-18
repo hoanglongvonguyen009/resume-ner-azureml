@@ -1,6 +1,19 @@
 # Inference Performance Benchmarking
 
-This directory contains tools for benchmarking NER model inference performance, measuring actual latency and throughput to replace parameter-count proxies with real performance data.
+Tools for benchmarking NER model inference performance, measuring actual latency and throughput to replace parameter-count proxies with real performance data.
+
+## TL;DR / Quick Start
+
+Benchmark model inference performance and generate `benchmark.json` files for model selection.
+
+```bash
+python -m src.evaluation.benchmarking.cli \
+  --checkpoint outputs/hpo/distilbert/trial_0/checkpoint \
+  --test-data dataset/test.json \
+  --batch-sizes 1 8 16 \
+  --iterations 100 \
+  --output outputs/hpo/distilbert/trial_0/benchmark.json
+```
 
 ## Overview
 
@@ -187,29 +200,22 @@ print(f"Batch 1 mean latency: {results['batch_1']['mean_ms']} ms")
 4. **Consistent environment**: Run benchmarks on the same hardware for fair comparison
 5. **Multiple batch sizes**: Test different batch sizes to understand scaling behavior
 
+## API Reference
+
+- `benchmark_champions(...)`: Benchmark multiple champions (Phase 3 - uses complete champion data, no redundant lookups)
+- `filter_missing_benchmarks(...)`: Filter champions that need benchmarking (idempotency check)
+- `benchmark_model(...)`: Benchmark a single model checkpoint programmatically
+- `compare_models(...)`: Compare benchmark results across multiple models
+
+For detailed signatures, see source code.
+
 ## Notes
 
 - Benchmarking automatically detects GPU availability (CUDA) or falls back to CPU
 - Results are device-specific - benchmarks run on different devices are not directly comparable
 - The `batch_1` mean latency is typically used as the speed score in model selection
 - Benchmark files are saved alongside `metrics.json` in trial directories
-
-## Module Structure
-
-The benchmarking module is organized with Single Responsibility Principle:
-
-- `cli.py`: CLI entry point and argument parsing
-- `model_loader.py`: Model and tokenizer loading
-- `execution.py`: Inference execution and latency measurement
-- `statistics.py`: Statistics calculation from measurements
-- `formatting.py`: Result formatting and comparison utilities
-- `orchestrator.py`: High-level orchestration for HPO trials
-  - **Backup support**: Uses standardized immediate backup pattern (`immediate_backup_if_needed()` from `infrastructure.shared.backup`)
-  - Backs up benchmark output files immediately after completion
-  - Consistent backup behavior with HPO, training, and conversion workflows
-- `utils.py`: Subprocess wrapper and MLflow logging
-
-**Note**: Test data loading is handled by `data.loaders.benchmark_loader` (see [`../../data/README.md`](../../data/README.md)). This module imports `load_test_texts()` from the data module to avoid duplication.
+- **Backup support**: Uses standardized immediate backup pattern - backs up benchmark output files immediately after completion
 
 ## Phase 3: Champion-Based Benchmarking
 
@@ -282,6 +288,12 @@ The benchmarking orchestrator automatically derives `config_dir` from `root_dir`
 - `benchmark_already_exists()` - Accepts optional `config_dir` parameter (derived from `root_dir` if not provided)
 
 **Best practice:** Always pass `root_dir` explicitly when calling benchmarking functions. The `config_dir` will be automatically derived as `root_dir / "config"` if not provided.
+
+## Testing
+
+```bash
+uvx pytest tests/evaluation/benchmarking/
+```
 
 ## Related Modules
 

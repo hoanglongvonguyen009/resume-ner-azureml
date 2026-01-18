@@ -25,6 +25,14 @@ import yaml
 def load_yaml(path: Path) -> Dict[str, Any]:
     """
     Load a YAML file from disk.
+    
+    **Single Source of Truth (SSOT)**:
+    This function is the SSOT for YAML loading across the codebase. All call sites should use
+    this function rather than directly calling `yaml.load()` or `yaml.safe_load()`.
+    
+    **Related Modules**:
+    - `infrastructure.config.loader` - Domain-specific config loaders (uses this function internally)
+    - `training.config` - Training-specific config builder (uses this function internally)
 
     Args:
         path: Absolute or relative path to a YAML file.
