@@ -140,6 +140,13 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
         "MLFLOW_RUN_ID") or os.environ.get("MLFLOW_USE_RUN_ID")
     parent_run_id = os.environ.get("MLFLOW_PARENT_RUN_ID")
     trial_number = os.environ.get("MLFLOW_TRIAL_NUMBER", "unknown")
+    
+    # DEBUG: Log environment variables for troubleshooting
+    print(f"  [Training Orchestrator] MLflow environment check:", file=sys.stderr, flush=True)
+    print(f"    MLFLOW_RUN_ID: {use_run_id[:12] if use_run_id else 'None'}...", file=sys.stderr, flush=True)
+    print(f"    MLFLOW_PARENT_RUN_ID: {parent_run_id[:12] if parent_run_id else 'None'}...", file=sys.stderr, flush=True)
+    print(f"    MLFLOW_CHILD_RUN_ID: {os.environ.get('MLFLOW_CHILD_RUN_ID', 'None')[:12] if os.environ.get('MLFLOW_CHILD_RUN_ID') else 'None'}...", file=sys.stderr, flush=True)
+    print(f"    MLFLOW_TRIAL_NUMBER: {trial_number}", file=sys.stderr, flush=True)
     fold_idx = os.environ.get("MLFLOW_FOLD_IDX")
 
     # Track whether we started a run directly (needed for cleanup)
@@ -284,24 +291,34 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
         mlflow_parent_env = os.environ.get("MLFLOW_PARENT_RUN_ID")
         mlflow_child_env = os.environ.get("MLFLOW_CHILD_RUN_ID")
         
+        print(f"  [Training Orchestrator] No use_run_id or parent_run_id parameter - checking environment", file=sys.stderr, flush=True)
+        print(f"    MLFLOW_PARENT_RUN_ID from env: {mlflow_parent_env[:12] if mlflow_parent_env else 'None'}...", file=sys.stderr, flush=True)
+        print(f"    MLFLOW_CHILD_RUN_ID from env: {mlflow_child_env[:12] if mlflow_child_env else 'None'}...", file=sys.stderr, flush=True)
+        
         if not mlflow_parent_env and not mlflow_child_env:
             # This should not happen in HPO - raise error instead of creating auto-generated run
+            import traceback
             error_msg = (
                 f"  [Training] CRITICAL: No parent run ID found. "
-                f"This will cause MLflow to auto-generate a run name. "
+                f"This will cause MLflow to auto-generate a run name like 'dynamic_duck_32f4qb48'. "
                 f"MLFLOW_PARENT_RUN_ID={mlflow_parent_env}, "
                 f"MLFLOW_CHILD_RUN_ID={mlflow_child_env}, "
                 f"parent_run_id parameter={parent_run_id}"
             )
             print(error_msg, file=sys.stderr, flush=True)
+            print("  [Training Orchestrator] Call stack:", file=sys.stderr, flush=True)
+            for line in traceback.format_stack()[-10:-1]:
+                print(f"    {line.rstrip()}", file=sys.stderr, flush=True)
             raise RuntimeError(
                 f"Cannot create MLflow run: No parent run ID found. "
                 f"In HPO context, MLFLOW_PARENT_RUN_ID or MLFLOW_CHILD_RUN_ID must be set. "
-                f"This prevents auto-generated run names like 'ashy_gyro_wf2z66m7'."
+                f"This prevents auto-generated run names like 'dynamic_duck_32f4qb48'."
             )
         
         # Use context manager as normal (should find existing run via env vars)
+        print(f"  [Training Orchestrator] Calling mlflow_context.get_context()", file=sys.stderr, flush=True)
         context_mgr = mlflow_context.get_context()
+        print(f"  [Training Orchestrator] Entering context manager", file=sys.stderr, flush=True)
         context_mgr.__enter__()
 
     try:
