@@ -177,7 +177,8 @@ class LocalMLflowContextManager(MLflowContextManager):
             # Create an independent run
             # Check for custom run name from environment variable
             run_name = os.environ.get("MLFLOW_RUN_NAME")
-            if run_name:
+            if run_name and run_name.strip():
+                # CRITICAL: Validate run_name is not empty after stripping
                 print(f"  [MLflow] Creating run with name: {run_name}", file=sys.stderr, flush=True)
                 print(f"  [MLflow] Creating run with name: {run_name}", flush=True)
                 # Use MLflow client to create run with explicit name
@@ -247,5 +248,23 @@ class LocalMLflowContextManager(MLflowContextManager):
                 
                 print(f"  [MLflow] No MLFLOW_RUN_NAME set, using fallback name: {run_name}", file=sys.stderr, flush=True)
                 print(f"  [MLflow] No MLFLOW_RUN_NAME set, using fallback name: {run_name}", flush=True)
+            
+            # CRITICAL: Validate run_name before creating run
+            # MLflow will auto-generate names (e.g., ashy_gyro_wf2z66m7) if run_name is None/empty
+            if not run_name or not run_name.strip():
+                error_msg = (
+                    f"CRITICAL: Cannot create MLflow run: run_name is None or empty. "
+                    f"This would cause MLflow to auto-generate a name like 'ashy_gyro_wf2z66m7'. "
+                    f"run_name={run_name}, MLFLOW_RUN_NAME={os.environ.get('MLFLOW_RUN_NAME')}, "
+                    f"MLFLOW_PARENT_RUN_ID={os.environ.get('MLFLOW_PARENT_RUN_ID')}, "
+                    f"MLFLOW_CHILD_RUN_ID={os.environ.get('MLFLOW_CHILD_RUN_ID')}"
+                )
+                print(error_msg, file=sys.stderr, flush=True)
+                print(error_msg, flush=True)
+                raise ValueError(
+                    f"Cannot create MLflow run: run_name is None or empty. "
+                    f"This would cause MLflow to auto-generate a name. "
+                    f"Set MLFLOW_RUN_NAME environment variable or ensure parent/child run IDs are set."
+                )
             
             return mlflow.start_run(run_name=run_name)

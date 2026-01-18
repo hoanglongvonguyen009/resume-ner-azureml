@@ -278,7 +278,29 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
             mlflow.start_run(run_name=run_name)
             started_run_directly = True
     else:
-        # No parent run ID - use context manager as normal
+        # No parent run ID - check if we're in HPO context
+        # In HPO, we should ALWAYS have a parent run ID set via MLFLOW_PARENT_RUN_ID
+        # If it's missing, this is an error condition, not a normal case
+        mlflow_parent_env = os.environ.get("MLFLOW_PARENT_RUN_ID")
+        mlflow_child_env = os.environ.get("MLFLOW_CHILD_RUN_ID")
+        
+        if not mlflow_parent_env and not mlflow_child_env:
+            # This should not happen in HPO - raise error instead of creating auto-generated run
+            error_msg = (
+                f"  [Training] CRITICAL: No parent run ID found. "
+                f"This will cause MLflow to auto-generate a run name. "
+                f"MLFLOW_PARENT_RUN_ID={mlflow_parent_env}, "
+                f"MLFLOW_CHILD_RUN_ID={mlflow_child_env}, "
+                f"parent_run_id parameter={parent_run_id}"
+            )
+            print(error_msg, file=sys.stderr, flush=True)
+            raise RuntimeError(
+                f"Cannot create MLflow run: No parent run ID found. "
+                f"In HPO context, MLFLOW_PARENT_RUN_ID or MLFLOW_CHILD_RUN_ID must be set. "
+                f"This prevents auto-generated run names like 'ashy_gyro_wf2z66m7'."
+            )
+        
+        # Use context manager as normal (should find existing run via env vars)
         context_mgr = mlflow_context.get_context()
         context_mgr.__enter__()
 
