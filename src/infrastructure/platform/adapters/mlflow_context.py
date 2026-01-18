@@ -24,6 +24,14 @@ lifecycle:
 
 """MLflow context management for different platforms."""
 
+# CRITICAL: Import MLflow patch BEFORE importing mlflow to catch all run creation
+import sys
+try:
+    from infrastructure.tracking.mlflow.patches import apply_patch
+    apply_patch()
+except Exception as e:
+    print(f"  [MLflow Context] WARNING: Could not apply MLflow patch: {e}", file=sys.stderr, flush=True)
+
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from typing import Any
