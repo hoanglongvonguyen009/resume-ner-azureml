@@ -195,9 +195,16 @@ def _setup_fold_splits(
 def _get_hpo_parent_context(
     run_id: Optional[str],
     config_dir: Path,
+    parent_run_id: Optional[str] = None,
 ) -> HPOParentContext:
     """
     Get HPO parent run context (run ID and grouping tags).
+
+    Args:
+        run_id: Optional run ID (legacy parameter, not used).
+        config_dir: Configuration directory path.
+        parent_run_id: Optional parent run ID to use directly. If provided, this takes
+            precedence over detecting from active MLflow run.
 
     Returns:
         HPOParentContext dictionary.
@@ -206,11 +213,18 @@ def _get_hpo_parent_context(
     study_key_hash = None
     study_family_hash = None
 
-    try:
-        from infrastructure.tracking.mlflow.utils import get_mlflow_run_id
-        hpo_parent_run_id = get_mlflow_run_id()
+    # Use provided parent_run_id if available, otherwise try to detect from active run
+    if parent_run_id:
+        hpo_parent_run_id = parent_run_id
+    else:
+        try:
+            from infrastructure.tracking.mlflow.utils import get_mlflow_run_id
+            hpo_parent_run_id = get_mlflow_run_id()
+        except Exception:
+            pass
 
-        # Get grouping tags from parent run
+    # Get grouping tags from parent run if we have a parent run ID
+    if hpo_parent_run_id:
         try:
             from mlflow.tracking import MlflowClient
             from infrastructure.tracking.mlflow.hash_utils import (
@@ -226,8 +240,6 @@ def _get_hpo_parent_context(
             )
         except Exception as e:
             logger.debug(f"Could not get grouping tags from parent run: {e}")
-    except Exception:
-        pass
 
     return HPOParentContext(
         hpo_parent_run_id=hpo_parent_run_id,
@@ -484,9 +496,14 @@ def create_local_hpo_objective(
     run_id: Optional[str] = None,
     data_config: Optional[Dict[str, Any]] = None,
     benchmark_config: Optional[Dict[str, Any]] = None,
-) -> Tuple[Callable[[Any], float], Callable[[], None]]:
+) -> Tuple[Callable[[Any], float], Callable[[], None], list]:
     """
     Create Optuna objective function for local HPO.
+    
+    Returns:
+        Tuple of (objective_function, cleanup_function, captured_parent_run_id_container)
+        where captured_parent_run_id_container is a mutable list that can be updated
+        to pass parent_run_id to the objective function.
 
     Args:
         dataset_path: Path to dataset directory.
@@ -525,6 +542,10 @@ def create_local_hpo_objective(
     # Capture run_id in closure (coerce to string for JSON serialization robustness)
     captured_run_id = str(run_id) if run_id is not None else None
 
+    # Capture parent_run_id in mutable container (will be set later in the with block)
+    # Use a list to allow mutation from nested scope
+    captured_parent_run_id = [None]
+
     # Initialize checkpoint cleanup manager
     cleanup_manager = CheckpointCleanupManager(
         output_base_dir=output_base_dir,
@@ -548,8 +569,10 @@ def create_local_hpo_objective(
         # This avoids issues with ended runs and ensures training logs to the correct run
         # We'll pass the parent run ID and let the subprocess create nested child runs
 
-        # Get HPO parent context
-        parent_context = _get_hpo_parent_context(captured_run_id, config_dir)
+        # Get HPO parent context (use captured parent_run_id if available)
+        parent_context = _get_hpo_parent_context(
+            captured_run_id, config_dir, parent_run_id=captured_parent_run_id[0]
+        )
 
         # Run training with or without CV
         logger.info(
@@ -597,7 +620,7 @@ def create_local_hpo_objective(
         """Final cleanup: delete all non-best checkpoints after HPO completes, preserving refit checkpoints."""
         cleanup_manager.final_cleanup()
 
-    return objective, cleanup_non_best_checkpoints
+    return objective, cleanup_non_best_checkpoints, captured_parent_run_id
 
 # run_refit_training is now imported from refit_executor module above
 
@@ -1008,7 +1031,7 @@ def run_local_hpo_sweep(
     # Create objective function and cleanup function
     logger.info(
         f"[HPO Setup] k_folds={k_folds}, fold_splits_file={fold_splits_file}, k_fold config: {hpo_config.get('k_fold', {})}")
-    objective, cleanup_checkpoints = create_local_hpo_objective(
+    objective, cleanup_checkpoints, captured_parent_run_id = create_local_hpo_objective(
         dataset_path=dataset_path,
         config_dir=config_dir,
         backbone=backbone,
@@ -1124,6 +1147,11 @@ def run_local_hpo_sweep(
 
             parent_run_handle = parent_run
             parent_run_id = parent_run.run_id if parent_run else None
+            
+            # Update captured parent_run_id for objective function closure
+            # This allows the objective function to access the parent run ID
+            if captured_parent_run_id:
+                captured_parent_run_id[0] = parent_run_id
 
             # Commit reserved version if auto-increment was used
             commit_run_name_version(
