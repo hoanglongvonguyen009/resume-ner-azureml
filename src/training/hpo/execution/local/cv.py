@@ -340,7 +340,9 @@ def _execute_cv_folds(
         fold_output_dir = trial_base_dir / "cv" / f"fold{fold_idx}"
 
         # Run training for this fold
-        fold_parent_id = trial_run_id if trial_run_id else hpo_parent_run_id
+        # Fold runs should always be direct children of the HPO parent run,
+        # not the trial run, to maintain proper hierarchy in MLflow
+        fold_parent_id = hpo_parent_run_id if hpo_parent_run_id else trial_run_id
         fold_metric = run_training_trial(
             trial_params=trial_params,
             dataset_path=dataset_path,
