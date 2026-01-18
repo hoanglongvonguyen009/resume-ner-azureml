@@ -23,7 +23,10 @@ Since `conda activate` requires initialization, use one of these methods:
 & "C:\Users\HOANG PHI LONG DANG\Miniconda3\Scripts\conda.exe" run -n resume-ner-training python --version
 
 # Option 2: Use the environment's Python directly (no activation needed)
-& "C:\Users\HOANG PHI LONG DANG\Miniconda3\envs\resume-ner-training\python.exe" -m pytest tests/
+# Preferred: Use uvx pytest (if uv is installed)
+uvx pytest tests/ -v
+# Alternative: Use python -m pytest
+& "C:\Users\HOANG PHI LONG DANG\Miniconda3\envs\resume-ner-training\python.exe" -m pytest tests/ -v
 
 # Option 3: Initialize conda for PowerShell (one-time setup, then restart PowerShell)
 & "C:\Users\HOANG PHI LONG DANG\Miniconda3\Scripts\conda.exe" init powershell

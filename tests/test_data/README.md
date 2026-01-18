@@ -191,8 +191,7 @@ print(f"Found: {len(result['found'])} files")
 ## Related Test Modules
 
 - **Downstream consumers** (test modules that use this test data):
-  - [`../api/README.md`](../api/README.md) - API tests use test data fixtures
-  - [`../integration/api/README.md`](../integration/api/README.md) - Integration API tests use test data
+  - [`../api/README.md`](../api/README.md) - API tests use test data fixtures (includes both unit and integration tests)
 
 ## References
 

@@ -46,6 +46,8 @@ dependencies:
     - pymupdf>=1.23.0  # PDF text extraction (default extractor)
     - pdfplumber>=0.10.0  # Alternative PDF text extraction
     - python-multipart>=0.0.6  # Required for FastAPI file uploads
+    - easyocr>=1.7.0  # OCR for image file processing (default extractor)
+    - pillow>=10.0.0  # Required for image processing with EasyOCR
 
 
 

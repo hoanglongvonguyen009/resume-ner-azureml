@@ -135,7 +135,7 @@ def main():
     
     # Start server
     uvicorn.run(
-        "src.api.app:app",
+        "src.deployment.api.app:app",
         host=APIConfig.API_HOST,
         port=APIConfig.API_PORT,
         workers=APIConfig.API_WORKERS if not args.reload else 1,

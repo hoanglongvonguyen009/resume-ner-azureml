@@ -213,6 +213,6 @@ If performance tests fail:
   - [`../fixtures/README.md`](../fixtures/README.md) - Shared fixtures used by these tests
 
 - **Related test modules** (similar functionality):
-  - [`../training/README.md`](../training/README.md) - Training tests (model training)
+  - [`../unit/training/`](../unit/training/) - Training tests (model training, no README)
   - [`../conversion/README.md`](../conversion/README.md) - Conversion tests (ONNX conversion)
 

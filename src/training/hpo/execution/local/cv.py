@@ -340,10 +340,9 @@ def _execute_cv_folds(
         fold_output_dir = trial_base_dir / "cv" / f"fold{fold_idx}"
 
         # Run training for this fold
-        # Fold runs should be children of the trial run to maintain proper hierarchy:
-        # HPO Parent -> Trial Run -> Fold Runs
-        # Fallback to hpo_parent_run_id only if trial_run_id is not available
-        fold_parent_id = trial_run_id if trial_run_id else hpo_parent_run_id
+        # Fold runs should always be direct children of the HPO parent run,
+        # not the trial run, to maintain proper hierarchy in MLflow
+        fold_parent_id = hpo_parent_run_id if hpo_parent_run_id else trial_run_id
         fold_metric = run_training_trial(
             trial_params=trial_params,
             dataset_path=dataset_path,
@@ -514,21 +513,11 @@ def _create_trial_run(
     try:
         from infrastructure.tracking.mlflow.client import create_mlflow_client
         client = create_mlflow_client()
-        
-        # Get experiment_id from parent run instead of relying on mlflow.active_run()
-        # This is more reliable, especially in Colab where active_run() may return None
-        try:
-            parent_run = client.get_run(hpo_parent_run_id)
-            experiment_id = parent_run.info.experiment_id
-        except Exception as e:
-            logger.warning(f"Could not get experiment_id from parent run {hpo_parent_run_id[:12] if hpo_parent_run_id else 'None'}...: {e}")
-            # Fallback to active_run() if parent lookup fails
-            active_run = mlflow.active_run()
-            if not active_run:
-                logger.warning("Could not get experiment_id from parent run or active_run(), cannot create trial run")
-                return None
-            experiment_id = active_run.info.experiment_id
-        
+        active_run = mlflow.active_run()
+        if not active_run:
+            return None
+
+        experiment_id = active_run.info.experiment_id
         trial_number = trial_params.get("trial_number", "unknown")
 
         # Build systematic run name using NamingContext
