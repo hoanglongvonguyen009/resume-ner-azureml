@@ -1,8 +1,9 @@
 """
 MLflow patches to add validation and logging.
 
-This module patches mlflow.start_run() to add validation that prevents
-auto-generated run names (e.g., 'gray_boniato_9qndy2l2', 'sad_toe_8qbllbws').
+This module patches mlflow.start_run() and MlflowClient.create_run() to add 
+validation that prevents auto-generated run names (e.g., 'gray_boniato_9qndy2l2', 
+'brave_shoe_fcqs83bv', 'sad_toe_8qbllbws').
 
 The patch is applied automatically when this module is imported.
 """
@@ -11,8 +12,9 @@ import sys
 import traceback
 from typing import Any, Optional
 
-# Store original function before patching
+# Store original functions before patching
 _original_start_run = None
+_original_client_create_run = None
 
 
 def _validate_run_name(run_name: Optional[str], call_site: str) -> None:
@@ -29,7 +31,7 @@ def _validate_run_name(run_name: Optional[str], call_site: str) -> None:
     if not run_name or not run_name.strip():
         error_msg = (
             f"CRITICAL: Cannot create MLflow run: run_name is None or empty. "
-            f"This would cause MLflow to auto-generate a name like 'gray_boniato_9qndy2l2'. "
+            f"This would cause MLflow to auto-generate a name like 'brave_shoe_fcqs83bv'. "
             f"Call site: {call_site}, run_name={run_name}"
         )
         print("=" * 80, file=sys.stderr, flush=True)
@@ -64,28 +66,62 @@ def _patched_start_run(run_name: Optional[str] = None, run_id: Optional[str] = N
         return _original_start_run(run_name=run_name, run_id=run_id, **kwargs)
 
 
+def _patched_client_create_run(self: Any, experiment_id: str, run_name: Optional[str] = None, **kwargs: Any) -> Any:
+    """
+    Patched version of MlflowClient.create_run() with validation.
+    
+    This wrapper adds validation to prevent auto-generated run names.
+    """
+    # Only validate if run_name is provided
+    if run_name is not None:
+        _validate_run_name(run_name, "MlflowClient.create_run()")
+        print(f"  [MLflow Patch] MlflowClient.create_run() called with run_name='{run_name}'", file=sys.stderr, flush=True)
+    
+    # Call original function
+    if _original_client_create_run is None:
+        from mlflow.tracking import MlflowClient
+        # Fallback to original if patch not ready
+        return MlflowClient.create_run(self, experiment_id=experiment_id, run_name=run_name, **kwargs)
+    else:
+        return _original_client_create_run(self, experiment_id=experiment_id, run_name=run_name, **kwargs)
+
+
 def apply_patch() -> None:
     """
-    Apply patch to mlflow.start_run() to add validation.
+    Apply patches to mlflow.start_run() and MlflowClient.create_run() to add validation.
     
     This should be called early in the application lifecycle, ideally
-    before any mlflow.start_run() calls are made.
+    before any mlflow.start_run() or client.create_run() calls are made.
     """
-    global _original_start_run
+    global _original_start_run, _original_client_create_run
     
     try:
         import mlflow
         
-        # Only patch if not already patched
+        # Patch mlflow.start_run()
         if not hasattr(mlflow, '_original_start_run_patched'):
             _original_start_run = mlflow.start_run
             mlflow.start_run = _patched_start_run
             mlflow._original_start_run_patched = True
             print("  [MLflow Patch] ✓ Applied patch to mlflow.start_run()", file=sys.stderr, flush=True)
         else:
-            print("  [MLflow Patch] Patch already applied", file=sys.stderr, flush=True)
+            print("  [MLflow Patch] mlflow.start_run() patch already applied", file=sys.stderr, flush=True)
     except Exception as e:
-        print(f"  [MLflow Patch] WARNING: Could not apply patch: {e}", file=sys.stderr, flush=True)
+        print(f"  [MLflow Patch] WARNING: Could not apply mlflow.start_run() patch: {e}", file=sys.stderr, flush=True)
+    
+    try:
+        from mlflow.tracking import MlflowClient
+        
+        # Patch MlflowClient.create_run()
+        if not hasattr(MlflowClient, '_create_run_patched'):
+            _original_client_create_run = MlflowClient.create_run
+            MlflowClient.create_run = _patched_client_create_run
+            MlflowClient._create_run_patched = True
+            print("  [MLflow Patch] ✓ Applied patch to MlflowClient.create_run()", file=sys.stderr, flush=True)
+        else:
+            print("  [MLflow Patch] MlflowClient.create_run() patch already applied", file=sys.stderr, flush=True)
+    except Exception as e:
+        print(f"  [MLflow Patch] WARNING: Could not apply MlflowClient.create_run() patch: {e}", file=sys.stderr, flush=True)
 
 
 # Auto-apply patch when module is imported

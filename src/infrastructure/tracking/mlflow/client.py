@@ -3,6 +3,14 @@
 Centralized MLflow client creation with error handling.
 """
 
+# CRITICAL: Import MLflow patch BEFORE importing MlflowClient to catch all run creation
+import sys
+try:
+    from infrastructure.tracking.mlflow.patches import apply_patch
+    apply_patch()
+except Exception as e:
+    print(f"  [MLflow Client] WARNING: Could not apply MLflow patch: {e}", file=sys.stderr, flush=True)
+
 from typing import Optional
 
 from mlflow.tracking import MlflowClient
