@@ -199,23 +199,8 @@ def create_child_run_core(
         return run_id, created_run
     except Exception as e:
         logger.warning(f"Error creating child run with tags: {e}")
-        # CRITICAL: Validate run_name before fallback
-        if not run_name or not run_name.strip():
-            error_msg = (
-                f"CRITICAL: Cannot create fallback run: run_name is None or empty. "
-                f"This would cause MLflow to auto-generate a name like 'dynamic_duck_32f4qb48'. "
-                f"run_name={run_name}, parent_run_id={parent_run_id[:12] if parent_run_id else 'None'}..., "
-                f"experiment_id={experiment_id}"
-            )
-            logger.error(error_msg)
-            import traceback
-            logger.error(f"Call stack:\n{''.join(traceback.format_stack()[-10:-1])}")
-            raise ValueError(
-                f"Cannot create fallback run: run_name is None or empty. "
-                f"This would cause MLflow to auto-generate a name. "
-                f"Original error: {e}"
-            ) from e
         # Fallback: create run without tags, then set them
+        # Patch will validate run_name
         logger.warning(f"[create_child_run_core] Fallback: Creating run without tags, then setting them (name: '{run_name}')")
         run = client.create_run(
             experiment_id=experiment_id,
@@ -276,24 +261,8 @@ def create_child_run(
             f"Could not determine experiment ID for child run! "
             f"Parent: {parent_run_id[:12]}..., Trial: {trial_number}, Experiment name: {experiment_name}"
         )
-        logger.error("This will create an independent run instead of a child run!")
-        # CRITICAL: Validate run_name before fallback
-        if not run_name or not run_name.strip():
-            error_msg = (
-                f"CRITICAL: Cannot create fallback run: run_name is None or empty. "
-                f"This would cause MLflow to auto-generate a name like 'dynamic_duck_32f4qb48'. "
-                f"run_name={run_name}, parent_run_id={parent_run_id[:12] if parent_run_id else 'None'}..."
-            )
-            logger.error(error_msg)
-            import traceback
-            logger.error(f"Call stack:\n{''.join(traceback.format_stack()[-10:-1])}")
-            raise ValueError(
-                f"Cannot create fallback run: run_name is None or empty. "
-                f"This would cause MLflow to auto-generate a name. "
-                f"Original error: {e}"
-            ) from e
-        # Still try to create a run, but it won't be nested
         logger.warning(f"[create_child_run] Fallback: Creating independent run with name: '{run_name}' (parent lookup failed)")
+        # Patch will validate run_name
         with mlflow.start_run(run_name=run_name) as run:
             # Try to set parent tag anyway
             try:
@@ -329,23 +298,8 @@ def create_child_run(
                     )
     except Exception as e:
         logger.warning(f"Error starting child run: {e}")
-        # CRITICAL: Validate run_name before fallback
-        if not run_name or not run_name.strip():
-            error_msg = (
-                f"CRITICAL: Cannot create fallback run: run_name is None or empty. "
-                f"This would cause MLflow to auto-generate a name like 'dynamic_duck_32f4qb48'. "
-                f"run_name={run_name}, run_id={run_id[:12] if run_id else 'None'}..., "
-                f"parent_run_id={parent_run_id[:12] if parent_run_id else 'None'}..."
-            )
-            logger.error(error_msg)
-            import traceback
-            logger.error(f"Call stack:\n{''.join(traceback.format_stack()[-10:-1])}")
-            raise ValueError(
-                f"Cannot create fallback run: run_name is None or empty. "
-                f"This would cause MLflow to auto-generate a name. "
-                f"Original error: {e}"
-            ) from e
         # Fallback: create new run
+        # Patch will validate run_name
         logger.warning(f"[create_child_run] Fallback: Creating independent run with name: '{run_name}' (run start failed)")
         with mlflow.start_run(run_name=run_name) as fallback_run:
             yield fallback_run

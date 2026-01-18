@@ -149,12 +149,6 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
     parent_run_id = os.environ.get("MLFLOW_PARENT_RUN_ID")
     trial_number = os.environ.get("MLFLOW_TRIAL_NUMBER", "unknown")
     
-    # DEBUG: Log environment variables for troubleshooting
-    print(f"  [Training Orchestrator] MLflow environment check:", file=sys.stderr, flush=True)
-    print(f"    MLFLOW_RUN_ID: {use_run_id[:12] if use_run_id else 'None'}...", file=sys.stderr, flush=True)
-    print(f"    MLFLOW_PARENT_RUN_ID: {parent_run_id[:12] if parent_run_id else 'None'}...", file=sys.stderr, flush=True)
-    print(f"    MLFLOW_CHILD_RUN_ID: {os.environ.get('MLFLOW_CHILD_RUN_ID', 'None')[:12] if os.environ.get('MLFLOW_CHILD_RUN_ID') else 'None'}...", file=sys.stderr, flush=True)
-    print(f"    MLFLOW_TRIAL_NUMBER: {trial_number}", file=sys.stderr, flush=True)
     fold_idx = os.environ.get("MLFLOW_FOLD_IDX")
 
     # Track whether we started a run directly (needed for cleanup)
@@ -263,52 +257,11 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
                 flush=True,
             )
         except Exception as e:
-            print(
-                f"  [Training] Error creating child run: {e}",
-                file=sys.stderr,
-                flush=True,
-            )
             import traceback
             traceback.print_exc()
-            # Fallback to independent run only if run_name is available
-            # If run_name is None/empty, MLflow will auto-generate a name (e.g., bright_peach_xxx)
-            # This should be avoided - raise error instead
-            if not run_name:
-                error_msg = (
-                    f"  [Training] Cannot create fallback run: run_name is None/empty. "
-                    f"Parent run ID was: {parent_run_id[:12] if parent_run_id else 'None'}..."
-                )
-                print(error_msg, file=sys.stderr, flush=True)
-                raise RuntimeError(
-                    f"Failed to create child run and cannot create fallback: "
-                    f"run_name is None/empty. Original error: {e}"
-                ) from e
-            # Fallback to independent run with explicit name
-            print(
-                f"  [Training] WARNING: Creating independent run as fallback "
-                f"(parent was: {parent_run_id[:12] if parent_run_id else 'None'}...)",
-                file=sys.stderr,
-                flush=True,
-            )
-            # CRITICAL: Double-check run_name before calling mlflow.start_run()
-            # Even though we validated earlier, be extra defensive here
-            if not run_name or not run_name.strip():
-                error_msg = (
-                    f"CRITICAL: Cannot create fallback run: run_name became None/empty. "
-                    f"This would cause MLflow to auto-generate a name like 'sad_toe_8qbllbws'. "
-                    f"run_name={run_name}, MLFLOW_RUN_NAME={os.environ.get('MLFLOW_RUN_NAME')}"
-                )
-                print(error_msg, file=sys.stderr, flush=True)
-                import traceback
-                print(f"Call stack:\n{''.join(traceback.format_stack()[-10:-1])}", file=sys.stderr, flush=True)
-                raise RuntimeError(
-                    f"Cannot create fallback run: run_name is None or empty. "
-                    f"This would cause MLflow to auto-generate a name."
-                )
-            print(f"  [Training] Fallback: About to call mlflow.start_run(run_name='{run_name}')", file=sys.stderr, flush=True)
-            mlflow.start_run(run_name=run_name)
-            started_run_directly = True
-            print(f"  [Training] Fallback: ✓ Successfully created run with name '{run_name}'", file=sys.stderr, flush=True)
+            raise RuntimeError(
+                f"Failed to create child run. Original error: {e}"
+            ) from e
     else:
         # No parent run ID - check if we're in HPO context
         # In HPO, we should ALWAYS have a parent run ID set via MLFLOW_PARENT_RUN_ID
@@ -316,34 +269,20 @@ def run_training(args: argparse.Namespace, prebuilt_config: dict | None = None) 
         mlflow_parent_env = os.environ.get("MLFLOW_PARENT_RUN_ID")
         mlflow_child_env = os.environ.get("MLFLOW_CHILD_RUN_ID")
         
-        print(f"  [Training Orchestrator] No use_run_id or parent_run_id parameter - checking environment", file=sys.stderr, flush=True)
-        print(f"    MLFLOW_PARENT_RUN_ID from env: {mlflow_parent_env[:12] if mlflow_parent_env else 'None'}...", file=sys.stderr, flush=True)
-        print(f"    MLFLOW_CHILD_RUN_ID from env: {mlflow_child_env[:12] if mlflow_child_env else 'None'}...", file=sys.stderr, flush=True)
-        
         if not mlflow_parent_env and not mlflow_child_env:
-            # This should not happen in HPO - raise error instead of creating auto-generated run
             import traceback
             error_msg = (
-                f"  [Training] CRITICAL: No parent run ID found. "
-                f"This will cause MLflow to auto-generate a run name like 'dynamic_duck_32f4qb48'. "
-                f"MLFLOW_PARENT_RUN_ID={mlflow_parent_env}, "
-                f"MLFLOW_CHILD_RUN_ID={mlflow_child_env}, "
-                f"parent_run_id parameter={parent_run_id}"
+                f"Cannot create MLflow run: No parent run ID found. "
+                f"In HPO context, MLFLOW_PARENT_RUN_ID or MLFLOW_CHILD_RUN_ID must be set."
             )
             print(error_msg, file=sys.stderr, flush=True)
-            print("  [Training Orchestrator] Call stack:", file=sys.stderr, flush=True)
+            print("Call stack:", file=sys.stderr, flush=True)
             for line in traceback.format_stack()[-10:-1]:
-                print(f"    {line.rstrip()}", file=sys.stderr, flush=True)
-            raise RuntimeError(
-                f"Cannot create MLflow run: No parent run ID found. "
-                f"In HPO context, MLFLOW_PARENT_RUN_ID or MLFLOW_CHILD_RUN_ID must be set. "
-                f"This prevents auto-generated run names like 'dynamic_duck_32f4qb48'."
-            )
+                print(f"  {line.rstrip()}", file=sys.stderr, flush=True)
+            raise RuntimeError(error_msg)
         
         # Use context manager as normal (should find existing run via env vars)
-        print(f"  [Training Orchestrator] Calling mlflow_context.get_context()", file=sys.stderr, flush=True)
         context_mgr = mlflow_context.get_context()
-        print(f"  [Training Orchestrator] Entering context manager", file=sys.stderr, flush=True)
         context_mgr.__enter__()
 
     try:

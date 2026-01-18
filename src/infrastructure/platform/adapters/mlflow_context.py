@@ -61,8 +61,6 @@ class AzureMLMLflowContextManager(MLflowContextManager):
 
     def get_context(self) -> AbstractContextManager[Any]:
         """Return a no-op context manager (Azure ML handles MLflow automatically)."""
-        import sys
-        print("  [MLflow Context] AzureMLMLflowContextManager.get_context() called - returning nullcontext", file=sys.stderr, flush=True)
         from contextlib import nullcontext
         return nullcontext()
 
@@ -74,18 +72,7 @@ class LocalMLflowContextManager(MLflowContextManager):
         """Return MLflow start_run context manager for local execution."""
         import mlflow
         import os
-        import sys
         from contextlib import contextmanager
-
-        # CRITICAL DEBUG: Print immediately to confirm this method is being called
-        import traceback
-        print("=" * 80, file=sys.stderr, flush=True)
-        print("  [MLflow Context Manager] LocalMLflowContextManager.get_context() CALLED",
-              file=sys.stderr, flush=True)
-        print(f"  [MLflow Context] Call stack:", file=sys.stderr, flush=True)
-        for line in traceback.format_stack()[-5:-1]:  # Show last few frames
-            print(f"    {line.rstrip()}", file=sys.stderr, flush=True)
-        print("=" * 80, file=sys.stderr, flush=True)
 
         # Set up MLflow from environment variables (CRITICAL for subprocesses)
         tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
@@ -96,77 +83,22 @@ class LocalMLflowContextManager(MLflowContextManager):
             try:
                 if tracking_uri:
                     mlflow.set_tracking_uri(tracking_uri)
-                    print(
-                        f"  [MLflow Context] Set tracking URI from env: {tracking_uri[:50]}...", file=sys.stderr, flush=True)
-                    print(
-                        f"  [MLflow Context] Set tracking URI from env: {tracking_uri[:50]}...", flush=True)
-                else:
-                    print(f"  [MLflow Context] WARNING: MLFLOW_TRACKING_URI not set in environment!",
-                          file=sys.stderr, flush=True)
-                    print(
-                        f"  [MLflow Context] WARNING: MLFLOW_TRACKING_URI not set in environment!", flush=True)
-
                 if experiment_name:
                     setup_mlflow_cross_platform(
                         experiment_name=experiment_name,
                         ml_client=None,  # Will use local tracking or env vars
                         fallback_to_local=True,
                     )
-                    print(
-                        f"  [MLflow Context] Set experiment from env: {experiment_name}", file=sys.stderr, flush=True)
-                    print(
-                        f"  [MLflow Context] Set experiment from env: {experiment_name}", flush=True)
             except Exception as e:
+                import sys
                 print(
                     f"  [MLflow Context] Warning: Could not set up MLflow: {e}", file=sys.stderr, flush=True)
 
-        # Debug: Print all MLflow-related environment variables
-        mlflow_child = os.environ.get("MLFLOW_CHILD_RUN_ID")
-        mlflow_parent = os.environ.get("MLFLOW_PARENT_RUN_ID")
-        mlflow_trial = os.environ.get("MLFLOW_TRIAL_NUMBER")
-        mlflow_experiment = os.environ.get("MLFLOW_EXPERIMENT_NAME")
-        mlflow_tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
-
-        # Always print MLflow environment variables for debugging
-        # Print to both stdout and stderr to ensure visibility
-        import sys
-        debug_msg = f"  [MLflow Context] Environment variables:"
-        print(debug_msg, file=sys.stderr, flush=True)
-        print(debug_msg, flush=True)  # Also print to stdout
-
-        mlflow_run_name = os.environ.get("MLFLOW_RUN_NAME")
-        
-        for var_name, var_value in [
-            ("MLFLOW_CHILD_RUN_ID", mlflow_child),
-            ("MLFLOW_PARENT_RUN_ID", mlflow_parent),
-            ("MLFLOW_TRIAL_NUMBER", mlflow_trial),
-            ("MLFLOW_EXPERIMENT_NAME", mlflow_experiment),
-            ("MLFLOW_TRACKING_URI", mlflow_tracking_uri),
-            ("MLFLOW_RUN_NAME", mlflow_run_name),
-        ]:
-            if var_name == "MLFLOW_TRACKING_URI" and var_value:
-                display_value = f"{var_value[:50]}..."
-            elif var_name in ["MLFLOW_CHILD_RUN_ID", "MLFLOW_PARENT_RUN_ID"] and var_value:
-                display_value = f"{var_value[:12]}..."
-            else:
-                display_value = var_value if var_value else 'None'
-
-            msg = f"    {var_name}: {display_value}"
-            print(msg, file=sys.stderr, flush=True)
-            print(msg, flush=True)  # Also print to stdout
-
         # Check if we should use an existing child run ID (created in parent process)
-        # This is the preferred method - child run was created with nested=True in parent
         child_run_id = os.environ.get("MLFLOW_CHILD_RUN_ID")
-        print(f"  [MLflow Context] Checking MLFLOW_CHILD_RUN_ID: {child_run_id[:12] if child_run_id else 'None'}...", file=sys.stderr, flush=True)
         if child_run_id:
-            # Use the existing child run that was created in the parent process
-            # This ensures proper parent-child relationship with Azure ML Workspace
-            print(f"  [MLflow] Resuming child run: {child_run_id[:8]}...", file=sys.stderr, flush=True)
-
             @contextmanager
             def existing_child_run_context():
-                # Resume the child run - MLflow allows resuming ended runs
                 mlflow.start_run(run_id=child_run_id)
                 try:
                     yield
@@ -177,158 +109,60 @@ class LocalMLflowContextManager(MLflowContextManager):
         # Check if we should create a nested child run (for HPO trials)
         parent_run_id = os.environ.get("MLFLOW_PARENT_RUN_ID")
         trial_number = os.environ.get("MLFLOW_TRIAL_NUMBER", "unknown")
-        print(f"  [MLflow Context] Checking MLFLOW_PARENT_RUN_ID: {parent_run_id[:12] if parent_run_id else 'None'}...", file=sys.stderr, flush=True)
         if parent_run_id:
-            print(
-                f"  [MLflow] Creating child run with parent: {parent_run_id[:12]}... (trial {trial_number})", file=sys.stderr, flush=True)
-            # Use shared child run creation function
             from infrastructure.tracking.mlflow.runs import create_child_run
             return create_child_run(
                 parent_run_id=parent_run_id,
                 trial_number=trial_number,
                 experiment_name=experiment_name,
             )
+        
+        # Create an independent run - MLFLOW_RUN_NAME must be set
+        # The patch will validate run_name and raise error if None/empty
+        run_name = os.environ.get("MLFLOW_RUN_NAME")
+        if not run_name or not run_name.strip():
+            import sys
+            import traceback
+            error_msg = (
+                f"CRITICAL: Cannot create MLflow run: MLFLOW_RUN_NAME is None or empty. "
+                f"This would cause MLflow to auto-generate a name. "
+                f"MLFLOW_RUN_NAME={run_name}, "
+                f"MLFLOW_PARENT_RUN_ID={os.environ.get('MLFLOW_PARENT_RUN_ID')}, "
+                f"MLFLOW_CHILD_RUN_ID={os.environ.get('MLFLOW_CHILD_RUN_ID')}"
+            )
+            print(error_msg, file=sys.stderr, flush=True)
+            print("Call stack:", file=sys.stderr, flush=True)
+            for line in traceback.format_stack()[-10:-1]:
+                print(f"  {line.rstrip()}", file=sys.stderr, flush=True)
+            raise ValueError(
+                f"Cannot create MLflow run: MLFLOW_RUN_NAME is None or empty. "
+                f"Set MLFLOW_RUN_NAME environment variable or ensure parent/child run IDs are set."
+            )
+        
+        # Use MLflow client to create run with explicit name
+        from infrastructure.tracking.mlflow.client import create_mlflow_client
+        client = create_mlflow_client()
+        experiment_id = None
+        if experiment_name:
+            experiment = mlflow.get_experiment_by_name(experiment_name)
+            if experiment:
+                experiment_id = experiment.experiment_id
+        
+        if experiment_id:
+            # Create run with explicit name using client
+            run = client.create_run(
+                experiment_id=experiment_id,
+                run_name=run_name
+            )
+            @contextmanager
+            def named_run_context():
+                mlflow.start_run(run_id=run.info.run_id)
+                try:
+                    yield
+                finally:
+                    mlflow.end_run()
+            return named_run_context()
         else:
-            # Create an independent run
-            # Check for custom run name from environment variable
-            run_name = os.environ.get("MLFLOW_RUN_NAME")
-            print(f"  [MLflow Context] No parent/child run ID found - creating independent run", file=sys.stderr, flush=True)
-            print(f"  [MLflow Context] MLFLOW_RUN_NAME: {run_name if run_name else 'None'}", file=sys.stderr, flush=True)
-            if run_name and run_name.strip():
-                # CRITICAL: Validate run_name is not empty after stripping
-                print(f"  [MLflow] Creating run with name: {run_name}", file=sys.stderr, flush=True)
-                print(f"  [MLflow] Creating run with name: {run_name}", flush=True)
-                # Use MLflow client to create run with explicit name
-                # This ensures the run name is set correctly
-                from infrastructure.tracking.mlflow.client import create_mlflow_client
-                client = create_mlflow_client()
-                experiment_id = None
-                if experiment_name:
-                    experiment = mlflow.get_experiment_by_name(experiment_name)
-                    if experiment:
-                        experiment_id = experiment.experiment_id
-                
-                if experiment_id:
-                    # CRITICAL: Validate run_name before creating run via client
-                    if not run_name or not run_name.strip():
-                        error_msg = (
-                            f"CRITICAL: Cannot create run via client: run_name is None or empty. "
-                            f"This would cause MLflow to auto-generate a name like 'sad_toe_8qbllbws'. "
-                            f"run_name={run_name}, experiment_id={experiment_id}"
-                        )
-                        print(error_msg, file=sys.stderr, flush=True)
-                        import traceback
-                        print(f"Call stack:\n{''.join(traceback.format_stack()[-10:-1])}", file=sys.stderr, flush=True)
-                        raise ValueError(
-                            f"Cannot create run via client: run_name is None or empty. "
-                            f"This would cause MLflow to auto-generate a name."
-                        )
-                    # Create run with explicit name using client
-                    print(f"  [MLflow Context] Creating run via client with name: '{run_name}' (experiment_id: {experiment_id})", file=sys.stderr, flush=True)
-                    run = client.create_run(
-                        experiment_id=experiment_id,
-                        run_name=run_name
-                    )
-                    print(f"  [MLflow] Created run: {run.info.run_id[:12]}... with name: {run_name}", file=sys.stderr, flush=True)
-                    # Use context manager to start the created run
-                    @contextmanager
-                    def named_run_context():
-                        mlflow.start_run(run_id=run.info.run_id)
-                        try:
-                            yield
-                        finally:
-                            mlflow.end_run()
-                    return named_run_context()
-                else:
-                    # Fallback to standard start_run with name
-                    # CRITICAL: Validate run_name before calling mlflow.start_run()
-                    if not run_name or not run_name.strip():
-                        error_msg = (
-                            f"CRITICAL: Cannot create fallback run: run_name is None or empty. "
-                            f"This would cause MLflow to auto-generate a name like 'sad_toe_8qbllbws'. "
-                            f"run_name={run_name}, MLFLOW_RUN_NAME={os.environ.get('MLFLOW_RUN_NAME')}, "
-                            f"MLFLOW_PARENT_RUN_ID={os.environ.get('MLFLOW_PARENT_RUN_ID')}, "
-                            f"MLFLOW_CHILD_RUN_ID={os.environ.get('MLFLOW_CHILD_RUN_ID')}"
-                        )
-                        print(error_msg, file=sys.stderr, flush=True)
-                        import traceback
-                        print(f"Call stack:\n{''.join(traceback.format_stack()[-10:-1])}", file=sys.stderr, flush=True)
-                        raise ValueError(
-                            f"Cannot create fallback run: run_name is None or empty. "
-                            f"This would cause MLflow to auto-generate a name."
-                        )
-                    print(f"  [MLflow Context] Fallback: Creating run with name: '{run_name}'", file=sys.stderr, flush=True)
-                    return mlflow.start_run(run_name=run_name)
-            else:
-                # Deterministic fallback — avoid MLflow auto-generated names
-                fallback_bits = []
-                
-                # Try to get process type
-                process_type = os.environ.get("PROCESS_TYPE", "run")
-                fallback_bits.append(process_type)
-                
-                # Try to get run ID (shortened)
-                run_id = os.environ.get("MLFLOW_RUN_ID", "")
-                if run_id:
-                    fallback_bits.append(run_id[:8])
-                else:
-                    # Try to get from other sources
-                    run_id_alt = os.environ.get("MLFLOW_CHILD_RUN_ID") or os.environ.get("MLFLOW_PARENT_RUN_ID")
-                    if run_id_alt:
-                        fallback_bits.append(run_id_alt[:8])
-                    else:
-                        fallback_bits.append("noid")
-                
-                # Try to get trial number
-                trial_number = os.environ.get("MLFLOW_TRIAL_NUMBER")
-                if trial_number:
-                    fallback_bits.append(f"t{trial_number}")
-                
-                # Try to get fold index
-                fold_idx = os.environ.get("MLFLOW_FOLD_IDX")
-                if fold_idx:
-                    fallback_bits.append(f"fold{fold_idx}")
-                
-                # Build deterministic fallback name
-                run_name = "_".join(fallback_bits)
-                
-                # Sanitize: replace problematic characters
-                run_name = run_name.replace("/", "_").replace("\\", "_").replace(":", "_")
-                
-                print(f"  [MLflow] No MLFLOW_RUN_NAME set, using fallback name: {run_name}", file=sys.stderr, flush=True)
-                print(f"  [MLflow] No MLFLOW_RUN_NAME set, using fallback name: {run_name}", flush=True)
-            
-            # CRITICAL: Validate run_name before creating run
-            # MLflow will auto-generate names (e.g., ashy_gyro_wf2z66m7) if run_name is None/empty
-            print(f"  [MLflow Context] Final run_name before validation: '{run_name}' (type: {type(run_name)})", file=sys.stderr, flush=True)
-            if not run_name or not run_name.strip():
-                error_msg = (
-                    f"CRITICAL: Cannot create MLflow run: run_name is None or empty. "
-                    f"This would cause MLflow to auto-generate a name like 'ashy_gyro_wf2z66m7' or 'dynamic_duck_32f4qb48'. "
-                    f"run_name={run_name}, MLFLOW_RUN_NAME={os.environ.get('MLFLOW_RUN_NAME')}, "
-                    f"MLFLOW_PARENT_RUN_ID={os.environ.get('MLFLOW_PARENT_RUN_ID')}, "
-                    f"MLFLOW_CHILD_RUN_ID={os.environ.get('MLFLOW_CHILD_RUN_ID')}, "
-                    f"MLFLOW_RUN_ID={os.environ.get('MLFLOW_RUN_ID')}"
-                )
-                print(error_msg, file=sys.stderr, flush=True)
-                print(error_msg, flush=True)
-                import traceback
-                print("  [MLflow Context] Call stack when run_name is empty:", file=sys.stderr, flush=True)
-                for line in traceback.format_stack()[-10:-1]:
-                    print(f"    {line.rstrip()}", file=sys.stderr, flush=True)
-                raise ValueError(
-                    f"Cannot create MLflow run: run_name is None or empty. "
-                    f"This would cause MLflow to auto-generate a name. "
-                    f"Set MLFLOW_RUN_NAME environment variable or ensure parent/child run IDs are set."
-                )
-            
-            print(f"  [MLflow Context] About to call mlflow.start_run(run_name='{run_name}')", file=sys.stderr, flush=True)
-            try:
-                result = mlflow.start_run(run_name=run_name)
-                print(f"  [MLflow Context] ✓ Successfully created run with name '{run_name}' (run_id: {result.info.run_id[:12]}...)", file=sys.stderr, flush=True)
-                return result
-            except Exception as e:
-                print(f"  [MLflow Context] ERROR creating run with name '{run_name}': {e}", file=sys.stderr, flush=True)
-                import traceback
-                traceback.print_exc()
-                raise
+            # Fallback to standard start_run with name
+            # Patch will validate run_name
+            return mlflow.start_run(run_name=run_name)
