@@ -169,6 +169,26 @@ def create_training_mlflow_run(
                 f"Ensure MLflow is configured via infrastructure.tracking.mlflow.setup.setup_mlflow()"
             )
 
+    # CRITICAL: Validate run_name before creating run
+    # MLflow will auto-generate names (e.g., dynamic_duck_32f4qb48) if run_name is None/empty
+    if not run_name or not run_name.strip():
+        error_msg = (
+            f"CRITICAL: Cannot create MLflow run: run_name is None or empty. "
+            f"This would cause MLflow to auto-generate a name like 'dynamic_duck_32f4qb48'. "
+            f"run_name={run_name}, experiment_name={experiment_name}, "
+            f"parent_run_id={parent_run_id}, create_as_child={create_as_child}"
+        )
+        logger.error(error_msg)
+        import traceback
+        logger.error(f"Call stack:\n{''.join(traceback.format_stack()[-10:-1])}")
+        raise ValueError(
+            f"Cannot create MLflow run: run_name is None or empty. "
+            f"This would cause MLflow to auto-generate a name. "
+            f"Check that run_name is provided and not empty."
+        )
+    
+    logger.debug(f"[create_training_mlflow_run] Creating run with name: '{run_name}' (experiment: {experiment_name}, parent: {parent_run_id[:12] if parent_run_id else 'None'}...)")
+    
     # Create run
     client = create_mlflow_client(tracking_uri=tracking_uri)
     try:
@@ -322,6 +342,27 @@ def create_training_child_run(
             fold_idx=0
         )
     """
+    # CRITICAL: Validate run_name before creating run
+    # MLflow will auto-generate names (e.g., dynamic_duck_32f4qb48) if run_name is None/empty
+    if not run_name or not run_name.strip():
+        error_msg = (
+            f"CRITICAL: Cannot create child run: run_name is None or empty. "
+            f"This would cause MLflow to auto-generate a name like 'dynamic_duck_32f4qb48'. "
+            f"run_name={run_name}, experiment_name={experiment_name}, "
+            f"parent_run_id={parent_run_id[:12] if parent_run_id else 'None'}..., "
+            f"trial_number={trial_number}, fold_idx={fold_idx}"
+        )
+        logger.error(error_msg)
+        import traceback
+        logger.error(f"Call stack:\n{''.join(traceback.format_stack()[-10:-1])}")
+        raise ValueError(
+            f"Cannot create child run: run_name is None or empty. "
+            f"This would cause MLflow to auto-generate a name. "
+            f"Check that run_name is provided and not empty."
+        )
+    
+    logger.debug(f"[create_training_child_run] Creating child run with name: '{run_name}' (parent: {parent_run_id[:12] if parent_run_id else 'None'}..., experiment: {experiment_name})")
+    
     # Delegate to SSOT core function
     from infrastructure.tracking.mlflow.runs import create_child_run_core
 
