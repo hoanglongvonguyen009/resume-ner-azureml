@@ -189,14 +189,30 @@ def acquire_best_model_checkpoint(
             
             if checkpoint_path.exists() and checkpoint_path.is_dir():
                 print(f"\n📦 Backing up best model checkpoint to Google Drive...")
-                result_backup = backup_to_drive.backup(checkpoint_path, expect="dir")
-                if result_backup.ok:
-                    print(f"✓ Successfully backed up checkpoint to Google Drive")
-                    print(f"  Drive path: {result_backup.dst}")
+                
+                # Handle both DriveBackupStore instance and function callback
+                if hasattr(backup_to_drive, "backup"):
+                    # DriveBackupStore instance - call .backup() method
+                    result_backup = backup_to_drive.backup(checkpoint_path, expect="dir")
+                    if result_backup.ok:
+                        print(f"✓ Successfully backed up checkpoint to Google Drive")
+                        print(f"  Drive path: {result_backup.dst}")
+                    else:
+                        print(f"⚠ Drive backup failed: {result_backup.reason}")
+                        if result_backup.error:
+                            print(f"  Error: {result_backup.error}")
+                        print(f"  Checkpoint is still available locally at: {checkpoint_path}")
+                elif callable(backup_to_drive):
+                    # Function callback - call directly
+                    backup_success = backup_to_drive(checkpoint_path, is_directory=True)
+                    if backup_success:
+                        print(f"✓ Successfully backed up checkpoint to Google Drive")
+                    else:
+                        print(f"⚠ Drive backup failed")
+                        print(f"  Checkpoint is still available locally at: {checkpoint_path}")
                 else:
-                    print(f"⚠ Drive backup failed: {result_backup.reason}")
-                    if result_backup.error:
-                        print(f"  Error: {result_backup.error}")
+                    logger.warning(f"backup_to_drive has unexpected type: {type(backup_to_drive)}")
+                    print(f"⚠ Drive backup skipped: invalid backup_to_drive type")
                     print(f"  Checkpoint is still available locally at: {checkpoint_path}")
         except Exception as e:
             print(f"⚠ Drive backup error: {e}")
