@@ -134,114 +134,129 @@ class MLflowSweepTracker(BaseTracker):
             )
         
         try:
-            with mlflow.start_run(run_name=run_name) as parent_run:
-                run_id = parent_run.info.run_id
-                experiment_id = parent_run.info.experiment_id
-                tracking_uri = mlflow.get_tracking_uri()
+            # CRITICAL: Don't use context manager for parent run in Colab/local execution
+            # The context manager automatically ends the run when the 'with' block exits,
+            # which happens immediately after study.optimize() completes, even if child runs
+            # are still running. This causes runs to be marked FINISHED prematurely in Colab.
+            # Instead, manually manage the run lifecycle to keep it open until all children complete.
+            parent_run = mlflow.start_run(run_name=run_name)
+            run_id = parent_run.info.run_id
+            experiment_id = parent_run.info.experiment_id
+            tracking_uri = mlflow.get_tracking_uri()
+            
+            # Store run object for manual cleanup later
+            _parent_run_obj = parent_run
 
-                # Trust provided config_dir parameter (DRY principle)
-                # Only infer when explicitly None
-                if config_dir is None:
-                    config_dir = infer_config_dir(path=output_dir)
+            # Trust provided config_dir parameter (DRY principle)
+            # Only infer when explicitly None
+            if config_dir is None:
+                config_dir = infer_config_dir(path=output_dir)
 
-                # Compute grouping tags using centralized utilities
-                # Priority: 1) Compute v2 from configs (for new runs), 2) Fallback to v1
-                from infrastructure.tracking.mlflow.hash_utils import (
-                    compute_study_key_hash_v2,
-                )
-                
-                study_key_hash = None
-                study_family_hash = None
-                
-                # Compute v2 hash using fingerprints (requires data_config, hpo_config, train_config)
-                if hpo_config and data_config and train_config and context and context.model:
-                    study_key_hash = compute_study_key_hash_v2(
-                        data_config, hpo_config, train_config, context.model, config_dir
-                            )
+            # Compute grouping tags using centralized utilities
+            # Priority: 1) Compute v2 from configs (for new runs), 2) Fallback to v1
+            from infrastructure.tracking.mlflow.hash_utils import (
+                compute_study_key_hash_v2,
+            )
+            
+            study_key_hash = None
+            study_family_hash = None
+            
+            # Compute v2 hash using fingerprints (requires data_config, hpo_config, train_config)
+            if hpo_config and data_config and train_config and context and context.model:
+                study_key_hash = compute_study_key_hash_v2(
+                    data_config, hpo_config, train_config, context.model, config_dir
+                        )
+                if study_key_hash:
+                        logger.info(
+                            f"[START_SWEEP_RUN] Computed v2 grouping hashes: "
+                        f"study_key_hash={study_key_hash[:16]}..."
+                    )
+            
+            # Always compute family hash (v1, doesn't depend on train_config)
+            if not study_family_hash and hpo_config and data_config:
+                try:
+                    from infrastructure.naming.mlflow.hpo_keys import (
+                        build_hpo_study_family_key,
+                        build_hpo_study_family_hash,
+                    )
+                    study_family_key = build_hpo_study_family_key(
+                        data_config, hpo_config, benchmark_config
+                    )
+                    study_family_hash = build_hpo_study_family_hash(
+                        study_family_key)
                     if study_key_hash:
-                            logger.info(
-                                f"[START_SWEEP_RUN] Computed v2 grouping hashes: "
-                            f"study_key_hash={study_key_hash[:16]}..."
+                        logger.info(
+                            f"[START_SWEEP_RUN] Computed grouping hashes: "
+                            f"study_key_hash={study_key_hash[:16]}..., "
+                            f"study_family_hash={study_family_hash[:16]}..."
                         )
-                
-                # Always compute family hash (v1, doesn't depend on train_config)
-                if not study_family_hash and hpo_config and data_config:
-                    try:
-                        from infrastructure.naming.mlflow.hpo_keys import (
-                            build_hpo_study_family_key,
-                            build_hpo_study_family_hash,
-                        )
-                        study_family_key = build_hpo_study_family_key(
-                            data_config, hpo_config, benchmark_config
-                        )
-                        study_family_hash = build_hpo_study_family_hash(
-                            study_family_key)
-                        if study_key_hash:
-                            logger.info(
-                                f"[START_SWEEP_RUN] Computed grouping hashes: "
-                                f"study_key_hash={study_key_hash[:16]}..., "
-                                f"study_family_hash={study_family_hash[:16]}..."
-                            )
-                    except Exception as e:
-                        logger.warning(
-                            f"[START_SWEEP_RUN] Could not compute study_family_hash: {e}",
-                            exc_info=True
-                        )
+                except Exception as e:
+                    logger.warning(
+                        f"[START_SWEEP_RUN] Could not compute study_family_hash: {e}",
+                        exc_info=True
+                    )
 
-                # Build RunHandle (compute run_key_hash before building tags)
-                run_key = build_mlflow_run_key(context) if context else None
-                run_key_hash = build_mlflow_run_key_hash(
-                    run_key) if run_key else None
+            # Build RunHandle (compute run_key_hash before building tags)
+            run_key = build_mlflow_run_key(context) if context else None
+            run_key_hash = build_mlflow_run_key_hash(
+                run_key) if run_key else None
 
-                # Build and set tags atomically
-                tags = build_mlflow_tags(
-                    context=context,
-                    output_dir=output_dir,
-                    group_id=group_id,
-                    config_dir=config_dir,
-                    study_key_hash=study_key_hash,
-                    study_family_hash=study_family_hash,
-                    trial_key_hash=None,  # Trial key hash is computed in trial runs
-                    run_key_hash=run_key_hash,  # Pass run_key_hash for cleanup matching
-                )
+            # Build and set tags atomically
+            tags = build_mlflow_tags(
+                context=context,
+                output_dir=output_dir,
+                group_id=group_id,
+                config_dir=config_dir,
+                study_key_hash=study_key_hash,
+                study_family_hash=study_family_hash,
+                trial_key_hash=None,  # Trial key hash is computed in trial runs
+                run_key_hash=run_key_hash,  # Pass run_key_hash for cleanup matching
+            )
 
-                mlflow.set_tags(tags)
+            mlflow.set_tags(tags)
 
-                handle = RunHandle(
-                    run_id=run_id,
-                    run_key=run_key or "",
-                    run_key_hash=run_key_hash or "",
-                    experiment_id=experiment_id,
-                    experiment_name=self.experiment_name,
-                    tracking_uri=tracking_uri,
-                    artifact_uri=parent_run.info.artifact_uri,
-                    study_key_hash=study_key_hash,
-                    study_family_hash=study_family_hash,
-                )
+            handle = RunHandle(
+                run_id=run_id,
+                run_key=run_key or "",
+                run_key_hash=run_key_hash or "",
+                experiment_id=experiment_id,
+                experiment_name=self.experiment_name,
+                tracking_uri=tracking_uri,
+                artifact_uri=parent_run.info.artifact_uri,
+                study_key_hash=study_key_hash,
+                study_family_hash=study_family_hash,
+            )
 
-                # Update local index
-                if run_key_hash:
-                    try:
-                        root_dir = output_dir.parent.parent if output_dir else Path.cwd()
-                        update_mlflow_index(
-                            root_dir=root_dir,
-                            run_key_hash=run_key_hash,
-                            run_id=run_id,
-                            experiment_id=experiment_id,
-                            tracking_uri=tracking_uri,
-                            config_dir=config_dir,
-                        )
-                    except Exception as e:
-                        logger.debug(f"Could not update MLflow index: {e}")
+            # Update local index
+            if run_key_hash:
+                try:
+                    root_dir = output_dir.parent.parent if output_dir else Path.cwd()
+                    update_mlflow_index(
+                        root_dir=root_dir,
+                        run_key_hash=run_key_hash,
+                        run_id=run_id,
+                        experiment_id=experiment_id,
+                        tracking_uri=tracking_uri,
+                        config_dir=config_dir,
+                    )
+                except Exception as e:
+                    logger.debug(f"Could not update MLflow index: {e}")
 
-                self._log_sweep_metadata(
-                    hpo_config, backbone, study_name, checkpoint_config, storage_path, should_resume, output_dir=output_dir
-                )
-                logger.info(
-                    f"[START_SWEEP_RUN] Yielding RunHandle. run_id={run_id[:12]}...")
+            self._log_sweep_metadata(
+                hpo_config, backbone, study_name, checkpoint_config, storage_path, should_resume, output_dir=output_dir
+            )
+            logger.info(
+                f"[START_SWEEP_RUN] Yielding RunHandle. run_id={run_id[:12]}...")
+            try:
                 yield handle
+            finally:
+                # CRITICAL: Don't end the run automatically - let the caller manage lifecycle
+                # The run should stay RUNNING until all child runs complete
+                # Only end it if there was an error that requires cleanup
                 logger.info(
-                    f"[START_SWEEP_RUN] Context manager exiting normally. run_id={run_id[:12]}...")
+                    f"[START_SWEEP_RUN] Context manager exiting. Run {run_id[:12]}... remains RUNNING until explicitly terminated.")
+                # Note: We intentionally do NOT call mlflow.end_run() here
+                # The caller (sweep_original.py) will terminate the run after all children complete
         except Exception as e:
             import traceback
             logger.error(f"[START_SWEEP_RUN] MLflow tracking failed: {e}")

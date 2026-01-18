@@ -1645,6 +1645,35 @@ def run_local_hpo_sweep(
                 logger.warning(
                     f"Error during final checkpoint cleanup: {e}"
                 )
+            
+            # CRITICAL: Terminate parent run AFTER all children complete
+            # Since we're not using context manager, we must manually end the run
+            if parent_run_id and parent_run_handle:
+                try:
+                    from infrastructure.tracking.mlflow import terminate_run_safe
+                    logger.info(
+                        f"[HPO] Terminating parent run {parent_run_id[:HASH_DISPLAY_LENGTH_MEDIUM]}... after all children completed"
+                    )
+                    terminate_run_safe(
+                        parent_run_id,
+                        status="FINISHED",
+                        check_status=True
+                    )
+                    logger.info(
+                        f"[HPO] ✓ Parent run {parent_run_id[:HASH_DISPLAY_LENGTH_MEDIUM]}... marked as FINISHED"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"[HPO] Could not terminate parent run {parent_run_id[:HASH_DISPLAY_LENGTH_MEDIUM] if parent_run_id else 'unknown'}...: {e}"
+                    )
+            elif parent_run_id:
+                # Fallback: try to end run even if handle is None
+                try:
+                    import mlflow
+                    mlflow.end_run()
+                    logger.info(f"[HPO] Ended parent run via mlflow.end_run()")
+                except Exception as e:
+                    logger.warning(f"[HPO] Could not end parent run: {e}")
 
     except KeyboardInterrupt:
         # Handle interruption - parent run will be finalized by signal handler or context manager
