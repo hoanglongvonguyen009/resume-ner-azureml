@@ -27,9 +27,12 @@ def get_mlflow_client() -> Optional[MlflowClient]:
         return None
 
 
-def create_mlflow_client() -> MlflowClient:
+def create_mlflow_client(tracking_uri: Optional[str] = None) -> MlflowClient:
     """
     Create MLflow client instance (raises exception on failure).
+    
+    Args:
+        tracking_uri: Optional tracking URI. If None, uses default MLflow tracking URI.
     
     Returns:
         MlflowClient instance.
@@ -38,5 +41,7 @@ def create_mlflow_client() -> MlflowClient:
         Exception: If client creation fails.
     """
     from mlflow.tracking import MlflowClient
+    if tracking_uri is not None:
+        return MlflowClient(tracking_uri=tracking_uri)
     return MlflowClient()
 

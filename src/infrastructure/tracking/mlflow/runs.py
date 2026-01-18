@@ -39,7 +39,7 @@ from contextlib import contextmanager
 from typing import Any, Optional, Tuple
 
 import mlflow
-# MlflowClient import removed - use create_mlflow_client() from infrastructure.tracking.mlflow.client instead
+from infrastructure.tracking.mlflow.client import create_mlflow_client
 from common.shared.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -79,7 +79,7 @@ def create_child_run_core(
     Raises:
         RuntimeError: If experiment ID cannot be determined.
     """
-    client = MlflowClient(tracking_uri=tracking_uri)
+    client = create_mlflow_client(tracking_uri=tracking_uri)
     tracking_uri_actual = tracking_uri or mlflow.get_tracking_uri()
     is_azure_ml = tracking_uri_actual and "azureml" in tracking_uri_actual.lower()
 

@@ -58,9 +58,9 @@ from typing import Any, Dict, Optional
 import sys
 
 import mlflow
-from mlflow.tracking import MlflowClient
 
 from common.shared.logging_utils import get_logger
+from infrastructure.tracking.mlflow.client import create_mlflow_client
 
 logger = get_logger(__name__)
 
@@ -135,7 +135,7 @@ def create_training_mlflow_run(
     """
     if run_id:
         # Run already exists, just return it
-        client = MlflowClient(tracking_uri=tracking_uri)
+        client = create_mlflow_client(tracking_uri=tracking_uri)
         run = client.get_run(run_id)
         return run_id, run
 
@@ -170,7 +170,7 @@ def create_training_mlflow_run(
             )
 
     # Create run
-    client = MlflowClient(tracking_uri=tracking_uri)
+    client = create_mlflow_client(tracking_uri=tracking_uri)
     try:
         created_run = client.create_run(
             experiment_id=experiment_id,

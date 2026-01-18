@@ -130,13 +130,13 @@ Tests the complete workflow from `01_orchestrate_training_colab.ipynb`:
 
 ```bash
 # Core workflow with mocked training (default, CI-compatible)
-pytest tests/workflows/test_notebook_01_e2e.py -v
+uvx pytest tests/workflows/test_notebook_01_e2e.py -v
 
 # Full workflow
-E2E_TEST_SCOPE=full pytest tests/workflows/test_notebook_01_e2e.py -v
+E2E_TEST_SCOPE=full uvx pytest tests/workflows/test_notebook_01_e2e.py -v
 
 # Real training execution (slower)
-E2E_USE_REAL_TRAINING=true pytest tests/workflows/test_notebook_01_e2e.py -v
+E2E_USE_REAL_TRAINING=true uvx pytest tests/workflows/test_notebook_01_e2e.py -v
 ```
 
 **What it tests:**
@@ -155,7 +155,7 @@ Tests the complete workflow from `02_best_config_selection.ipynb`:
 
 ```bash
 # Default: CI-compatible mode (mocked training)
-pytest tests/workflows/test_notebook_02_e2e.py -v
+uvx pytest tests/workflows/test_notebook_02_e2e.py -v
 ```
 
 **What it tests:**
@@ -172,10 +172,10 @@ Tests the complete workflow from notebook 01 through notebook 02:
 
 ```bash
 # Default: CI-compatible mode (mocked training)
-pytest tests/workflows/test_full_workflow_e2e.py -v
+uvx pytest tests/workflows/test_full_workflow_e2e.py -v
 
 # Real training execution (slower)
-E2E_USE_REAL_TRAINING=true pytest tests/workflows/test_full_workflow_e2e.py -v
+E2E_USE_REAL_TRAINING=true uvx pytest tests/workflows/test_full_workflow_e2e.py -v
 ```
 
 **What it tests:**
@@ -190,28 +190,28 @@ Tests are organized by feature. Run tests for a specific feature:
 
 ```bash
 # HPO tests
-pytest tests/hpo/ -v
+uvx pytest tests/hpo/ -v
 
 # Benchmarking tests
-pytest tests/benchmarking/ -v
+uvx pytest tests/benchmarking/ -v
 
 # Selection tests
-pytest tests/selection/ -v
+uvx pytest tests/selection/ -v
 
 # Final training tests
-pytest tests/final_training/ -v
+uvx pytest tests/final_training/ -v
 
 # Conversion tests
-pytest tests/conversion/ -v
+uvx pytest tests/conversion/ -v
 
 # Tracking tests
-pytest tests/tracking/ -v
+uvx pytest tests/tracking/ -v
 
 # Azure ML artifact upload tests (unit tests)
-pytest tests/tracking/unit/test_azureml_artifact_upload.py -v
+uvx pytest tests/tracking/unit/test_azureml_artifact_upload.py -v
 
 # Azure ML artifact upload integration tests (requires Azure ML)
-pytest tests/tracking/integration/test_azureml_artifact_upload_integration.py -v --run-azureml-tests
+uvx pytest tests/tracking/integration/test_azureml_artifact_upload_integration.py -v --run-azureml-tests
 
 # Verify artifact upload fixes are in place
 python tests/tracking/scripts/verify_artifact_upload_fix.py
@@ -220,29 +220,29 @@ python tests/tracking/scripts/verify_artifact_upload_fix.py
 python tests/tracking/scripts/test_artifact_upload_manual.py
 
 # Config tests
-pytest tests/config/ -v
+uvx pytest tests/config/ -v
 ```
 
 ### Training Tests
 
 ```bash
 # Run all training tests
-pytest tests/training/ -v
+uvx pytest tests/training/ -v
 
 # Run specific tests
-pytest tests/training/test_checkpoint_loader.py -v
-pytest tests/training/test_data_combiner.py -v
-pytest tests/training/test_trainer.py -v
+uvx pytest tests/training/test_checkpoint_loader.py -v
+uvx pytest tests/training/test_data_combiner.py -v
+uvx pytest tests/training/test_trainer.py -v
 ```
 
 ### API Tests
 
 ```bash
 # Run all API tests
-pytest tests/api/ -v
+uvx pytest tests/api/ -v
 
 # Run with coverage
-pytest tests/ --cov=src --cov-report=html
+uvx pytest tests/ --cov=src --cov-report=html
 ```
 
 ### Shared Fixtures
@@ -268,10 +268,10 @@ Tests for Azure ML artifact upload fixes, including monkey-patch for compatibili
 
 ```bash
 # Run all unit tests (9 tests, all passing)
-pytest tests/tracking/unit/test_azureml_artifact_upload.py -v
+uvx pytest tests/tracking/unit/test_azureml_artifact_upload.py -v
 
 # Run specific test class
-pytest tests/tracking/unit/test_azureml_artifact_upload.py::TestAzureMLArtifactBuilderPatch -v
+uvx pytest tests/tracking/unit/test_azureml_artifact_upload.py::TestAzureMLArtifactBuilderPatch -v
 
 # Verify fixes are in place (quick check)
 python tests/tracking/scripts/verify_artifact_upload_fix.py

@@ -142,8 +142,8 @@ def setup_mlflow(
                 )
                 # Try to get experiment without creating it
                 try:
-                    from mlflow.tracking import MlflowClient
-                    client = MlflowClient(tracking_uri=tracking_uri)
+                    from infrastructure.tracking.mlflow.client import create_mlflow_client
+                    client = create_mlflow_client(tracking_uri=tracking_uri)
                     client.get_experiment_by_name(experiment_name)
                 except Exception:
                     # If we can't get experiment, log warning but continue

@@ -523,40 +523,34 @@ class TestSweepTrackerBestTrialSearch:
 
 
 class TestSweepTrackerTrialNumberExtraction:
-    """Test _extract_trial_number method."""
+    """Test extract_trial_number function."""
 
     def test_extract_trial_number_from_tag(self):
         """Test extracting trial number from trial_number tag."""
-        tracker = MLflowSweepTracker(experiment_name="test")
-        
         mock_run = MagicMock()
         mock_run.data.tags.get.side_effect = lambda key: {
             "trial_number": "5",
         }.get(key)
         
-        result = tracker._extract_trial_number(mock_run)
+        result = extract_trial_number(mock_run)
         assert result == 5
 
     def test_extract_trial_number_from_run_name(self):
         """Test extracting trial number from run name when tag not available."""
-        tracker = MLflowSweepTracker(experiment_name="test")
-        
         mock_run = MagicMock()
         mock_run.data.tags.get.return_value = None  # No trial_number tag
         mock_run.info.run_name = "trial_3_something"
         
-        result = tracker._extract_trial_number(mock_run)
+        result = extract_trial_number(mock_run)
         assert result == 3
 
     def test_extract_trial_number_returns_none_when_not_found(self):
         """Test that None is returned when trial number cannot be extracted."""
-        tracker = MLflowSweepTracker(experiment_name="test")
-        
         mock_run = MagicMock()
         mock_run.data.tags.get.return_value = None
         mock_run.info.run_name = "some_other_run_name"
         
-        result = tracker._extract_trial_number(mock_run)
+        result = extract_trial_number(mock_run)
         assert result is None
 
 
