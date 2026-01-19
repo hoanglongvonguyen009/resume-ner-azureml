@@ -8,8 +8,6 @@ This notebook tests the Resume NER API with actual test files and visualizes ext
 
 ### 1. Find Models
 
-**Option A: Using find commands (Simplest)**
-
 ```bash
 # Find latest ONNX model
 ONNX_MODEL=$(find outputs/conversion -name "model.onnx" -type f | head -1)
@@ -21,17 +19,10 @@ CHECKPOINT_DIR=$(find outputs/final_training -path "*${SPEC_HASH}*/checkpoint" -
 echo "Checkpoint: $CHECKPOINT_DIR"
 ```
 
-**Option B: Using Python (in notebook)**
-
-After running the setup cell in the notebook:
-
-```python
-find_and_display_models(verbose=True)  # Shows available models
-```
-
 ### 2. Start Server
 
 **Prerequisites:** Ensure dependencies are installed:
+
 ```bash
 pip install python-multipart  # Required for file upload endpoints
 ```
@@ -52,6 +43,7 @@ python -m src.deployment.api.cli.run_api \
 ```
 
 **Note:** If `conda activate` doesn't work in your shell, use:
+
 ```bash
 source $(conda info --base)/etc/profile.d/conda.sh
 conda activate resume-ner-training

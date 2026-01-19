@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: resume-ner-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount outputs directory for models and checkpoints
+      - ./outputs:/app/outputs
+      # Optional: Mount source for development (comment out for production)
+      # - ./src:/app/src
+      # - ./config:/app/config
+    environment:
+      - PYTHONPATH=/app/src:/app
+      - OCR_EXTRACTOR=easyocr
+      - PDF_EXTRACTOR=pymupdf
+    # Override command with your model paths
+    # Find models using: find outputs/conversion -name "model.onnx" -type f | head -1
+    command: >
+      conda run -n resume-ner-training python -m src.deployment.api.cli.run_api
+      --onnx-model /app/outputs/conversion/local/<model_path>/model.onnx
+      --checkpoint /app/outputs/final_training/local/<checkpoint_path>/checkpoint
+      --host 0.0.0.0
+      --port 8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
