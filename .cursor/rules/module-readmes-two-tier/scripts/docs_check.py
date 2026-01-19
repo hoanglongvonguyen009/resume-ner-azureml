@@ -51,6 +51,25 @@ def run_docs_check(diff_range: str) -> int:
         print("  uvx python .cursor/rules/module-readmes-two-tier/scripts/docs_update.py --diff <range>")
         return 1
 
+    # Link check: validate relative links inside module READMEs and the curated template.
+    try:
+        from .check_markdown_links import find_broken_links  # type: ignore[attr-defined]
+    except ImportError:
+        scripts_dir = Path(__file__).resolve().parent
+        if str(scripts_dir) not in sys.path:
+            sys.path.insert(0, str(scripts_dir))
+        from check_markdown_links import find_broken_links  # type: ignore[attr-defined,no-redef]
+
+    # Only scan `src/**/README.md` for link drift in CI.
+    broken_links = find_broken_links([repo_root / "src"])
+    if broken_links:
+        print("Broken relative markdown links detected:")
+        for item in broken_links:
+            print(f"- source: {item.source_file}")
+            print(f"  target: {item.target}")
+            print(f"  resolved: {item.resolved_path}")
+        return 1
+
     return 0
 
 

@@ -32,6 +32,15 @@ def collect_module_evidence(module_path: Path) -> Dict[str, object]:
     if module_path.is_dir():
         for path in sorted(module_path.rglob("*")):
             if path.is_file():
+                # Skip obvious generated artifacts to keep output deterministic and low-noise.
+                if "__pycache__" in path.parts:
+                    continue
+                if path.suffix == ".pyc":
+                    continue
+                if path.name == ".DS_Store":
+                    continue
+                if ".ipynb_checkpoints" in path.parts:
+                    continue
                 # Store paths relative to the repo root `src/` parent for stability.
                 try:
                     rel = path.relative_to(src_dir.parent)

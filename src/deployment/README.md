@@ -45,6 +45,54 @@ This module enables production deployment of trained models by converting them t
 - **Model loading**: Lazy loading of ONNX models and tokenizers
 
 ## Module Structure
+<!-- AUTO-GENERATED:START -->
+### Auto-generated overview for `deployment`
+
+This section is generated from repository structure. Do not edit manually.
+
+#### Files
+- `src/deployment/README.md`
+- `src/deployment/__init__.py`
+- `src/deployment/api/README.md`
+- `src/deployment/api/__init__.py`
+- `src/deployment/api/app.py`
+- `src/deployment/api/cli/__init__.py`
+- `src/deployment/api/cli/run_api.py`
+- `src/deployment/api/config.py`
+- `src/deployment/api/entities.py`
+- `src/deployment/api/exception_handlers.py`
+- `src/deployment/api/exceptions.py`
+- `src/deployment/api/extractors.py`
+- `src/deployment/api/inference.py`
+- `src/deployment/api/inference/__init__.py`
+- `src/deployment/api/inference/decoder.py`
+- `src/deployment/api/inference/engine.py`
+- `src/deployment/api/middleware.py`
+- `src/deployment/api/model_loader.py`
+- `src/deployment/api/models.py`
+- `src/deployment/api/response_converters.py`
+- `src/deployment/api/routes/__init__.py`
+- `src/deployment/api/routes/health.py`
+- `src/deployment/api/routes/predictions.py`
+- `src/deployment/api/startup.py`
+- `src/deployment/api/tools/README.md`
+- `src/deployment/api/tools/__init__.py`
+- `src/deployment/api/tools/model_diagnostics.py`
+- `src/deployment/api/tools/model_finder.py`
+- `src/deployment/api/tools/notebook_config.py`
+- `src/deployment/api/tools/notebook_helpers.py`
+- `src/deployment/api/tools/server_launcher.py`
+- `src/deployment/conversion/README.md`
+- `src/deployment/conversion/__init__.py`
+- `src/deployment/conversion/azureml.py`
+- `src/deployment/conversion/azureml/__init__.py`
+- `src/deployment/conversion/azureml/jobs.py`
+- `src/deployment/conversion/cli.py`
+- `src/deployment/conversion/execution.py`
+- `src/deployment/conversion/export.py`
+- `src/deployment/conversion/orchestration.py`
+- `src/deployment/conversion/testing.py`
+<!-- AUTO-GENERATED:END -->
 
 This module is organized into the following submodules:
 
