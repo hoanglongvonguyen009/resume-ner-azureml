@@ -153,3 +153,4 @@ def display_entities(
             )
         print(f"\nContext: {highlighted_text}")
 
+

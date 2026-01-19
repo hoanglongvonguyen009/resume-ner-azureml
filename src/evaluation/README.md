@@ -184,5 +184,4 @@ uvx pytest tests/evaluation/
 - [`benchmarking/README.md`](benchmarking/README.md) - Benchmarking utilities
 - [`../training/README.md`](../training/README.md) - Training and HPO
 - [`../infrastructure/README.md`](../infrastructure/README.md) - Infrastructure layer
-- [`../benchmarking/README.md`](../benchmarking/README.md) - Standalone benchmarking module
 

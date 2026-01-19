@@ -216,5 +216,5 @@ uvx pytest tests/data/
 
 - [`../training/README.md`](../training/README.md) - Training workflows use data loaders
 - [`../testing/README.md`](../testing/README.md) - Testing uses data loaders for validation
-- [`../benchmarking/README.md`](../benchmarking/README.md) - Benchmarking uses test data loaders
+- [`../evaluation/benchmarking/README.md`](../evaluation/benchmarking/README.md) - Benchmarking uses test data loaders
 

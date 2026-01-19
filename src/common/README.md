@@ -44,6 +44,38 @@ These utilities are used extensively across training, evaluation, infrastructure
 
 ## Module Structure
 
+<!-- AUTO-GENERATED:START -->
+
+```text
+src/common/
+  __init__.py
+  README.md
+  types.py
+  constants/
+    __init__.py
+    mlflow.py
+    orchestration.py
+  shared/
+    __init__.py
+    argument_parsing.py
+    cli_utils.py
+    dict_utils.py
+    file_utils.py
+    hash_utils.py
+    json_cache.py
+    logging_utils.py
+    metrics_utils.py
+    mlflow_setup.py
+    notebook_setup.py
+    performance.py
+    platform_detection.py
+    script_setup.py
+    tokenization_utils.py
+    yaml_utils.py
+```
+
+<!-- AUTO-GENERATED:END -->
+
 - `shared/`: Shared utility functions
   - `logging_utils.py`: Logger configuration
   - `hash_utils.py`: Hash computation
@@ -258,3 +290,24 @@ uvx pytest tests/common/
 - [`../core/README.md`](../core/README.md) - Core utilities (no dependencies, used by infrastructure)
 - [`../infrastructure/README.md`](../infrastructure/README.md) - Infrastructure layer uses common utilities
 - [`../training/README.md`](../training/README.md) - Training workflows use common utilities
+
+## Module READMEs Two-Tier Rule (Docs tooling)
+
+This repository uses a **two-tier module README rule** managed under `.cursor/rules/module-readmes-two-tier.mdc`:
+
+- A **generated tier** (between `<!-- AUTO-GENERATED:START -->` / `<!-- AUTO-GENERATED:END -->`) is updated by rule-local scripts.
+- A **curated tier** (everything else) is maintained manually and is never auto-overwritten by default.
+
+To update module READMEs locally based on `git diff`:
+
+```bash
+uvx python .cursor/rules/module-readmes-two-tier/scripts/docs_update.py --diff HEAD~1..HEAD
+```
+
+In CI, the `docs-check` workflow runs:
+
+```bash
+uvx python .cursor/rules/module-readmes-two-tier/scripts/docs_check.py --diff origin/main...HEAD
+```
+
+and will fail if module READMEs are out of date relative to code changes.
