@@ -199,10 +199,6 @@ Comprehensive module documentation is available in the **Module Documentation In
 
 - [`docs/modules/INDEX.md`](docs/modules/INDEX.md)
 
-Each module README follows the shared documentation standards in:
-
-- [`docs/templates/TEMPLATE-documentation_standards.md`](docs/templates/TEMPLATE-documentation_standards.md)
-
 Module READMEs include:
 
 - TL;DR / Quick Start
@@ -212,8 +208,3 @@ Module READMEs include:
 - Integration points
 - Related modules
 
-## Getting Help
-
-- **Module documentation**: See [`docs/modules/INDEX.md`](docs/modules/INDEX.md)
-- **Implementation plans**: See [`docs/implementation_plans/`](docs/implementation_plans/)
-- **Documentation standards**: See [`docs/templates/TEMPLATE-documentation_standards.md`](docs/templates/TEMPLATE-documentation_standards.md)
